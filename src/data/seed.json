@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "lastPersistedAt": null,
+  "projects": [
+    {
+      "id": "proj-001",
+      "pid": "P1040",
+      "accountName": "Agency Alpha",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-06-15",
+      "progressStatus": "IN_PROGRESS",
+      "dealOwner": "Jordan Lee",
+      "opportunityName": "OPP-2026-0140",
+      "canceledAt": null,
+      "createdAt": "2026-05-01T10:00:00.000Z",
+      "updatedAt": "2026-05-20T14:30:00.000Z"
+    },
+    {
+      "id": "proj-002",
+      "pid": "P1041",
+      "accountName": "Bureau Beta",
+      "mainType": "POC",
+      "subType": "NONE",
+      "deliveryDate": "2026-05-28",
+      "progressStatus": "OPEN",
+      "dealOwner": "Sam Rivera",
+      "opportunityName": "OPP-2026-0141",
+      "canceledAt": null,
+      "createdAt": "2026-05-05T09:00:00.000Z",
+      "updatedAt": "2026-05-18T11:00:00.000Z"
+    },
+    {
+      "id": "proj-003",
+      "pid": "P1042",
+      "accountName": "Corp Gamma",
+      "mainType": "RENEWAL",
+      "subType": "STANDARD",
+      "deliveryDate": "2026-07-01",
+      "progressStatus": "OPEN",
+      "dealOwner": "Alex Morgan",
+      "opportunityName": "OPP-2026-0142",
+      "canceledAt": null,
+      "createdAt": "2026-05-10T08:00:00.000Z",
+      "updatedAt": "2026-05-10T08:00:00.000Z"
+    }
+  ],
+  "systems": [
+    {
+      "id": "sys-001",
+      "sid": "S1048",
+      "machineId": null,
+      "systemClass": "CUSTOMER",
+      "purpose": "CUSTOMER",
+      "availability": "OCCUPIED",
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "timeGroup": "EMEA",
+      "operationalStatus": "Active",
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "updatedAt": "2026-05-15T10:00:00.000Z"
+    },
+    {
+      "id": "sys-002",
+      "sid": "S1049",
+      "machineId": null,
+      "systemClass": "CUSTOMER",
+      "purpose": "CUSTOMER",
+      "availability": "OCCUPIED",
+      "productType": "Tangles",
+      "hostingType": "On prem",
+      "timeGroup": "AMER",
+      "operationalStatus": "Active",
+      "createdAt": "2026-04-10T10:00:00.000Z",
+      "updatedAt": "2026-05-12T10:00:00.000Z"
+    },
+    {
+      "id": "sys-003",
+      "sid": null,
+      "machineId": "p202",
+      "systemClass": "POC_DEMO_TRAINING",
+      "purpose": "AVAILABLE",
+      "availability": "AVAILABLE",
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "timeGroup": "EMEA",
+      "operationalStatus": "Available",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "updatedAt": "2026-05-01T10:00:00.000Z"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "ten-001",
+      "tid": "T1200",
+      "systemId": "sys-001",
+      "tenantType": "CUSTOMER",
+      "accountName": "Agency Alpha",
+      "country": "Germany",
+      "timeGroup": "EMEA",
+      "operationalStatus": "Live",
+      "productType": "Tangles",
+      "warrantyStatus": "VALID",
+      "warrantyEndDate": "2027-03-31",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-05-02T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ten-002",
+      "tid": "T1201",
+      "systemId": "sys-001",
+      "tenantType": "CUSTOMER",
+      "accountName": "Agency Alpha — Unit B",
+      "country": "France",
+      "timeGroup": "EMEA",
+      "operationalStatus": "Live",
+      "productType": "Tangles",
+      "warrantyStatus": "PENDING",
+      "warrantyEndDate": "2026-08-15",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-05-10T10:00:00.000Z",
+      "updatedAt": "2026-05-18T10:00:00.000Z"
+    },
+    {
+      "id": "ten-003",
+      "tid": "T1202",
+      "systemId": "sys-002",
+      "tenantType": "POC",
+      "accountName": "Bureau Beta",
+      "country": "USA",
+      "timeGroup": "AMER",
+      "operationalStatus": "Within POC period",
+      "productType": "Tangles",
+      "warrantyStatus": "NOT_SET",
+      "warrantyEndDate": null,
+      "pocStartDate": "2026-05-12",
+      "pocEndDate": "2026-06-12",
+      "createdAt": "2026-05-12T10:00:00.000Z",
+      "updatedAt": "2026-05-12T10:00:00.000Z"
+    }
+  ],
+  "projectSystems": [
+    {
+      "id": "ps-001",
+      "projectId": "proj-001",
+      "systemId": "sys-001",
+      "allocatedAt": "2026-05-08T10:00:00.000Z"
+    },
+    {
+      "id": "ps-002",
+      "projectId": "proj-002",
+      "systemId": "sys-002",
+      "allocatedAt": "2026-05-14T10:00:00.000Z"
+    }
+  ],
+  "projectTenants": [
+    {
+      "id": "pt-001",
+      "projectId": "proj-001",
+      "tenantId": "ten-001"
+    },
+    {
+      "id": "pt-002",
+      "projectId": "proj-001",
+      "tenantId": "ten-002"
+    },
+    {
+      "id": "pt-003",
+      "projectId": "proj-002",
+      "tenantId": "ten-003"
+    }
+  ]
+}
