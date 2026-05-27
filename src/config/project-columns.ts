@@ -1,11 +1,34 @@
-/**
- * Project list column definitions — wired in Phase B (TanStack Table).
- */
-export const projectListColumns = [
-  { id: 'pid', label: 'PID', editable: false },
-  { id: 'accountName', label: 'Account', editable: false },
-  { id: 'mainType', label: 'Type', editable: false },
-  { id: 'deliveryDate', label: 'Delivery date', editable: true },
-  { id: 'progressStatus', label: 'Progress', editable: true },
-  { id: 'dealOwner', label: 'Deal owner', editable: true },
-] as const
+import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import type { Project } from '@/data/seed.types'
+
+export const projectListColumns: DashboardColumn<Project>[] = [
+  { id: 'pid', label: 'PID#', getValue: (r) => r.pid },
+  { id: 'projectName', label: 'Project Name', getValue: (r) => r.opportunityName, editable: true, editKey: 'opportunityName' },
+  { id: 'endUser', label: 'End User', getValue: (r) => r.accountName, editable: true, editKey: 'accountName' },
+  { id: 'payingCustomer', label: 'Paying Paying customer', getValue: (r) => r.accountName },
+  { id: 'region', label: 'Region', getValue: () => '' },
+  { id: 'country', label: 'Country', getValue: () => '' },
+  { id: 'status', label: 'Status', getValue: (r) => r.progressStatus, editable: true, editKey: 'progressStatus', options: ['OPEN', 'IN_PROGRESS', 'DONE'] },
+  { id: 'deliveryDate', label: 'Delivery Date', getValue: (r) => r.deliveryDate ?? '', editable: true, editKey: 'deliveryDate' },
+  { id: 'deliveryDurationDays', label: 'Delivery Duration (Days)', getValue: () => '' },
+  { id: 'pocStartDate', label: 'POC Start Date', getValue: () => '' },
+  { id: 'pocEndDate', label: 'POC End Date', getValue: () => '' },
+  { id: 'completionDate', label: 'Completion Date', getValue: () => '' },
+  { id: 'brand', label: 'Brand', getValue: () => '' },
+  { id: 'type', label: 'Type', getValue: (r) => r.mainType, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
+  { id: 'hosting', label: 'Hosting', getValue: () => '' },
+  { id: 'systems', label: 'Systems', getValue: () => '' },
+  { id: 'modules', label: 'Modules', getValue: () => '' },
+  { id: 'licenses', label: 'Licenses', getValue: () => '' },
+  { id: 'users', label: 'Users', getValue: () => '' },
+  { id: 'projectAlerts', label: 'Project Alerts', getValue: () => '' },
+  { id: 'percent', label: '%', getValue: () => '' },
+  { id: 'milestonesCompletion', label: 'Milestones Completion', getValue: () => '' },
+  { id: 'lastMilestone', label: 'Last Milestone', getValue: () => '' },
+  { id: 'financialProfile', label: 'Financial Profile', getValue: () => '' },
+  { id: 'directChannel', label: 'Direct/Channel', getValue: () => '' },
+  { id: 'currentMilestone', label: 'Current Milestone', getValue: () => '' },
+  { id: 'owner', label: 'Owner', getValue: (r) => r.dealOwner, editable: true, editKey: 'dealOwner' },
+  { id: 'sales', label: 'Sales', getValue: () => '' },
+  { id: 'finance', label: 'Finance', getValue: () => '' },
+]

@@ -1,39 +1,42 @@
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { PlaceholderCard, LinkId } from '@/components/ui'
+import { systemListColumns } from '@/config/system-columns'
 
 export function SystemListPage() {
-  const systems = useAppStore((s) => s.systems)
+const navigate = useNavigate()
+const systems = useAppStore((s) => s.systems)
+const updateSystem = useAppStore((s) => s.updateSystem)
+const createSystem = useAppStore((s) => s.createSystem)
 
-  return (
-    <div>
-      <PageHeader
-        title="Systems"
-        subtitle="Customer and POC systems — list dashboard (Phase B)"
-      />
+return (
+<div>
+<PageHeader title="Systems" subtitle="Customer and POC systems" />
 
-      <DataDashboard title="System list" recordCount={systems.length}>
-        <PlaceholderCard title="Preview">
-          <ul className="divide-y divide-sf-border text-sm">
-            {systems.map((s) => (
-              <li key={s.id} className="flex items-center justify-between py-2">
-                {s.sid ? (
-                  <LinkId to={`/systems/${s.sid}`}>{s.sid}</LinkId>
-                ) : s.machineId ? (
-                  <LinkId to={`/systems/${s.machineId}`}>
-                    {`MID ${s.machineId}`}
-                  </LinkId>
-                ) : (
-                  <span className="text-sf-text-muted">—</span>
-                )}
-                <span className="text-sf-text-muted">{s.systemClass}</span>
-                <span className="text-xs">{s.purpose}</span>
-              </li>
-            ))}
-          </ul>
-        </PlaceholderCard>
-      </DataDashboard>
-    </div>
-  )
+  <DataDashboard
+    title="System list"
+    rows={systems}
+    columns={systemListColumns}
+    toolbar={
+      <button
+        type="button"
+        className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+        onClick={() => {
+          const system = createSystem()
+          navigate(`/systems/${system.sid ?? system.machineId}`)
+        }}
+      >
+        + New System
+      </button>
+    }
+    onEdit={(row, columnId, value) => {
+      const column = systemListColumns.find((col) => col.id === columnId)
+      if (!column?.editKey) return
+      updateSystem(row.id, { [column.editKey]: value } as never)
+    }}
+    onRowClick={(row) => navigate(`/systems/${row.sid ?? row.machineId}`)}
+  />
+</div>
+)
 }
