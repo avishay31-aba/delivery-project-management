@@ -1,36 +1,42 @@
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { PlaceholderCard, LinkId } from '@/components/ui'
+import { projectListColumns } from '@/config/project-columns'
 
 export function ProjectListPage() {
-  const projects = useAppStore((s) => s.projects)
+const navigate = useNavigate()
+const projects = useAppStore((s) => s.projects)
+const updateProject = useAppStore((s) => s.updateProject)
+const createProject = useAppStore((s) => s.createProject)
 
-  return (
-    <div>
-      <PageHeader
-        title="Projects"
-        subtitle="Delivery specialist desktop — list dashboard (Phase B: TanStack Table + inline edit)"
-      />
+return (
+<div>
+<PageHeader title="Projects" subtitle="Delivery specialist desktop" />
 
-      <DataDashboard title="Project list" recordCount={projects.length}>
-        <PlaceholderCard
-          title="Preview"
-          description="Seed data loaded from store. Full table coming in Phase B."
-        >
-          <ul className="divide-y divide-sf-border text-sm">
-            {projects.map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-2">
-                <LinkId to={`/projects/${p.pid}`}>{p.pid}</LinkId>
-                <span className="text-sf-text-muted">{p.accountName}</span>
-                <span className="text-xs text-sf-text-muted">
-                  {p.mainType} / {p.subType}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </PlaceholderCard>
-      </DataDashboard>
-    </div>
-  )
+  <DataDashboard
+    title="Project list"
+    rows={projects}
+    columns={projectListColumns}
+    toolbar={
+      <button
+        type="button"
+        className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+        onClick={() => {
+          const project = createProject()
+          navigate(`/projects/${project.pid}`)
+        }}
+      >
+        + New Project
+      </button>
+    }
+    onEdit={(row, columnId, value) => {
+      const column = projectListColumns.find((col) => col.id === columnId)
+      if (!column?.editKey) return
+      updateProject(row.id, { [column.editKey]: value } as never)
+    }}
+    onRowClick={(row) => navigate(`/projects/${row.pid}`)}
+  />
+</div>
+)
 }

@@ -1,11 +1,47 @@
-/**
- * System list column definitions — wired in Phase B.
- */
-export const systemListColumns = [
-  { id: 'sid', label: 'SID', editable: false },
-  { id: 'machineId', label: 'MID', editable: false },
-  { id: 'systemClass', label: 'Class', editable: false },
-  { id: 'purpose', label: 'Purpose', editable: true },
-  { id: 'availability', label: 'Availability', editable: true },
-  { id: 'operationalStatus', label: 'Status', editable: true },
-] as const
+import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import type { System } from '@/data/seed.types'
+
+export const systemListColumns: DashboardColumn<System>[] = [
+{ id: 'sid', label: 'SID#', getValue: (r) => r.sid ?? r.machineId ?? '' },
+{ id: 'pocDeliveryPid', label: 'POC/Delivery PID#', getValue: () => '' },
+{ id: 'projectType', label: 'Project Type', getValue: () => '' },
+{ id: 'renewalPid', label: 'Renewal PID#', getValue: () => '' },
+{ id: 'aboutService', label: 'About Service', getValue: () => '' },
+{ id: 'systemStatusRaw', label: 'System Status', getValue: (r) => r.operationalStatus, editable: true, editKey: 'operationalStatus' },
+{ id: 'performanceTier', label: 'Performance Tier', getValue: () => '' },
+{ id: 'owner', label: 'Owner', getValue: () => '' },
+{ id: 'systemStatusVisual', label: 'System Status (visual)', getValue: (r) => r.operationalStatus },
+{ id: 'region', label: 'Region', getValue: (r) => r.timeGroup },
+{ id: 'projectName', label: 'Project Name', getValue: () => '' },
+{ id: 'country', label: 'Country', getValue: () => '' },
+{ id: 'state', label: 'State', getValue: () => '' },
+{ id: 'endUser', label: 'End User', getValue: () => '' },
+{ id: 'system', label: 'System', getValue: (r) => r.productType },
+{ id: 'systemUrl', label: 'System URL (text)', getValue: () => '' },
+{ id: 'modulesRaw', label: 'Modules', getValue: () => '' },
+{ id: 'cloudRegion', label: 'Cloud Region', getValue: () => '' },
+{ id: 'hosting', label: 'Hosting', getValue: (r) => r.hostingType, editable: true, editKey: 'hostingType' },
+{ id: 'cloudEnvironment', label: 'Cloud Environment', getValue: () => '' },
+{ id: 'csp', label: 'CSP', getValue: () => '' },
+{ id: 'saasRegion', label: 'SaaS Region', getValue: () => '' },
+{ id: 'product', label: 'Product', getValue: (r) => r.productType, editable: true, editKey: 'productType' },
+{ id: 'modulesProduct', label: 'Modules (product)', getValue: () => '' },
+{ id: 'aiFeatures', label: 'AI Features', getValue: () => '' },
+{ id: 'additionalFeatures', label: 'Additional Features', getValue: () => '' },
+{ id: 'brand', label: 'Brand', getValue: () => '' },
+{ id: 'servers', label: 'No. of Servers', getValue: () => '' },
+{ id: 'licenses', label: 'No. of Licenses (Concurrent Login)', getValue: () => '' },
+{ id: 'users', label: 'No. of Users (Named)', getValue: () => '' },
+{ id: 'searches', label: 'Searches - Concurrent', getValue: () => '' },
+{ id: 'analyses', label: 'Analyses - Concurrent', getValue: () => '' },
+{ id: 'standardMonitors', label: 'No. of standard Monitors', getValue: () => '' },
+{ id: 'fullMonitors', label: 'No. of full Monitors', getValue: () => '' },
+{ id: 'topicMonitors', label: 'No. of Topic Monitors', getValue: () => '' },
+{ id: 'mediaProxy', label: 'Media Proxy', getValue: () => '' },
+{ id: 'currentVersion', label: 'Current Version', getValue: () => '' },
+{ id: 'lastVersionUpdate', label: 'Last Version Update', getValue: () => '' },
+{ id: 'systemAlerts', label: 'System Alerts', getValue: () => '' },
+{ id: 'systemDeliveryDate', label: 'System Delivery Date', getValue: () => '' },
+{ id: 'projectStatus', label: 'Project Status', getValue: () => '' },
+{ id: 'customer', label: 'Custmoer', getValue: () => '' },
+]
