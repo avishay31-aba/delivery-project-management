@@ -7,7 +7,6 @@ import { projectListColumns } from '@/config/project-columns'
 export function ProjectListPage() {
 const navigate = useNavigate()
 const projects = useAppStore((s) => s.projects)
-const updateProject = useAppStore((s) => s.updateProject)
 const createProject = useAppStore((s) => s.createProject)
 
 return (
@@ -30,11 +29,11 @@ return (
         + New Project
       </button>
     }
-    onEdit={(row, columnId, value) => {
-      const column = projectListColumns.find((col) => col.id === columnId)
-      if (!column?.editKey) return
-      updateProject(row.id, { [column.editKey]: value } as never)
-    }}
+    getRowClassName={(row) =>
+      row.progressStatus === 'DONE'
+        ? 'bg-blue-50 hover:bg-blue-100'
+        : 'bg-green-50 hover:bg-green-100'
+    }
     onRowClick={(row) => navigate(`/projects/${row.pid}`)}
   />
 </div>

@@ -1,14 +1,22 @@
 import type { AppDataState } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
+import { normalizeIdCounters } from '@/data/id-generator'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
+function normalizeState(state: AppDataState): AppDataState {
+  return {
+    ...state,
+    idCounters: normalizeIdCounters(state.idCounters, state),
+  }
+}
+
 /** Default state loaded from seed file */
 export function createInitialState(): AppDataState {
-  return {
+  return normalizeState({
     ...(seedJson as AppDataState),
     lastPersistedAt: null,
-  }
+  })
 }
 
 export function loadPersistedState(): AppDataState | null {
@@ -20,17 +28,17 @@ export function loadPersistedState(): AppDataState | null {
     if (typeof parsed.version !== 'number' || !Array.isArray(parsed.projects)) {
       return null
     }
-    return parsed
+    return normalizeState(parsed)
   } catch {
     return null
   }
 }
 
 export function persistState(state: AppDataState): void {
-  const payload: AppDataState = {
+  const payload: AppDataState = normalizeState({
     ...state,
     lastPersistedAt: new Date().toISOString(),
-  }
+  })
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
 }
 

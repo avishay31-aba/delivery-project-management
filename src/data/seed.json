@@ -112,7 +112,7 @@
       "tid": "T1201",
       "systemId": "sys-001",
       "tenantType": "CUSTOMER",
-      "accountName": "Agency Alpha — Unit B",
+      "accountName": "Agency Alpha \u2014 Unit B",
       "country": "France",
       "timeGroup": "EMEA",
       "operationalStatus": "Live",
@@ -172,5 +172,11 @@
       "projectId": "proj-002",
       "tenantId": "ten-003"
     }
-  ]
+  ],
+  "idCounters": {
+    "pid": 1042,
+    "sid": 1049,
+    "tid": 1202,
+    "mid": 202
+  }
 }

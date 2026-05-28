@@ -15,6 +15,15 @@ export type SystemPurpose =
 export type AvailabilityStatus = 'AVAILABLE' | 'OCCUPIED' | 'OBSOLETE'
 
 export type TenantType = 'CUSTOMER' | 'POC' | 'PENLINK_INTERNAL'
+export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
+
+export interface IdCounters {
+  pid: number
+  sid: number
+  tid: number
+  mid: number
+}
+
 export type WarrantyStatus =
   | 'NOT_SET'
   | 'PLANNED'
@@ -94,5 +103,6 @@ export interface AppDataState {
   tenants: Tenant[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
+  idCounters: IdCounters
   lastPersistedAt: string | null
 }
