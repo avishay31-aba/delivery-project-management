@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
 flexRender,
@@ -51,6 +51,15 @@ onToggle: () => void
 onClose: () => void
 }
 
+interface FloatingMenuPosition {
+top: number
+left: number
+maxHeight: number
+}
+
+const FLOATING_MENU_VIEWPORT_PADDING = 8
+const FLOATING_MENU_TRIGGER_GAP = 4
+
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
 return classNames.filter(Boolean).join(' ')
 }
@@ -75,7 +84,17 @@ isOpen,
 onToggle,
 onClose,
 }: HeaderMenuProps<T>) {
-const menuRef = useRef<HTMLDivElement>(null)
+const menuWrapperRef = useRef<HTMLDivElement>(null)
+const menuButtonRef = useRef<HTMLButtonElement>(null)
+const menuPanelRef = useRef<HTMLDivElement>(null)
+const [menuPosition, setMenuPosition] = useState<FloatingMenuPosition>(() => ({
+top: FLOATING_MENU_VIEWPORT_PADDING,
+left: FLOATING_MENU_VIEWPORT_PADDING,
+maxHeight:
+typeof window === 'undefined'
+? 0
+: Math.max(0, window.innerHeight - FLOATING_MENU_VIEWPORT_PADDING * 2),
+}))
 const filterOptions = uniqueColumnOptions(rows, sourceColumn)
 const headerLabel = String(column.columnDef.header)
 const isGrouped = grouping.includes(column.id)
@@ -83,6 +102,38 @@ const hiddenColumns = allColumns.filter((tableColumn) => !tableColumn.getIsVisib
 const hiddenColumnCount = hiddenColumns.length
 const [showRestoreColumns, setShowRestoreColumns] = useState(false)
 const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([])
+
+const updateMenuPosition = useCallback(() => {
+const triggerElement = menuButtonRef.current
+const menuElement = menuPanelRef.current
+
+if (!triggerElement || !menuElement) return
+
+const triggerRect = triggerElement.getBoundingClientRect()
+const menuRect = menuElement.getBoundingClientRect()
+const viewportWidth = window.innerWidth
+const viewportHeight = window.innerHeight
+const maxHeight = Math.max(0, viewportHeight - FLOATING_MENU_VIEWPORT_PADDING * 2)
+const menuWidth = menuRect.width
+const menuHeight = Math.min(menuRect.height, maxHeight)
+const spaceBelow = viewportHeight - triggerRect.bottom - FLOATING_MENU_TRIGGER_GAP - FLOATING_MENU_VIEWPORT_PADDING
+const spaceAbove = triggerRect.top - FLOATING_MENU_TRIGGER_GAP - FLOATING_MENU_VIEWPORT_PADDING
+const shouldOpenUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow
+const preferredTop = shouldOpenUpward
+? triggerRect.top - FLOATING_MENU_TRIGGER_GAP - menuHeight
+: triggerRect.bottom + FLOATING_MENU_TRIGGER_GAP
+const top = Math.min(
+Math.max(FLOATING_MENU_VIEWPORT_PADDING, preferredTop),
+Math.max(FLOATING_MENU_VIEWPORT_PADDING, viewportHeight - FLOATING_MENU_VIEWPORT_PADDING - menuHeight),
+)
+const preferredLeft = triggerRect.left
+const left = Math.min(
+Math.max(FLOATING_MENU_VIEWPORT_PADDING, preferredLeft),
+Math.max(FLOATING_MENU_VIEWPORT_PADDING, viewportWidth - FLOATING_MENU_VIEWPORT_PADDING - menuWidth),
+)
+
+setMenuPosition({ top, left, maxHeight })
+}, [])
 
 useEffect(() => {
 if (!isOpen) {
@@ -92,18 +143,34 @@ setSelectedColumnIds([])
 }, [isOpen])
 
 
+useLayoutEffect(() => {
+if (!isOpen) return
+
+updateMenuPosition()
+}, [hiddenColumnCount, isOpen, showRestoreColumns, updateMenuPosition])
+
 useEffect(() => {
 if (!isOpen) return
 
 function handlePointerDown(event: PointerEvent) {
-if (!menuRef.current?.contains(event.target as Node)) {
+if (!menuWrapperRef.current?.contains(event.target as Node)) {
 onClose()
 }
 }
 
+function handleViewportChange() {
+updateMenuPosition()
+}
+
 document.addEventListener('pointerdown', handlePointerDown)
-return () => document.removeEventListener('pointerdown', handlePointerDown)
-}, [isOpen, onClose])
+window.addEventListener('resize', handleViewportChange)
+window.addEventListener('scroll', handleViewportChange, true)
+return () => {
+document.removeEventListener('pointerdown', handlePointerDown)
+window.removeEventListener('resize', handleViewportChange)
+window.removeEventListener('scroll', handleViewportChange, true)
+}
+}, [isOpen, onClose, updateMenuPosition])
 
 function closeAfterAction(action: () => void) {
 action()
@@ -134,8 +201,9 @@ onClose()
 }
 
 return (
-<div ref={menuRef} className="relative inline-block" onClick={(event) => event.stopPropagation()}>
+<div ref={menuWrapperRef} className="relative inline-block" onClick={(event) => event.stopPropagation()}>
 <button
+ref={menuButtonRef}
 className="ml-1 inline-flex cursor-pointer list-none items-center rounded border border-transparent px-1 text-xs text-sf-text-muted hover:border-sf-border hover:bg-white"
 title={`${headerLabel} column menu`}
 type="button"
@@ -145,7 +213,11 @@ onClick={onToggle}
 ▾
 </button>
 {isOpen ? (
-<div className="absolute left-0 z-20 mt-1 w-64 space-y-2 rounded border border-sf-border bg-white p-3 text-sm font-normal text-sf-text shadow-lg">
+<div
+ref={menuPanelRef}
+className="fixed z-20 w-64 space-y-2 overflow-y-auto rounded border border-sf-border bg-white p-3 text-sm font-normal text-sf-text shadow-lg"
+style={{ top: menuPosition.top, left: menuPosition.left, maxHeight: menuPosition.maxHeight }}
+>
 <label className="block space-y-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
 <span>Filter</span>
 <select
