@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
 flexRender,
@@ -45,6 +45,10 @@ sourceColumn?: DashboardColumn<T>
 rows: T[]
 grouping: GroupingState
 setGrouping: (grouping: GroupingState) => void
+setSorting: (sorting: SortingState) => void
+isOpen: boolean
+onToggle: () => void
+onClose: () => void
 }
 
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
@@ -66,83 +70,186 @@ sourceColumn,
 rows,
 grouping,
 setGrouping,
+setSorting,
+isOpen,
+onToggle,
+onClose,
 }: HeaderMenuProps<T>) {
+const menuRef = useRef<HTMLDivElement>(null)
 const filterOptions = uniqueColumnOptions(rows, sourceColumn)
 const headerLabel = String(column.columnDef.header)
 const isGrouped = grouping.includes(column.id)
-const hasHiddenColumns = allColumns.some((tableColumn) => !tableColumn.getIsVisible())
+const hiddenColumns = allColumns.filter((tableColumn) => !tableColumn.getIsVisible())
+const hiddenColumnCount = hiddenColumns.length
+const [showRestoreColumns, setShowRestoreColumns] = useState(false)
+const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([])
+
+useEffect(() => {
+if (!isOpen) {
+setShowRestoreColumns(false)
+setSelectedColumnIds([])
+}
+}, [isOpen])
+
+
+useEffect(() => {
+if (!isOpen) return
+
+function handlePointerDown(event: PointerEvent) {
+if (!menuRef.current?.contains(event.target as Node)) {
+onClose()
+}
+}
+
+document.addEventListener('pointerdown', handlePointerDown)
+return () => document.removeEventListener('pointerdown', handlePointerDown)
+}, [isOpen, onClose])
+
+function closeAfterAction(action: () => void) {
+action()
+onClose()
+}
+
+function toggleSelectedColumn(columnId: string) {
+setSelectedColumnIds((currentSelection) =>
+currentSelection.includes(columnId)
+? currentSelection.filter((selectedColumnId) => selectedColumnId !== columnId)
+: [...currentSelection, columnId],
+)
+}
+
+function restoreSelectedColumns() {
+const selectedColumnIdSet = new Set(selectedColumnIds)
+hiddenColumns.forEach((hiddenColumn) => {
+if (selectedColumnIdSet.has(hiddenColumn.id)) {
+hiddenColumn.toggleVisibility(true)
+}
+})
+onClose()
+}
+
+function restoreAllColumns() {
+hiddenColumns.forEach((hiddenColumn) => hiddenColumn.toggleVisibility(true))
+onClose()
+}
 
 return (
-<details className="group relative inline-block" onClick={(event) => event.stopPropagation()}>
-<summary
+<div ref={menuRef} className="relative inline-block" onClick={(event) => event.stopPropagation()}>
+<button
 className="ml-1 inline-flex cursor-pointer list-none items-center rounded border border-transparent px-1 text-xs text-sf-text-muted hover:border-sf-border hover:bg-white"
 title={`${headerLabel} column menu`}
+type="button"
+aria-expanded={isOpen}
+onClick={onToggle}
 >
 ▾
-</summary>
-<div className="absolute left-0 z-20 mt-1 w-56 space-y-2 rounded border border-sf-border bg-white p-3 text-sm font-normal text-sf-text shadow-lg">
-<div className="space-y-1">
-<button
-type="button"
-className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
-disabled={!column.getCanSort()}
-onClick={() => column.toggleSorting(false)}
->
-Sort A-Z
 </button>
-<button
-type="button"
-className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
-disabled={!column.getCanSort()}
-onClick={() => column.toggleSorting(true)}
+{isOpen ? (
+<div className="absolute left-0 z-20 mt-1 w-64 space-y-2 rounded border border-sf-border bg-white p-3 text-sm font-normal text-sf-text shadow-lg">
+<label className="block space-y-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+<span>Filter</span>
+<select
+className="w-full rounded border border-sf-border px-2 py-1 text-sm font-normal normal-case text-sf-text"
+disabled={!column.getCanFilter()}
+value={(column.getFilterValue() as string) ?? ''}
+onChange={(event) => column.setFilterValue(event.target.value || undefined)}
 >
-Sort Z-A
-</button>
-</div>
-
-    <label className="block space-y-1 border-t border-sf-border pt-2 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
-      <span>Filter</span>
-      <select
-        className="w-full rounded border border-sf-border px-2 py-1 text-sm font-normal normal-case text-sf-text"
-        disabled={!column.getCanFilter()}
-        value={(column.getFilterValue() as string) ?? ''}
-        onChange={(event) => column.setFilterValue(event.target.value || undefined)}
-      >
-        <option value="">All</option>
-        {filterOptions.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
-    </label>
+<option value="">All</option>
+{filterOptions.map((option) => (
+<option key={option} value={option}>{option}</option>
+))}
+</select>
+</label>
 
     <div className="space-y-1 border-t border-sf-border pt-2">
       <button
         type="button"
         className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
         disabled={!column.getCanGroup()}
-        onClick={() => setGrouping(isGrouped ? [] : [column.id])}
+        onClick={() => closeAfterAction(() => {
+          setGrouping([column.id])
+          setSorting([{ id: column.id, desc: false }])
+        })}
       >
-        {isGrouped ? 'Ungroup column' : 'Group by column'}
+        Group ascending
       </button>
       <button
         type="button"
         className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+        disabled={!column.getCanGroup()}
+        onClick={() => closeAfterAction(() => {
+          setGrouping([column.id])
+          setSorting([{ id: column.id, desc: true }])
+        })}
+      >
+        Group descending
+      </button>
+      <button
+        type="button"
+        className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+        disabled={!isGrouped}
+        onClick={() => closeAfterAction(() => setGrouping([]))}
+      >
+        Ungroup
+      </button>
+    </div>
+
+    <div className="space-y-1 border-t border-sf-border pt-2">
+      <button
+        type="button"
+        className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
         disabled={!column.getCanHide()}
-        onClick={() => column.toggleVisibility(false)}
+        onClick={() => closeAfterAction(() => column.toggleVisibility(false))}
       >
         Hide column
       </button>
       <button
         type="button"
         className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
-        disabled={!hasHiddenColumns}
-        onClick={() => allColumns.forEach((tableColumn) => tableColumn.toggleVisibility(true))}
+        disabled={hiddenColumnCount === 0}
+        onClick={() => setShowRestoreColumns((isVisible) => !isVisible)}
       >
-        Show all columns
+        Restore hidden columns{hiddenColumnCount > 0 ? ` (${hiddenColumnCount})` : ''}
       </button>
     </div>
+
+    {showRestoreColumns && hiddenColumnCount > 0 ? (
+      <div className="space-y-2 border-t border-sf-border pt-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-sf-text-muted">Hidden columns</p>
+        <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+          {hiddenColumns.map((hiddenColumn) => (
+            <label key={hiddenColumn.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-sf-surface-alt">
+              <input
+                type="checkbox"
+                checked={selectedColumnIds.includes(hiddenColumn.id)}
+                onChange={() => toggleSelectedColumn(hiddenColumn.id)}
+              />
+              <span>{String(hiddenColumn.columnDef.header)}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded border border-sf-border px-2 py-1 text-xs hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+            disabled={selectedColumnIds.length === 0}
+            onClick={restoreSelectedColumns}
+          >
+            Restore selected
+          </button>
+          <button
+            type="button"
+            className="rounded border border-sf-border px-2 py-1 text-xs hover:bg-sf-surface-alt"
+            onClick={restoreAllColumns}
+          >
+            Restore all
+          </button>
+        </div>
+      </div>
+    ) : null}
   </div>
-</details>
+) : null}
+</div>
 )
 }
 
@@ -162,6 +269,7 @@ const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
 Object.fromEntries(columns.map((c) => [c.id, true])),
 )
+const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null)
 
 const tableColumns = useMemo<ColumnDef<T>[]>(
 () =>
@@ -311,6 +419,10 @@ return (
                           rows={rows}
                           grouping={grouping}
                           setGrouping={setGrouping}
+                          setSorting={setSorting}
+                          isOpen={openMenuColumnId === header.column.id}
+                          onToggle={() => setOpenMenuColumnId((columnId) => columnId === header.column.id ? null : header.column.id)}
+                          onClose={() => setOpenMenuColumnId(null)}
                         />
                       </div>
                     )}
