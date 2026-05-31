@@ -1,9 +1,10 @@
 interface UnsavedChangesDialogProps {
   onDiscardChanges: () => void
   onCancel: () => void
+  onSave?: () => void
 }
 
-export function UnsavedChangesDialog({ onDiscardChanges, onCancel }: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({ onDiscardChanges, onCancel, onSave }: UnsavedChangesDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
       <div
@@ -18,9 +19,10 @@ export function UnsavedChangesDialog({ onDiscardChanges, onCancel }: UnsavedChan
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            className="rounded border border-sf-border px-3 py-1 text-sf-text-muted disabled:cursor-not-allowed"
-            disabled
-            title="Save will be implemented in B.2C.1c"
+            className="rounded border border-sf-border bg-white px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+            disabled={!onSave}
+            title={onSave ? 'Save changes before continuing' : 'Save is not available'}
+            onClick={onSave}
           >
             Save
           </button>

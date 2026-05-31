@@ -14,6 +14,7 @@ export function AppShell() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const pendingNavigation = useUnsavedChangesGuardStore((state) => state.pendingNavigation)
+  const saveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.saveUnsavedDashboardChanges)
   const clearPendingNavigation = useUnsavedChangesGuardStore((state) => state.clearPendingNavigation)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const headerTitle = resolveHeaderTitle(pathname)
@@ -27,10 +28,24 @@ export function AppShell() {
     navigate(targetPath)
   }
 
+  function saveChangesAndNavigate() {
+    if (!pendingNavigation || !saveUnsavedDashboardChanges) return
+
+    const targetPath = pendingNavigation.targetPath
+    saveUnsavedDashboardChanges(() => {
+      clearPendingNavigation()
+      navigate(targetPath)
+    })
+  }
+
   return (
     <div className="flex h-full min-h-screen">
       {pendingNavigation ? (
-        <UnsavedChangesDialog onDiscardChanges={discardChangesAndNavigate} onCancel={clearPendingNavigation} />
+        <UnsavedChangesDialog
+          onSave={saveUnsavedDashboardChanges ? saveChangesAndNavigate : undefined}
+          onDiscardChanges={discardChangesAndNavigate}
+          onCancel={clearPendingNavigation}
+        />
       ) : null}
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">

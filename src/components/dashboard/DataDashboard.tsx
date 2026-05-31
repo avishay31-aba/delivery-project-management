@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, KeyboardEvent, ReactNode } from 'react'
+import type { DragEvent, FormEvent, KeyboardEvent, ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -17,11 +17,16 @@ import {
 } from '@tanstack/react-table'
 import {
   FULL_DASHBOARD_VIEW_ID,
+  addDashboardView,
   areDashboardViewStatesEqual,
   getRuntimeDashboardViews,
+  hasDashboardViewNameConflict,
   loadDashboardViews,
   normalizeDashboardViewState,
+  persistDashboardViews,
   resolveDefaultDashboardViewId,
+  setDefaultDashboardView,
+  updateDashboardView,
   type DashboardViewScope,
   type RuntimeDashboardView,
   type SavedDashboardViewState,
@@ -110,6 +115,188 @@ function moveColumn(
 
   nextColumnOrder.splice(insertionIndex, 0, movedColumnId)
   return nextColumnOrder
+}
+
+
+type SaveDashboardViewOperation = 'update-existing' | 'save-as-new' | 'set-default'
+
+interface SaveDashboardViewDialogProps {
+  selectedView: RuntimeDashboardView
+  isModified: boolean
+  hasNameConflict: (name: string) => boolean
+  onCancel: () => void
+  onSaveAsNew: (name: string, setAsDefault: boolean) => string | null
+  onUpdateExisting: (setAsDefault: boolean) => string | null
+  onSetDefault: () => string | null
+}
+
+function SaveDashboardViewDialog({
+  selectedView,
+  isModified,
+  hasNameConflict,
+  onCancel,
+  onSaveAsNew,
+  onUpdateExisting,
+  onSetDefault,
+}: SaveDashboardViewDialogProps) {
+  const canUpdateExisting = isModified && !selectedView.isFullDashboard
+  const canSaveAsNew = isModified
+  const canSetDefaultOnly = !isModified && !selectedView.isDefault
+  const initialOperation: SaveDashboardViewOperation = canUpdateExisting
+    ? 'update-existing'
+    : canSaveAsNew
+      ? 'save-as-new'
+      : 'set-default'
+  const [operation, setOperation] = useState<SaveDashboardViewOperation>(initialOperation)
+  const [newViewName, setNewViewName] = useState('')
+  const [setAsDefault, setSetAsDefault] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const trimmedNewViewName = newViewName.trim()
+  const isSavingAsNew = operation === 'save-as-new'
+
+  function validateNewViewName(): string | null {
+    if (!trimmedNewViewName) return 'View name is required.'
+    if (hasNameConflict(trimmedNewViewName)) return `A view named "${trimmedNewViewName}" already exists for this dashboard.`
+    return null
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+
+    if (operation === 'set-default') {
+      setError(onSetDefault())
+      return
+    }
+
+    if (operation === 'update-existing') {
+      setError(onUpdateExisting(setAsDefault))
+      return
+    }
+
+    const validationError = validateNewViewName()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
+    setError(onSaveAsNew(trimmedNewViewName, setAsDefault))
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" role="presentation">
+      <form
+        className="w-full max-w-md space-y-4 rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="save-dashboard-view-title"
+        onSubmit={handleSubmit}
+      >
+        <div>
+          <h2 id="save-dashboard-view-title" className="text-base font-semibold">
+            Save dashboard view
+          </h2>
+          <p className="mt-1 text-sf-text-muted">
+            Save the current dashboard configuration for your local dashboard views.
+          </p>
+        </div>
+
+        {selectedView.isFullDashboard && isModified ? (
+          <p className="rounded border border-sf-border bg-sf-surface-alt p-2 text-sf-text-muted">
+            Full Dashboard is protected and cannot be overwritten. Save these changes as a new view instead.
+          </p>
+        ) : null}
+
+        <div className="space-y-3">
+          {canUpdateExisting ? (
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="save-dashboard-view-operation"
+                className="mt-1"
+                checked={operation === 'update-existing'}
+                onChange={() => setOperation('update-existing')}
+              />
+              <span>
+                <span className="block font-medium">Update Existing View</span>
+                <span className="block text-sf-text-muted">Replace “{selectedView.name}” with the current dashboard state.</span>
+              </span>
+            </label>
+          ) : null}
+
+          {canSaveAsNew ? (
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="save-dashboard-view-operation"
+                className="mt-1"
+                checked={operation === 'save-as-new'}
+                onChange={() => setOperation('save-as-new')}
+              />
+              <span className="flex-1 space-y-2">
+                <span className="block font-medium">Save as New View</span>
+                <span className="block text-sf-text-muted">Create a personal saved view from the current dashboard state.</span>
+                {isSavingAsNew ? (
+                  <input
+                    className="w-full rounded border border-sf-border px-2 py-1"
+                    placeholder="New view name"
+                    value={newViewName}
+                    autoFocus
+                    onChange={(event) => {
+                      setNewViewName(event.target.value)
+                      setError(null)
+                    }}
+                  />
+                ) : null}
+              </span>
+            </label>
+          ) : null}
+
+          {canSetDefaultOnly ? (
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="save-dashboard-view-operation"
+                className="mt-1"
+                checked={operation === 'set-default'}
+                onChange={() => setOperation('set-default')}
+              />
+              <span>
+                <span className="block font-medium">Set as Default View</span>
+                <span className="block text-sf-text-muted">Open “{selectedView.name}” by default for this dashboard.</span>
+              </span>
+            </label>
+          ) : null}
+        </div>
+
+        {operation !== 'set-default' ? (
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={setAsDefault}
+              onChange={(event) => setSetAsDefault(event.target.checked)}
+            />
+            <span>Set saved view as default for this dashboard</span>
+          </label>
+        ) : null}
+
+        {error ? <p className="rounded border border-red-200 bg-red-50 p-2 text-red-700">{error}</p> : null}
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1 hover:bg-sf-surface-alt"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button type="submit" className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-white">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  )
 }
 
 function HeaderMenu<T extends { id: string }>({
@@ -393,10 +580,14 @@ export function DataDashboard<T extends { id: string }>({
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const sourceColumnIds = useMemo(() => columns.map((column) => column.id), [columns])
-  const [persistedDashboardViews] = useState(() => loadDashboardViews())
+  const [persistedDashboardViews, setPersistedDashboardViews] = useState(() => loadDashboardViews())
   const [selectedViewId, setSelectedViewId] = useState(FULL_DASHBOARD_VIEW_ID)
   const [pendingViewId, setPendingViewId] = useState<string | null>(null)
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
+  const [saveSuccessContinuation, setSaveSuccessContinuation] = useState<(() => void) | null>(null)
+  const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
+  const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
 
   useEffect(() => {
     setColumnOrder((currentColumnOrder) => {
@@ -509,11 +700,14 @@ export function DataDashboard<T extends { id: string }>({
   )
 
   useEffect(() => {
+    if (hasAppliedInitialDefaultRef.current === dashboardScope) return
+
     const defaultViewId = resolveDefaultDashboardViewId(persistedDashboardViews, dashboardScope)
     const defaultView = runtimeDashboardViews.find((view) => view.id === defaultViewId) ?? runtimeDashboardViews[0]
 
     if (defaultView) {
       applyDashboardView(defaultView)
+      hasAppliedInitialDefaultRef.current = dashboardScope
     }
   }, [applyDashboardView, dashboardScope, persistedDashboardViews, runtimeDashboardViews])
 
@@ -522,6 +716,99 @@ export function DataDashboard<T extends { id: string }>({
 
     return () => setHasUnsavedDashboardChanges(false)
   }, [isSelectedViewModified, setHasUnsavedDashboardChanges])
+
+  const openSaveFlow = useCallback((onSuccess?: () => void) => {
+    setSaveSuccessContinuation(() => onSuccess ?? null)
+    setIsSaveDialogOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (isSelectedViewModified) {
+      setSaveUnsavedDashboardChanges(openSaveFlow)
+    } else {
+      setSaveUnsavedDashboardChanges(null)
+    }
+
+    return () => setSaveUnsavedDashboardChanges(null)
+  }, [isSelectedViewModified, openSaveFlow, setSaveUnsavedDashboardChanges])
+
+  function completeSave(nextSelectedViewId?: string) {
+    setIsSaveDialogOpen(false)
+    if (nextSelectedViewId) {
+      setSelectedViewId(nextSelectedViewId)
+    }
+
+    const continuation = saveSuccessContinuation
+    setSaveSuccessContinuation(null)
+    continuation?.()
+  }
+
+  function persistAndSetDashboardViews(nextDashboardViews: typeof persistedDashboardViews) {
+    persistDashboardViews(nextDashboardViews)
+    setPersistedDashboardViews(nextDashboardViews)
+  }
+
+  function saveAsNewView(name: string, setAsDefault: boolean): string | null {
+    try {
+      const { dashboardViews, view } = addDashboardView(
+        persistedDashboardViews,
+        dashboardScope,
+        name,
+        currentDashboardViewState,
+        setAsDefault,
+      )
+
+      persistAndSetDashboardViews(dashboardViews)
+      completeSave(view.id)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Unable to save dashboard view.'
+    }
+  }
+
+  function saveExistingView(setAsDefault: boolean): string | null {
+    if (!selectedDashboardView || selectedDashboardView.isFullDashboard) {
+      return 'Full Dashboard cannot be overwritten. Save these changes as a new view.'
+    }
+
+    try {
+      const dashboardViews = updateDashboardView(
+        persistedDashboardViews,
+        dashboardScope,
+        selectedDashboardView.id,
+        currentDashboardViewState,
+        setAsDefault,
+      )
+
+      persistAndSetDashboardViews(dashboardViews)
+      completeSave(selectedDashboardView.id)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Unable to update dashboard view.'
+    }
+  }
+
+  function setSelectedViewAsDefault(): string | null {
+    if (!selectedDashboardView) return 'Select a dashboard view first.'
+  
+    try {
+      const dashboardViews = setDefaultDashboardView(
+        persistedDashboardViews,
+        dashboardScope,
+        selectedDashboardView.id,
+      )
+      persistAndSetDashboardViews(dashboardViews)
+      completeSave(selectedDashboardView.id)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Unable to set default dashboard view.'
+    }
+  }
+
+  function handleSaveCancel() {
+    setIsSaveDialogOpen(false)
+    setSaveSuccessContinuation(null)
+  }
 
   function handleViewSelection(nextViewId: string) {
     if (nextViewId === selectedViewId) return
@@ -546,6 +833,20 @@ export function DataDashboard<T extends { id: string }>({
     if (nextView) {
       applyDashboardView(nextView)
     }
+  }
+
+  function saveChangesAndApplyPendingView() {
+    if (!pendingViewId) return
+
+    const nextViewId = pendingViewId
+    openSaveFlow(() => {
+      const nextView = runtimeDashboardViews.find((view) => view.id === nextViewId)
+      setPendingViewId(null)
+
+      if (nextView) {
+        applyDashboardView(nextView)
+      }
+    })
   }
 
   function revertSelectedView() {
@@ -609,6 +910,8 @@ export function DataDashboard<T extends { id: string }>({
     moveColumnByOffset(columnId, event.key === 'ArrowRight' ? 1 : -1)
   }
 
+  const canOpenSaveFlow = Boolean(selectedDashboardView && (isSelectedViewModified || !selectedDashboardView.isDefault))
+
   function exportCsv() {
     const visibleColumns = table.getVisibleLeafColumns()
     const header = visibleColumns.map((column) => column.columnDef.header as string).join(',')
@@ -633,8 +936,20 @@ export function DataDashboard<T extends { id: string }>({
     <div className="space-y-4">
       {pendingViewId ? (
         <UnsavedChangesDialog
+          onSave={saveChangesAndApplyPendingView}
           onDiscardChanges={discardChangesAndApplyPendingView}
           onCancel={() => setPendingViewId(null)}
+        />
+      ) : null}
+      {isSaveDialogOpen && selectedDashboardView ? (
+        <SaveDashboardViewDialog
+          selectedView={selectedDashboardView}
+          isModified={isSelectedViewModified}
+          hasNameConflict={(name) => hasDashboardViewNameConflict(persistedDashboardViews, dashboardScope, name)}
+          onCancel={handleSaveCancel}
+          onSaveAsNew={saveAsNewView}
+          onUpdateExisting={saveExistingView}
+          onSetDefault={setSelectedViewAsDefault}
         />
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -671,20 +986,22 @@ export function DataDashboard<T extends { id: string }>({
             </span>
           ) : null}
 
+          {selectedDashboardView ? (
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+              disabled={!canOpenSaveFlow}
+              title={canOpenSaveFlow ? 'Save dashboard view changes' : 'No dashboard view changes to save'}
+              onClick={() => openSaveFlow()}
+            >
+              Save
+            </button>
+          ) : null}
+
           {isSelectedViewModified ? (
-            <>
-              <button
-                type="button"
-                className="rounded border border-sf-border px-3 py-1 text-sf-text-muted disabled:cursor-not-allowed"
-                disabled
-                title="Save will be implemented in B.2C.1c"
-              >
-                Save
-              </button>
-              <button type="button" onClick={revertSelectedView} className="rounded border border-sf-border px-3 py-1">
-                Revert
-              </button>
-            </>
+            <button type="button" onClick={revertSelectedView} className="rounded border border-sf-border px-3 py-1">
+              Revert
+            </button>
           ) : null}
 
           <input
