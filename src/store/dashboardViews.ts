@@ -279,6 +279,49 @@ function createViewId(): string {
   return `view-${crypto.randomUUID()}`
 }
 
+function normalizeDashboardViewName(name: string): string {
+  return name.trim().toLocaleLowerCase()
+}
+
+export function hasDashboardViewNameConflict(
+  persistedViews: PersistedDashboardViews,
+  scope: DashboardViewScope,
+  name: string,
+  excludeViewId?: string,
+): boolean {
+  const normalizedName = normalizeDashboardViewName(name)
+
+  if (!normalizedName) return false
+  if (normalizedName === normalizeDashboardViewName(FULL_DASHBOARD_VIEW_NAME)) return true
+
+  return persistedViews.dashboards[scope].views.some(
+    (view) => view.id !== excludeViewId && normalizeDashboardViewName(view.name) === normalizedName,
+  )
+}
+
+function validateDashboardViewName(
+  persistedViews: PersistedDashboardViews,
+  scope: DashboardViewScope,
+  name: string,
+  excludeViewId?: string,
+): string {
+  const nextName = name.trim()
+
+  if (!nextName) {
+    throw new Error('Saved dashboard view name is required.')
+  }
+
+  if (normalizeDashboardViewName(nextName) === normalizeDashboardViewName(FULL_DASHBOARD_VIEW_NAME)) {
+    throw new Error('Full Dashboard is a reserved dashboard view name.')
+  }
+
+  if (hasDashboardViewNameConflict(persistedViews, scope, nextName, excludeViewId)) {
+    throw new Error('A saved dashboard view with this name already exists.')
+  }
+
+  return nextName
+}
+
 export function addDashboardView(
   persistedViews: PersistedDashboardViews,
   scope: DashboardViewScope,
@@ -289,14 +332,10 @@ export function addDashboardView(
   const now = new Date().toISOString()
   const view: SavedDashboardView = {
     id: createViewId(),
-    name: name.trim(),
+    name: validateDashboardViewName(persistedViews, scope, name),
     state,
     createdAt: now,
     updatedAt: now,
-  }
-
-  if (!view.name) {
-    throw new Error('Saved dashboard view name is required.')
   }
 
   const dashboardViews = updateScope(persistedViews, scope, (scopeViews) => ({
@@ -354,10 +393,7 @@ export function renameDashboardView(
     throw new Error('Full Dashboard cannot be renamed.')
   }
 
-  const nextName = name.trim()
-  if (!nextName) {
-    throw new Error('Saved dashboard view name is required.')
-  }
+  const nextName = validateDashboardViewName(persistedViews, scope, name, viewId)
 
   return updateScope(persistedViews, scope, (scopeViews) => ({
     ...scopeViews,
