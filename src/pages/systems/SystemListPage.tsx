@@ -16,6 +16,7 @@ return (
 
   <DataDashboard
     title="System list"
+    dashboardScope="systems"
     rows={systems}
     columns={systemListColumns}
     toolbar={

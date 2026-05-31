@@ -1,8 +1,13 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { mainNavigation } from '@/config/navigation'
 import { cn } from '@/utils/cn'
+import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 export function Sidebar() {
+  const { pathname } = useLocation()
+  const hasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.hasUnsavedDashboardChanges)
+  const requestNavigation = useUnsavedChangesGuardStore((state) => state.requestNavigation)
+
   return (
     <aside className="flex w-56 shrink-0 flex-col bg-sf-sidebar text-white">
       <div className="border-b border-white/10 px-4 py-4">
@@ -19,6 +24,12 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={(event) => {
+                if (hasUnsavedDashboardChanges && pathname !== item.path) {
+                  event.preventDefault()
+                  requestNavigation(item.path)
+                }
+              }}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',

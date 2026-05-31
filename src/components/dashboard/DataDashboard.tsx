@@ -15,6 +15,19 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table'
+import {
+  FULL_DASHBOARD_VIEW_ID,
+  areDashboardViewStatesEqual,
+  getRuntimeDashboardViews,
+  loadDashboardViews,
+  normalizeDashboardViewState,
+  resolveDefaultDashboardViewId,
+  type DashboardViewScope,
+  type RuntimeDashboardView,
+  type SavedDashboardViewState,
+} from '@/store/dashboardViews'
+import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
+import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 export interface DashboardColumn<T> {
   id: string
@@ -31,6 +44,7 @@ export interface DashboardColumn<T> {
 
 interface DataDashboardProps<T extends { id: string }> {
   title: string
+  dashboardScope: DashboardViewScope
   rows: T[]
   columns: DashboardColumn<T>[]
   onRowClick?: (row: T) => void
@@ -356,8 +370,10 @@ function HeaderMenu<T extends { id: string }>({
   )
 }
 
+
 export function DataDashboard<T extends { id: string }>({
   title,
+  dashboardScope,
   rows,
   columns,
   onRowClick,
@@ -377,6 +393,10 @@ export function DataDashboard<T extends { id: string }>({
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const sourceColumnIds = useMemo(() => columns.map((column) => column.id), [columns])
+  const [persistedDashboardViews] = useState(() => loadDashboardViews())
+  const [selectedViewId, setSelectedViewId] = useState(FULL_DASHBOARD_VIEW_ID)
+  const [pendingViewId, setPendingViewId] = useState<string | null>(null)
+  const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
 
   useEffect(() => {
     setColumnOrder((currentColumnOrder) => {
@@ -453,6 +473,86 @@ export function DataDashboard<T extends { id: string }>({
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
   })
+
+  const runtimeDashboardViews = useMemo(
+    () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds),
+    [dashboardScope, persistedDashboardViews, sourceColumnIds],
+  )
+  const selectedDashboardView =
+    runtimeDashboardViews.find((view) => view.id === selectedViewId) ?? runtimeDashboardViews[0]
+  const currentDashboardViewState: SavedDashboardViewState = useMemo(
+    () =>
+      normalizeDashboardViewState(
+        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter },
+        sourceColumnIds,
+      ),
+    [columnFilters, columnOrder, columnVisibility, globalFilter, grouping, sorting, sourceColumnIds],
+  )
+  const isSelectedViewModified = selectedDashboardView
+    ? !areDashboardViewStatesEqual(currentDashboardViewState, selectedDashboardView.state, sourceColumnIds)
+    : false
+
+  const applyDashboardView = useCallback(
+    (view: RuntimeDashboardView) => {
+      const normalizedState = normalizeDashboardViewState(view.state, sourceColumnIds)
+
+      setGlobalFilter(normalizedState.globalFilter)
+      setSorting(normalizedState.sorting)
+      setGrouping(normalizedState.grouping)
+      setColumnFilters(normalizedState.columnFilters)
+      setColumnOrder(normalizedState.columnOrder)
+      setColumnVisibility(normalizedState.columnVisibility)
+      setSelectedViewId(view.id)
+      setOpenMenuColumnId(null)
+    },
+    [sourceColumnIds],
+  )
+
+  useEffect(() => {
+    const defaultViewId = resolveDefaultDashboardViewId(persistedDashboardViews, dashboardScope)
+    const defaultView = runtimeDashboardViews.find((view) => view.id === defaultViewId) ?? runtimeDashboardViews[0]
+
+    if (defaultView) {
+      applyDashboardView(defaultView)
+    }
+  }, [applyDashboardView, dashboardScope, persistedDashboardViews, runtimeDashboardViews])
+
+  useEffect(() => {
+    setHasUnsavedDashboardChanges(isSelectedViewModified)
+
+    return () => setHasUnsavedDashboardChanges(false)
+  }, [isSelectedViewModified, setHasUnsavedDashboardChanges])
+
+  function handleViewSelection(nextViewId: string) {
+    if (nextViewId === selectedViewId) return
+
+    if (isSelectedViewModified) {
+      setPendingViewId(nextViewId)
+      return
+    }
+
+    const nextView = runtimeDashboardViews.find((view) => view.id === nextViewId)
+    if (nextView) {
+      applyDashboardView(nextView)
+    }
+  }
+
+  function discardChangesAndApplyPendingView() {
+    if (!pendingViewId) return
+
+    const nextView = runtimeDashboardViews.find((view) => view.id === pendingViewId)
+    setPendingViewId(null)
+
+    if (nextView) {
+      applyDashboardView(nextView)
+    }
+  }
+
+  function revertSelectedView() {
+    if (selectedDashboardView) {
+      applyDashboardView(selectedDashboardView)
+    }
+  }
 
   function updateColumnOrder(sourceColumnId: string, targetColumnId: string, placement: ColumnDropPlacement = 'before') {
     setColumnOrder((currentColumnOrder) => moveColumn(currentColumnOrder, sourceColumnId, targetColumnId, placement))
@@ -531,6 +631,12 @@ export function DataDashboard<T extends { id: string }>({
 
   return (
     <div className="space-y-4">
+      {pendingViewId ? (
+        <UnsavedChangesDialog
+          onDiscardChanges={discardChangesAndApplyPendingView}
+          onCancel={() => setPendingViewId(null)}
+        />
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sf-text-muted">
           <span className="font-semibold text-sf-text">{title}</span>
@@ -541,7 +647,46 @@ export function DataDashboard<T extends { id: string }>({
       </div>
 
       <div className="sf-card space-y-3 p-3">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-sf-text-muted">View</span>
+            <select
+              className="rounded border border-sf-border px-2 py-1"
+              value={selectedDashboardView?.id ?? FULL_DASHBOARD_VIEW_ID}
+              onChange={(event) => handleViewSelection(event.target.value)}
+            >
+              {runtimeDashboardViews.map((view) => (
+                <option key={view.id} value={view.id}>
+                  {view.name}
+                  {view.isDefault ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {selectedDashboardView ? (
+            <span className="text-sm text-sf-text-muted">
+              {selectedDashboardView.name}
+              {isSelectedViewModified ? ' (modified)' : ''}
+            </span>
+          ) : null}
+
+          {isSelectedViewModified ? (
+            <>
+              <button
+                type="button"
+                className="rounded border border-sf-border px-3 py-1 text-sf-text-muted disabled:cursor-not-allowed"
+                disabled
+                title="Save will be implemented in B.2C.1c"
+              >
+                Save
+              </button>
+              <button type="button" onClick={revertSelectedView} className="rounded border border-sf-border px-3 py-1">
+                Revert
+              </button>
+            </>
+          ) : null}
+
           <input
             placeholder="Search"
             className="rounded border border-sf-border px-2 py-1"

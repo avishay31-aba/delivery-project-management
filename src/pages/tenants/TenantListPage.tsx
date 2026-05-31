@@ -16,6 +16,7 @@ return (
 
   <DataDashboard
     title="Tenant list"
+    dashboardScope="tenants"
     rows={tenants}
     columns={tenantListColumns}
     toolbar={
