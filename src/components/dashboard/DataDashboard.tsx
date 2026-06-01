@@ -19,8 +19,8 @@ import {
   FULL_DASHBOARD_VIEW_ID,
   addDashboardView,
   areDashboardViewStatesEqual,
-deleteDashboardView,
-duplicateDashboardView,
+  deleteDashboardView,
+  duplicateDashboardView,
   getRuntimeDashboardViews,
   hasDashboardViewNameConflict,
   loadDashboardViews,
@@ -29,7 +29,7 @@ duplicateDashboardView,
   resolveDefaultDashboardViewId,
   setDefaultDashboardView,
   updateDashboardView,
-renameDashboardView,
+  renameDashboardView,
   type DashboardViewScope,
   type RuntimeDashboardView,
   type SavedDashboardViewState,
@@ -49,6 +49,8 @@ export interface DashboardColumn<T> {
   editable?: boolean
   options?: string[]
 }
+
+
 
 interface DataDashboardProps<T extends { id: string }> {
   title: string
@@ -919,7 +921,7 @@ export function DataDashboard<T extends { id: string }>({
     setSaveSuccessContinuation(null)
   }
 
- function renameSelectedView() {
+  function renameSelectedView() {
     if (!selectedDashboardView) return
 
     if (selectedDashboardView.isFullDashboard) {
@@ -1196,13 +1198,13 @@ function clearAllFiltersAndSearch() {
           </label>
 
 {selectedDashboardView ? (
-  <ViewActionsMenu
-    selectedView={selectedDashboardView}
-    onRename={renameSelectedView}
-    onDuplicate={duplicateSelectedView}
-    onDelete={deleteSelectedView}
-  />
-) : null}
+            <ViewActionsMenu
+              selectedView={selectedDashboardView}
+              onRename={renameSelectedView}
+              onDuplicate={duplicateSelectedView}
+              onDelete={deleteSelectedView}
+            />
+          ) : null}
 
 
           {selectedDashboardView ? (
