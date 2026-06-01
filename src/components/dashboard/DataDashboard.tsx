@@ -117,6 +117,16 @@ function moveColumn(
   return nextColumnOrder
 }
 
+function FilterFunnelIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M2 3.5A.5.5 0 0 1 2.5 3h11a.5.5 0 0 1 .38.82L9.5 9.05V12a.5.5 0 0 1-.22.42l-2 1.3A.5.5 0 0 1 6.5 13.3V9.05L2.12 3.82A.5.5 0 0 1 2 3.5Z"
+      />
+    </svg>
+  )
+}
 
 type SaveDashboardViewOperation = 'update-existing' | 'save-as-new' | 'set-default'
 
@@ -912,6 +922,31 @@ export function DataDashboard<T extends { id: string }>({
 
   const canOpenSaveFlow = Boolean(selectedDashboardView && (isSelectedViewModified || !selectedDashboardView.isDefault))
 
+const activeColumnFilterCount = columnFilters.length
+const hasGlobalSearch = globalFilter.trim().length > 0
+const activeFilterAndSearchCount = activeColumnFilterCount + (hasGlobalSearch ? 1 : 0)
+
+const hiddenFilteredColumns = table
+  .getAllLeafColumns()
+  .filter((column) => !column.getIsVisible() && column.getIsFiltered())
+
+const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
+  String(column.columnDef.header),
+)
+
+function clearAllColumnFilters() {
+  setColumnFilters([])
+}
+
+function clearGlobalSearch() {
+  setGlobalFilter('')
+}
+
+function clearAllFiltersAndSearch() {
+  setColumnFilters([])
+  setGlobalFilter('')
+}
+
   function exportCsv() {
     const visibleColumns = table.getVisibleLeafColumns()
     const header = visibleColumns.map((column) => column.columnDef.header as string).join(',')
@@ -1004,12 +1039,51 @@ export function DataDashboard<T extends { id: string }>({
             </button>
           ) : null}
 
-          <input
-            placeholder="Search"
-            className="rounded border border-sf-border px-2 py-1"
-            value={globalFilter}
-            onChange={(event) => setGlobalFilter(event.target.value)}
-          />
+<div className="flex flex-wrap items-center gap-2">
+            <input
+              placeholder="Search"
+              className="rounded border border-sf-border px-2 py-1"
+              value={globalFilter}
+              onChange={(event) => setGlobalFilter(event.target.value)}
+            />
+            <span
+              className={joinClassNames(
+                'rounded-full border px-2 py-0.5 text-xs font-semibold',
+                activeFilterAndSearchCount > 0
+                  ? 'border-sf-brand bg-sf-brand/10 text-sf-brand'
+                  : 'border-sf-border text-sf-text-muted',
+              )}
+              title={`${activeColumnFilterCount} column filter${activeColumnFilterCount === 1 ? '' : 's'} and ${
+                hasGlobalSearch ? 1 : 0
+              } global search active`}
+            >
+              Filters ({activeFilterAndSearchCount})
+            </span>
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+              disabled={activeColumnFilterCount === 0}
+              onClick={clearAllColumnFilters}
+            >
+              Clear All Column Filters
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+              disabled={!hasGlobalSearch}
+              onClick={clearGlobalSearch}
+            >
+              Clear Global Search
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+              disabled={activeFilterAndSearchCount === 0}
+              onClick={clearAllFiltersAndSearch}
+            >
+              Clear All Filters/Search
+            </button>
+          </div>
 
           <button type="button" onClick={exportCsv} className="rounded border border-sf-border px-3 py-1">
             Export CSV
@@ -1027,6 +1101,13 @@ export function DataDashboard<T extends { id: string }>({
             ))}
           </div>
         </details>
+
+        {hiddenFilteredColumns.length > 0 ? (
+          <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+            <span className="font-semibold">Hidden filtered columns:</span> {hiddenFilteredColumnNames.join(', ')}.
+            {' '}These hidden columns are still filtering the visible records.
+          </div>
+        ) : null}  
 
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-sf-border text-sm">
@@ -1076,6 +1157,15 @@ export function DataDashboard<T extends { id: string }>({
                               onClick={header.column.getToggleSortingHandler()}
                             >
                               {flexRender(header.column.columnDef.header, header.getContext())}
+                              {header.column.getIsFiltered() ? (
+                                <span
+                                  className="inline-flex text-sf-brand"
+                                  title={`${String(header.column.columnDef.header)} column is filtered`}
+                                >
+                                  <span className="sr-only">Filtered</span>
+                                  <FilterFunnelIcon className="h-3.5 w-3.5" />
+                                </span>
+                              ) : null}  
                               {header.column.getIsSorted() === 'asc' ? '↑' : ''}
                               {header.column.getIsSorted() === 'desc' ? '↓' : ''}
                             </button>
