@@ -19,6 +19,8 @@ import {
   FULL_DASHBOARD_VIEW_ID,
   addDashboardView,
   areDashboardViewStatesEqual,
+deleteDashboardView,
+duplicateDashboardView,
   getRuntimeDashboardViews,
   hasDashboardViewNameConflict,
   loadDashboardViews,
@@ -27,6 +29,7 @@ import {
   resolveDefaultDashboardViewId,
   setDefaultDashboardView,
   updateDashboardView,
+renameDashboardView,
   type DashboardViewScope,
   type RuntimeDashboardView,
   type SavedDashboardViewState,
@@ -308,6 +311,102 @@ function SaveDashboardViewDialog({
     </div>
   )
 }
+
+interface ViewActionsMenuProps {
+  selectedView: RuntimeDashboardView
+  onRename: () => void
+  onDuplicate: () => void
+  onDelete: () => void
+}
+
+function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: ViewActionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuWrapperRef = useRef<HTMLDivElement>(null)
+  const isFullDashboard = selectedView.isFullDashboard
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuWrapperRef.current?.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    function handleEscape(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
+
+  function closeAfterAction(action: () => void) {
+    setIsOpen(false)
+    action()
+  }
+
+  return (
+    <div ref={menuWrapperRef} className="relative inline-flex">
+      <button
+        type="button"
+        className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
+        disabled={isFullDashboard}
+        title={
+          isFullDashboard
+            ? 'Full Dashboard cannot be renamed, duplicated, or deleted.'
+            : 'Open saved view actions'
+        }
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((isVisible) => !isVisible)}
+      >
+        View Actions ▾
+      </button>
+
+      {isOpen && !isFullDashboard ? (
+        <div
+          className="absolute left-0 top-full z-30 mt-1 w-44 rounded border border-sf-border bg-white p-1 text-sm shadow-lg"
+          role="menu"
+          aria-label="Saved view actions"
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt"
+            role="menuitem"
+            onClick={() => closeAfterAction(onRename)}
+          >
+            Rename View
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt"
+            role="menuitem"
+            onClick={() => closeAfterAction(onDuplicate)}
+          >
+            Duplicate View
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1 text-left text-red-700 hover:bg-red-50"
+            role="menuitem"
+            onClick={() => closeAfterAction(onDelete)}
+          >
+            Delete View
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 
 function HeaderMenu<T extends { id: string }>({
   column,
@@ -820,6 +919,88 @@ export function DataDashboard<T extends { id: string }>({
     setSaveSuccessContinuation(null)
   }
 
+ function renameSelectedView() {
+    if (!selectedDashboardView) return
+
+    if (selectedDashboardView.isFullDashboard) {
+      window.alert('Full Dashboard cannot be renamed.')
+      return
+    }
+
+    const nextName = window.prompt('Rename View', selectedDashboardView.name)
+    if (nextName === null) return
+
+    try {
+      const dashboardViews = renameDashboardView(
+        persistedDashboardViews,
+        dashboardScope,
+        selectedDashboardView.id,
+        nextName,
+      )
+
+      persistAndSetDashboardViews(dashboardViews)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to rename dashboard view.')
+    }
+  }
+
+  function duplicateSelectedView() {
+    if (!selectedDashboardView) return
+
+    if (selectedDashboardView.isFullDashboard) {
+      window.alert('Full Dashboard cannot be duplicated.')
+      return
+    }
+
+    const nextName = window.prompt('Duplicate View', `Copy of ${selectedDashboardView.name}`)
+    if (nextName === null) return
+
+    try {
+      const { dashboardViews, view } = duplicateDashboardView(
+        persistedDashboardViews,
+        dashboardScope,
+        selectedDashboardView.id,
+        nextName,
+      )
+
+      persistAndSetDashboardViews(dashboardViews)
+      setSelectedViewId(view.id)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to duplicate dashboard view.')
+    }
+  }
+
+  function deleteSelectedView() {
+    if (!selectedDashboardView) return
+
+    if (selectedDashboardView.isFullDashboard) {
+      window.alert('Full Dashboard cannot be deleted.')
+      return
+    }
+
+    const confirmationMessage = isSelectedViewModified
+      ? 'This view has unsaved changes.\n\nDeleting this view will:\n- permanently remove the saved view\n- discard all unsaved changes\n- switch back to Full Dashboard\n\nContinue?'
+      : `Delete “${selectedDashboardView.name}”?\n\nThis will permanently remove the saved view and switch back to Full Dashboard.\n\nContinue?`
+
+    if (!window.confirm(confirmationMessage)) return
+
+    try {
+      const dashboardViews = deleteDashboardView(persistedDashboardViews, dashboardScope, selectedDashboardView.id)
+      const fullDashboardView = runtimeDashboardViews.find((view) => view.id === FULL_DASHBOARD_VIEW_ID)
+
+      persistAndSetDashboardViews(dashboardViews)
+
+      if (fullDashboardView) {
+        applyDashboardView(fullDashboardView)
+      } else {
+        setSelectedViewId(FULL_DASHBOARD_VIEW_ID)
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to delete dashboard view.')
+    }
+  }
+
+
   function handleViewSelection(nextViewId: string) {
     if (nextViewId === selectedViewId) return
 
@@ -1013,6 +1194,16 @@ function clearAllFiltersAndSearch() {
               ))}
             </select>
           </label>
+
+{selectedDashboardView ? (
+  <ViewActionsMenu
+    selectedView={selectedDashboardView}
+    onRename={renameSelectedView}
+    onDuplicate={duplicateSelectedView}
+    onDelete={deleteSelectedView}
+  />
+) : null}
+
 
           {selectedDashboardView ? (
             <span className="text-sm text-sf-text-muted">
