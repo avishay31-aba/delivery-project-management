@@ -1,4 +1,4 @@
-import { FolderKanban, Server, Users } from 'lucide-react'
+import { BriefcaseBusiness, FolderKanban, Server, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -9,6 +9,12 @@ export interface NavItem {
 }
 
 export const mainNavigation: NavItem[] = [
+  {
+    label: 'Opportunities',
+    path: '/opportunities',
+    icon: BriefcaseBusiness,
+    description: 'Sales opportunity intake',
+  },
   {
     label: 'Projects',
     path: '/projects',

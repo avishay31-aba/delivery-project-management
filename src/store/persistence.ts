@@ -5,9 +5,22 @@ import { normalizeIdCounters } from '@/data/id-generator'
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
 function normalizeState(state: AppDataState): AppDataState {
-  return {
+  const seedState = seedJson as AppDataState
+  const normalizedState = {
     ...state,
-    idCounters: normalizeIdCounters(state.idCounters, state),
+    salesManagers: Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers,
+    accounts: Array.isArray(state.accounts) ? state.accounts : seedState.accounts,
+    opportunities: Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities,
+    systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
+    tenants: Array.isArray(state.tenants) ? state.tenants : seedState.tenants,
+    warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
+    projectSystems: Array.isArray(state.projectSystems) ? state.projectSystems : seedState.projectSystems,
+    projectTenants: Array.isArray(state.projectTenants) ? state.projectTenants : seedState.projectTenants,
+  }
+
+  return {
+    ...normalizedState,
+    idCounters: normalizeIdCounters(state.idCounters, normalizedState),
   }
 }
 

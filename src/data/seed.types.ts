@@ -3,6 +3,12 @@
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
 export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL'
 export type ProgressStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE'
+export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
+export type OpportunityType = ProjectMainType
+export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
+export type OpportunityStage = 'OPEN' | 'WON' | 'LOST'
+export type RequirementType = 'A' | 'B' | 'C'
+export type RequirementDeployTarget = 'NEW_SYSTEM' | 'EXISTING_SID'
 
 export type SystemClass = 'CUSTOMER' | 'POC_DEMO_TRAINING'
 export type SystemPurpose =
@@ -22,6 +28,30 @@ export interface IdCounters {
   sid: number
   tid: number
   mid: number
+}
+
+export interface SalesManager {
+  id: string
+  name: string
+  email: string
+  region: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Account {
+  id: string
+  accountCode: string
+  accountName: string
+  customerType: AccountCustomerType
+  salesManagerId: string
+  region: string
+  country: string
+  state: string
+  timeZone: string
+  timeGroup: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type WarrantyStatus =
@@ -49,8 +79,74 @@ export interface Project {
   updatedAt: string
 }
 
+export interface OpportunityRequirementBase {
+  id: string
+  requirementId: string
+  hostingType: string
+  cloudPlatform: string
+  productType: string
+  licenses: number | null
+  users: number | null
+  concurrentSearches: number | null
+  dailySearches: number | null
+  monthlySearches: number | null
+  concurrentAnalyses: number | null
+  dailyAnalyses: number | null
+  monthlyAnalyses: number | null
+  topicAnalyses: 'YES' | 'NO' | ''
+  standardMonitors: number | null
+  fullMonitors: number | null
+}
+
+export interface NewTenantRequirement extends OpportunityRequirementBase {
+  deployTarget: RequirementDeployTarget
+  existingSystemId: string | null
+}
+
+export interface ChangeRequestRequirement extends OpportunityRequirementBase {
+  tenantId: string
+  systemId: string
+}
+
+export interface StandardRenewalRequirement {
+  id: string
+  requirementId: string
+  tenantId: string
+  systemId: string
+  warrantyStatus: WarrantyStatus
+  warrantyEndDate: string | null
+}
+
+export interface Opportunity {
+  id: string
+  opportunityId: string
+  opportunityName: string
+  stage: OpportunityStage
+  accountId: string
+  salesManagerId: string
+  type: OpportunityType
+  subType: OpportunitySubType
+  deliveryDate: string | null
+  pocStartDate: string | null
+  pocEndDate: string | null
+  warrantyServiceMonths: number | null
+  region: string
+  country: string
+  state: string
+  timeZone: string
+  timeGroup: string
+  currentMilestone: string
+  projectAlerts: string[]
+  newTenantRequirements: NewTenantRequirement[]
+  changeRequestRequirements: ChangeRequestRequirement[]
+  standardRenewalRequirements: StandardRenewalRequirement[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface System {
   id: string
+  accountId?: string | null
   sid: string | null
   machineId: string | null
   systemClass: SystemClass
@@ -67,6 +163,7 @@ export interface System {
 export interface Tenant {
   id: string
   tid: string
+  accountId: string
   systemId: string
   tenantType: TenantType
   accountName: string
@@ -75,9 +172,21 @@ export interface Tenant {
   operationalStatus: string
   productType: string
   warrantyStatus: WarrantyStatus
+  warrantyStartDate?: string | null
   warrantyEndDate: string | null
   pocStartDate: string | null
   pocEndDate: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WarrantyRecord {
+  warrantyRecordId: string
+  tenantId: string
+  startDate: string | null
+  endDate: string | null
+  status: WarrantyStatus
+  predecessorWarrantyId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -98,9 +207,13 @@ export interface ProjectTenantLink {
 /** Root shape persisted to localStorage */
 export interface AppDataState {
   version: number
+  salesManagers: SalesManager[]
+  accounts: Account[]
+  opportunities: Opportunity[]
   projects: Project[]
   systems: System[]
   tenants: Tenant[]
+  warrantyRecords: WarrantyRecord[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
   idCounters: IdCounters
