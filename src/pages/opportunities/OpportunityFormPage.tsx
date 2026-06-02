@@ -238,10 +238,13 @@ function RequirementGrid({
 
     if (column.key === 'existingSystemId' && kind === 'A') {
       const requirement = row as NewTenantRequirement
+      if (requirement.deployTarget !== 'EXISTING_SID') {
+        return <span className="text-xs text-sf-text-muted">New System</span>
+      }
+
       return (
         <select
           className={inputClassName(isChanged, 'h-8 w-44 text-xs')}
-          disabled={requirement.deployTarget !== 'EXISTING_SID'}
           value={requirement.existingSystemId ?? ''}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
         >

@@ -88,8 +88,8 @@ const RENEWAL_STANDARD_HEADER_FIELDS: OpportunityHeaderField[] = [
 
 export const requirementAColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Requirement ID', group: 'Tenant requirements', editable: true },
-  { key: 'deployTarget', label: 'Deploy target', group: 'Tenant requirements', editable: true, inputType: 'picklist' },
-  { key: 'existingSystemId', label: 'SID (if existing system)', group: 'Tenant requirements', editable: true },
+  { key: 'deployTarget', label: 'System New/Existing?', group: 'Tenant requirements', editable: true, inputType: 'picklist' },
+  { key: 'existingSystemId', label: 'Existing System SID', group: 'Tenant requirements', editable: true },
   { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist' },
   { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist' },
   { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist' },

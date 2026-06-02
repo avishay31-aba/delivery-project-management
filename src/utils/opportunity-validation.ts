@@ -115,16 +115,16 @@ export function validateRequirementA(
 ): ValidationMessage[] {
   const messages: ValidationMessage[] = [
     ...requiredText(row.requirementId, 'Requirement ID'),
-    ...requiredText(row.deployTarget, 'Deploy target'),
+    ...requiredText(row.deployTarget, 'System New/Existing?'),
   ]
 
   if (row.deployTarget === 'EXISTING_SID') {
     if (!row.existingSystemId) {
-      messages.push({ level: 'error', message: 'Existing SID is required when deploy target is Existing SID.' })
+      messages.push({ level: 'error', message: 'Existing System SID is required when System New/Existing? is Existing System.' })
     } else if (!opportunityCanUseSystem(opportunity, row.existingSystemId, context)) {
       messages.push({
         level: 'error',
-        message: 'Existing SID must belong to a customer owned by the selected Sales Manager and account.',
+        message: 'Existing System SID must belong to a customer owned by the selected Sales Manager and account.',
       })
     }
   }
