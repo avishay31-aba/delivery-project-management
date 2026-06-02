@@ -132,7 +132,7 @@
           "requirementId": "A-001",
           "deployTarget": "EXISTING_SID",
           "existingSystemId": "sys-001",
-          "hostingType": "Saas",
+          "hostingType": "SaaS",
           "cloudPlatform": "Azure",
           "productType": "Tangles",
           "licenses": 40,
@@ -145,7 +145,19 @@
           "monthlyAnalyses": 12000,
           "topicAnalyses": "YES",
           "standardMonitors": 20,
-          "fullMonitors": 4
+          "fullMonitors": 4,
+          "mapCenter": "Germany",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "changeRequestRequirements": [
@@ -154,7 +166,7 @@
           "requirementId": "B-001",
           "tenantId": "ten-001",
           "systemId": "sys-001",
-          "hostingType": "Saas",
+          "hostingType": "SaaS",
           "cloudPlatform": "Azure",
           "productType": "Tangles",
           "licenses": 60,
@@ -167,7 +179,19 @@
           "monthlyAnalyses": 16000,
           "topicAnalyses": "YES",
           "standardMonitors": 30,
-          "fullMonitors": 6
+          "fullMonitors": 6,
+          "mapCenter": "Germany",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "standardRenewalRequirements": [
@@ -177,7 +201,8 @@
           "tenantId": "ten-003",
           "systemId": "sys-002",
           "warrantyStatus": "PENDING",
-          "warrantyEndDate": "2026-07-20"
+          "warrantyEndDate": "2026-07-20",
+          "warrantyRecordId": "wr-003"
         }
       ],
       "createdAt": "2026-05-20T10:00:00.000Z",
@@ -209,7 +234,7 @@
           "requirementId": "A-002",
           "deployTarget": "NEW_SYSTEM",
           "existingSystemId": null,
-          "hostingType": "Saas",
+          "hostingType": "SaaS",
           "cloudPlatform": "Azure",
           "productType": "Tangles",
           "licenses": 12,
@@ -222,7 +247,19 @@
           "monthlyAnalyses": 3000,
           "topicAnalyses": "NO",
           "standardMonitors": 6,
-          "fullMonitors": 1
+          "fullMonitors": 1,
+          "mapCenter": "United Kingdom",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "changeRequestRequirements": [],
@@ -269,7 +306,19 @@
           "monthlyAnalyses": 9000,
           "topicAnalyses": "YES",
           "standardMonitors": 14,
-          "fullMonitors": 3
+          "fullMonitors": 3,
+          "mapCenter": "USA",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "changeRequestRequirements": [],
@@ -306,7 +355,8 @@
           "tenantId": "ten-006",
           "systemId": "sys-005",
           "warrantyStatus": "EXPIRED",
-          "warrantyEndDate": "2026-02-28"
+          "warrantyEndDate": "2026-02-28",
+          "warrantyRecordId": "wr-004"
         }
       ],
       "createdAt": "2026-05-23T10:00:00.000Z",
@@ -352,7 +402,19 @@
           "monthlyAnalyses": 6500,
           "topicAnalyses": "NO",
           "standardMonitors": 9,
-          "fullMonitors": 2
+          "fullMonitors": 2,
+          "mapCenter": "France",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "standardRenewalRequirements": [
@@ -362,7 +424,8 @@
           "tenantId": "ten-005",
           "systemId": "sys-003",
           "warrantyStatus": "NO_WARRANTY",
-          "warrantyEndDate": null
+          "warrantyEndDate": null,
+          "warrantyRecordId": ""
         }
       ],
       "createdAt": "2026-05-24T10:00:00.000Z",
@@ -394,7 +457,7 @@
           "requirementId": "A-004",
           "deployTarget": "NEW_SYSTEM",
           "existingSystemId": null,
-          "hostingType": "Saas",
+          "hostingType": "SaaS",
           "cloudPlatform": "AWS",
           "productType": "Tangles",
           "licenses": 8,
@@ -407,7 +470,19 @@
           "monthlyAnalyses": 1800,
           "topicAnalyses": "NO",
           "standardMonitors": 4,
-          "fullMonitors": 1
+          "fullMonitors": 1,
+          "mapCenter": "Australia",
+          "tanglesGo": "NO",
+          "webloc": "NO",
+          "webeye": "NO",
+          "ingest": "NO",
+          "blockchain": "NO",
+          "crossSystemFeatures": [],
+          "apiEnabled": "NO",
+          "apiDailyQty": null,
+          "apiMonthlyQty": null,
+          "aiFeatures": [],
+          "additionalFeatures": []
         }
       ],
       "changeRequestRequirements": [],
@@ -442,11 +517,12 @@
       "purpose": "CUSTOMER",
       "availability": "OCCUPIED",
       "productType": "Tangles",
-      "hostingType": "Saas",
+      "hostingType": "SaaS",
       "timeGroup": "EMEA",
       "operationalStatus": "Active",
       "createdAt": "2026-04-01T10:00:00.000Z",
-      "updatedAt": "2026-05-15T10:00:00.000Z"
+      "updatedAt": "2026-05-15T10:00:00.000Z",
+      "salesManagerId": "sm-001"
     },
     {
       "id": "sys-002",
@@ -457,11 +533,12 @@
       "purpose": "CUSTOMER",
       "availability": "OCCUPIED",
       "productType": "Tangles",
-      "hostingType": "Saas",
+      "hostingType": "SaaS",
       "timeGroup": "EMEA",
       "operationalStatus": "Active",
       "createdAt": "2026-04-10T10:00:00.000Z",
-      "updatedAt": "2026-05-12T10:00:00.000Z"
+      "updatedAt": "2026-05-12T10:00:00.000Z",
+      "salesManagerId": "sm-001"
     },
     {
       "id": "sys-003",
@@ -476,7 +553,8 @@
       "timeGroup": "EMEA",
       "operationalStatus": "Active",
       "createdAt": "2026-04-11T10:00:00.000Z",
-      "updatedAt": "2026-05-12T10:00:00.000Z"
+      "updatedAt": "2026-05-12T10:00:00.000Z",
+      "salesManagerId": "sm-001"
     },
     {
       "id": "sys-004",
@@ -491,7 +569,8 @@
       "timeGroup": "AMER",
       "operationalStatus": "Active",
       "createdAt": "2026-04-12T10:00:00.000Z",
-      "updatedAt": "2026-05-12T10:00:00.000Z"
+      "updatedAt": "2026-05-12T10:00:00.000Z",
+      "salesManagerId": "sm-002"
     },
     {
       "id": "sys-005",
@@ -502,11 +581,12 @@
       "purpose": "CUSTOMER",
       "availability": "OCCUPIED",
       "productType": "Tangles",
-      "hostingType": "Saas",
+      "hostingType": "SaaS",
       "timeGroup": "AMER",
       "operationalStatus": "Active",
       "createdAt": "2026-04-13T10:00:00.000Z",
-      "updatedAt": "2026-05-12T10:00:00.000Z"
+      "updatedAt": "2026-05-12T10:00:00.000Z",
+      "salesManagerId": "sm-002"
     },
     {
       "id": "sys-006",
@@ -517,11 +597,12 @@
       "purpose": "AVAILABLE",
       "availability": "AVAILABLE",
       "productType": "Tangles",
-      "hostingType": "Saas",
+      "hostingType": "SaaS",
       "timeGroup": "EMEA",
       "operationalStatus": "Available",
       "createdAt": "2026-03-01T10:00:00.000Z",
-      "updatedAt": "2026-05-01T10:00:00.000Z"
+      "updatedAt": "2026-05-01T10:00:00.000Z",
+      "salesManagerId": null
     }
   ],
   "tenants": [

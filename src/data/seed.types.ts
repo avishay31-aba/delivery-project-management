@@ -9,6 +9,7 @@ export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
 export type OpportunityStage = 'OPEN' | 'WON' | 'LOST'
 export type RequirementType = 'A' | 'B' | 'C'
 export type RequirementDeployTarget = 'NEW_SYSTEM' | 'EXISTING_SID'
+export type YesNo = 'YES' | 'NO' | ''
 
 export type SystemClass = 'CUSTOMER' | 'POC_DEMO_TRAINING'
 export type SystemPurpose =
@@ -85,6 +86,7 @@ export interface OpportunityRequirementBase {
   hostingType: string
   cloudPlatform: string
   productType: string
+  mapCenter: string
   licenses: number | null
   users: number | null
   concurrentSearches: number | null
@@ -93,7 +95,18 @@ export interface OpportunityRequirementBase {
   concurrentAnalyses: number | null
   dailyAnalyses: number | null
   monthlyAnalyses: number | null
-  topicAnalyses: 'YES' | 'NO' | ''
+  tanglesGo: YesNo
+  webloc: YesNo
+  webeye: YesNo
+  ingest: YesNo
+  blockchain: YesNo
+  crossSystemFeatures: string[]
+  apiEnabled: YesNo
+  apiDailyQty: number | null
+  apiMonthlyQty: number | null
+  aiFeatures: string[]
+  additionalFeatures: string[]
+  topicAnalyses: YesNo
   standardMonitors: number | null
   fullMonitors: number | null
 }
@@ -113,6 +126,7 @@ export interface StandardRenewalRequirement {
   requirementId: string
   tenantId: string
   systemId: string
+  warrantyRecordId: string
   warrantyStatus: WarrantyStatus
   warrantyEndDate: string | null
 }
@@ -147,6 +161,7 @@ export interface Opportunity {
 export interface System {
   id: string
   accountId?: string | null
+  salesManagerId?: string | null
   sid: string | null
   machineId: string | null
   systemClass: SystemClass

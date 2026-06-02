@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppDataState } from '@/data/seed.types'
+import type { AppDataState, OpportunitySubType, OpportunityType } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
   createInitialState,
@@ -18,7 +18,7 @@ interface AppStore extends AppDataState {
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
-  createOpportunity: () => AppDataState['opportunities'][number]
+  createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
@@ -95,7 +95,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
-  createOpportunity: () => {
+  createOpportunity: (type = 'POC', subType = 'FREE') => {
     const state = get()
     const now = new Date().toISOString()
     const defaultAccount = state.accounts[0]
@@ -108,8 +108,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       stage: 'OPEN',
       accountId: defaultAccount?.id ?? '',
       salesManagerId: defaultSalesManagerId,
-      type: 'POC',
-      subType: 'FREE',
+      type,
+      subType,
       deliveryDate: null,
       pocStartDate: null,
       pocEndDate: null,
@@ -166,6 +166,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const system: AppDataState['systems'][number] = {
       id: `sys-${crypto.randomUUID()}`,
       accountId: null,
+      salesManagerId: null,
       sid: nextSid,
       machineId: null,
       systemClass: 'CUSTOMER',

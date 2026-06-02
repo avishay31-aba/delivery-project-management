@@ -29,6 +29,8 @@ export interface RequirementColumnMetadata {
   label: string
   group: string
   editable: boolean
+  inputType?: 'text' | 'integer' | 'picklist' | 'multiselect'
+  options?: string[]
 }
 
 export interface OpportunityMetadata {
@@ -41,7 +43,6 @@ const COMMON_HEADER_FIELDS: OpportunityHeaderField[] = [
   { key: 'opportunityName', label: 'Opportunity name', editable: true, source: '2. Header yellow cells' },
   { key: 'type', label: 'Opportunity Type', editable: true, source: '2. Header yellow cells' },
   { key: 'subType', label: 'Opportunity sub type', editable: true, source: '2. Header yellow cells' },
-  { key: 'deliveryDate', label: 'Delivery date', editable: true, source: '2. Header yellow cells' },
   { key: 'opportunityId', label: 'Opportunity (name and ID)', editable: true, source: '2. Header yellow cells' },
   { key: 'accountId', label: 'Account (end user)', editable: true, source: '2. Header yellow cells' },
   { key: 'region', label: 'Region', editable: false, source: '2. Header yellow cells' },
@@ -55,41 +56,66 @@ const COMMON_HEADER_FIELDS: OpportunityHeaderField[] = [
 ]
 
 const POC_HEADER_FIELDS: OpportunityHeaderField[] = [
-  ...COMMON_HEADER_FIELDS.slice(0, 4),
+  ...COMMON_HEADER_FIELDS.slice(0, 3),
+  { key: 'deliveryDate', label: 'Delivery date', editable: true, source: '2. Header yellow cells' },
   { key: 'pocStartDate', label: 'Start Date', editable: true, source: '2. Header yellow cells' },
   { key: 'pocEndDate', label: 'End Date', editable: true, source: '2. Header yellow cells' },
-  ...COMMON_HEADER_FIELDS.slice(4),
+  ...COMMON_HEADER_FIELDS.slice(3),
 ]
 
 const DELIVERY_HEADER_FIELDS: OpportunityHeaderField[] = [
-  ...COMMON_HEADER_FIELDS.slice(0, 4),
+  ...COMMON_HEADER_FIELDS.slice(0, 3),
+  { key: 'deliveryDate', label: 'Delivery date', editable: true, source: '2. Header yellow cells' },
   {
     key: 'warrantyServiceMonths',
     label: 'Warranty/Service period (months)',
     editable: false,
     source: '2. Header yellow cells',
   },
-  ...COMMON_HEADER_FIELDS.slice(4),
+  ...COMMON_HEADER_FIELDS.slice(3),
+]
+
+const RENEWAL_STANDARD_HEADER_FIELDS: OpportunityHeaderField[] = [
+  ...COMMON_HEADER_FIELDS.slice(0, 3),
+  {
+    key: 'warrantyServiceMonths',
+    label: 'Warranty/Service period (months)',
+    editable: false,
+    source: '2. Header yellow cells',
+  },
+  ...COMMON_HEADER_FIELDS.slice(3),
 ]
 
 export const requirementAColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Requirement ID', group: 'Tenant requirements', editable: true },
-  { key: 'deployTarget', label: 'New System (Boolean)', group: 'Tenant requirements', editable: true },
-  { key: 'existingSystemId', label: 'SID (If not a new system)', group: 'Tenant requirements', editable: true },
-  { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true },
-  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true },
-  { key: 'productType', label: 'Product', group: 'Core Details', editable: true },
-  { key: 'licenses', label: 'Licenses', group: 'Core Details', editable: true },
-  { key: 'users', label: 'Users', group: 'Core Details', editable: true },
-  { key: 'concurrentSearches', label: 'Con. Searches', group: 'Core Details', editable: true },
-  { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', editable: true },
-  { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', editable: true },
-  { key: 'concurrentAnalyses', label: 'Con. Analyses', group: 'Core Details', editable: true },
-  { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', editable: true },
-  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', editable: true },
-  { key: 'topicAnalyses', label: 'Topic analyses', group: 'AI', editable: true },
-  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules', editable: true },
-  { key: 'fullMonitors', label: 'Full monitors', group: 'Modules', editable: true },
+  { key: 'deployTarget', label: 'Deploy target', group: 'Tenant requirements', editable: true, inputType: 'picklist' },
+  { key: 'existingSystemId', label: 'SID (if existing system)', group: 'Tenant requirements', editable: true },
+  { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist' },
+  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist' },
+  { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist' },
+  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist' },
+  { key: 'licenses', label: 'Licenses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'users', label: 'Users (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'concurrentSearches', label: 'Con. Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'dailySearches', label: 'Daily Qty Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'monthlySearches', label: 'Monthly Qty Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'concurrentAnalyses', label: 'Con. Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'dailyAnalyses', label: 'Daily Qty Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'webloc', label: 'Webloc', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'webeye', label: 'Webeye', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'ingest', label: 'Ingest', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'crossSystemFeatures', label: 'Cross System', group: 'Modules', editable: true, inputType: 'multiselect' },
+  { key: 'standardMonitors', label: 'Std. Monitors (integer)', group: 'Modules', editable: true, inputType: 'integer' },
+  { key: 'fullMonitors', label: 'Full monitors (integer)', group: 'Modules', editable: true, inputType: 'integer' },
+  { key: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
+  { key: 'apiDailyQty', label: 'API Daily Qty (integer)', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiMonthlyQty', label: 'API Monthly (integer)', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
+  { key: 'topicAnalyses', label: 'Topic analyses', group: 'AI', editable: true, inputType: 'picklist' },
+  { key: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
 ]
 
 export const requirementBColumns: RequirementColumnMetadata[] = [
@@ -103,6 +129,7 @@ export const requirementCColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
   { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
+  { key: 'warrantyRecordId', label: 'Warranty record to extend', group: 'Renewal context', editable: true, inputType: 'picklist' },
   { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
   { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },
 ]
@@ -148,7 +175,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     keyForOpportunity('RENEWAL', 'STANDARD'),
     {
       sourceSheet: 'Project form-Renewal-Standard',
-      headerFields: DELIVERY_HEADER_FIELDS,
+      headerFields: RENEWAL_STANDARD_HEADER_FIELDS,
       visibleRequirementTypes: ['C'],
     },
   ],

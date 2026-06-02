@@ -38,6 +38,18 @@ export function getAccountSystems(accountId: string, systems: System[]): System[
   return systems.filter((system) => system.accountId === accountId && Boolean(system.sid))
 }
 
+export function getOpportunityExistingSidSystems(opportunity: Opportunity, accounts: Account[], systems: System[]): System[] {
+  const account = accounts.find((candidate) => candidate.id === opportunity.accountId)
+  if (!account || account.salesManagerId !== opportunity.salesManagerId) return []
+
+  return systems.filter(
+    (system) =>
+      system.accountId === opportunity.accountId &&
+      system.salesManagerId === opportunity.salesManagerId &&
+      Boolean(system.sid),
+  )
+}
+
 export function getAccountTenants(accountId: string, tenants: Tenant[]): Tenant[] {
   return tenants.filter((tenant) => tenant.accountId === accountId)
 }
@@ -53,10 +65,12 @@ export function resolveTenantSid(tenantId: string, tenants: Tenant[], systems: S
   return system?.sid ?? ''
 }
 
-function accountOwnsSystem(accountId: string, systemId: string | null, systems: System[]): boolean {
+function opportunityCanUseSystem(opportunity: Opportunity, systemId: string | null, context: OpportunityContext): boolean {
   if (!systemId) return false
 
-  return systems.some((system) => system.id === systemId && system.accountId === accountId)
+  return getOpportunityExistingSidSystems(opportunity, context.accounts, context.systems).some(
+    (system) => system.id === systemId,
+  )
 }
 
 function accountOwnsTenant(accountId: string, tenantId: string, tenants: Tenant[]): boolean {
@@ -65,6 +79,33 @@ function accountOwnsTenant(accountId: string, tenantId: string, tenants: Tenant[
 
 function requiredText(value: string | null | undefined, label: string): ValidationMessage[] {
   return value?.trim() ? [] : [{ level: 'error', message: `${label} is required.` }]
+}
+
+const INTEGER_FIELD_LABELS: Array<[string, string]> = [
+  ['licenses', 'Licenses'],
+  ['users', 'Users'],
+  ['concurrentSearches', 'Concurrent searches'],
+  ['dailySearches', 'Daily searches'],
+  ['monthlySearches', 'Monthly searches'],
+  ['concurrentAnalyses', 'Concurrent analyses'],
+  ['dailyAnalyses', 'Daily analyses'],
+  ['monthlyAnalyses', 'Monthly analyses'],
+  ['standardMonitors', 'Standard monitors'],
+  ['fullMonitors', 'Full monitors'],
+  ['apiDailyQty', 'API daily quantity'],
+  ['apiMonthlyQty', 'API monthly quantity'],
+]
+
+function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirement): ValidationMessage[] {
+  const values = row as unknown as Record<string, unknown>
+
+  return INTEGER_FIELD_LABELS.flatMap(([key, label]) => {
+    const value = values[key]
+
+    return value == null || value === '' || (typeof value === 'number' && Number.isInteger(value))
+      ? []
+      : [{ level: 'error' as const, message: `${label} must be an integer.` }]
+  })
 }
 
 export function validateRequirementA(
@@ -80,12 +121,15 @@ export function validateRequirementA(
   if (row.deployTarget === 'EXISTING_SID') {
     if (!row.existingSystemId) {
       messages.push({ level: 'error', message: 'Existing SID is required when deploy target is Existing SID.' })
-    } else if (!accountOwnsSystem(opportunity.accountId, row.existingSystemId, context.systems)) {
-      messages.push({ level: 'error', message: 'Existing SID must belong to the selected account.' })
+    } else if (!opportunityCanUseSystem(opportunity, row.existingSystemId, context)) {
+      messages.push({
+        level: 'error',
+        message: 'Existing SID must belong to a customer owned by the selected Sales Manager and account.',
+      })
     }
   }
 
-  return messages
+  return [...messages, ...validateIntegerFields(row)]
 }
 
 export function validateRequirementB(
@@ -106,7 +150,7 @@ export function validateRequirementB(
     messages.push({ level: 'warning', message: 'SID will be reset from the selected tenant.' })
   }
 
-  return messages
+  return [...messages, ...validateIntegerFields(row)]
 }
 
 export function validateRequirementC(
@@ -120,6 +164,10 @@ export function validateRequirementC(
     messages.push({ level: 'error', message: 'Existing tenant is required.' })
   } else if (!accountOwnsTenant(opportunity.accountId, row.tenantId, context.tenants)) {
     messages.push({ level: 'error', message: 'Selected tenant must belong to the selected account.' })
+  }
+
+  if (!row.warrantyRecordId) {
+    messages.push({ level: 'error', message: 'Warranty record to extend is required.' })
   }
 
   return messages
@@ -170,7 +218,7 @@ export function validateOpportunityRequirements(
   }, 0)
   const messages: ValidationMessage[] = []
 
-  if (visibleRows === 0) {
+  if (opportunity.stage === 'WON' && visibleRows === 0) {
     messages.push({ level: 'error', message: 'At least one visible tenant requirement row is required.' })
   }
 
