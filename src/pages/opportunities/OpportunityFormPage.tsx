@@ -197,23 +197,25 @@ function RequirementGrid({
     const isChanged = cellChanged(row, column.key)
 
     return (
-      <div className={inputClassName(isChanged, 'min-w-48 space-y-1 p-2')}>
+      <select
+        multiple
+        size={Math.min(options.length, 4)}
+        className={inputClassName(isChanged, 'min-h-24 w-52 text-xs')}
+        value={selected}
+        onChange={(event) =>
+          onUpdateRow(
+            row.id,
+            column.key,
+            Array.from(event.currentTarget.selectedOptions).map((option) => option.value),
+          )
+        }
+      >
         {options.map((option) => (
-          <label key={option} className="flex items-center gap-1 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={selected.includes(option)}
-              onChange={(event) => {
-                const nextValue = event.target.checked
-                  ? [...selected, option]
-                  : selected.filter((selectedOption) => selectedOption !== option)
-                onUpdateRow(row.id, column.key, nextValue)
-              }}
-            />
+          <option key={option} value={option}>
             {option}
-          </label>
+          </option>
         ))}
-      </div>
+      </select>
     )
   }
 
@@ -224,7 +226,7 @@ function RequirementGrid({
       const requirement = row as NewTenantRequirement
       return (
         <select
-          className={inputClassName(isChanged, 'w-36')}
+          className={inputClassName(isChanged, 'h-8 w-36 text-xs')}
           value={requirement.deployTarget}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value as RequirementDeployTarget)}
         >
@@ -238,7 +240,7 @@ function RequirementGrid({
       const requirement = row as NewTenantRequirement
       return (
         <select
-          className={inputClassName(isChanged, 'w-44')}
+          className={inputClassName(isChanged, 'h-8 w-44 text-xs')}
           disabled={requirement.deployTarget !== 'EXISTING_SID'}
           value={requirement.existingSystemId ?? ''}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
@@ -256,7 +258,7 @@ function RequirementGrid({
     if (column.key === 'tenantId' && (kind === 'B' || kind === 'C')) {
       return (
         <select
-          className={inputClassName(isChanged, 'w-48')}
+          className={inputClassName(isChanged, 'h-8 w-48 text-xs')}
           value={(row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -272,7 +274,11 @@ function RequirementGrid({
 
     if (column.key === 'systemId' && (kind === 'B' || kind === 'C')) {
       const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
-      return <span className={isChanged ? 'bg-yellow-100 px-1' : 'text-sf-text-muted'}>{resolveTenantSid(tenantId, accountTenants, sidSystems)}</span>
+      return (
+        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
+          {resolveTenantSid(tenantId, accountTenants, sidSystems)}
+        </span>
+      )
     }
 
     if (column.key === 'warrantyRecordId' && kind === 'C') {
@@ -280,7 +286,7 @@ function RequirementGrid({
       const tenantWarrantyRecords = warrantyRecords.filter((record) => record.tenantId === requirement.tenantId)
       return (
         <select
-          className={inputClassName(isChanged, 'w-52')}
+          className={inputClassName(isChanged, 'h-8 w-52 text-xs')}
           value={requirement.warrantyRecordId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -308,7 +314,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={inputClassName(isChanged, 'w-40')}
+          className={inputClassName(isChanged, 'h-8 w-40 text-xs')}
           value={textValue(rowValue(row, column.key))}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -334,7 +340,7 @@ function RequirementGrid({
     if (column.inputType === 'integer') {
       return (
         <input
-          className={inputClassName(isChanged, 'w-28')}
+          className={inputClassName(isChanged, 'h-8 w-28 text-xs')}
           type="number"
           step="1"
           value={textValue(rowValue(row, column.key))}
@@ -344,12 +350,16 @@ function RequirementGrid({
     }
 
     if (!column.editable) {
-      return <span className={isChanged ? 'bg-yellow-100 px-1' : 'text-sf-text-muted'}>{textValue(rowValue(row, column.key))}</span>
+      return (
+        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
+          {textValue(rowValue(row, column.key))}
+        </span>
+      )
     }
 
     return (
       <input
-        className={inputClassName(isChanged, 'w-36')}
+        className={inputClassName(isChanged, 'h-8 w-36 text-xs')}
         value={textValue(rowValue(row, column.key))}
         onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
       />
@@ -357,42 +367,42 @@ function RequirementGrid({
   }
 
   return (
-    <section className="sf-card space-y-3 p-3">
-      <div className="flex items-center justify-between gap-3">
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-sf-text">{title}</h2>
-          <p className="text-sm text-sf-text-muted">Editable tenant requirements from Excel section 3.</p>
+          <h2 className="text-sm font-semibold text-sf-text">{title}</h2>
+          <p className="text-xs text-sf-text-muted">Each row represents one tenant requirement from Excel section 3.</p>
         </div>
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
           + Add Tenant Requirement
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-sf-border text-sm">
+      <div className="overflow-x-auto rounded border border-sf-border bg-white">
+        <table className="min-w-full border-collapse text-xs">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className="whitespace-nowrap px-3 py-2 font-semibold text-sf-text">
+                <th key={column.key} className="whitespace-nowrap border border-sf-border px-2 py-1 align-bottom font-semibold text-sf-text">
                   <span>{column.label}</span>
                   <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
                 </th>
               ))}
-              <th className="px-3 py-2" />
+              <th className="border border-sf-border px-2 py-1" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-sf-border bg-white">
+          <tbody className="bg-white">
             {rows.map((row) => (
-              <tr key={row.id}>
+              <tr key={row.id} className="hover:bg-sf-surface-alt">
                 {columns.map((column) => (
-                  <td key={column.key} className="px-3 py-2 align-top">
+                  <td key={column.key} className="border border-sf-border px-2 py-1 align-top">
                     {renderCell(row, column)}
                   </td>
                 ))}
-                <td className="px-3 py-2 align-top">
+                <td className="border border-sf-border px-2 py-1 align-top">
                   <button
                     type="button"
-                    className="rounded border border-red-200 px-2 py-1 text-red-700 hover:bg-red-50"
+                    className="h-8 rounded border border-red-200 px-2 text-xs text-red-700 hover:bg-red-50"
                     onClick={() => onDeleteRow(row.id)}
                   >
                     Delete
@@ -402,7 +412,7 @@ function RequirementGrid({
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-4 text-sf-text-muted" colSpan={columns.length + 1}>
+                <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={columns.length + 1}>
                   No tenant requirements yet.
                 </td>
               </tr>
@@ -795,7 +805,7 @@ export function OpportunityFormPage() {
 
       {visibleRequirementTypes.includes('A') ? (
         <RequirementGrid
-          title="Grid A - New tenant requirements"
+          title="Grid A: New Tenant Requirements"
           kind="A"
           columns={requirementAColumns}
           draft={currentDraft}
@@ -812,7 +822,7 @@ export function OpportunityFormPage() {
 
       {visibleRequirementTypes.includes('B') ? (
         <RequirementGrid
-          title="Grid B - Existing tenant change requests"
+          title="Grid B: Change Request Requirements"
           kind="B"
           columns={requirementBColumns}
           draft={currentDraft}
@@ -829,7 +839,7 @@ export function OpportunityFormPage() {
 
       {visibleRequirementTypes.includes('C') ? (
         <RequirementGrid
-          title="Grid C - Standard renewal requirements"
+          title="Grid C: Standard Renewal Requirements"
           kind="C"
           columns={requirementCColumns}
           draft={currentDraft}
