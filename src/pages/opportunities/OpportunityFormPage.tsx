@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   getOpportunityMetadata,
@@ -36,6 +37,7 @@ import {
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project'
+type ActiveMultiSelect = { id: string; left: number; top: number; width: number }
 
 const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   POC: ['FREE', 'PAID'],
@@ -292,7 +294,7 @@ function RequirementGrid({
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
 }) {
-  const [activeMultiSelect, setActiveMultiSelect] = useState<string | null>(null)
+  const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const rows =
     kind === 'A'
       ? draft.newTenantRequirements
@@ -332,6 +334,7 @@ function RequirementGrid({
     const selected = Array.isArray(rowValue(row, column.key)) ? (rowValue(row, column.key) as string[]) : []
     const isChanged = cellChanged(row, column.key)
     const pickerId = `${row.id}:${column.key}`
+    const isOpen = activeMultiSelect?.id === pickerId
 
     function toggleOption(option: string) {
       const nextSelected = selected.includes(option)
@@ -342,26 +345,39 @@ function RequirementGrid({
     }
 
     return (
-      <div className="relative">
+      <>
         <button
           type="button"
           className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-xs')}
           title={selected.join('; ')}
-          onClick={() => setActiveMultiSelect((current) => (current === pickerId ? null : pickerId))}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setActiveMultiSelect((current) =>
+              current?.id === pickerId
+                ? null
+                : { id: pickerId, left: rect.left, top: rect.bottom + 4, width: Math.max(rect.width, 224) },
+            )
+          }}
         >
           {selected.length > 0 ? selected.join('; ') : 'Select'}
         </button>
-        {activeMultiSelect === pickerId ? (
-          <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg">
-            {options.map((option) => (
-              <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-sf-surface-alt">
-                <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
-        ) : null}
-      </div>
+        {isOpen
+          ? createPortal(
+              <div
+                className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
+                style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
+              >
+                {options.map((option) => (
+                  <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-sf-surface-alt">
+                    <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>,
+              document.body,
+            )
+          : null}
+      </>
     )
   }
 
