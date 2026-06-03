@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppDataState, OpportunitySubType, OpportunityType } from '@/data/seed.types'
+import type { AppDataState, Opportunity, OpportunitySubType, OpportunityType, Project } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
   createInitialState,
@@ -20,6 +20,7 @@ interface AppStore extends AppDataState {
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
+  createProjectFromOpportunity: (opportunity: Opportunity) => Project
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
 }
@@ -114,6 +115,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       pocStartDate: null,
       pocEndDate: null,
       warrantyServiceMonths: null,
+      warrantyRecordId: '',
       region: defaultAccount?.region ?? '',
       country: defaultAccount?.country ?? '',
       state: defaultAccount?.state ?? '',
@@ -141,6 +143,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const project: AppDataState['projects'][number] = {
       id: `proj-${crypto.randomUUID()}`,
       pid: nextPid,
+      opportunityId: undefined,
       accountName: '',
       mainType: 'DELIVERY',
       subType: 'NONE',
@@ -154,6 +157,48 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     set((s) => ({ idCounters, projects: [project, ...s.projects] }))
+    get().saveToStorage()
+    return project
+  },
+
+  createProjectFromOpportunity: (opportunity) => {
+    const state = get()
+    const existingProject = state.projects.find((project) => project.opportunityId === opportunity.opportunityId)
+    const account = state.accounts.find((candidate) => candidate.id === opportunity.accountId)
+    const salesManager = state.salesManagers.find((candidate) => candidate.id === opportunity.salesManagerId)
+    const projectPatch = {
+      opportunityId: opportunity.opportunityId,
+      accountName: account?.accountName ?? '',
+      mainType: opportunity.type,
+      subType: opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType,
+      deliveryDate: opportunity.deliveryDate,
+      progressStatus: 'OPEN',
+      dealOwner: salesManager?.name ?? '',
+      opportunityName: opportunity.opportunityName,
+      canceledAt: null,
+      updatedAt: new Date().toISOString(),
+    } satisfies Omit<Project, 'id' | 'pid' | 'createdAt'>
+
+    if (existingProject) {
+      const project = { ...existingProject, ...projectPatch }
+      set((currentState) => ({
+        projects: currentState.projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate)),
+      }))
+      get().saveToStorage()
+      return project
+    }
+
+    const { counters: idCounters, id: nextPid } = incrementCounter(state.idCounters, 'pid')
+    const now = new Date().toISOString()
+    const project: Project = {
+      id: `proj-${crypto.randomUUID()}`,
+      pid: nextPid,
+      ...projectPatch,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    set((currentState) => ({ idCounters, projects: [project, ...currentState.projects] }))
     get().saveToStorage()
     return project
   },

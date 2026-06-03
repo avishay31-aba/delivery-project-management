@@ -1,4 +1,11 @@
-import { getVisibleRequirementTypes } from '@/config/opportunity-metadata'
+import {
+  getOpportunityMetadata,
+  getVisibleRequirementTypes,
+  requirementAColumns,
+  requirementBColumns,
+  requirementCColumns,
+  type RequirementColumnMetadata,
+} from '@/config/opportunity-metadata'
 import type {
   Account,
   ChangeRequestRequirement,
@@ -81,6 +88,10 @@ function requiredText(value: string | null | undefined, label: string): Validati
   return value?.trim() ? [] : [{ level: 'error', message: `${label} is required.` }]
 }
 
+function isEmpty(value: unknown): boolean {
+  return value == null || value === '' || (Array.isArray(value) && value.length === 0)
+}
+
 const INTEGER_FIELD_LABELS: Array<[string, string]> = [
   ['licenses', 'Licenses'],
   ['users', 'Users'],
@@ -108,14 +119,34 @@ function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirem
   })
 }
 
+function validateRequiredGridFields(
+  row: NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement,
+  columns: RequirementColumnMetadata[],
+  gridName: string,
+  rowIndex: number,
+): ValidationMessage[] {
+  const values = row as unknown as Record<string, unknown>
+
+  return columns.flatMap((column) => {
+    if (column.key === 'existingSystemId' && values.deployTarget !== 'EXISTING_SID') return []
+
+    const isAutoRequired = column.key === 'systemId'
+    if (!column.editable && !isAutoRequired) return []
+
+    return isEmpty(values[column.key])
+      ? [{ level: 'error' as const, message: `${gridName} row ${rowIndex + 1}: ${column.label} is required.` }]
+      : []
+  })
+}
+
 export function validateRequirementA(
   row: NewTenantRequirement,
   opportunity: Opportunity,
   context: OpportunityContext,
+  rowIndex = 0,
 ): ValidationMessage[] {
   const messages: ValidationMessage[] = [
-    ...requiredText(row.requirementId, 'Requirement ID'),
-    ...requiredText(row.deployTarget, 'System New/Existing?'),
+    ...validateRequiredGridFields(row, requirementAColumns, 'Grid A', rowIndex),
   ]
 
   if (row.deployTarget === 'EXISTING_SID') {
@@ -136,8 +167,9 @@ export function validateRequirementB(
   row: ChangeRequestRequirement,
   opportunity: Opportunity,
   context: OpportunityContext,
+  rowIndex = 0,
 ): ValidationMessage[] {
-  const messages: ValidationMessage[] = [...requiredText(row.requirementId, 'Requirement ID')]
+  const messages: ValidationMessage[] = [...validateRequiredGridFields(row, requirementBColumns, 'Grid B', rowIndex)]
 
   if (!row.tenantId) {
     messages.push({ level: 'error', message: 'Existing tenant is required.' })
@@ -157,17 +189,14 @@ export function validateRequirementC(
   row: StandardRenewalRequirement,
   opportunity: Opportunity,
   context: OpportunityContext,
+  rowIndex = 0,
 ): ValidationMessage[] {
-  const messages: ValidationMessage[] = [...requiredText(row.requirementId, 'Requirement ID')]
+  const messages: ValidationMessage[] = [...validateRequiredGridFields(row, requirementCColumns, 'Grid C', rowIndex)]
 
   if (!row.tenantId) {
     messages.push({ level: 'error', message: 'Existing tenant is required.' })
   } else if (!accountOwnsTenant(opportunity.accountId, row.tenantId, context.tenants)) {
     messages.push({ level: 'error', message: 'Selected tenant must belong to the selected account.' })
-  }
-
-  if (!row.warrantyRecordId) {
-    messages.push({ level: 'error', message: 'Warranty record to extend is required.' })
   }
 
   return messages
@@ -192,12 +221,30 @@ export function validateRequirementTenantUniqueness(opportunity: Opportunity): V
 }
 
 export function validateOpportunityHeader(opportunity: Opportunity, context: OpportunityContext): ValidationMessage[] {
+  const metadata = getOpportunityMetadata(opportunity.type, opportunity.subType)
+  const visibleHeaderKeys = new Set(metadata.headerFields.map((field) => field.key))
   const messages: ValidationMessage[] = [
     ...requiredText(opportunity.opportunityId, 'Salesforce Opportunity ID'),
     ...requiredText(opportunity.opportunityName, 'Opportunity name'),
     ...requiredText(opportunity.accountId, 'Account'),
     ...requiredText(opportunity.salesManagerId, 'Sales Manager / Deal Owner'),
   ]
+
+  if (visibleHeaderKeys.has('deliveryDate') && !opportunity.deliveryDate) {
+    messages.push({ level: 'error', message: 'Delivery date is required.' })
+  }
+
+  if (visibleHeaderKeys.has('pocStartDate') && !opportunity.pocStartDate) {
+    messages.push({ level: 'error', message: 'Start Date is required.' })
+  }
+
+  if (visibleHeaderKeys.has('pocEndDate') && !opportunity.pocEndDate) {
+    messages.push({ level: 'error', message: 'End Date is required.' })
+  }
+
+  if (visibleHeaderKeys.has('warrantyRecordId') && !opportunity.warrantyRecordId?.trim()) {
+    messages.push({ level: 'error', message: 'Warranty record to extend is required.' })
+  }
 
   if (opportunity.accountId && !context.accounts.some((account) => account.id === opportunity.accountId)) {
     messages.push({ level: 'error', message: 'Selected account does not exist.' })
@@ -229,15 +276,21 @@ export function validateOpportunityRequirements(
     })
   })
 
-  opportunity.newTenantRequirements.forEach((row) => {
-    validateRequirementA(row, opportunity, context).forEach((message) => messages.push(message))
-  })
-  opportunity.changeRequestRequirements.forEach((row) => {
-    validateRequirementB(row, opportunity, context).forEach((message) => messages.push(message))
-  })
-  opportunity.standardRenewalRequirements.forEach((row) => {
-    validateRequirementC(row, opportunity, context).forEach((message) => messages.push(message))
-  })
+  if (visibleTypes.includes('A')) {
+    opportunity.newTenantRequirements.forEach((row, index) => {
+      validateRequirementA(row, opportunity, context, index).forEach((message) => messages.push(message))
+    })
+  }
+  if (visibleTypes.includes('B')) {
+    opportunity.changeRequestRequirements.forEach((row, index) => {
+      validateRequirementB(row, opportunity, context, index).forEach((message) => messages.push(message))
+    })
+  }
+  if (visibleTypes.includes('C')) {
+    opportunity.standardRenewalRequirements.forEach((row, index) => {
+      validateRequirementC(row, opportunity, context, index).forEach((message) => messages.push(message))
+    })
+  }
 
   validateRequirementTenantUniqueness(opportunity).forEach((message) => messages.push(message))
 

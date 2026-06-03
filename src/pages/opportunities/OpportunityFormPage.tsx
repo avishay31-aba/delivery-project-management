@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { type KeyboardEvent, useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   getOpportunityMetadata,
   getVisibleRequirementTypes,
@@ -51,7 +51,11 @@ const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face',
 const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
 
 function cloneOpportunity(opportunity: Opportunity): Opportunity {
-  return JSON.parse(JSON.stringify(opportunity)) as Opportunity
+  const clone = JSON.parse(JSON.stringify(opportunity)) as Opportunity
+  return {
+    ...clone,
+    warrantyRecordId: clone.warrantyRecordId ?? clone.standardRenewalRequirements[0]?.warrantyRecordId ?? '',
+  }
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -65,18 +69,28 @@ function textValue(value: unknown): string {
 
 function inputClassName(isChanged: boolean, extra = ''): string {
   return [
-    'rounded border border-sf-border px-2 py-1',
+    'rounded border border-sf-border px-2 py-1 leading-tight',
     isChanged ? 'bg-yellow-100' : 'bg-white',
     extra,
   ].join(' ')
 }
 
-function readonlyClassName(isChanged: boolean): string {
-  return inputClassName(isChanged, 'bg-sf-surface-alt')
-}
-
 function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
+}
+
+function digitString(value: unknown): string {
+  return value == null ? '' : String(value).replace(/\D/g, '')
+}
+
+function parseDigitValue(value: string): number | null {
+  return value === '' ? null : Number(value)
+}
+
+function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  if (!/^\d$/.test(event.key)) event.preventDefault()
 }
 
 function createBaseRequirement(requirementId: string): Omit<
@@ -201,7 +215,7 @@ function RequirementGrid({
       <select
         multiple
         size={Math.min(options.length, 4)}
-        className={inputClassName(isChanged, 'min-h-24 w-52 text-xs')}
+        className={inputClassName(isChanged, 'min-h-16 w-44 text-[11px]')}
         value={selected}
         onChange={(event) =>
           onUpdateRow(
@@ -227,7 +241,7 @@ function RequirementGrid({
       const requirement = row as NewTenantRequirement
       return (
         <select
-          className={inputClassName(isChanged, 'h-8 w-36 text-xs')}
+          className={inputClassName(isChanged, 'h-6 w-32 text-[11px]')}
           value={requirement.deployTarget}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value as RequirementDeployTarget)}
         >
@@ -245,7 +259,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={inputClassName(isChanged, 'h-8 w-44 text-xs')}
+          className={inputClassName(isChanged, 'h-6 w-40 text-[11px]')}
           value={requirement.existingSystemId ?? ''}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
         >
@@ -262,7 +276,7 @@ function RequirementGrid({
     if (column.key === 'tenantId' && (kind === 'B' || kind === 'C')) {
       return (
         <select
-          className={inputClassName(isChanged, 'h-8 w-48 text-xs')}
+          className={inputClassName(isChanged, 'h-6 w-40 text-[11px]')}
           value={(row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -290,7 +304,7 @@ function RequirementGrid({
       const tenantWarrantyRecords = warrantyRecords.filter((record) => record.tenantId === requirement.tenantId)
       return (
         <select
-          className={inputClassName(isChanged, 'h-8 w-52 text-xs')}
+          className={inputClassName(isChanged, 'h-6 w-44 text-[11px]')}
           value={requirement.warrantyRecordId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -318,7 +332,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={inputClassName(isChanged, 'h-8 w-40 text-xs')}
+          className={inputClassName(isChanged, 'h-6 w-36 text-[11px]')}
           value={textValue(rowValue(row, column.key))}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -344,11 +358,17 @@ function RequirementGrid({
     if (column.inputType === 'integer') {
       return (
         <input
-          className={inputClassName(isChanged, 'h-8 w-28 text-xs')}
-          type="number"
-          step="1"
-          value={textValue(rowValue(row, column.key))}
-          onChange={(event) => onUpdateRow(row.id, column.key, event.target.value === '' ? null : Number(event.target.value))}
+          className={inputClassName(isChanged, 'h-6 w-20 text-[11px]')}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={digitString(rowValue(row, column.key))}
+          onKeyDown={preventNonDigitKey}
+          onPaste={(event) => {
+            event.preventDefault()
+            onUpdateRow(row.id, column.key, parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')))
+          }}
+          onChange={(event) => onUpdateRow(row.id, column.key, parseDigitValue(event.target.value.replace(/\D/g, '')))}
         />
       )
     }
@@ -363,7 +383,7 @@ function RequirementGrid({
 
     return (
       <input
-        className={inputClassName(isChanged, 'h-8 w-36 text-xs')}
+        className={inputClassName(isChanged, 'h-6 w-32 text-[11px]')}
         value={textValue(rowValue(row, column.key))}
         onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
       />
@@ -383,13 +403,13 @@ function RequirementGrid({
       </div>
 
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-xs">
+        <table className="min-w-full border-collapse text-[11px]">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className="whitespace-nowrap border border-sf-border px-2 py-1 align-bottom font-semibold text-sf-text">
+                <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom font-semibold text-sf-text">
                   <span>{column.label}</span>
-                  <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
+                  <span className="block text-[10px] font-normal text-sf-text-muted">{column.group}</span>
                 </th>
               ))}
               <th className="border border-sf-border px-2 py-1" />
@@ -399,14 +419,14 @@ function RequirementGrid({
             {rows.map((row) => (
               <tr key={row.id} className="hover:bg-sf-surface-alt">
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-sf-border px-2 py-1 align-top">
+                  <td key={column.key} className="border border-sf-border px-1.5 py-0.5 align-top">
                     {renderCell(row, column)}
                   </td>
                 ))}
-                <td className="border border-sf-border px-2 py-1 align-top">
+                <td className="border border-sf-border px-1.5 py-0.5 align-top">
                   <button
                     type="button"
-                    className="h-8 rounded border border-red-200 px-2 text-xs text-red-700 hover:bg-red-50"
+                    className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
                     onClick={() => onDeleteRow(row.id)}
                   >
                     Delete
@@ -437,7 +457,9 @@ export function OpportunityFormPage() {
   const systems = useAppStore((state) => state.systems)
   const tenants = useAppStore((state) => state.tenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
+  const projects = useAppStore((state) => state.projects)
   const updateOpportunity = useAppStore((state) => state.updateOpportunity)
+  const createProjectFromOpportunity = useAppStore((state) => state.createProjectFromOpportunity)
   const savedOpportunity = opportunities.find((candidate) => candidate.opportunityId === opportunityId)
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
@@ -452,6 +474,7 @@ export function OpportunityFormPage() {
   const account = draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined
   const sidSystems = draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []
   const accountTenants = draft ? getAccountTenants(draft.accountId, tenants) : []
+  const createdProjects = draft ? projects.filter((project) => project.opportunityId === draft.opportunityId) : []
   const hiddenRequirementTypes = draft ? getHiddenRequirementTypesWithRows(draft) : []
   const countryOptions = Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort()
   const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
@@ -475,6 +498,25 @@ export function OpportunityFormPage() {
 
   function headerChanged(field: keyof Opportunity): boolean {
     return !valuesEqual(currentDraft[field], currentSavedOpportunity[field])
+  }
+
+  function headerFieldWidthClass(key: OpportunityHeaderField['key'] | 'stage'): string {
+    if (key === 'opportunityName' || key === 'accountId' || key === 'warrantyRecordId') return 'w-64'
+    if (key === 'salesManagerId') return 'w-56'
+    if (key === 'opportunityId' || key === 'timeZone') return 'w-48'
+    if (key === 'deliveryDate' || key === 'pocStartDate' || key === 'pocEndDate') return 'w-40'
+    if (key === 'warrantyServiceMonths') return 'w-36'
+    if (key === 'type' || key === 'subType' || key === 'region' || key === 'country' || key === 'state') return 'w-36'
+    return 'w-32'
+  }
+
+  function headerLabelClassName(key: OpportunityHeaderField['key'] | 'stage'): string {
+    return `inline-flex ${headerFieldWidthClass(key)} flex-col items-start gap-1 text-sm align-top`
+  }
+
+  function headerControlClassName(key: OpportunityHeaderField['key'] | 'stage', changed: boolean, editable = true): string {
+    const base = `${headerFieldWidthClass(key)} h-8 text-sm`
+    return editable ? inputClassName(changed, base) : inputClassName(changed, `${base} bg-sf-surface-alt`)
   }
 
   function updateAccount(accountId: string) {
@@ -622,6 +664,7 @@ export function OpportunityFormPage() {
     }
 
     updateOpportunity(currentSavedOpportunity.id, currentDraft)
+    createProjectFromOpportunity(currentDraft)
     setSaveMessages([])
 
     if (currentDraft.opportunityId !== currentSavedOpportunity.opportunityId) {
@@ -632,10 +675,10 @@ export function OpportunityFormPage() {
   function renderHeaderField(field: OpportunityHeaderField) {
     if (field.key === 'type') {
       return (
-        <label key={field.key} className="space-y-1 text-sm">
+        <label key={field.key} className={headerLabelClassName(field.key)}>
           <span className="font-medium text-sf-text-muted">{field.label}</span>
           <select
-            className={inputClassName(headerChanged('type'), 'w-full')}
+            className={headerControlClassName(field.key, headerChanged('type'))}
             value={currentDraft.type}
             onChange={(event) => updateType(event.target.value as OpportunityType)}
           >
@@ -649,10 +692,10 @@ export function OpportunityFormPage() {
 
     if (field.key === 'subType') {
       return (
-        <label key={field.key} className="space-y-1 text-sm">
+        <label key={field.key} className={headerLabelClassName(field.key)}>
           <span className="font-medium text-sf-text-muted">{field.label}</span>
           <select
-            className={inputClassName(headerChanged('subType'), 'w-full')}
+            className={headerControlClassName(field.key, headerChanged('subType'))}
             value={currentDraft.subType}
             onChange={(event) => patchDraft({ subType: event.target.value as OpportunitySubType })}
           >
@@ -668,10 +711,10 @@ export function OpportunityFormPage() {
 
     if (field.key === 'accountId') {
       return (
-        <label key={field.key} className="space-y-1 text-sm">
+        <label key={field.key} className={headerLabelClassName(field.key)}>
           <span className="font-medium text-sf-text-muted">{field.label}</span>
           <select
-            className={inputClassName(headerChanged('accountId'), 'w-full')}
+            className={headerControlClassName(field.key, headerChanged('accountId'))}
             value={currentDraft.accountId}
             onChange={(event) => updateAccount(event.target.value)}
           >
@@ -687,10 +730,10 @@ export function OpportunityFormPage() {
 
     if (field.key === 'salesManagerId') {
       return (
-        <label key={field.key} className="space-y-1 text-sm">
+        <label key={field.key} className={headerLabelClassName(field.key)}>
           <span className="font-medium text-sf-text-muted">{field.label}</span>
           <select
-            className={inputClassName(headerChanged('salesManagerId'), 'w-full')}
+            className={headerControlClassName(field.key, headerChanged('salesManagerId'))}
             value={currentDraft.salesManagerId}
             onChange={(event) => patchDraft({ salesManagerId: event.target.value })}
           >
@@ -704,26 +747,59 @@ export function OpportunityFormPage() {
       )
     }
 
+    if (field.key === 'warrantyRecordId') {
+      const tenantIds = new Set(accountTenants.map((tenant) => tenant.id))
+      const accountWarrantyRecords = warrantyRecords.filter((record) => tenantIds.has(record.tenantId))
+      return (
+        <label key={field.key} className={headerLabelClassName(field.key)}>
+          <span className="font-medium text-sf-text-muted">{field.label}</span>
+          <select
+            className={headerControlClassName(field.key, headerChanged('warrantyRecordId'))}
+            value={currentDraft.warrantyRecordId ?? ''}
+            onChange={(event) => patchDraft({ warrantyRecordId: event.target.value })}
+          >
+            <option value="">Select warranty</option>
+            {accountWarrantyRecords.map((record) => (
+              <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
+                {record.warrantyRecordId} - {record.status} - {record.endDate ?? 'No end'}
+              </option>
+            ))}
+          </select>
+        </label>
+      )
+    }
+
     const dateFields = new Set(['deliveryDate', 'pocStartDate', 'pocEndDate'])
     const isDate = dateFields.has(field.key)
     const isNumber = field.key === 'warrantyServiceMonths'
     const changed = headerChanged(field.key)
 
     return (
-      <label key={field.key} className="space-y-1 text-sm">
-        <span className="font-medium text-sf-text-muted">{field.label}</span>
+      <label key={field.key} className={headerLabelClassName(field.key)}>
+        <span className="font-medium text-sf-text-muted">
+          {field.label}
+          {isDate ? <span className="ml-0.5 text-red-600">*</span> : null}
+        </span>
         <input
-          className={field.editable ? inputClassName(changed, 'w-full') : readonlyClassName(changed)}
-          type={isDate ? 'date' : isNumber ? 'number' : 'text'}
-          step={isNumber ? '1' : undefined}
-          value={textValue(currentDraft[field.key])}
+          className={headerControlClassName(field.key, changed, field.editable)}
+          type={isDate ? 'date' : 'text'}
+          inputMode={isNumber ? 'numeric' : undefined}
+          pattern={isNumber ? '[0-9]*' : undefined}
+          value={isNumber ? digitString(currentDraft[field.key]) : textValue(currentDraft[field.key])}
           readOnly={!field.editable}
+          onKeyDown={isNumber ? preventNonDigitKey : undefined}
+          onPaste={
+            isNumber
+              ? (event) => {
+                  event.preventDefault()
+                  patchDraft({ [field.key]: parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')) } as Partial<Opportunity>)
+                }
+              : undefined
+          }
           onChange={(event) =>
             patchDraft({
               [field.key]: isNumber
-                ? event.target.value === ''
-                  ? null
-                  : Number(event.target.value)
+                ? parseDigitValue(event.target.value.replace(/\D/g, ''))
                 : event.target.value || (isDate ? null : ''),
             } as Partial<Opportunity>)
           }
@@ -734,10 +810,10 @@ export function OpportunityFormPage() {
 
   function renderStageField() {
     return (
-      <label className="space-y-1 text-sm">
+      <label className={headerLabelClassName('stage')}>
         <span className="font-medium text-sf-text-muted">Stage</span>
         <select
-          className={inputClassName(headerChanged('stage'), 'w-full')}
+          className={headerControlClassName('stage', headerChanged('stage'))}
           value={currentDraft.stage}
           onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
         >
@@ -761,6 +837,7 @@ export function OpportunityFormPage() {
     'timeZone',
   ]
   const commercialTermKeys: OpportunityHeaderField['key'][] = [
+    'warrantyRecordId',
     'deliveryDate',
     'pocStartDate',
     'pocEndDate',
@@ -829,26 +906,26 @@ export function OpportunityFormPage() {
           </span>
         </div>
         <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex flex-wrap items-start gap-3">
             {renderHeaderFields(lineOneKeys)}
             {renderStageField()}
           </div>
 
           <div className="border-t border-sf-border" />
 
-          <div className="grid gap-3 md:grid-cols-4">{renderHeaderFields(lineTwoKeys)}</div>
+          <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineTwoKeys)}</div>
 
-          <div className="grid gap-3 md:grid-cols-5">{renderHeaderFields(lineThreeKeys)}</div>
+          <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineThreeKeys)}</div>
 
           <div className="space-y-2">
             <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Commercial terms</h3>
-            <div className="grid gap-3 md:grid-cols-4">{renderHeaderFields(commercialTermKeys)}</div>
+            <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(commercialTermKeys)}</div>
           </div>
 
           {operationalMetadataFields.length > 0 ? (
             <div className="space-y-2">
               <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Operational metadata</h3>
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="flex flex-wrap items-start gap-3">
                 {operationalMetadataFields.map(renderHeaderField)}
               </div>
             </div>
@@ -913,6 +990,42 @@ export function OpportunityFormPage() {
           onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
         />
       ) : null}
+
+      <section className="sf-card space-y-2 p-3">
+        <h2 className="text-sm font-semibold text-sf-text">Project Created</h2>
+        {createdProjects.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  <th className="border border-sf-border px-2 py-1 font-semibold">PID</th>
+                  <th className="border border-sf-border px-2 py-1 font-semibold">Project</th>
+                  <th className="border border-sf-border px-2 py-1 font-semibold">Account</th>
+                  <th className="border border-sf-border px-2 py-1 font-semibold">Delivery date</th>
+                  <th className="border border-sf-border px-2 py-1 font-semibold">Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {createdProjects.map((project) => (
+                  <tr key={project.id}>
+                    <td className="border border-sf-border px-2 py-1">{project.pid}</td>
+                    <td className="border border-sf-border px-2 py-1">{project.opportunityName}</td>
+                    <td className="border border-sf-border px-2 py-1">{project.accountName}</td>
+                    <td className="border border-sf-border px-2 py-1">{project.deliveryDate ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                        Open project
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-sf-text-muted">No project has been created for this Opportunity yet.</p>
+        )}
+      </section>
     </div>
   )
 }

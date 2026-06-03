@@ -68,6 +68,7 @@ export type WarrantyStatus =
 export interface Project {
   id: string
   pid: string
+  opportunityId?: string
   accountName: string
   mainType: ProjectMainType
   subType: ProjectSubType
@@ -144,6 +145,7 @@ export interface Opportunity {
   pocStartDate: string | null
   pocEndDate: string | null
   warrantyServiceMonths: number | null
+  warrantyRecordId?: string
   region: string
   country: string
   state: string

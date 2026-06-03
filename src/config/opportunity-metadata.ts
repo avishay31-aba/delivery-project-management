@@ -9,6 +9,7 @@ export interface OpportunityHeaderField {
     | 'pocStartDate'
     | 'pocEndDate'
     | 'warrantyServiceMonths'
+    | 'warrantyRecordId'
     | 'opportunityId'
     | 'accountId'
     | 'region'
@@ -67,7 +68,7 @@ const DELIVERY_HEADER_FIELDS: OpportunityHeaderField[] = [
   {
     key: 'warrantyServiceMonths',
     label: 'Warranty/Service period (months)',
-    editable: false,
+    editable: true,
     source: '2. Header yellow cells',
   },
   ...COMMON_HEADER_FIELDS.slice(3),
@@ -76,9 +77,33 @@ const DELIVERY_HEADER_FIELDS: OpportunityHeaderField[] = [
 const RENEWAL_STANDARD_HEADER_FIELDS: OpportunityHeaderField[] = [
   ...COMMON_HEADER_FIELDS.slice(0, 3),
   {
+    key: 'warrantyRecordId',
+    label: 'Warranty record to extend',
+    editable: true,
+    source: '2. Header yellow cells',
+  },
+  {
     key: 'warrantyServiceMonths',
     label: 'Warranty/Service period (months)',
-    editable: false,
+    editable: true,
+    source: '2. Header yellow cells',
+  },
+  ...COMMON_HEADER_FIELDS.slice(3),
+]
+
+const RENEWAL_CHANGE_HEADER_FIELDS: OpportunityHeaderField[] = [
+  ...COMMON_HEADER_FIELDS.slice(0, 3),
+  {
+    key: 'warrantyRecordId',
+    label: 'Warranty record to extend',
+    editable: true,
+    source: '2. Header yellow cells',
+  },
+  { key: 'deliveryDate', label: 'Delivery date', editable: true, source: '2. Header yellow cells' },
+  {
+    key: 'warrantyServiceMonths',
+    label: 'Warranty/Service period (months)',
+    editable: true,
     source: '2. Header yellow cells',
   },
   ...COMMON_HEADER_FIELDS.slice(3),
@@ -92,25 +117,25 @@ export const requirementAColumns: RequirementColumnMetadata[] = [
   { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist' },
   { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist' },
   { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist' },
-  { key: 'licenses', label: 'Licenses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'users', label: 'Users (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'concurrentSearches', label: 'Con. Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'dailySearches', label: 'Daily Qty Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'monthlySearches', label: 'Monthly Qty Searches (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'concurrentAnalyses', label: 'Con. Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'dailyAnalyses', label: 'Daily Qty Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses (integer)', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'licenses', label: 'Licenses', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'users', label: 'Users', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'concurrentSearches', label: 'Con. Searches', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'concurrentAnalyses', label: 'Con. Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules', editable: true, inputType: 'picklist' },
   { key: 'webloc', label: 'Webloc', group: 'Modules', editable: true, inputType: 'picklist' },
   { key: 'webeye', label: 'Webeye', group: 'Modules', editable: true, inputType: 'picklist' },
   { key: 'ingest', label: 'Ingest', group: 'Modules', editable: true, inputType: 'picklist' },
   { key: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
   { key: 'crossSystemFeatures', label: 'Cross System', group: 'Modules', editable: true, inputType: 'multiselect' },
-  { key: 'standardMonitors', label: 'Std. Monitors (integer)', group: 'Modules', editable: true, inputType: 'integer' },
-  { key: 'fullMonitors', label: 'Full monitors (integer)', group: 'Modules', editable: true, inputType: 'integer' },
+  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules', editable: true, inputType: 'integer' },
+  { key: 'fullMonitors', label: 'Full monitors', group: 'Modules', editable: true, inputType: 'integer' },
   { key: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
-  { key: 'apiDailyQty', label: 'API Daily Qty (integer)', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'apiMonthlyQty', label: 'API Monthly (integer)', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiMonthlyQty', label: 'API Monthly', group: 'API', editable: true, inputType: 'integer' },
   { key: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
   { key: 'topicAnalyses', label: 'Topic analyses', group: 'AI', editable: true, inputType: 'picklist' },
   { key: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
@@ -127,7 +152,6 @@ export const requirementCColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
   { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
-  { key: 'warrantyRecordId', label: 'Warranty record to extend', group: 'Renewal context', editable: true, inputType: 'picklist' },
   { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
   { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },
 ]
@@ -181,7 +205,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     keyForOpportunity('RENEWAL', 'UPSELL'),
     {
       sourceSheet: 'Project form-Renewal-Upsell',
-      headerFields: DELIVERY_HEADER_FIELDS,
+      headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
       visibleRequirementTypes: ['A', 'B', 'C'],
     },
   ],
@@ -189,7 +213,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     keyForOpportunity('RENEWAL', 'DOWN_SELL'),
     {
       sourceSheet: 'Project form-Renewal-Down Sell',
-      headerFields: DELIVERY_HEADER_FIELDS,
+      headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
       visibleRequirementTypes: ['B', 'C'],
     },
   ],
