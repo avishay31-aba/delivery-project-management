@@ -276,6 +276,7 @@ function RequirementGrid({
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
 }) {
+  const [activeMultiSelect, setActiveMultiSelect] = useState<string | null>(null)
   const rows =
     kind === 'A'
       ? draft.newTenantRequirements
@@ -302,27 +303,37 @@ function RequirementGrid({
   function renderMultiSelect(row: RequirementRow, column: RequirementColumnMetadata, options: string[]) {
     const selected = Array.isArray(rowValue(row, column.key)) ? (rowValue(row, column.key) as string[]) : []
     const isChanged = cellChanged(row, column.key)
+    const pickerId = `${row.id}:${column.key}`
+
+    function toggleOption(option: string) {
+      const nextSelected = selected.includes(option)
+        ? selected.filter((value) => value !== option)
+        : [...selected, option]
+      onUpdateRow(row.id, column.key, nextSelected)
+      setActiveMultiSelect(null)
+    }
 
     return (
-      <select
-        multiple
-        size={Math.min(options.length, 4)}
-        className={inputClassName(isChanged, 'min-h-16 w-44 text-[11px]')}
-        value={selected}
-        onChange={(event) =>
-          onUpdateRow(
-            row.id,
-            column.key,
-            Array.from(event.currentTarget.selectedOptions).map((option) => option.value),
-          )
-        }
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <button
+          type="button"
+          className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-xs')}
+          title={selected.join('; ')}
+          onClick={() => setActiveMultiSelect((current) => (current === pickerId ? null : pickerId))}
+        >
+          {selected.length > 0 ? selected.join('; ') : 'Select'}
+        </button>
+        {activeMultiSelect === pickerId ? (
+          <div className="absolute left-0 top-full z-20 mt-1 max-h-56 w-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg">
+            {options.map((option) => (
+              <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-sf-surface-alt">
+                <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
     )
   }
 
@@ -491,13 +502,13 @@ function RequirementGrid({
           <p className="text-xs text-sf-text-muted">Each row represents one tenant requirement from Excel section 3.</p>
         </div>
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
-          + Add Tenant Requirement
+          {kind === 'B' ? 'Select and Change Tenant' : kind === 'C' ? 'Select Tenant' : '+ Add Tenant Requirement'}
         </button>
       </div>
 
       {kind === 'B' || kind === 'C' ? (
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-xs">
+          <table className="min-w-full border-collapse text-xs leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
                 <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
@@ -523,7 +534,7 @@ function RequirementGrid({
       ) : null}
 
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-xs">
+        <table className="min-w-full border-collapse text-xs leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
@@ -531,10 +542,12 @@ function RequirementGrid({
                   <span>
                     {column.label}
                     {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
-                    {column.requiredWhen ? <span className="ml-0.5 text-red-600">*</span> : null}
+                    {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
                   </span>
-                  <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
-                  {column.requiredWhen ? (
+                  {column.key !== 'existingSystemId' ? (
+                    <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
+                  ) : null}
+                  {column.requiredWhen && column.key !== 'existingSystemId' ? (
                     <span className="block max-w-40 whitespace-normal text-[10px] font-normal leading-tight text-red-700">
                       {column.requiredWhen}
                     </span>
@@ -548,11 +561,11 @@ function RequirementGrid({
             {rows.map((row, rowIndex) => (
               <tr key={row.id} className="hover:bg-sf-surface-alt">
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-sf-border px-1.5 py-0.5 align-top">
+                  <td key={column.key} className="border border-sf-border px-1.5 py-px align-top">
                     {renderCell(row, column, rowIndex)}
                   </td>
                 ))}
-                <td className="border border-sf-border px-1.5 py-0.5 align-top">
+                <td className="border border-sf-border px-1.5 py-px align-top">
                   <button
                     type="button"
                     className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
@@ -604,7 +617,13 @@ export function OpportunityFormPage() {
   const account = draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined
   const sidSystems = draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []
   const accountTenants = draft ? getAccountTenants(draft.accountId, tenants) : []
-  const createdProjects = draft ? projects.filter((project) => project.opportunityId === draft.opportunityId) : []
+  const createdProjects = draft
+    ? projects.filter(
+        (project) =>
+          project.opportunityId === draft.opportunityId ||
+          Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId),
+      )
+    : []
   const hiddenRequirementTypes = draft ? getHiddenRequirementTypesWithRows(draft) : []
   const countryOptions = Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort()
   const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
@@ -807,8 +826,35 @@ export function OpportunityFormPage() {
       return
     }
 
+    let forceNewProject = false
+    const existingLinkedProjects = projects.filter(
+      (project) =>
+        project.opportunityId === currentDraft.opportunityId ||
+        project.opportunityId === currentSavedOpportunity.opportunityId,
+    )
+
+    if (currentDraft.type === 'POC') {
+      const activePocProject = existingLinkedProjects.find(
+        (project) => project.mainType === 'POC' && project.progressStatus !== 'DONE',
+      )
+      const completedPocProject = existingLinkedProjects.find(
+        (project) => project.mainType === 'POC' && project.progressStatus === 'DONE',
+      )
+
+      if (activePocProject) {
+        forceNewProject = !window.confirm(
+          `Linked POC Project ${activePocProject.pid} is not Done. Press OK to update it, or Cancel to create a new POC Project.`,
+        )
+      } else if (completedPocProject) {
+        forceNewProject = true
+      }
+    }
+
     updateOpportunity(currentSavedOpportunity.id, currentDraft)
-    createProjectFromOpportunity(currentDraft)
+    createProjectFromOpportunity(currentDraft, {
+      forceNew: forceNewProject,
+      existingOpportunityId: currentSavedOpportunity.opportunityId,
+    })
     setSaveMessages([])
 
     if (currentDraft.opportunityId !== currentSavedOpportunity.opportunityId) {

@@ -20,7 +20,10 @@ interface AppStore extends AppDataState {
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
-  createProjectFromOpportunity: (opportunity: Opportunity) => Project
+  createProjectFromOpportunity: (
+    opportunity: Opportunity,
+    options?: { forceNew?: boolean; existingOpportunityId?: string },
+  ) => Project
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
 }
@@ -161,9 +164,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return project
   },
 
-  createProjectFromOpportunity: (opportunity) => {
+  createProjectFromOpportunity: (opportunity, options) => {
     const state = get()
-    const existingProject = state.projects.find((project) => project.opportunityId === opportunity.opportunityId)
+    const existingProject = options?.forceNew
+      ? undefined
+      : state.projects.find(
+          (project) =>
+            project.opportunityId === opportunity.opportunityId ||
+            Boolean(options?.existingOpportunityId && project.opportunityId === options.existingOpportunityId),
+        )
     const account = state.accounts.find((candidate) => candidate.id === opportunity.accountId)
     const salesManager = state.salesManagers.find((candidate) => candidate.id === opportunity.salesManagerId)
     const projectPatch = {

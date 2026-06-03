@@ -79,12 +79,6 @@ const DELIVERY_HEADER_FIELDS: OpportunityHeaderField[] = [
 const RENEWAL_STANDARD_HEADER_FIELDS: OpportunityHeaderField[] = [
   ...COMMON_HEADER_FIELDS.slice(0, 3),
   {
-    key: 'warrantyRecordId',
-    label: 'Warranty record to extend',
-    editable: true,
-    source: '2. Header yellow cells',
-  },
-  {
     key: 'warrantyServiceMonths',
     label: 'Warranty/Service period (months)',
     editable: true,
@@ -95,12 +89,6 @@ const RENEWAL_STANDARD_HEADER_FIELDS: OpportunityHeaderField[] = [
 
 const RENEWAL_CHANGE_HEADER_FIELDS: OpportunityHeaderField[] = [
   ...COMMON_HEADER_FIELDS.slice(0, 3),
-  {
-    key: 'warrantyRecordId',
-    label: 'Warranty record to extend',
-    editable: true,
-    source: '2. Header yellow cells',
-  },
   { key: 'deliveryDate', label: 'Delivery date', editable: true, source: '2. Header yellow cells' },
   {
     key: 'warrantyServiceMonths',
@@ -129,17 +117,17 @@ export const requirementAColumns: RequirementColumnMetadata[] = [
   { key: 'concurrentSearches', label: 'Concurrent Searches', group: 'Core Details', editable: true, inputType: 'integer', required: true },
   { key: 'concurrentAnalyses', label: 'Concurrent Analyses', group: 'Core Details', editable: true, inputType: 'integer', required: true },
   { key: 'topicAnalyses', label: 'Topic Analysis', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
+  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'fullMonitors', label: 'Full Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'topicMonitors', label: 'Topic Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
-  { key: 'fullMonitors', label: 'Full Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
-  { key: 'topicMonitors', label: 'Topic Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
-  { key: 'tangles', label: 'Tangles', group: 'Modules / usage', editable: true, inputType: 'integer', requiredWhen: 'At least Tangles or Webloc is required' },
+  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
+  { key: 'tangles', label: 'Tangles', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules / usage', editable: true, inputType: 'integer' },
-  { key: 'webloc', label: 'Webloc', group: 'Modules / usage', editable: true, inputType: 'integer', requiredWhen: 'At least Tangles or Webloc is required' },
+  { key: 'webloc', label: 'Webloc', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'webeye', label: 'Webeye', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'ingest', label: 'Ingest', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
