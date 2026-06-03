@@ -298,7 +298,6 @@ function RequirementGrid({
       : kind === 'B'
         ? draft.changeRequestRequirements
         : draft.standardRenewalRequirements
-  const canUseExistingSystem = sidSystems.length > 0
 
   function cellChanged(row: RequirementRow, key: string): boolean {
     const savedRow = findRequirement(saved, kind, row.id)
@@ -378,7 +377,7 @@ function RequirementGrid({
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value as RequirementDeployTarget)}
         >
           <option value="NEW_SYSTEM">New System</option>
-          {canUseExistingSystem ? <option value="EXISTING_SID">Existing System</option> : null}
+          <option value="EXISTING_SID">Existing System</option>
         </select>
       )
     }
@@ -390,18 +389,26 @@ function RequirementGrid({
       }
 
       return (
-        <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
-          value={requirement.existingSystemId ?? ''}
-          onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
-        >
-          <option value="">Select SID</option>
-          {sidSystems.map((system) => (
-            <option key={system.id} value={system.id}>
-              {system.sid} - {system.hostingType}
-            </option>
-          ))}
-        </select>
+        <>
+          <select
+            className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
+            value={requirement.existingSystemId ?? ''}
+            onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
+            disabled={sidSystems.length === 0}
+          >
+            <option value="">{sidSystems.length > 0 ? 'Select SID' : 'No eligible SIDs'}</option>
+            {sidSystems.map((system) => (
+              <option key={system.id} value={system.id}>
+                {system.sid} - {system.hostingType}
+              </option>
+            ))}
+          </select>
+          {sidSystems.length === 0 ? (
+            <span className="block max-w-44 text-[10px] leading-tight text-sf-text-muted">
+              No eligible existing systems found for this deal owner.
+            </span>
+          ) : null}
+        </>
       )
     }
 
