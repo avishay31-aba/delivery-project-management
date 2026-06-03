@@ -648,8 +648,9 @@ export function OpportunityFormPage() {
   const createdProjects = draft
     ? projects.filter(
         (project) =>
-          project.opportunityId === draft.opportunityId ||
-          Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId),
+          (project.accountName === account?.accountName || !account) &&
+          (project.opportunityId === draft.opportunityId ||
+            Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId)),
       )
     : []
   const hiddenRequirementTypes = draft ? getHiddenRequirementTypesWithRows(draft) : []
@@ -842,6 +843,13 @@ export function OpportunityFormPage() {
   function discardChanges() {
     setDraft(cloneOpportunity(currentSavedOpportunity))
     setSaveMessages([])
+  }
+
+  function switchDetailTab(nextTab: OpportunityDetailTab) {
+    const scrollX = window.scrollX
+    const scrollY = window.scrollY
+    setActiveDetailTab(nextTab)
+    window.requestAnimationFrame(() => window.scrollTo(scrollX, scrollY))
   }
 
   function saveChanges() {
@@ -1089,11 +1097,10 @@ export function OpportunityFormPage() {
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:text-sf-text-muted"
-            disabled={!isDirty}
+            className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={discardChanges}
           >
-            Cancel / Discard
+            Cancel / Clear
           </button>
           <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={saveChanges}>
             Save
@@ -1168,7 +1175,7 @@ export function OpportunityFormPage() {
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
             ].join(' ')}
             aria-selected={activeDetailTab === 'requirements'}
-            onClick={() => setActiveDetailTab('requirements')}
+            onClick={() => switchDetailTab('requirements')}
           >
             Tenant Requirements
           </button>
@@ -1181,12 +1188,13 @@ export function OpportunityFormPage() {
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
             ].join(' ')}
             aria-selected={activeDetailTab === 'project'}
-            onClick={() => setActiveDetailTab('project')}
+            onClick={() => switchDetailTab('project')}
           >
             Created Project
           </button>
         </div>
 
+        <div className="min-h-[60vh]">
         {activeDetailTab === 'requirements' ? (
           <div className="space-y-4 p-3" role="tabpanel" aria-label="Tenant Requirements">
             {visibleRequirementTypes.includes('A') ? (
@@ -1281,6 +1289,7 @@ export function OpportunityFormPage() {
             )}
           </div>
         )}
+        </div>
       </section>
     </div>
   )

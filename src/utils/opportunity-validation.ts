@@ -52,7 +52,7 @@ export function getOpportunityExistingSidSystems(opportunity: Opportunity, accou
   return systems.filter(
     (system) =>
       system.accountId === opportunity.accountId &&
-      system.salesManagerId === opportunity.salesManagerId &&
+      (!system.salesManagerId || system.salesManagerId === opportunity.salesManagerId) &&
       Boolean(system.sid),
   )
 }
