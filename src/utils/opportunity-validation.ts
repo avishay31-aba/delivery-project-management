@@ -114,6 +114,18 @@ const INTEGER_FIELD_LABELS: Array<[string, string]> = [
   ['apiMonthlyQty', 'API monthly quantity'],
 ]
 
+const MODULE_QUANTITY_FIELD_LABELS: Array<[string, string]> = [
+  ['topicAnalyses', 'Topic Analysis'],
+  ['tangles', 'Tangles'],
+  ['tanglesGo', 'Tangles Go'],
+  ['webloc', 'Webloc'],
+  ['webeye', 'Webeye'],
+  ['ingest', 'Ingest'],
+  ['standardMonitors', 'Std. Monitors'],
+  ['fullMonitors', 'Full Monitors'],
+  ['topicMonitors', 'Topic Monitors'],
+]
+
 function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirement): ValidationMessage[] {
   const values = row as unknown as Record<string, unknown>
 
@@ -123,6 +135,28 @@ function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirem
     return value == null || value === '' || (typeof value === 'number' && Number.isInteger(value))
       ? []
       : [{ level: 'error' as const, message: `${label} must be an integer.` }]
+  })
+}
+
+function validateModuleQuantitiesDoNotExceedUsers(
+  row: NewTenantRequirement | ChangeRequestRequirement,
+  gridName: string,
+  rowIndex: number,
+): ValidationMessage[] {
+  const values = row as unknown as Record<string, unknown>
+  const users = values.users
+  if (typeof users !== 'number' || !Number.isInteger(users)) return []
+
+  return MODULE_QUANTITY_FIELD_LABELS.flatMap(([key, label]) => {
+    const value = values[key]
+    return typeof value === 'number' && value > users
+      ? [
+          {
+            level: 'error' as const,
+            message: `${gridName} row ${rowIndex + 1}: ${label} - Module quantity cannot exceed number of users.`,
+          },
+        ]
+      : []
   })
 }
 
@@ -169,7 +203,11 @@ export function validateRequirementA(
     messages.push({ level: 'error', message: `Grid A row ${rowIndex + 1}: Tangles or Webloc is required.` })
   }
 
-  return [...messages, ...validateIntegerFields(row)]
+  return [
+    ...messages,
+    ...validateIntegerFields(row),
+    ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid A', rowIndex),
+  ]
 }
 
 export function validateRequirementB(
@@ -195,7 +233,11 @@ export function validateRequirementB(
     messages.push({ level: 'error', message: `Grid B row ${rowIndex + 1}: Tangles or Webloc is required.` })
   }
 
-  return [...messages, ...validateIntegerFields(row)]
+  return [
+    ...messages,
+    ...validateIntegerFields(row),
+    ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid B', rowIndex),
+  ]
 }
 
 export function validateRequirementC(

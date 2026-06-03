@@ -87,6 +87,21 @@ function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
 
+function moduleQuantityLabel(key: string): string | null {
+  const labels: Record<string, string> = {
+    topicAnalyses: 'Topic Analysis',
+    tangles: 'Tangles',
+    tanglesGo: 'Tangles Go',
+    webloc: 'Webloc',
+    webeye: 'Webeye',
+    ingest: 'Ingest',
+    standardMonitors: 'Std. Monitors',
+    fullMonitors: 'Full Monitors',
+    topicMonitors: 'Topic Monitors',
+  }
+  return labels[key] ?? null
+}
+
 function digitString(value: unknown): string {
   return value == null ? '' : String(value).replace(/\D/g, '')
 }
@@ -294,8 +309,21 @@ function RequirementGrid({
 
   function cellMissing(rowIndex: number, column: RequirementColumnMetadata): boolean {
     const prefix = `Grid ${kind} row ${rowIndex + 1}: `
+    const moduleLabel = moduleQuantityLabel(column.key)
     if (column.key === 'tangles' || column.key === 'webloc') {
-      return saveMessages.some((message) => message.startsWith(prefix) && message.includes('Tangles or Webloc'))
+      return saveMessages.some(
+        (message) =>
+          message.startsWith(prefix) &&
+          (message.includes('Tangles or Webloc') ||
+            message.includes(`${moduleLabel} - Module quantity cannot exceed number of users.`)),
+      )
+    }
+    if (moduleLabel) {
+      return saveMessages.some(
+        (message) =>
+          message.startsWith(prefix) &&
+          message.includes(`${moduleLabel} - Module quantity cannot exceed number of users.`),
+      )
     }
     return saveMessages.some((message) => message === `${prefix}${column.label} is required.`)
   }
