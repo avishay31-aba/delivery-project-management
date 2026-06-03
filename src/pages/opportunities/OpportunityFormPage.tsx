@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import { useAppStore } from '@/store/useAppStore'
 import {
+  getAccountSystems,
   getAccountTenants,
   getHiddenRequirementTypesWithRows,
   getOpportunityExistingSidSystems,
@@ -38,6 +39,14 @@ type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project'
 type ActiveMultiSelect = { id: string; left: number; top: number; width: number }
+type ExistingActionValue =
+  | 'Not selected'
+  | 'New tenant'
+  | 'Upsell change'
+  | 'Downsell change'
+  | 'Standard renewal'
+  | 'Renewal + upsell'
+  | 'Renewal + downsell'
 
 const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   POC: ['FREE', 'PAID'],
@@ -265,6 +274,40 @@ function tenantOptionText(tenant: Tenant, accountTenants: Tenant[], sidSystems: 
     .join(' | ')
 }
 
+function changeActionLabel(opportunity: Opportunity): 'Upsell change' | 'Downsell change' {
+  return opportunity.subType === 'DOWN_SELL' ? 'Downsell change' : 'Upsell change'
+}
+
+function combinedRenewalActionLabel(opportunity: Opportunity): 'Renewal + upsell' | 'Renewal + downsell' {
+  return opportunity.subType === 'DOWN_SELL' ? 'Renewal + downsell' : 'Renewal + upsell'
+}
+
+function actionBadgeClassName(action: ExistingActionValue): string {
+  const classes: Record<ExistingActionValue, string> = {
+    'Not selected': 'border-sf-border bg-white text-sf-text-muted',
+    'New tenant': 'border-green-200 bg-green-50 text-green-700',
+    'Upsell change': 'border-blue-200 bg-blue-50 text-blue-700',
+    'Downsell change': 'border-orange-200 bg-orange-50 text-orange-700',
+    'Standard renewal': 'border-purple-200 bg-purple-50 text-purple-700',
+    'Renewal + upsell': 'border-teal-200 bg-teal-50 text-teal-700',
+    'Renewal + downsell': 'border-amber-200 bg-amber-50 text-amber-700',
+  }
+  return `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[action]}`
+}
+
+function actionBadgeIcon(action: ExistingActionValue): string {
+  const icons: Record<ExistingActionValue, string> = {
+    'Not selected': '-',
+    'New tenant': '+',
+    'Upsell change': 'UP',
+    'Downsell change': 'DN',
+    'Standard renewal': 'RN',
+    'Renewal + upsell': 'RN UP',
+    'Renewal + downsell': 'RN DN',
+  }
+  return icons[action]
+}
+
 function RequirementGrid({
   title,
   kind,
@@ -276,6 +319,7 @@ function RequirementGrid({
   warrantyRecords,
   countryOptions,
   saveMessages,
+  isTenantOptionDisabled,
   onAddRow,
   onDeleteRow,
   onUpdateRow,
@@ -290,6 +334,7 @@ function RequirementGrid({
   warrantyRecords: WarrantyRecord[]
   countryOptions: string[]
   saveMessages: string[]
+  isTenantOptionDisabled: (kind: RequirementGridKind, rowId: string, tenantId: string) => boolean
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
@@ -445,7 +490,7 @@ function RequirementGrid({
         >
           <option value="">Select tenant</option>
           {accountTenants.map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>
+            <option key={tenant.id} value={tenant.id} disabled={isTenantOptionDisabled(kind, row.id, tenant.id)}>
               {tenantOptionText(tenant, accountTenants, sidSystems)}
             </option>
           ))}
@@ -565,33 +610,6 @@ function RequirementGrid({
         </button>
       </div>
 
-      {kind === 'B' || kind === 'C' ? (
-        <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-xs leading-tight">
-            <thead className="bg-sf-surface-alt text-left">
-              <tr>
-                <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Tenant Name</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">SID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Delivery PID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Current product/config summary</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accountTenants.map((tenant) => (
-                <tr key={tenant.id}>
-                  <td className="border border-sf-border px-2 py-1">{tenant.tid}</td>
-                  <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
-                  <td className="border border-sf-border px-2 py-1">{resolveTenantSid(tenant.id, accountTenants, sidSystems)}</td>
-                  <td className="border border-sf-border px-2 py-1">{tenant.deliveryPid ?? ''}</td>
-                  <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
         <table className="min-w-full border-collapse text-xs leading-tight">
           <thead className="bg-sf-surface-alt text-left">
@@ -675,6 +693,7 @@ export function OpportunityFormPage() {
   const visibleRequirementTypes = draft ? getVisibleRequirementTypes(draft.type, draft.subType) : []
   const account = draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined
   const sidSystems = draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []
+  const accountSystems = draft ? getAccountSystems(draft.accountId, systems) : []
   const accountTenants = draft ? getAccountTenants(draft.accountId, tenants) : []
   const createdProjects = draft
     ? projects.filter(
@@ -707,6 +726,41 @@ export function OpportunityFormPage() {
 
   function headerChanged(field: keyof Opportunity): boolean {
     return !valuesEqual(currentDraft[field], currentSavedOpportunity[field])
+  }
+
+  function tenantAction(tenantId: string): ExistingActionValue {
+    const hasChange = currentDraft.changeRequestRequirements.some((requirement) => requirement.tenantId === tenantId)
+    const hasRenewal = currentDraft.standardRenewalRequirements.some((requirement) => requirement.tenantId === tenantId)
+
+    if (hasChange && hasRenewal) return combinedRenewalActionLabel(currentDraft)
+    if (hasChange) return changeActionLabel(currentDraft)
+    if (hasRenewal) return 'Standard renewal'
+    return 'Not selected'
+  }
+
+  function systemAction(systemId: string): ExistingActionValue {
+    return currentDraft.newTenantRequirements.some(
+      (requirement) => requirement.deployTarget === 'EXISTING_SID' && requirement.existingSystemId === systemId,
+    )
+      ? 'New tenant'
+      : 'Not selected'
+  }
+
+  function tenantSelectionDisabled(kind: RequirementGridKind, rowId: string, tenantId: string): boolean {
+    if (kind !== 'B' && kind !== 'C') return false
+
+    const duplicateInChangeGrid = currentDraft.changeRequestRequirements.some(
+      (requirement) => requirement.id !== rowId && requirement.tenantId === tenantId,
+    )
+    const duplicateInRenewalGrid = currentDraft.standardRenewalRequirements.some(
+      (requirement) => requirement.id !== rowId && requirement.tenantId === tenantId,
+    )
+
+    return kind === 'B' ? duplicateInChangeGrid : duplicateInRenewalGrid
+  }
+
+  function firstAvailableTenant(kind: 'B' | 'C'): Tenant | undefined {
+    return accountTenants.find((tenant) => !tenantSelectionDisabled(kind, '', tenant.id))
   }
 
   function headerFieldWidthClass(key: OpportunityHeaderField['key'] | 'stage'): string {
@@ -762,7 +816,7 @@ export function OpportunityFormPage() {
   }
 
   function addRequirement(kind: RequirementGridKind) {
-    const firstTenant = accountTenants[0]
+    const firstTenant = kind === 'B' || kind === 'C' ? firstAvailableTenant(kind) : accountTenants[0]
     const firstWarranty = firstTenant
       ? warrantyRecords.find((record) => record.tenantId === firstTenant.id)
       : undefined
@@ -1118,6 +1172,99 @@ export function OpportunityFormPage() {
     })
   }
 
+  function renderActionBadge(action: ExistingActionValue) {
+    if (action === 'Not selected') {
+      return <span className={actionBadgeClassName(action)}>{action}</span>
+    }
+
+    return (
+      <span className={actionBadgeClassName(action)}>
+        <span>{actionBadgeIcon(action)}</span>
+        <span>{action}</span>
+      </span>
+    )
+  }
+
+  function renderExistingTenantsAndSystemsSection() {
+    const tenantSystemIds = new Set(accountTenants.map((tenant) => tenant.systemId))
+    const systemOnlyRows = accountSystems.filter((system) => !tenantSystemIds.has(system.id))
+    const colSpan = 8
+
+    return (
+      <section className="sf-card space-y-3 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-sf-text">Customer Existing Tenants / Systems</h2>
+            <p className="text-sm text-sf-text-muted">
+              Existing tenant and system references for {account?.accountName ?? 'the selected account'}.
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <table className="min-w-full border-collapse text-xs leading-tight">
+            <thead className="bg-sf-surface-alt text-left">
+              <tr>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Action Chosen</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Action Indicator</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Tenant Name</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">SID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Delivery PID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Current product/config summary</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Warranty status</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Warranty end date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountTenants.map((tenant) => {
+                const action = tenantAction(tenant.id)
+                return (
+                  <tr key={`tenant-${tenant.id}`}>
+                    <td className="border border-sf-border px-2 py-1">{action === 'Not selected' ? '' : action}</td>
+                    <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenant.tid}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
+                    <td className="border border-sf-border px-2 py-1">{resolveTenantSid(tenant.id, tenants, systems)}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenant.deliveryPid ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenant.warrantyStatus}</td>
+                    <td className="border border-sf-border px-2 py-1">{tenant.warrantyEndDate ?? ''}</td>
+                  </tr>
+                )
+              })}
+              {systemOnlyRows.map((system) => {
+                const action = systemAction(system.id)
+                return (
+                  <tr key={`system-${system.id}`}>
+                    <td className="border border-sf-border px-2 py-1">{action === 'Not selected' ? '' : action}</td>
+                    <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
+                    <td className="border border-sf-border px-2 py-1" />
+                    <td className="border border-sf-border px-2 py-1" />
+                    <td className="border border-sf-border px-2 py-1">{system.sid ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">{system.deliveryPid ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      {[system.productType, system.hostingType, system.cloudPlatform].filter(Boolean).join(' | ')}
+                    </td>
+                    <td className="border border-sf-border px-2 py-1" />
+                    <td className="border border-sf-border px-2 py-1" />
+                  </tr>
+                )
+              })}
+              {accountTenants.length === 0 && systemOnlyRows.length === 0 ? (
+                <tr>
+                  <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={colSpan + 1}>
+                    No existing tenants or systems for this customer.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -1195,6 +1342,8 @@ export function OpportunityFormPage() {
         </div>
       </section>
 
+      {renderExistingTenantsAndSystemsSection()}
+
       {saveMessages.length > 0 && hiddenRequirementTypes.length > 0 ? (
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Hidden requirement rows are preserved for Grid {hiddenRequirementTypes.join(', ')}. Change the type/subtype back
@@ -1247,6 +1396,7 @@ export function OpportunityFormPage() {
                 warrantyRecords={warrantyRecords}
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
+                isTenantOptionDisabled={tenantSelectionDisabled}
                 onAddRow={() => addRequirement('A')}
                 onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
@@ -1265,6 +1415,7 @@ export function OpportunityFormPage() {
                 warrantyRecords={warrantyRecords}
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
+                isTenantOptionDisabled={tenantSelectionDisabled}
                 onAddRow={() => addRequirement('B')}
                 onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
@@ -1283,6 +1434,7 @@ export function OpportunityFormPage() {
                 warrantyRecords={warrantyRecords}
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
+                isTenantOptionDisabled={tenantSelectionDisabled}
                 onAddRow={() => addRequirement('C')}
                 onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}

@@ -94,6 +94,15 @@ function isEmpty(value: unknown): boolean {
   return value == null || value === '' || (Array.isArray(value) && value.length === 0)
 }
 
+function findDuplicateValue(values: string[]): string | null {
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (seen.has(value)) return value
+    seen.add(value)
+  }
+  return null
+}
+
 const INTEGER_FIELD_LABELS: Array<[string, string]> = [
   ['licenses', 'Licenses'],
   ['users', 'Users'],
@@ -260,21 +269,23 @@ export function validateRequirementC(
 }
 
 export function validateRequirementTenantUniqueness(opportunity: Opportunity): ValidationMessage[] {
-  const changeTenantIds = new Set(
+  const messages: ValidationMessage[] = []
+  const duplicateChangeTenant = findDuplicateValue(
     opportunity.changeRequestRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
   )
-  const duplicates = opportunity.standardRenewalRequirements
-    .map((requirement) => requirement.tenantId)
-    .filter((tenantId) => tenantId && changeTenantIds.has(tenantId))
+  const duplicateRenewalTenant = findDuplicateValue(
+    opportunity.standardRenewalRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
+  )
 
-  return duplicates.length > 0
-    ? [
-        {
-          level: 'error',
-          message: 'The same existing tenant cannot appear in both Grid B and Grid C for one opportunity.',
-        },
-      ]
-    : []
+  if (duplicateChangeTenant) {
+    messages.push({ level: 'error', message: 'The same existing tenant cannot appear more than once in Grid B.' })
+  }
+
+  if (duplicateRenewalTenant) {
+    messages.push({ level: 'error', message: 'The same existing tenant cannot appear more than once in Grid C.' })
+  }
+
+  return messages
 }
 
 export function validateOpportunityHeader(opportunity: Opportunity, context: OpportunityContext): ValidationMessage[] {
