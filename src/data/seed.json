@@ -620,7 +620,12 @@
       "operationalStatus": "Active",
       "createdAt": "2026-04-01T10:00:00.000Z",
       "updatedAt": "2026-05-15T10:00:00.000Z",
-      "salesManagerId": "sm-001"
+      "salesManagerId": "sm-001",
+      "deliveryPid": "P1040",
+      "cloudPlatform": "Azure",
+      "region": "EMEA",
+      "country": "Germany",
+      "state": "Berlin"
     },
     {
       "id": "sys-002",
@@ -636,7 +641,12 @@
       "operationalStatus": "Active",
       "createdAt": "2026-04-10T10:00:00.000Z",
       "updatedAt": "2026-05-12T10:00:00.000Z",
-      "salesManagerId": "sm-001"
+      "salesManagerId": "sm-001",
+      "deliveryPid": "P1042",
+      "cloudPlatform": "AWS",
+      "region": "EMEA",
+      "country": "Germany",
+      "state": "Berlin"
     },
     {
       "id": "sys-003",
@@ -652,7 +662,12 @@
       "operationalStatus": "Active",
       "createdAt": "2026-04-11T10:00:00.000Z",
       "updatedAt": "2026-05-12T10:00:00.000Z",
-      "salesManagerId": "sm-001"
+      "salesManagerId": "sm-001",
+      "deliveryPid": "P1050",
+      "cloudPlatform": "Local",
+      "region": "EMEA",
+      "country": "France",
+      "state": "Ile-de-France"
     },
     {
       "id": "sys-004",
@@ -668,7 +683,12 @@
       "operationalStatus": "Active",
       "createdAt": "2026-04-12T10:00:00.000Z",
       "updatedAt": "2026-05-12T10:00:00.000Z",
-      "salesManagerId": "sm-002"
+      "salesManagerId": "sm-002",
+      "deliveryPid": "P1061",
+      "cloudPlatform": "Customer's VPC",
+      "region": "AMER",
+      "country": "USA",
+      "state": "Virginia"
     },
     {
       "id": "sys-005",
@@ -684,7 +704,12 @@
       "operationalStatus": "Active",
       "createdAt": "2026-04-13T10:00:00.000Z",
       "updatedAt": "2026-05-12T10:00:00.000Z",
-      "salesManagerId": "sm-002"
+      "salesManagerId": "sm-002",
+      "deliveryPid": "P1060",
+      "cloudPlatform": "Azure Gov",
+      "region": "AMER",
+      "country": "USA",
+      "state": "Virginia"
     },
     {
       "id": "sys-006",
@@ -700,7 +725,9 @@
       "operationalStatus": "Available",
       "createdAt": "2026-03-01T10:00:00.000Z",
       "updatedAt": "2026-05-01T10:00:00.000Z",
-      "salesManagerId": null
+      "salesManagerId": null,
+      "deliveryPid": "",
+      "cloudPlatform": "Azure"
     }
   ],
   "tenants": [

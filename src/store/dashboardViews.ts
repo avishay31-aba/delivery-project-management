@@ -10,7 +10,7 @@ export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
 export const FULL_DASHBOARD_VIEW_ID = 'full-dashboard'
 export const FULL_DASHBOARD_VIEW_NAME = 'Full Dashboard'
 
-export type DashboardViewScope = 'opportunities' | 'projects' | 'systems' | 'tenants'
+export type DashboardViewScope = 'opportunities' | 'projects' | 'systems' | 'tenants' | 'customers'
 
 export interface SavedDashboardViewState {
   columnOrder: ColumnOrderState
@@ -44,7 +44,7 @@ export interface RuntimeDashboardView extends SavedDashboardView {
   isDefault: boolean
 }
 
-const DASHBOARD_SCOPES: DashboardViewScope[] = ['opportunities', 'projects', 'systems', 'tenants']
+const DASHBOARD_SCOPES: DashboardViewScope[] = ['opportunities', 'projects', 'systems', 'tenants', 'customers']
 
 function createEmptyScopeViews(): DashboardViewsForScope {
   return {
@@ -61,6 +61,7 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
       projects: createEmptyScopeViews(),
       systems: createEmptyScopeViews(),
       tenants: createEmptyScopeViews(),
+      customers: createEmptyScopeViews(),
     },
   }
 }
@@ -164,6 +165,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
       projects: sanitizeScopeViews(value.dashboards.projects),
       systems: sanitizeScopeViews(value.dashboards.systems),
       tenants: sanitizeScopeViews(value.dashboards.tenants),
+      customers: sanitizeScopeViews(value.dashboards.customers),
     },
   }
 }

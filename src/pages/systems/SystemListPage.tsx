@@ -2,13 +2,17 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { systemListColumns } from '@/config/system-columns'
+import { createSystemColumns } from '@/config/system-columns'
 
 export function SystemListPage() {
 const navigate = useNavigate()
 const systems = useAppStore((s) => s.systems)
+const accounts = useAppStore((s) => s.accounts)
+const salesManagers = useAppStore((s) => s.salesManagers)
+const tenants = useAppStore((s) => s.tenants)
 const updateSystem = useAppStore((s) => s.updateSystem)
 const createSystem = useAppStore((s) => s.createSystem)
+const systemListColumns = createSystemColumns(accounts, salesManagers, tenants)
 
 return (
 <div>

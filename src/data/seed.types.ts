@@ -167,12 +167,17 @@ export interface System {
   accountId?: string | null
   salesManagerId?: string | null
   sid: string | null
+  deliveryPid?: string | null
   machineId: string | null
   systemClass: SystemClass
   purpose: SystemPurpose
   availability: AvailabilityStatus
   productType: string
   hostingType: string
+  cloudPlatform?: string
+  region?: string
+  country?: string
+  state?: string
   timeGroup: string
   operationalStatus: string
   createdAt: string

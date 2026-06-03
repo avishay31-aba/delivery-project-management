@@ -2,13 +2,15 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { tenantListColumns } from '@/config/tenant-columns'
+import { createTenantColumns } from '@/config/tenant-columns'
 
 export function TenantListPage() {
 const navigate = useNavigate()
 const tenants = useAppStore((s) => s.tenants)
+const systems = useAppStore((s) => s.systems)
 const updateTenant = useAppStore((s) => s.updateTenant)
 const createTenant = useAppStore((s) => s.createTenant)
+const tenantListColumns = createTenantColumns(systems)
 
 return (
 <div>
