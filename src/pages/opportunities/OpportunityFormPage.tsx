@@ -216,6 +216,7 @@ function createRequirementC(index: number, tenant?: Tenant, warrantyRecord?: War
   return {
     id: `req-${crypto.randomUUID()}`,
     requirementId: `C-${String(index + 1).padStart(3, '0')}`,
+    ...tenantConfigurationPatch(tenant),
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
     warrantyRecordId: warrantyRecord?.warrantyRecordId ?? '',
@@ -368,6 +369,13 @@ function RequirementGrid({
     const isChanged = cellChanged(row, column.key)
     const isMissing = cellMissing(rowIndex, column)
 
+    if ((column.key === 'tenantName' || column.key === 'deliveryPid') && (kind === 'B' || kind === 'C')) {
+      const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
+      const tenant = accountTenants.find((candidate) => candidate.id === tenantId)
+      const value = column.key === 'tenantName' ? (tenant ? tenantDisplayName(tenant) : '') : tenant?.deliveryPid ?? ''
+      return <span className="text-xs text-sf-text-muted">{value}</span>
+    }
+
     if (column.key === 'deployTarget' && kind === 'A') {
       const requirement = row as NewTenantRequirement
       return (
@@ -457,6 +465,14 @@ function RequirementGrid({
       )
     }
 
+    if (!column.editable) {
+      return (
+        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
+          {textValue(rowValue(row, column.key))}
+        </span>
+      )
+    }
+
     if (column.inputType === 'picklist') {
       const options =
         column.key === 'hostingType'
@@ -509,14 +525,6 @@ function RequirementGrid({
           }}
           onChange={(event) => onUpdateRow(row.id, column.key, parseDigitValue(event.target.value.replace(/\D/g, '')))}
         />
-      )
-    }
-
-    if (!column.editable) {
-      return (
-        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
-          {textValue(rowValue(row, column.key))}
-        </span>
       )
     }
 
@@ -828,6 +836,7 @@ export function OpportunityFormPage() {
             [key]: value,
             ...(key === 'tenantId' && selectedTenant
               ? {
+                  ...tenantConfigurationPatch(selectedTenant),
                   systemId: selectedTenant.systemId,
                   warrantyRecordId:
                     warrantyRecords.find((record) => record.tenantId === selectedTenant.id)?.warrantyRecordId ?? '',

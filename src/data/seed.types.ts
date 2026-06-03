@@ -124,7 +124,7 @@ export interface ChangeRequestRequirement extends OpportunityRequirementBase {
   systemId: string
 }
 
-export interface StandardRenewalRequirement {
+export interface StandardRenewalRequirement extends Partial<OpportunityRequirementBase> {
   id: string
   requirementId: string
   tenantId: string

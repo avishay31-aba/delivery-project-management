@@ -142,16 +142,21 @@ export const requirementAColumns: RequirementColumnMetadata[] = [
 export const requirementBColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
   { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
+  { key: 'tenantName', label: 'Tenant Name', group: 'Tenant requirements', editable: false },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
+  { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
   ...requirementAColumns.slice(3),
 ]
 
 export const requirementCColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
   { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
+  { key: 'tenantName', label: 'Tenant Name', group: 'Tenant requirements', editable: false },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
+  { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
   { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
   { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },
+  ...requirementAColumns.slice(3).map((column) => ({ ...column, editable: false, required: false, requiredWhen: undefined })),
 ]
 
 function keyForOpportunity(type: OpportunityType, subType: OpportunitySubType): string {
