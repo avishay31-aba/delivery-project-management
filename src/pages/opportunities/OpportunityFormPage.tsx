@@ -23,7 +23,7 @@ import type {
   YesNo,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { PlaceholderCard } from '@/components/ui'
+import { FormField, PlaceholderCard } from '@/components/ui'
 import { useAppStore } from '@/store/useAppStore'
 import {
   getAccountTenants,
@@ -75,6 +75,13 @@ function inputClassName(isChanged: boolean, extra = ''): string {
   ].join(' ')
 }
 
+function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): string {
+  return [
+    inputClassName(isChanged, extra),
+    isMissing ? 'border-red-500 ring-1 ring-red-500' : '',
+  ].join(' ')
+}
+
 function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
@@ -85,6 +92,10 @@ function digitString(value: unknown): string {
 
 function parseDigitValue(value: string): number | null {
   return value === '' ? null : Number(value)
+}
+
+function numericOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
@@ -110,22 +121,24 @@ function createBaseRequirement(requirementId: string): Omit<
     dailySearches: null,
     monthlySearches: null,
     concurrentAnalyses: null,
+    topicAnalyses: null,
     dailyAnalyses: null,
     monthlyAnalyses: null,
-    tanglesGo: 'NO',
-    webloc: 'NO',
-    webeye: 'NO',
-    ingest: 'NO',
-    blockchain: 'NO',
+    tangles: null,
+    tanglesGo: null,
+    webloc: null,
+    webeye: null,
+    ingest: null,
+    blockchain: '',
     crossSystemFeatures: [],
-    apiEnabled: 'NO',
+    apiEnabled: '',
     apiDailyQty: null,
     apiMonthlyQty: null,
     aiFeatures: [],
-    topicAnalyses: '',
     additionalFeatures: [],
     standardMonitors: null,
     fullMonitors: null,
+    topicMonitors: null,
   }
 }
 
@@ -138,10 +151,46 @@ function createRequirementA(index: number, mapCenter = ''): NewTenantRequirement
   }
 }
 
+function tenantConfigurationPatch(tenant?: Tenant): Partial<NewTenantRequirement> {
+  if (!tenant) return {}
+
+  return {
+    hostingType: tenant.hostingType ?? 'SaaS',
+    cloudPlatform: tenant.cloudPlatform ?? 'Azure',
+    productType: tenant.productType,
+    mapCenter: tenant.mapCenter ?? tenant.country,
+    licenses: numericOrNull(tenant.licenses),
+    users: numericOrNull(tenant.users),
+    concurrentSearches: numericOrNull(tenant.concurrentSearches),
+    dailySearches: numericOrNull(tenant.dailySearches),
+    monthlySearches: numericOrNull(tenant.monthlySearches),
+    concurrentAnalyses: numericOrNull(tenant.concurrentAnalyses),
+    topicAnalyses: numericOrNull(tenant.topicAnalyses),
+    dailyAnalyses: numericOrNull(tenant.dailyAnalyses),
+    monthlyAnalyses: numericOrNull(tenant.monthlyAnalyses),
+    tangles: numericOrNull(tenant.tangles),
+    tanglesGo: numericOrNull(tenant.tanglesGo),
+    webloc: numericOrNull(tenant.webloc),
+    webeye: numericOrNull(tenant.webeye),
+    ingest: numericOrNull(tenant.ingest),
+    blockchain: tenant.blockchain ?? '',
+    crossSystemFeatures: tenant.crossSystemFeatures ?? [],
+    apiEnabled: tenant.apiEnabled ?? '',
+    apiDailyQty: numericOrNull(tenant.apiDailyQty),
+    apiMonthlyQty: numericOrNull(tenant.apiMonthlyQty),
+    aiFeatures: tenant.aiFeatures ?? [],
+    additionalFeatures: tenant.additionalFeatures ?? [],
+    standardMonitors: numericOrNull(tenant.standardMonitors),
+    fullMonitors: numericOrNull(tenant.fullMonitors),
+    topicMonitors: numericOrNull(tenant.topicMonitors),
+  }
+}
+
 function createRequirementB(index: number, tenant?: Tenant, mapCenter = ''): ChangeRequestRequirement {
   return {
     ...createBaseRequirement(`B-${String(index + 1).padStart(3, '0')}`),
     mapCenter,
+    ...tenantConfigurationPatch(tenant),
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
   }
@@ -165,6 +214,38 @@ function findRequirement(saved: Opportunity, kind: RequirementGridKind, rowId: s
   return saved.standardRenewalRequirements.find((row) => row.id === rowId)
 }
 
+function tenantDisplayName(tenant: Tenant): string {
+  return tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim()
+}
+
+function tenantConfigurationSummary(tenant: Tenant): string {
+  return [
+    tenant.productType,
+    tenant.hostingType,
+    tenant.cloudPlatform,
+    tenant.licenses != null ? `${tenant.licenses} lic.` : null,
+    tenant.users != null ? `${tenant.users} users` : null,
+    tenant.concurrentSearches != null ? `${tenant.concurrentSearches} searches` : null,
+    tenant.concurrentAnalyses != null ? `${tenant.concurrentAnalyses} analyses` : null,
+    tenant.tangles != null ? `Tangles ${tenant.tangles}` : null,
+    tenant.webloc != null ? `Webloc ${tenant.webloc}` : null,
+  ]
+    .filter(Boolean)
+    .join(' | ')
+}
+
+function tenantOptionText(tenant: Tenant, accountTenants: Tenant[], sidSystems: System[]): string {
+  return [
+    tenantDisplayName(tenant),
+    `TID ${tenant.tid}`,
+    `SID ${resolveTenantSid(tenant.id, accountTenants, sidSystems) || '-'}`,
+    `PID ${tenant.deliveryPid || '-'}`,
+    tenantConfigurationSummary(tenant),
+  ]
+    .filter(Boolean)
+    .join(' | ')
+}
+
 function RequirementGrid({
   title,
   kind,
@@ -175,6 +256,7 @@ function RequirementGrid({
   sidSystems,
   warrantyRecords,
   countryOptions,
+  saveMessages,
   onAddRow,
   onDeleteRow,
   onUpdateRow,
@@ -188,6 +270,7 @@ function RequirementGrid({
   sidSystems: System[]
   warrantyRecords: WarrantyRecord[]
   countryOptions: string[]
+  saveMessages: string[]
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
@@ -205,6 +288,14 @@ function RequirementGrid({
     if (!savedRow) return true
 
     return !valuesEqual(rowValue(row, key), rowValue(savedRow, key))
+  }
+
+  function cellMissing(rowIndex: number, column: RequirementColumnMetadata): boolean {
+    const prefix = `Grid ${kind} row ${rowIndex + 1}: `
+    if (column.key === 'tangles' || column.key === 'webloc') {
+      return saveMessages.some((message) => message.startsWith(prefix) && message.includes('Tangles or Webloc'))
+    }
+    return saveMessages.some((message) => message === `${prefix}${column.label} is required.`)
   }
 
   function renderMultiSelect(row: RequirementRow, column: RequirementColumnMetadata, options: string[]) {
@@ -234,14 +325,15 @@ function RequirementGrid({
     )
   }
 
-  function renderCell(row: RequirementRow, column: RequirementColumnMetadata) {
+  function renderCell(row: RequirementRow, column: RequirementColumnMetadata, rowIndex: number) {
     const isChanged = cellChanged(row, column.key)
+    const isMissing = cellMissing(rowIndex, column)
 
     if (column.key === 'deployTarget' && kind === 'A') {
       const requirement = row as NewTenantRequirement
       return (
         <select
-          className={inputClassName(isChanged, 'h-6 w-32 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-xs')}
           value={requirement.deployTarget}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value as RequirementDeployTarget)}
         >
@@ -259,7 +351,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={inputClassName(isChanged, 'h-6 w-40 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
           value={requirement.existingSystemId ?? ''}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
         >
@@ -276,14 +368,14 @@ function RequirementGrid({
     if (column.key === 'tenantId' && (kind === 'B' || kind === 'C')) {
       return (
         <select
-          className={inputClassName(isChanged, 'h-6 w-40 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-72 text-xs')}
           value={(row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
           <option value="">Select tenant</option>
           {accountTenants.map((tenant) => (
             <option key={tenant.id} value={tenant.id}>
-              {tenant.tid} - {tenant.operationalStatus}
+              {tenantOptionText(tenant, accountTenants, sidSystems)}
             </option>
           ))}
         </select>
@@ -304,7 +396,7 @@ function RequirementGrid({
       const tenantWarrantyRecords = warrantyRecords.filter((record) => record.tenantId === requirement.tenantId)
       return (
         <select
-          className={inputClassName(isChanged, 'h-6 w-44 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
           value={requirement.warrantyRecordId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -332,7 +424,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={inputClassName(isChanged, 'h-6 w-36 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-xs')}
           value={textValue(rowValue(row, column.key))}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -358,7 +450,7 @@ function RequirementGrid({
     if (column.inputType === 'integer') {
       return (
         <input
-          className={inputClassName(isChanged, 'h-6 w-20 text-[11px]')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-24 text-xs')}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -383,7 +475,7 @@ function RequirementGrid({
 
     return (
       <input
-        className={inputClassName(isChanged, 'h-6 w-32 text-[11px]')}
+        className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-xs')}
         value={textValue(rowValue(row, column.key))}
         onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
       />
@@ -402,25 +494,61 @@ function RequirementGrid({
         </button>
       </div>
 
+      {kind === 'B' || kind === 'C' ? (
+        <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <table className="min-w-full border-collapse text-xs">
+            <thead className="bg-sf-surface-alt text-left">
+              <tr>
+                <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Tenant Name</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">SID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Delivery PID</th>
+                <th className="border border-sf-border px-2 py-1 font-semibold">Current product/config summary</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountTenants.map((tenant) => (
+                <tr key={tenant.id}>
+                  <td className="border border-sf-border px-2 py-1">{tenant.tid}</td>
+                  <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
+                  <td className="border border-sf-border px-2 py-1">{resolveTenantSid(tenant.id, accountTenants, sidSystems)}</td>
+                  <td className="border border-sf-border px-2 py-1">{tenant.deliveryPid ?? ''}</td>
+                  <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-[11px]">
+        <table className="min-w-full border-collapse text-xs">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom font-semibold text-sf-text">
-                  <span>{column.label}</span>
-                  <span className="block text-[10px] font-normal text-sf-text-muted">{column.group}</span>
+                  <span>
+                    {column.label}
+                    {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
+                    {column.requiredWhen ? <span className="ml-0.5 text-red-600">*</span> : null}
+                  </span>
+                  <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
+                  {column.requiredWhen ? (
+                    <span className="block max-w-40 whitespace-normal text-[10px] font-normal leading-tight text-red-700">
+                      {column.requiredWhen}
+                    </span>
+                  ) : null}
                 </th>
               ))}
               <th className="border border-sf-border px-2 py-1" />
             </tr>
           </thead>
           <tbody className="bg-white">
-            {rows.map((row) => (
+            {rows.map((row, rowIndex) => (
               <tr key={row.id} className="hover:bg-sf-surface-alt">
                 {columns.map((column) => (
                   <td key={column.key} className="border border-sf-border px-1.5 py-0.5 align-top">
-                    {renderCell(row, column)}
+                    {renderCell(row, column, rowIndex)}
                   </td>
                 ))}
                 <td className="border border-sf-border px-1.5 py-0.5 align-top">
@@ -510,13 +638,25 @@ export function OpportunityFormPage() {
     return 'w-32'
   }
 
-  function headerLabelClassName(key: OpportunityHeaderField['key'] | 'stage'): string {
-    return `inline-flex ${headerFieldWidthClass(key)} flex-col items-start gap-1 text-sm align-top`
+  function headerControlClassName(changed: boolean, editable = true, isMissing = false): string {
+    const base = 'h-8 w-full text-sm'
+    return editable
+      ? fieldClassName(changed, isMissing, base)
+      : fieldClassName(changed, isMissing, `${base} bg-sf-surface-alt`)
   }
 
-  function headerControlClassName(key: OpportunityHeaderField['key'] | 'stage', changed: boolean, editable = true): string {
-    const base = `${headerFieldWidthClass(key)} h-8 text-sm`
-    return editable ? inputClassName(changed, base) : inputClassName(changed, `${base} bg-sf-surface-alt`)
+  function headerMissing(fieldKey: OpportunityHeaderField['key'] | 'stage'): boolean {
+    const labels: Partial<Record<OpportunityHeaderField['key'] | 'stage', string[]>> = {
+      opportunityId: ['Salesforce Opportunity ID is required.'],
+      opportunityName: ['Opportunity name is required.'],
+      accountId: ['Account is required.'],
+      salesManagerId: ['Sales Manager / Deal Owner is required.'],
+      deliveryDate: ['Delivery date is required.'],
+      pocStartDate: ['Start Date is required.'],
+      pocEndDate: ['End Date is required.'],
+      warrantyRecordId: ['Warranty record to extend is required.'],
+    }
+    return (labels[fieldKey] ?? []).some((message) => saveMessages.includes(message))
   }
 
   function updateAccount(accountId: string) {
@@ -609,7 +749,9 @@ export function OpportunityFormPage() {
           ? ({
               ...row,
               [key]: value,
-              ...(key === 'tenantId' && selectedTenant ? { systemId: selectedTenant.systemId } : {}),
+              ...(key === 'tenantId' && selectedTenant
+                ? { ...tenantConfigurationPatch(selectedTenant), systemId: selectedTenant.systemId }
+                : {}),
             } as ChangeRequestRequirement)
           : row,
       )
@@ -675,10 +817,9 @@ export function OpportunityFormPage() {
   function renderHeaderField(field: OpportunityHeaderField) {
     if (field.key === 'type') {
       return (
-        <label key={field.key} className={headerLabelClassName(field.key)}>
-          <span className="font-medium text-sf-text-muted">{field.label}</span>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
-            className={headerControlClassName(field.key, headerChanged('type'))}
+            className={headerControlClassName(headerChanged('type'), true, headerMissing(field.key))}
             value={currentDraft.type}
             onChange={(event) => updateType(event.target.value as OpportunityType)}
           >
@@ -686,16 +827,15 @@ export function OpportunityFormPage() {
             <option value="DELIVERY">Delivery</option>
             <option value="RENEWAL">Renewal</option>
           </select>
-        </label>
+        </FormField>
       )
     }
 
     if (field.key === 'subType') {
       return (
-        <label key={field.key} className={headerLabelClassName(field.key)}>
-          <span className="font-medium text-sf-text-muted">{field.label}</span>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
-            className={headerControlClassName(field.key, headerChanged('subType'))}
+            className={headerControlClassName(headerChanged('subType'), true, headerMissing(field.key))}
             value={currentDraft.subType}
             onChange={(event) => patchDraft({ subType: event.target.value as OpportunitySubType })}
           >
@@ -705,16 +845,15 @@ export function OpportunityFormPage() {
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
       )
     }
 
     if (field.key === 'accountId') {
       return (
-        <label key={field.key} className={headerLabelClassName(field.key)}>
-          <span className="font-medium text-sf-text-muted">{field.label}</span>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
-            className={headerControlClassName(field.key, headerChanged('accountId'))}
+            className={headerControlClassName(headerChanged('accountId'), true, headerMissing(field.key))}
             value={currentDraft.accountId}
             onChange={(event) => updateAccount(event.target.value)}
           >
@@ -724,16 +863,15 @@ export function OpportunityFormPage() {
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
       )
     }
 
     if (field.key === 'salesManagerId') {
       return (
-        <label key={field.key} className={headerLabelClassName(field.key)}>
-          <span className="font-medium text-sf-text-muted">{field.label}</span>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
-            className={headerControlClassName(field.key, headerChanged('salesManagerId'))}
+            className={headerControlClassName(headerChanged('salesManagerId'), true, headerMissing(field.key))}
             value={currentDraft.salesManagerId}
             onChange={(event) => patchDraft({ salesManagerId: event.target.value })}
           >
@@ -743,7 +881,7 @@ export function OpportunityFormPage() {
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
       )
     }
 
@@ -751,10 +889,9 @@ export function OpportunityFormPage() {
       const tenantIds = new Set(accountTenants.map((tenant) => tenant.id))
       const accountWarrantyRecords = warrantyRecords.filter((record) => tenantIds.has(record.tenantId))
       return (
-        <label key={field.key} className={headerLabelClassName(field.key)}>
-          <span className="font-medium text-sf-text-muted">{field.label}</span>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
-            className={headerControlClassName(field.key, headerChanged('warrantyRecordId'))}
+            className={headerControlClassName(headerChanged('warrantyRecordId'), true, headerMissing(field.key))}
             value={currentDraft.warrantyRecordId ?? ''}
             onChange={(event) => patchDraft({ warrantyRecordId: event.target.value })}
           >
@@ -765,7 +902,7 @@ export function OpportunityFormPage() {
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
       )
     }
 
@@ -775,13 +912,18 @@ export function OpportunityFormPage() {
     const changed = headerChanged(field.key)
 
     return (
-      <label key={field.key} className={headerLabelClassName(field.key)}>
-        <span className="font-medium text-sf-text-muted">
-          {field.label}
-          {isDate ? <span className="ml-0.5 text-red-600">*</span> : null}
-        </span>
+      <FormField
+        key={field.key}
+        label={
+          <>
+            {field.label}
+            {isDate ? <span className="ml-0.5 text-red-600">*</span> : null}
+          </>
+        }
+        controlWidthClassName={headerFieldWidthClass(field.key)}
+      >
         <input
-          className={headerControlClassName(field.key, changed, field.editable)}
+          className={headerControlClassName(changed, field.editable, headerMissing(field.key))}
           type={isDate ? 'date' : 'text'}
           inputMode={isNumber ? 'numeric' : undefined}
           pattern={isNumber ? '[0-9]*' : undefined}
@@ -804,16 +946,15 @@ export function OpportunityFormPage() {
             } as Partial<Opportunity>)
           }
         />
-      </label>
+      </FormField>
     )
   }
 
   function renderStageField() {
     return (
-      <label className={headerLabelClassName('stage')}>
-        <span className="font-medium text-sf-text-muted">Stage</span>
+      <FormField label="Stage" controlWidthClassName={headerFieldWidthClass('stage')}>
         <select
-          className={headerControlClassName('stage', headerChanged('stage'))}
+          className={headerControlClassName(headerChanged('stage'), true, headerMissing('stage'))}
           value={currentDraft.stage}
           onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
         >
@@ -821,7 +962,7 @@ export function OpportunityFormPage() {
           <option value="WON">Won</option>
           <option value="LOST">Lost</option>
         </select>
-      </label>
+      </FormField>
     )
   }
 
@@ -951,6 +1092,7 @@ export function OpportunityFormPage() {
           sidSystems={sidSystems}
           warrantyRecords={warrantyRecords}
           countryOptions={countryOptions}
+          saveMessages={saveMessages}
           onAddRow={() => addRequirement('A')}
           onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
           onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
@@ -968,6 +1110,7 @@ export function OpportunityFormPage() {
           sidSystems={sidSystems}
           warrantyRecords={warrantyRecords}
           countryOptions={countryOptions}
+          saveMessages={saveMessages}
           onAddRow={() => addRequirement('B')}
           onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
           onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
@@ -985,6 +1128,7 @@ export function OpportunityFormPage() {
           sidSystems={sidSystems}
           warrantyRecords={warrantyRecords}
           countryOptions={countryOptions}
+          saveMessages={saveMessages}
           onAddRow={() => addRequirement('C')}
           onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
           onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}

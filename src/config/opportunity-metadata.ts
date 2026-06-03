@@ -31,6 +31,8 @@ export interface RequirementColumnMetadata {
   editable: boolean
   inputType?: 'text' | 'integer' | 'picklist' | 'multiselect'
   options?: string[]
+  required?: boolean
+  requiredWhen?: string
 }
 
 export interface OpportunityMetadata {
@@ -111,46 +113,54 @@ const RENEWAL_CHANGE_HEADER_FIELDS: OpportunityHeaderField[] = [
 
 export const requirementAColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Requirement ID', group: 'Tenant requirements', editable: true },
-  { key: 'deployTarget', label: 'System New/Existing?', group: 'Tenant requirements', editable: true, inputType: 'picklist' },
-  { key: 'existingSystemId', label: 'Existing System SID', group: 'Tenant requirements', editable: true },
-  { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist' },
-  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist' },
-  { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist' },
-  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist' },
-  { key: 'licenses', label: 'Licenses', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'users', label: 'Users', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'concurrentSearches', label: 'Con. Searches', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'deployTarget', label: 'New / Existing System', group: 'Environment', editable: true, inputType: 'picklist', required: true },
+  {
+    key: 'existingSystemId',
+    label: 'Existing System ID',
+    group: 'Environment',
+    editable: true,
+    requiredWhen: 'Required when New / Existing System = Existing System',
+  },
+  { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist', required: true },
+  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist', required: true },
+  { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
+  { key: 'licenses', label: 'License', group: 'Core Details', editable: true, inputType: 'integer', required: true },
+  { key: 'users', label: 'Users', group: 'Core Details', editable: true, inputType: 'integer', required: true },
+  { key: 'concurrentSearches', label: 'Concurrent Searches', group: 'Core Details', editable: true, inputType: 'integer', required: true },
+  { key: 'concurrentAnalyses', label: 'Concurrent Analyses', group: 'Core Details', editable: true, inputType: 'integer', required: true },
+  { key: 'topicAnalyses', label: 'Topic Analysis', group: 'Core Details', editable: true, inputType: 'integer' },
+  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
   { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'concurrentAnalyses', label: 'Con. Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
   { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'webloc', label: 'Webloc', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'webeye', label: 'Webeye', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'ingest', label: 'Ingest', group: 'Modules', editable: true, inputType: 'picklist' },
+  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'fullMonitors', label: 'Full Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'topicMonitors', label: 'Topic Monitors', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'tangles', label: 'Tangles', group: 'Modules / usage', editable: true, inputType: 'integer', requiredWhen: 'At least Tangles or Webloc is required' },
+  { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'webloc', label: 'Webloc', group: 'Modules / usage', editable: true, inputType: 'integer', requiredWhen: 'At least Tangles or Webloc is required' },
+  { key: 'webeye', label: 'Webeye', group: 'Modules / usage', editable: true, inputType: 'integer' },
+  { key: 'ingest', label: 'Ingest', group: 'Modules / usage', editable: true, inputType: 'integer' },
   { key: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'crossSystemFeatures', label: 'Cross System', group: 'Modules', editable: true, inputType: 'multiselect' },
-  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules', editable: true, inputType: 'integer' },
-  { key: 'fullMonitors', label: 'Full monitors', group: 'Modules', editable: true, inputType: 'integer' },
+  { key: 'crossSystemFeatures', label: 'Additional Sources', group: 'Additional Sources', editable: true, inputType: 'multiselect' },
   { key: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
   { key: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
   { key: 'apiMonthlyQty', label: 'API Monthly', group: 'API', editable: true, inputType: 'integer' },
   { key: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
-  { key: 'topicAnalyses', label: 'Topic analyses', group: 'AI', editable: true, inputType: 'picklist' },
   { key: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
 ]
 
 export const requirementBColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
-  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true },
+  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
   ...requirementAColumns.slice(3),
 ]
 
 export const requirementCColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
-  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true },
+  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
   { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
   { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },

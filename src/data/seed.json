@@ -143,21 +143,23 @@
           "concurrentAnalyses": 6,
           "dailyAnalyses": 600,
           "monthlyAnalyses": 12000,
-          "topicAnalyses": "YES",
+          "topicAnalyses": 1,
           "standardMonitors": 20,
           "fullMonitors": 4,
           "mapCenter": "Germany",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "changeRequestRequirements": [
@@ -177,21 +179,23 @@
           "concurrentAnalyses": 8,
           "dailyAnalyses": 800,
           "monthlyAnalyses": 16000,
-          "topicAnalyses": "YES",
+          "topicAnalyses": 1,
           "standardMonitors": 30,
           "fullMonitors": 6,
           "mapCenter": "Germany",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "standardRenewalRequirements": [
@@ -206,7 +210,8 @@
         }
       ],
       "createdAt": "2026-05-20T10:00:00.000Z",
-      "updatedAt": "2026-05-25T10:00:00.000Z"
+      "updatedAt": "2026-05-25T10:00:00.000Z",
+      "warrantyRecordId": "wr-003"
     },
     {
       "id": "opp-002",
@@ -245,21 +250,23 @@
           "concurrentAnalyses": 2,
           "dailyAnalyses": 120,
           "monthlyAnalyses": 3000,
-          "topicAnalyses": "NO",
+          "topicAnalyses": 0,
           "standardMonitors": 6,
           "fullMonitors": 1,
           "mapCenter": "United Kingdom",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "changeRequestRequirements": [],
@@ -304,21 +311,23 @@
           "concurrentAnalyses": 4,
           "dailyAnalyses": 400,
           "monthlyAnalyses": 9000,
-          "topicAnalyses": "YES",
+          "topicAnalyses": 1,
           "standardMonitors": 14,
           "fullMonitors": 3,
           "mapCenter": "USA",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "changeRequestRequirements": [],
@@ -360,7 +369,8 @@
         }
       ],
       "createdAt": "2026-05-23T10:00:00.000Z",
-      "updatedAt": "2026-05-23T10:00:00.000Z"
+      "updatedAt": "2026-05-23T10:00:00.000Z",
+      "warrantyRecordId": "wr-004"
     },
     {
       "id": "opp-005",
@@ -400,21 +410,23 @@
           "concurrentAnalyses": 3,
           "dailyAnalyses": 260,
           "monthlyAnalyses": 6500,
-          "topicAnalyses": "NO",
+          "topicAnalyses": 0,
           "standardMonitors": 9,
           "fullMonitors": 2,
           "mapCenter": "France",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "standardRenewalRequirements": [
@@ -468,21 +480,23 @@
           "concurrentAnalyses": 1,
           "dailyAnalyses": 80,
           "monthlyAnalyses": 1800,
-          "topicAnalyses": "NO",
+          "topicAnalyses": 0,
           "standardMonitors": 4,
           "fullMonitors": 1,
           "mapCenter": "Australia",
-          "tanglesGo": "NO",
-          "webloc": "NO",
-          "webeye": "NO",
-          "ingest": "NO",
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 0,
           "blockchain": "NO",
           "crossSystemFeatures": [],
           "apiEnabled": "NO",
           "apiDailyQty": null,
           "apiMonthlyQty": null,
           "aiFeatures": [],
-          "additionalFeatures": []
+          "additionalFeatures": [],
+          "tangles": 10,
+          "topicMonitors": null
         }
       ],
       "changeRequestRequirements": [],
@@ -505,6 +519,90 @@
       "canceledAt": null,
       "createdAt": "2026-05-01T10:00:00.000Z",
       "updatedAt": "2026-05-20T14:30:00.000Z"
+    },
+    {
+      "id": "proj-p1041",
+      "pid": "P1041",
+      "accountName": "Agency Alpha",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-02-01",
+      "progressStatus": "DONE",
+      "dealOwner": "Maya Cohen",
+      "opportunityName": "Seed delivery for T2102 Agency Alpha Investigations",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "proj-p1042",
+      "pid": "P1042",
+      "accountName": "Agency Alpha",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2025-07-21",
+      "progressStatus": "DONE",
+      "dealOwner": "Maya Cohen",
+      "opportunityName": "Seed delivery for T2103 Agency Alpha Renewal Tenant",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "proj-p1050",
+      "pid": "P1050",
+      "accountName": "Bureau Beta",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-03-01",
+      "progressStatus": "DONE",
+      "dealOwner": "Maya Cohen",
+      "opportunityName": "Seed delivery for T2201 Bureau Beta Production",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "proj-p1051",
+      "pid": "P1051",
+      "accountName": "Bureau Beta",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-01-01",
+      "progressStatus": "DONE",
+      "dealOwner": "Maya Cohen",
+      "opportunityName": "Seed delivery for T2202 Bureau Beta Archive",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "proj-p1060",
+      "pid": "P1060",
+      "accountName": "Corp Gamma",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2025-03-01",
+      "progressStatus": "DONE",
+      "dealOwner": "Daniel Brooks",
+      "opportunityName": "Seed delivery for T2301 Corp Gamma Renewal",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "proj-p1061",
+      "pid": "P1061",
+      "accountName": "Corp Gamma",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-04-01",
+      "progressStatus": "DONE",
+      "dealOwner": "Daniel Brooks",
+      "opportunityName": "Seed delivery for T2302 Corp Gamma Active Ops",
+      "canceledAt": null,
+      "createdAt": "2026-05-20T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
     }
   ],
   "systems": [
@@ -623,7 +721,42 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-02T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2101 Agency Alpha Command",
+      "deliveryPid": "P1040",
+      "hostingType": "SaaS",
+      "cloudPlatform": "Azure",
+      "mapCenter": "Germany",
+      "licenses": 45,
+      "users": 36,
+      "concurrentSearches": 12,
+      "dailySearches": 4800,
+      "monthlySearches": 110000,
+      "concurrentAnalyses": 6,
+      "topicAnalyses": 2,
+      "dailyAnalyses": 620,
+      "monthlyAnalyses": 13000,
+      "tangles": 14,
+      "tanglesGo": 2,
+      "webloc": null,
+      "webeye": 1,
+      "ingest": 1,
+      "blockchain": "",
+      "crossSystemFeatures": [
+        "Weaver"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 500,
+      "apiMonthlyQty": 12000,
+      "aiFeatures": [
+        "OCR"
+      ],
+      "additionalFeatures": [
+        "SSO"
+      ],
+      "standardMonitors": 24,
+      "fullMonitors": 4,
+      "topicMonitors": 2
     },
     {
       "id": "ten-002",
@@ -642,7 +775,40 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-03T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2102 Agency Alpha Investigations",
+      "deliveryPid": "P1041",
+      "hostingType": "SaaS",
+      "cloudPlatform": "Azure",
+      "mapCenter": "Germany",
+      "licenses": 30,
+      "users": 24,
+      "concurrentSearches": 8,
+      "dailySearches": 3000,
+      "monthlySearches": 72000,
+      "concurrentAnalyses": 4,
+      "topicAnalyses": 1,
+      "dailyAnalyses": 360,
+      "monthlyAnalyses": 9000,
+      "tangles": 9,
+      "tanglesGo": 1,
+      "webloc": 2,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "",
+      "crossSystemFeatures": [
+        "Dark web"
+      ],
+      "apiEnabled": "",
+      "apiDailyQty": null,
+      "apiMonthlyQty": null,
+      "aiFeatures": [
+        "Face Detection"
+      ],
+      "additionalFeatures": [],
+      "standardMonitors": 16,
+      "fullMonitors": 2,
+      "topicMonitors": 1
     },
     {
       "id": "ten-003",
@@ -661,7 +827,40 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-04T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2103 Agency Alpha Renewal Tenant",
+      "deliveryPid": "P1042",
+      "hostingType": "SaaS",
+      "cloudPlatform": "AWS",
+      "mapCenter": "Germany",
+      "licenses": 22,
+      "users": 18,
+      "concurrentSearches": 6,
+      "dailySearches": 2400,
+      "monthlySearches": 58000,
+      "concurrentAnalyses": 3,
+      "topicAnalyses": 1,
+      "dailyAnalyses": 260,
+      "monthlyAnalyses": 6500,
+      "tangles": 7,
+      "tanglesGo": 0,
+      "webloc": null,
+      "webeye": 1,
+      "ingest": 0,
+      "blockchain": "",
+      "crossSystemFeatures": [
+        "Lynx"
+      ],
+      "apiEnabled": "NO",
+      "apiDailyQty": null,
+      "apiMonthlyQty": null,
+      "aiFeatures": [],
+      "additionalFeatures": [
+        "2FA"
+      ],
+      "standardMonitors": 10,
+      "fullMonitors": 1,
+      "topicMonitors": null
     },
     {
       "id": "ten-004",
@@ -680,7 +879,38 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-05T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2201 Bureau Beta Production",
+      "deliveryPid": "P1050",
+      "hostingType": "On premise",
+      "cloudPlatform": "Local",
+      "mapCenter": "France",
+      "licenses": 20,
+      "users": 18,
+      "concurrentSearches": 5,
+      "dailySearches": 1900,
+      "monthlySearches": 50000,
+      "concurrentAnalyses": 3,
+      "topicAnalyses": null,
+      "dailyAnalyses": 260,
+      "monthlyAnalyses": 6500,
+      "tangles": 6,
+      "tanglesGo": 0,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "",
+      "crossSystemFeatures": [],
+      "apiEnabled": "NO",
+      "apiDailyQty": null,
+      "apiMonthlyQty": null,
+      "aiFeatures": [],
+      "additionalFeatures": [
+        "Export to PDF"
+      ],
+      "standardMonitors": 9,
+      "fullMonitors": 2,
+      "topicMonitors": null
     },
     {
       "id": "ten-005",
@@ -699,7 +929,38 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-06T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2202 Bureau Beta Archive",
+      "deliveryPid": "P1051",
+      "hostingType": "On premise",
+      "cloudPlatform": "Local",
+      "mapCenter": "France",
+      "licenses": 12,
+      "users": 10,
+      "concurrentSearches": 3,
+      "dailySearches": 900,
+      "monthlySearches": 24000,
+      "concurrentAnalyses": 2,
+      "topicAnalyses": null,
+      "dailyAnalyses": 120,
+      "monthlyAnalyses": 3000,
+      "tangles": null,
+      "tanglesGo": 0,
+      "webloc": 3,
+      "webeye": 0,
+      "ingest": 0,
+      "blockchain": "",
+      "crossSystemFeatures": [
+        "Dark web"
+      ],
+      "apiEnabled": "",
+      "apiDailyQty": null,
+      "apiMonthlyQty": null,
+      "aiFeatures": [],
+      "additionalFeatures": [],
+      "standardMonitors": 4,
+      "fullMonitors": null,
+      "topicMonitors": null
     },
     {
       "id": "ten-006",
@@ -718,7 +979,44 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-07T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2301 Corp Gamma Renewal",
+      "deliveryPid": "P1060",
+      "hostingType": "SaaS",
+      "cloudPlatform": "Azure Gov",
+      "mapCenter": "USA",
+      "licenses": 35,
+      "users": 30,
+      "concurrentSearches": 9,
+      "dailySearches": 3200,
+      "monthlySearches": 82000,
+      "concurrentAnalyses": 5,
+      "topicAnalyses": 2,
+      "dailyAnalyses": 420,
+      "monthlyAnalyses": 10000,
+      "tangles": 12,
+      "tanglesGo": 1,
+      "webloc": null,
+      "webeye": 1,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Weaver",
+        "Lynx"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 350,
+      "apiMonthlyQty": 9000,
+      "aiFeatures": [
+        "OCR",
+        "Object Detection"
+      ],
+      "additionalFeatures": [
+        "SSO"
+      ],
+      "standardMonitors": 18,
+      "fullMonitors": 3,
+      "topicMonitors": 2
     },
     {
       "id": "ten-007",
@@ -737,7 +1035,40 @@
       "pocStartDate": null,
       "pocEndDate": null,
       "createdAt": "2026-05-08T10:00:00.000Z",
-      "updatedAt": "2026-05-20T10:00:00.000Z"
+      "updatedAt": "2026-05-20T10:00:00.000Z",
+      "tenantName": "T2302 Corp Gamma Active Ops",
+      "deliveryPid": "P1061",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "Customer's VPC",
+      "mapCenter": "USA",
+      "licenses": 28,
+      "users": 22,
+      "concurrentSearches": 7,
+      "dailySearches": 2500,
+      "monthlySearches": 64000,
+      "concurrentAnalyses": 4,
+      "topicAnalyses": 1,
+      "dailyAnalyses": 300,
+      "monthlyAnalyses": 7600,
+      "tangles": 8,
+      "tanglesGo": 0,
+      "webloc": 2,
+      "webeye": 1,
+      "ingest": 0,
+      "blockchain": "",
+      "crossSystemFeatures": [],
+      "apiEnabled": "NO",
+      "apiDailyQty": null,
+      "apiMonthlyQty": null,
+      "aiFeatures": [
+        "Face Detection"
+      ],
+      "additionalFeatures": [
+        "2FA"
+      ],
+      "standardMonitors": 12,
+      "fullMonitors": 2,
+      "topicMonitors": 1
     }
   ],
   "warrantyRecords": [
@@ -788,6 +1119,42 @@
       "projectId": "proj-001",
       "systemId": "sys-001",
       "allocatedAt": "2026-05-08T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-002",
+      "projectId": "proj-p1041",
+      "systemId": "sys-001",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-003",
+      "projectId": "proj-p1042",
+      "systemId": "sys-002",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-004",
+      "projectId": "proj-p1050",
+      "systemId": "sys-003",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-005",
+      "projectId": "proj-p1051",
+      "systemId": "sys-003",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-006",
+      "projectId": "proj-p1060",
+      "systemId": "sys-005",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-ten-007",
+      "projectId": "proj-p1061",
+      "systemId": "sys-004",
+      "allocatedAt": "2026-05-20T10:00:00.000Z"
     }
   ],
   "projectTenants": [
@@ -795,10 +1162,40 @@
       "id": "pt-001",
       "projectId": "proj-001",
       "tenantId": "ten-001"
+    },
+    {
+      "id": "pt-ten-002",
+      "projectId": "proj-p1041",
+      "tenantId": "ten-002"
+    },
+    {
+      "id": "pt-ten-003",
+      "projectId": "proj-p1042",
+      "tenantId": "ten-003"
+    },
+    {
+      "id": "pt-ten-004",
+      "projectId": "proj-p1050",
+      "tenantId": "ten-004"
+    },
+    {
+      "id": "pt-ten-005",
+      "projectId": "proj-p1051",
+      "tenantId": "ten-005"
+    },
+    {
+      "id": "pt-ten-006",
+      "projectId": "proj-p1060",
+      "tenantId": "ten-006"
+    },
+    {
+      "id": "pt-ten-007",
+      "projectId": "proj-p1061",
+      "tenantId": "ten-007"
     }
   ],
   "idCounters": {
-    "pid": 1040,
+    "pid": 1061,
     "sid": 1302,
     "tid": 2302,
     "mid": 202

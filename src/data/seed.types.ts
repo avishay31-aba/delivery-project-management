@@ -94,12 +94,14 @@ export interface OpportunityRequirementBase {
   dailySearches: number | null
   monthlySearches: number | null
   concurrentAnalyses: number | null
+  topicAnalyses: number | null
   dailyAnalyses: number | null
   monthlyAnalyses: number | null
-  tanglesGo: YesNo
-  webloc: YesNo
-  webeye: YesNo
-  ingest: YesNo
+  tangles: number | null
+  tanglesGo: number | null
+  webloc: number | null
+  webeye: number | null
+  ingest: number | null
   blockchain: YesNo
   crossSystemFeatures: string[]
   apiEnabled: YesNo
@@ -107,9 +109,9 @@ export interface OpportunityRequirementBase {
   apiMonthlyQty: number | null
   aiFeatures: string[]
   additionalFeatures: string[]
-  topicAnalyses: YesNo
   standardMonitors: number | null
   fullMonitors: number | null
+  topicMonitors: number | null
 }
 
 export interface NewTenantRequirement extends OpportunityRequirementBase {
@@ -180,14 +182,43 @@ export interface System {
 export interface Tenant {
   id: string
   tid: string
+  tenantName?: string
   accountId: string
   systemId: string
+  deliveryPid?: string
   tenantType: TenantType
   accountName: string
   country: string
   timeGroup: string
   operationalStatus: string
   productType: string
+  hostingType?: string
+  cloudPlatform?: string
+  mapCenter?: string
+  licenses?: number | null
+  users?: number | null
+  concurrentSearches?: number | null
+  dailySearches?: number | null
+  monthlySearches?: number | null
+  concurrentAnalyses?: number | null
+  topicAnalyses?: number | null
+  dailyAnalyses?: number | null
+  monthlyAnalyses?: number | null
+  tangles?: number | null
+  tanglesGo?: number | null
+  webloc?: number | null
+  webeye?: number | null
+  ingest?: number | null
+  blockchain?: YesNo
+  crossSystemFeatures?: string[]
+  apiEnabled?: YesNo
+  apiDailyQty?: number | null
+  apiMonthlyQty?: number | null
+  aiFeatures?: string[]
+  additionalFeatures?: string[]
+  standardMonitors?: number | null
+  fullMonitors?: number | null
+  topicMonitors?: number | null
   warrantyStatus: WarrantyStatus
   warrantyStartDate?: string | null
   warrantyEndDate: string | null

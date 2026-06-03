@@ -99,10 +99,17 @@ const INTEGER_FIELD_LABELS: Array<[string, string]> = [
   ['dailySearches', 'Daily searches'],
   ['monthlySearches', 'Monthly searches'],
   ['concurrentAnalyses', 'Concurrent analyses'],
+  ['topicAnalyses', 'Topic analysis'],
   ['dailyAnalyses', 'Daily analyses'],
   ['monthlyAnalyses', 'Monthly analyses'],
+  ['tangles', 'Tangles'],
+  ['tanglesGo', 'Tangles Go'],
+  ['webloc', 'Webloc'],
+  ['webeye', 'Webeye'],
+  ['ingest', 'Ingest'],
   ['standardMonitors', 'Standard monitors'],
   ['fullMonitors', 'Full monitors'],
+  ['topicMonitors', 'Topic monitors'],
   ['apiDailyQty', 'API daily quantity'],
   ['apiMonthlyQty', 'API monthly quantity'],
 ]
@@ -129,9 +136,7 @@ function validateRequiredGridFields(
 
   return columns.flatMap((column) => {
     if (column.key === 'existingSystemId' && values.deployTarget !== 'EXISTING_SID') return []
-
-    const isAutoRequired = column.key === 'systemId'
-    if (!column.editable && !isAutoRequired) return []
+    if (!column.required) return []
 
     return isEmpty(values[column.key])
       ? [{ level: 'error' as const, message: `${gridName} row ${rowIndex + 1}: ${column.label} is required.` }]
@@ -160,6 +165,10 @@ export function validateRequirementA(
     }
   }
 
+  if (isEmpty(row.tangles) && isEmpty(row.webloc)) {
+    messages.push({ level: 'error', message: `Grid A row ${rowIndex + 1}: Tangles or Webloc is required.` })
+  }
+
   return [...messages, ...validateIntegerFields(row)]
 }
 
@@ -180,6 +189,10 @@ export function validateRequirementB(
   const tenant = context.tenants.find((candidate) => candidate.id === row.tenantId)
   if (tenant && row.systemId !== tenant.systemId) {
     messages.push({ level: 'warning', message: 'SID will be reset from the selected tenant.' })
+  }
+
+  if (isEmpty(row.tangles) && isEmpty(row.webloc)) {
+    messages.push({ level: 'error', message: `Grid B row ${rowIndex + 1}: Tangles or Webloc is required.` })
   }
 
   return [...messages, ...validateIntegerFields(row)]
