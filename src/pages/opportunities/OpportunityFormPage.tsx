@@ -59,6 +59,7 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function textValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
   return value == null ? '' : String(value)
 }
 
@@ -703,10 +704,6 @@ export function OpportunityFormPage() {
       )
     }
 
-    if (field.key === 'projectAlerts' || field.key === 'currentMilestone') {
-      return null
-    }
-
     const dateFields = new Set(['deliveryDate', 'pocStartDate', 'pocEndDate'])
     const isDate = dateFields.has(field.key)
     const isNumber = field.key === 'warrantyServiceMonths'
@@ -733,6 +730,55 @@ export function OpportunityFormPage() {
         />
       </label>
     )
+  }
+
+  function renderStageField() {
+    return (
+      <label className="space-y-1 text-sm">
+        <span className="font-medium text-sf-text-muted">Stage</span>
+        <select
+          className={inputClassName(headerChanged('stage'), 'w-full')}
+          value={currentDraft.stage}
+          onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
+        >
+          <option value="OPEN">Open</option>
+          <option value="WON">Won</option>
+          <option value="LOST">Lost</option>
+        </select>
+      </label>
+    )
+  }
+
+  const headerFieldByKey = new Map(metadata.headerFields.map((field) => [field.key, field]))
+  const lineOneKeys: OpportunityHeaderField['key'][] = ['salesManagerId']
+  const lineTwoKeys: OpportunityHeaderField['key'][] = ['opportunityId', 'opportunityName', 'type', 'subType']
+  const locationFieldKeys: OpportunityHeaderField['key'][] = ['accountId', 'region', 'country', 'state', 'timeZone']
+  const lineThreeKeys: OpportunityHeaderField['key'][] = [
+    'accountId',
+    'region',
+    'country',
+    ...(currentDraft.country === 'USA' ? (['state'] as OpportunityHeaderField['key'][]) : []),
+    'timeZone',
+  ]
+  const commercialTermKeys: OpportunityHeaderField['key'][] = [
+    'deliveryDate',
+    'pocStartDate',
+    'pocEndDate',
+    'warrantyServiceMonths',
+  ]
+  const orderedHeaderKeys = new Set<OpportunityHeaderField['key']>([
+    ...lineOneKeys,
+    ...lineTwoKeys,
+    ...locationFieldKeys,
+    ...commercialTermKeys,
+  ])
+  const operationalMetadataFields = metadata.headerFields.filter((field) => !orderedHeaderKeys.has(field.key))
+
+  function renderHeaderFields(keys: OpportunityHeaderField['key'][]) {
+    return keys.map((key) => {
+      const field = headerFieldByKey.get(key)
+      return field ? renderHeaderField(field) : null
+    })
   }
 
   return (
@@ -782,20 +828,31 @@ export function OpportunityFormPage() {
             Account/End User: {account?.accountName ?? 'Not set'}
           </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {metadata.headerFields.map(renderHeaderField)}
-          <label className="space-y-1 text-sm">
-            <span className="font-medium text-sf-text-muted">Stage</span>
-            <select
-              className={inputClassName(headerChanged('stage'), 'w-full')}
-              value={currentDraft.stage}
-              onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
-            >
-              <option value="OPEN">Open</option>
-              <option value="WON">Won</option>
-              <option value="LOST">Lost</option>
-            </select>
-          </label>
+        <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {renderHeaderFields(lineOneKeys)}
+            {renderStageField()}
+          </div>
+
+          <div className="border-t border-sf-border" />
+
+          <div className="grid gap-3 md:grid-cols-4">{renderHeaderFields(lineTwoKeys)}</div>
+
+          <div className="grid gap-3 md:grid-cols-5">{renderHeaderFields(lineThreeKeys)}</div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Commercial terms</h3>
+            <div className="grid gap-3 md:grid-cols-4">{renderHeaderFields(commercialTermKeys)}</div>
+          </div>
+
+          {operationalMetadataFields.length > 0 ? (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Operational metadata</h3>
+              <div className="grid gap-3 md:grid-cols-3">
+                {operationalMetadataFields.map(renderHeaderField)}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

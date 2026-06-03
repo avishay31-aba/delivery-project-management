@@ -15,7 +15,6 @@ export interface OpportunityHeaderField {
     | 'country'
     | 'state'
     | 'timeZone'
-    | 'timeGroup'
     | 'projectAlerts'
     | 'currentMilestone'
     | 'salesManagerId'
@@ -49,7 +48,6 @@ const COMMON_HEADER_FIELDS: OpportunityHeaderField[] = [
   { key: 'country', label: 'Country', editable: false, source: '2. Header yellow cells' },
   { key: 'state', label: 'State', editable: false, source: '2. Header yellow cells' },
   { key: 'timeZone', label: 'Time Zone', editable: false, source: '2. Header yellow cells' },
-  { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header yellow cells' },
   { key: 'salesManagerId', label: 'Deal Owner', editable: true, source: '2. Header yellow cells' },
   { key: 'currentMilestone', label: 'Current milestone', editable: false, source: '2. Header yellow cells' },
   { key: 'projectAlerts', label: 'Project Alerts', editable: false, source: '2. Header yellow cells' },
