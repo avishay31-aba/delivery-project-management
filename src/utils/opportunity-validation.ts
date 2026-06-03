@@ -47,12 +47,11 @@ export function getAccountSystems(accountId: string, systems: System[]): System[
 
 export function getOpportunityExistingSidSystems(opportunity: Opportunity, accounts: Account[], systems: System[]): System[] {
   const account = accounts.find((candidate) => candidate.id === opportunity.accountId)
-  if (!account || account.salesManagerId !== opportunity.salesManagerId) return []
+  if (!account) return []
 
   return systems.filter(
     (system) =>
       system.accountId === opportunity.accountId &&
-      (!system.salesManagerId || system.salesManagerId === opportunity.salesManagerId) &&
       Boolean(system.sid),
   )
 }
@@ -194,7 +193,7 @@ export function validateRequirementA(
     } else if (!opportunityCanUseSystem(opportunity, row.existingSystemId, context)) {
       messages.push({
         level: 'error',
-        message: 'Existing System SID must belong to a customer owned by the selected Sales Manager and account.',
+        message: 'Existing System SID must belong to the selected account.',
       })
     }
   }

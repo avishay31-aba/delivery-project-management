@@ -845,6 +845,12 @@ export function OpportunityFormPage() {
     setSaveMessages([])
   }
 
+  function cancelChanges() {
+    setDraft(cloneOpportunity(currentSavedOpportunity))
+    setSaveMessages([])
+    navigate('/opportunities')
+  }
+
   function switchDetailTab(nextTab: OpportunityDetailTab) {
     const scrollX = window.scrollX
     const scrollY = window.scrollY
@@ -892,10 +898,7 @@ export function OpportunityFormPage() {
       existingOpportunityId: currentSavedOpportunity.opportunityId,
     })
     setSaveMessages([])
-
-    if (currentDraft.opportunityId !== currentSavedOpportunity.opportunityId) {
-      navigate(`/opportunities/${currentDraft.opportunityId}`)
-    }
+    navigate('/opportunities')
   }
 
   function renderHeaderField(field: OpportunityHeaderField) {
@@ -1100,7 +1103,10 @@ export function OpportunityFormPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={discardChanges}
           >
-            Cancel / Clear
+            Revert
+          </button>
+          <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={cancelChanges}>
+            Cancel
           </button>
           <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={saveChanges}>
             Save
