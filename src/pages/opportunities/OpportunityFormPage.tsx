@@ -1081,94 +1081,115 @@ export function OpportunityFormPage() {
         </div>
       ) : null}
 
-      {visibleRequirementTypes.includes('A') ? (
-        <RequirementGrid
-          title="Grid A: New Tenant Requirements"
-          kind="A"
-          columns={requirementAColumns}
-          draft={currentDraft}
-          saved={currentSavedOpportunity}
-          accountTenants={accountTenants}
-          sidSystems={sidSystems}
-          warrantyRecords={warrantyRecords}
-          countryOptions={countryOptions}
-          saveMessages={saveMessages}
-          onAddRow={() => addRequirement('A')}
-          onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
-          onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
-        />
-      ) : null}
-
-      {visibleRequirementTypes.includes('B') ? (
-        <RequirementGrid
-          title="Grid B: Change Request Requirements"
-          kind="B"
-          columns={requirementBColumns}
-          draft={currentDraft}
-          saved={currentSavedOpportunity}
-          accountTenants={accountTenants}
-          sidSystems={sidSystems}
-          warrantyRecords={warrantyRecords}
-          countryOptions={countryOptions}
-          saveMessages={saveMessages}
-          onAddRow={() => addRequirement('B')}
-          onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
-          onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
-        />
-      ) : null}
-
-      {visibleRequirementTypes.includes('C') ? (
-        <RequirementGrid
-          title="Grid C: Standard Renewal Requirements"
-          kind="C"
-          columns={requirementCColumns}
-          draft={currentDraft}
-          saved={currentSavedOpportunity}
-          accountTenants={accountTenants}
-          sidSystems={sidSystems}
-          warrantyRecords={warrantyRecords}
-          countryOptions={countryOptions}
-          saveMessages={saveMessages}
-          onAddRow={() => addRequirement('C')}
-          onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
-          onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
-        />
-      ) : null}
-
-      <section className="sf-card space-y-2 p-3">
-        <h2 className="text-sm font-semibold text-sf-text">Project Created</h2>
-        {createdProjects.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  <th className="border border-sf-border px-2 py-1 font-semibold">PID</th>
-                  <th className="border border-sf-border px-2 py-1 font-semibold">Project</th>
-                  <th className="border border-sf-border px-2 py-1 font-semibold">Account</th>
-                  <th className="border border-sf-border px-2 py-1 font-semibold">Delivery date</th>
-                  <th className="border border-sf-border px-2 py-1 font-semibold">Open</th>
-                </tr>
-              </thead>
-              <tbody>
-                {createdProjects.map((project) => (
-                  <tr key={project.id}>
-                    <td className="border border-sf-border px-2 py-1">{project.pid}</td>
-                    <td className="border border-sf-border px-2 py-1">{project.opportunityName}</td>
-                    <td className="border border-sf-border px-2 py-1">{project.accountName}</td>
-                    <td className="border border-sf-border px-2 py-1">{project.deliveryDate ?? ''}</td>
-                    <td className="border border-sf-border px-2 py-1">
-                      <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
-                        Open project
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className="grid min-w-[78rem] grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)] gap-4 overflow-x-auto">
+        <div className="sf-card overflow-hidden">
+          <div className="flex border-b border-sf-border bg-sf-surface-alt">
+            <div className="border-b-2 border-sf-brand bg-white px-4 py-2 text-sm font-semibold text-sf-text">
+              Tenant Requirements
+            </div>
+            <div className="px-4 py-2 text-sm font-medium text-sf-text-muted">Created Project</div>
           </div>
-        ) : (
-          <p className="text-sm text-sf-text-muted">No project has been created for this Opportunity yet.</p>
-        )}
+          <div className="space-y-4 p-3">
+            {visibleRequirementTypes.includes('A') ? (
+              <RequirementGrid
+                title="Grid A: New Tenant Requirements"
+                kind="A"
+                columns={requirementAColumns}
+                draft={currentDraft}
+                saved={currentSavedOpportunity}
+                accountTenants={accountTenants}
+                sidSystems={sidSystems}
+                warrantyRecords={warrantyRecords}
+                countryOptions={countryOptions}
+                saveMessages={saveMessages}
+                onAddRow={() => addRequirement('A')}
+                onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
+                onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
+              />
+            ) : null}
+
+            {visibleRequirementTypes.includes('B') ? (
+              <RequirementGrid
+                title="Grid B: Change Request Requirements"
+                kind="B"
+                columns={requirementBColumns}
+                draft={currentDraft}
+                saved={currentSavedOpportunity}
+                accountTenants={accountTenants}
+                sidSystems={sidSystems}
+                warrantyRecords={warrantyRecords}
+                countryOptions={countryOptions}
+                saveMessages={saveMessages}
+                onAddRow={() => addRequirement('B')}
+                onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
+                onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
+              />
+            ) : null}
+
+            {visibleRequirementTypes.includes('C') ? (
+              <RequirementGrid
+                title="Grid C: Standard Renewal Requirements"
+                kind="C"
+                columns={requirementCColumns}
+                draft={currentDraft}
+                saved={currentSavedOpportunity}
+                accountTenants={accountTenants}
+                sidSystems={sidSystems}
+                warrantyRecords={warrantyRecords}
+                countryOptions={countryOptions}
+                saveMessages={saveMessages}
+                onAddRow={() => addRequirement('C')}
+                onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
+                onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
+              />
+            ) : null}
+          </div>
+        </div>
+
+        <aside className="sf-card overflow-hidden">
+          <div className="flex border-b border-sf-border bg-sf-surface-alt">
+            <div className="px-4 py-2 text-sm font-medium text-sf-text-muted">Tenant Requirements</div>
+            <div className="border-b-2 border-sf-border bg-white px-4 py-2 text-sm font-semibold text-sf-text">
+              Created Project
+            </div>
+          </div>
+          <div className="space-y-2 p-3">
+            {createdProjects.length > 0 ? (
+              <div className="overflow-x-auto rounded border border-sf-border bg-white">
+                <table className="min-w-full border-collapse text-sm">
+                  <thead className="bg-sf-surface-alt text-left">
+                    <tr>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">PID</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Project</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Account</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Delivery date</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Open</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {createdProjects.map((project) => (
+                      <tr key={project.id}>
+                        <td className="border border-sf-border px-2 py-1">{project.pid}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.opportunityName}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.accountName}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.deliveryDate ?? ''}</td>
+                        <td className="border border-sf-border px-2 py-1">
+                          <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                            Open project
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+                No project created yet.
+              </div>
+            )}
+          </div>
+        </aside>
       </section>
     </div>
   )
