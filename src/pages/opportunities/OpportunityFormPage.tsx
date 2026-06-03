@@ -35,6 +35,7 @@ import {
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
+type OpportunityDetailTab = 'requirements' | 'project'
 
 const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   POC: ['FREE', 'PAID'],
@@ -591,6 +592,7 @@ export function OpportunityFormPage() {
   const savedOpportunity = opportunities.find((candidate) => candidate.opportunityId === opportunityId)
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
+  const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
 
   useEffect(() => {
     setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
@@ -1081,15 +1083,38 @@ export function OpportunityFormPage() {
         </div>
       ) : null}
 
-      <section className="grid min-w-[78rem] grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)] gap-4 overflow-x-auto">
-        <div className="sf-card overflow-hidden">
-          <div className="flex border-b border-sf-border bg-sf-surface-alt">
-            <div className="border-b-2 border-sf-brand bg-white px-4 py-2 text-sm font-semibold text-sf-text">
-              Tenant Requirements
-            </div>
-            <div className="px-4 py-2 text-sm font-medium text-sf-text-muted">Created Project</div>
-          </div>
-          <div className="space-y-4 p-3">
+      <section className="sf-card overflow-hidden">
+        <div className="flex border-b border-sf-border bg-sf-surface-alt">
+          <button
+            type="button"
+            className={[
+              'border-b-2 px-4 py-2 text-sm font-semibold',
+              activeDetailTab === 'requirements'
+                ? 'border-sf-brand bg-white text-sf-text'
+                : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+            ].join(' ')}
+            aria-selected={activeDetailTab === 'requirements'}
+            onClick={() => setActiveDetailTab('requirements')}
+          >
+            Tenant Requirements
+          </button>
+          <button
+            type="button"
+            className={[
+              'border-b-2 px-4 py-2 text-sm font-semibold',
+              activeDetailTab === 'project'
+                ? 'border-sf-brand bg-white text-sf-text'
+                : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+            ].join(' ')}
+            aria-selected={activeDetailTab === 'project'}
+            onClick={() => setActiveDetailTab('project')}
+          >
+            Created Project
+          </button>
+        </div>
+
+        {activeDetailTab === 'requirements' ? (
+          <div className="space-y-4 p-3" role="tabpanel" aria-label="Tenant Requirements">
             {visibleRequirementTypes.includes('A') ? (
               <RequirementGrid
                 title="Grid A: New Tenant Requirements"
@@ -1144,16 +1169,8 @@ export function OpportunityFormPage() {
               />
             ) : null}
           </div>
-        </div>
-
-        <aside className="sf-card overflow-hidden">
-          <div className="flex border-b border-sf-border bg-sf-surface-alt">
-            <div className="px-4 py-2 text-sm font-medium text-sf-text-muted">Tenant Requirements</div>
-            <div className="border-b-2 border-sf-border bg-white px-4 py-2 text-sm font-semibold text-sf-text">
-              Created Project
-            </div>
-          </div>
-          <div className="space-y-2 p-3">
+        ) : (
+          <div className="space-y-2 p-3" role="tabpanel" aria-label="Created Project">
             {createdProjects.length > 0 ? (
               <div className="overflow-x-auto rounded border border-sf-border bg-white">
                 <table className="min-w-full border-collapse text-sm">
@@ -1189,7 +1206,7 @@ export function OpportunityFormPage() {
               </div>
             )}
           </div>
-        </aside>
+        )}
       </section>
     </div>
   )
