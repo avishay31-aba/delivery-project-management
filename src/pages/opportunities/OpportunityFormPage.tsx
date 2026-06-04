@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Plus, RefreshCw } from 'lucide-react'
 import {
   getOpportunityMetadata,
   getVisibleRequirementTypes,
@@ -17,6 +17,7 @@ import type {
   Opportunity,
   OpportunitySubType,
   OpportunityType,
+  Project,
   RequirementDeployTarget,
   StandardRenewalRequirement,
   System,
@@ -26,7 +27,7 @@ import type {
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
-import { useAppStore } from '@/store/useAppStore'
+import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import {
   getAccountSystems,
   getAccountTenants,
@@ -40,6 +41,7 @@ type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project'
 type ActiveMultiSelect = { id: string; left: number; top: number; width: number }
+type PendingSave = { stayOnPage?: boolean }
 type ExistingActionValue =
   | 'Not selected'
   | 'New tenant'
@@ -68,6 +70,9 @@ function cloneOpportunity(opportunity: Opportunity): Opportunity {
   return {
     ...clone,
     warrantyRecordId: clone.warrantyRecordId ?? clone.standardRenewalRequirements[0]?.warrantyRecordId ?? '',
+    pocProjectIds: clone.pocProjectIds ?? [],
+    finalProjectId: clone.finalProjectId ?? null,
+    wonAt: clone.wonAt ?? null,
   }
 }
 
@@ -693,18 +698,24 @@ export function OpportunityFormPage() {
   const tenants = useAppStore((state) => state.tenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const projects = useAppStore((state) => state.projects)
-  const updateOpportunity = useAppStore((state) => state.updateOpportunity)
-  const createProjectFromOpportunity = useAppStore((state) => state.createProjectFromOpportunity)
+  const saveOpportunityWithProjectSync = useAppStore((state) => state.saveOpportunityWithProjectSync)
   const savedOpportunity = opportunities.find((candidate) => candidate.opportunityId === opportunityId)
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
+  const [projectChanges, setProjectChanges] = useState<ProjectLifecycleChange[]>([])
+  const [pendingWonSave, setPendingWonSave] = useState<PendingSave | null>(null)
+  const [pendingPocSave, setPendingPocSave] = useState<PendingSave | null>(null)
 
   useEffect(() => {
     setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
     setSaveMessages([])
   }, [savedOpportunity])
+
+  useEffect(() => {
+    setProjectChanges([])
+  }, [opportunityId])
 
   const metadata = draft ? getOpportunityMetadata(draft.type, draft.subType) : null
   const visibleRequirementTypes = draft ? getVisibleRequirementTypes(draft.type, draft.subType) : []
@@ -713,12 +724,14 @@ export function OpportunityFormPage() {
   const accountSystems = draft ? getAccountSystems(draft.accountId, systems) : []
   const accountTenants = draft ? getAccountTenants(draft.accountId, tenants) : []
   const createdProjects = draft
-    ? projects.filter(
-        (project) =>
-          (project.accountName === account?.accountName || !account) &&
-          (project.opportunityId === draft.opportunityId ||
-            Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId)),
-      )
+    ? projects.filter((project) => {
+        const linkedIds = new Set([...(draft.pocProjectIds ?? []), draft.finalProjectId].filter(Boolean))
+        const isExplicitlyLinked = linkedIds.has(project.id)
+        const isLegacyLinked =
+          project.opportunityId === draft.opportunityId ||
+          Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId)
+        return isExplicitlyLinked || isLegacyLinked
+      })
     : []
   const hiddenRequirementTypes = draft ? getHiddenRequirementTypesWithRows(draft) : []
   const countryOptions = Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort()
@@ -743,6 +756,21 @@ export function OpportunityFormPage() {
 
   function headerChanged(field: keyof Opportunity): boolean {
     return !valuesEqual(currentDraft[field], currentSavedOpportunity[field])
+  }
+
+  function linkedPocProjects(opportunity: Opportunity, saved: Opportunity): Project[] {
+    const linkedIds = new Set([...(opportunity.pocProjectIds ?? []), ...(saved.pocProjectIds ?? [])])
+    const opportunityIds = new Set([opportunity.opportunityId, saved.opportunityId])
+
+    return projects.filter(
+      (project) =>
+        linkedIds.has(project.id) ||
+        (project.projectSource === 'POC' && Boolean(project.opportunityId && opportunityIds.has(project.opportunityId))),
+    )
+  }
+
+  function activePocProject(opportunity: Opportunity, saved: Opportunity): Project | undefined {
+    return linkedPocProjects(opportunity, saved).find((project) => project.progressStatus !== 'DONE')
   }
 
   function tenantAction(tenantId: string): ExistingActionValue {
@@ -975,50 +1003,48 @@ export function OpportunityFormPage() {
     window.requestAnimationFrame(() => window.scrollTo(scrollX, scrollY))
   }
 
-  function saveChanges(options: { stayOnPage?: boolean } = {}) {
+  function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
+    const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
+    setDraft(cloneOpportunity(result.opportunity))
+    setProjectChanges(result.projectChanges)
+    setSaveMessages([])
+    setPendingPocSave(null)
+    setPendingWonSave(null)
+    if (!options.stayOnPage) {
+      navigate('/opportunities')
+    }
+  }
+
+  function saveChanges(options: PendingSave = {}) {
     setIsSaveMenuOpen(false)
     const messages = validateOpportunity(currentDraft, { accounts, systems, tenants })
       .filter((message) => message.level === 'error')
       .map((message) => message.message)
+
+    if (currentSavedOpportunity.stage === 'WON' && currentDraft.stage !== 'WON') {
+      messages.push('WON is irreversible. A WON Opportunity cannot be changed back to Open.')
+    }
+
+    if (currentDraft.stage === 'WON' && currentDraft.type === 'POC') {
+      messages.push('WON Opportunities must be Delivery or Renewal to create a final Project.')
+    }
 
     if (messages.length > 0) {
       setSaveMessages(messages)
       return
     }
 
-    let forceNewProject = false
-    const existingLinkedProjects = projects.filter(
-      (project) =>
-        project.opportunityId === currentDraft.opportunityId ||
-        project.opportunityId === currentSavedOpportunity.opportunityId,
-    )
-
-    if (currentDraft.type === 'POC') {
-      const activePocProject = existingLinkedProjects.find(
-        (project) => project.mainType === 'POC' && project.progressStatus !== 'DONE',
-      )
-      const completedPocProject = existingLinkedProjects.find(
-        (project) => project.mainType === 'POC' && project.progressStatus === 'DONE',
-      )
-
-      if (activePocProject) {
-        forceNewProject = !window.confirm(
-          `Linked POC Project ${activePocProject.pid} is not Done. Press OK to update it, or Cancel to create a new POC Project.`,
-        )
-      } else if (completedPocProject) {
-        forceNewProject = true
-      }
+    if (currentSavedOpportunity.stage !== 'WON' && currentDraft.stage === 'WON') {
+      setPendingWonSave(options)
+      return
     }
 
-    updateOpportunity(currentSavedOpportunity.id, currentDraft)
-    createProjectFromOpportunity(currentDraft, {
-      forceNew: forceNewProject,
-      existingOpportunityId: currentSavedOpportunity.opportunityId,
-    })
-    setSaveMessages([])
-    if (!options.stayOnPage) {
-      navigate('/opportunities')
+    if (currentDraft.stage !== 'WON' && currentDraft.type === 'POC' && activePocProject(currentDraft, currentSavedOpportunity)) {
+      setPendingPocSave(options)
+      return
     }
+
+    executeSave(options)
   }
 
   function renderHeaderField(field: OpportunityHeaderField) {
@@ -1158,16 +1184,17 @@ export function OpportunityFormPage() {
   }
 
   function renderStageField() {
+    const isWonLocked = currentSavedOpportunity.stage === 'WON'
     return (
       <FormField label="Stage" controlWidthClassName={headerFieldWidthClass('stage')}>
         <select
-          className={headerControlClassName(headerChanged('stage'), true, headerMissing('stage'))}
+          className={headerControlClassName(headerChanged('stage'), !isWonLocked, headerMissing('stage'))}
           value={currentDraft.stage}
+          disabled={isWonLocked}
           onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
         >
           <option value="OPEN">Open</option>
           <option value="WON">Won</option>
-          <option value="LOST">Lost</option>
         </select>
       </FormField>
     )
@@ -1208,6 +1235,28 @@ export function OpportunityFormPage() {
 
   function renderActionBadge(action: ExistingActionValue) {
     return <span className={actionBadgeClassName(action)}>{action}</span>
+  }
+
+  function projectChangeStatus(projectId: string): ProjectLifecycleChange['changeStatus'] | null {
+    return projectChanges.find((change) => change.projectId === projectId)?.changeStatus ?? null
+  }
+
+  function renderProjectChangeBadge(changeStatus: ProjectLifecycleChange['changeStatus'] | null) {
+    if (!changeStatus) return null
+
+    const isNew = changeStatus === 'New'
+    const Icon = isNew ? Plus : RefreshCw
+    return (
+      <span
+        className={[
+          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+          isNew ? 'border-green-200 bg-green-50 text-green-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700',
+        ].join(' ')}
+      >
+        <Icon className="h-3 w-3" aria-hidden="true" />
+        {changeStatus}
+      </span>
+    )
   }
 
   function renderExistingTenantsAndSystemsSection() {
@@ -1351,6 +1400,69 @@ export function OpportunityFormPage() {
               <li key={message}>{message}</li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {pendingWonSave ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-base font-semibold text-sf-text">Mark Opportunity as WON?</h2>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              WON is irreversible. After this, no new POC projects can be created and one final Delivery/Renewal project
+              will be created or updated.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={() => setPendingWonSave(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                onClick={() => executeSave(pendingWonSave)}
+              >
+                Mark as WON
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingPocSave && activePocProject(currentDraft, currentSavedOpportunity) ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-base font-semibold text-sf-text">Active POC project exists</h2>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              POC Project {activePocProject(currentDraft, currentSavedOpportunity)?.pid} is not Done. What would you like
+              to do?
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={() => setPendingPocSave(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={() => executeSave(pendingPocSave, { pocAction: 'CREATE_NEW_POC' })}
+              >
+                Create New POC
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                onClick={() => executeSave(pendingPocSave, { pocAction: 'UPDATE_EXISTING_POC' })}
+              >
+                Update Existing POC
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -1501,20 +1613,29 @@ export function OpportunityFormPage() {
                 <table className="min-w-full border-collapse text-sm">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Change Status</th>
                       <th className="border border-sf-border px-2 py-1 font-semibold">PID</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Project</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Account</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Delivery date</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Open</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Type</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Subtype</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Status</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Created Date</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Updated Date</th>
+                      <th className="border border-sf-border px-2 py-1 font-semibold">Link to Project</th>
                     </tr>
                   </thead>
                   <tbody>
                     {createdProjects.map((project) => (
-                      <tr key={project.id}>
+                      <tr
+                        key={project.id}
+                        className={project.progressStatus === 'DONE' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-green-50 hover:bg-green-100'}
+                      >
+                        <td className="border border-sf-border px-2 py-1">{renderProjectChangeBadge(projectChangeStatus(project.id))}</td>
                         <td className="border border-sf-border px-2 py-1">{project.pid}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.opportunityName}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.accountName}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.deliveryDate ?? ''}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.mainType}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.subType}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.progressStatus}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.createdAt}</td>
+                        <td className="border border-sf-border px-2 py-1">{project.updatedAt}</td>
                         <td className="border border-sf-border px-2 py-1">
                           <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
                             Open project

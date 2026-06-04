@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import type { AppDataState, Opportunity, OpportunitySubType, OpportunityType, Project } from '@/data/seed.types'
+import type {
+  AppDataState,
+  Opportunity,
+  OpportunitySubType,
+  OpportunityType,
+  Project,
+  ProjectSubType,
+} from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
   createInitialState,
@@ -20,12 +27,64 @@ interface AppStore extends AppDataState {
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
-  createProjectFromOpportunity: (
+  saveOpportunityWithProjectSync: (
     opportunity: Opportunity,
-    options?: { forceNew?: boolean; existingOpportunityId?: string },
-  ) => Project
+    savedOpportunity: Opportunity,
+    options?: OpportunityProjectSyncOptions,
+  ) => OpportunityProjectSyncResult
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
+}
+
+export type PocProjectSyncAction = 'UPDATE_EXISTING_POC' | 'CREATE_NEW_POC'
+
+export interface OpportunityProjectSyncOptions {
+  pocAction?: PocProjectSyncAction
+  allowDoneFinalUpdate?: boolean
+}
+
+export interface ProjectLifecycleChange {
+  projectId: string
+  changeStatus: 'New' | 'Updated'
+}
+
+export interface OpportunityProjectSyncResult {
+  opportunity: Opportunity
+  projectChanges: ProjectLifecycleChange[]
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType {
+  return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
+}
+
+function findLinkedPocProjects(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project[] {
+  const linkedIds = new Set(uniqueValues([...(opportunity.pocProjectIds ?? []), ...(savedOpportunity.pocProjectIds ?? [])]))
+  const opportunityIds = new Set([opportunity.opportunityId, savedOpportunity.opportunityId])
+
+  return projects.filter(
+    (project) =>
+      linkedIds.has(project.id) ||
+      (project.projectSource === 'POC' && Boolean(project.opportunityId && opportunityIds.has(project.opportunityId))),
+  )
+}
+
+function findFinalProject(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project | undefined {
+  const linkedId = opportunity.finalProjectId ?? savedOpportunity.finalProjectId
+  if (linkedId) {
+    const linkedProject = projects.find((project) => project.id === linkedId)
+    if (linkedProject) return linkedProject
+  }
+
+  const opportunityIds = new Set([opportunity.opportunityId, savedOpportunity.opportunityId])
+  return projects.find(
+    (project) =>
+      project.projectSource === 'FINAL' &&
+      Boolean(project.opportunityId && opportunityIds.has(project.opportunityId)),
+  )
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -129,6 +188,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       newTenantRequirements: [],
       changeRequestRequirements: [],
       standardRenewalRequirements: [],
+      pocProjectIds: [],
+      finalProjectId: null,
+      wonAt: null,
       createdAt: now,
       updatedAt: now,
     }
@@ -147,6 +209,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       id: `proj-${crypto.randomUUID()}`,
       pid: nextPid,
       opportunityId: undefined,
+      projectSource: 'FINAL',
       accountName: '',
       mainType: 'DELIVERY',
       subType: 'NONE',
@@ -164,52 +227,101 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return project
   },
 
-  createProjectFromOpportunity: (opportunity, options) => {
+  saveOpportunityWithProjectSync: (opportunity, savedOpportunity, options) => {
     const state = get()
-    const existingProject = options?.forceNew
-      ? undefined
-      : state.projects.find(
-          (project) =>
-            project.opportunityId === opportunity.opportunityId ||
-            Boolean(options?.existingOpportunityId && project.opportunityId === options.existingOpportunityId),
-        )
     const account = state.accounts.find((candidate) => candidate.id === opportunity.accountId)
     const salesManager = state.salesManagers.find((candidate) => candidate.id === opportunity.salesManagerId)
-    const projectPatch = {
-      opportunityId: opportunity.opportunityId,
-      accountName: account?.accountName ?? '',
-      mainType: opportunity.type,
-      subType: opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType,
-      deliveryDate: opportunity.deliveryDate,
-      progressStatus: 'OPEN',
-      dealOwner: salesManager?.name ?? '',
-      opportunityName: opportunity.opportunityName,
-      canceledAt: null,
-      updatedAt: new Date().toISOString(),
-    } satisfies Omit<Project, 'id' | 'pid' | 'createdAt'>
-
-    if (existingProject) {
-      const project = { ...existingProject, ...projectPatch }
-      set((currentState) => ({
-        projects: currentState.projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate)),
-      }))
-      get().saveToStorage()
-      return project
-    }
-
-    const { counters: idCounters, id: nextPid } = incrementCounter(state.idCounters, 'pid')
     const now = new Date().toISOString()
-    const project: Project = {
-      id: `proj-${crypto.randomUUID()}`,
-      pid: nextPid,
-      ...projectPatch,
-      createdAt: now,
+    let idCounters = state.idCounters
+    let projects = state.projects
+    const projectChanges: ProjectLifecycleChange[] = []
+    const nextOpportunity: Opportunity = {
+      ...opportunity,
+      pocProjectIds: [...(opportunity.pocProjectIds ?? [])],
+      finalProjectId: opportunity.finalProjectId ?? null,
+      wonAt:
+        opportunity.stage === 'WON'
+          ? savedOpportunity.stage === 'WON'
+            ? savedOpportunity.wonAt ?? opportunity.wonAt ?? now
+            : now
+          : null,
       updatedAt: now,
     }
 
-    set((currentState) => ({ idCounters, projects: [project, ...currentState.projects] }))
+    const buildProjectPatch = (projectSource: Project['projectSource']) => ({
+      opportunityId: nextOpportunity.opportunityId,
+      projectSource,
+      accountName: account?.accountName ?? '',
+      mainType: projectSource === 'POC' ? 'POC' : nextOpportunity.type,
+      subType: projectSource === 'POC' ? 'NONE' : projectSubTypeForOpportunity(nextOpportunity),
+      deliveryDate: nextOpportunity.deliveryDate,
+      dealOwner: salesManager?.name ?? '',
+      opportunityName: nextOpportunity.opportunityName,
+      canceledAt: null,
+      updatedAt: now,
+    })
+
+    const updateProjectFromOpportunity = (existingProject: Project, projectSource: Project['projectSource']): Project => {
+      const project = {
+        ...existingProject,
+        ...buildProjectPatch(projectSource),
+      }
+      projects = projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate))
+      projectChanges.push({ projectId: project.id, changeStatus: 'Updated' })
+      return project
+    }
+
+    const createProjectFromOpportunity = (projectSource: Project['projectSource']): Project => {
+      const nextProjectId = incrementCounter(idCounters, 'pid')
+      idCounters = nextProjectId.counters
+      const project: Project = {
+        id: `proj-${crypto.randomUUID()}`,
+        pid: nextProjectId.id,
+        ...buildProjectPatch(projectSource),
+        progressStatus: 'OPEN',
+        createdAt: now,
+        updatedAt: now,
+      }
+      projects = [project, ...projects]
+      projectChanges.push({ projectId: project.id, changeStatus: 'New' })
+      return project
+    }
+
+    if (nextOpportunity.stage !== 'WON' && nextOpportunity.type === 'POC') {
+      const pocProjects = findLinkedPocProjects(nextOpportunity, savedOpportunity, projects)
+      const activePocProject = pocProjects.find((project) => project.progressStatus !== 'DONE')
+
+      if (activePocProject && options?.pocAction === 'UPDATE_EXISTING_POC') {
+        updateProjectFromOpportunity(activePocProject, 'POC')
+      } else if (!activePocProject || options?.pocAction === 'CREATE_NEW_POC') {
+        const project = createProjectFromOpportunity('POC')
+        nextOpportunity.pocProjectIds = uniqueValues([...nextOpportunity.pocProjectIds, project.id])
+      }
+    }
+
+    if (nextOpportunity.stage === 'WON' && nextOpportunity.type !== 'POC') {
+      const finalProject = findFinalProject(nextOpportunity, savedOpportunity, projects)
+
+      if (!finalProject) {
+        const project = createProjectFromOpportunity('FINAL')
+        nextOpportunity.finalProjectId = project.id
+      } else {
+        nextOpportunity.finalProjectId = finalProject.id
+        if (finalProject.progressStatus !== 'DONE' || options?.allowDoneFinalUpdate) {
+          updateProjectFromOpportunity(finalProject, 'FINAL')
+        }
+      }
+    }
+
+    set((currentState) => ({
+      idCounters,
+      projects,
+      opportunities: currentState.opportunities.map((candidate) =>
+        candidate.id === savedOpportunity.id ? nextOpportunity : candidate,
+      ),
+    }))
     get().saveToStorage()
-    return project
+    return { opportunity: nextOpportunity, projectChanges }
   },
 
   createSystem: () => {

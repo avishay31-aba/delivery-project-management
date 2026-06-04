@@ -126,6 +126,9 @@
       "timeGroup": "EMEA",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": null,
       "newTenantRequirements": [
         {
           "id": "req-a-001",
@@ -233,6 +236,9 @@
       "timeGroup": "EMEA",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": null,
       "newTenantRequirements": [
         {
           "id": "req-a-002",
@@ -294,6 +300,9 @@
       "timeGroup": "AMER",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": "2026-05-22T10:00:00.000Z",
       "newTenantRequirements": [
         {
           "id": "req-a-003",
@@ -355,6 +364,9 @@
       "timeGroup": "AMER",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": null,
       "newTenantRequirements": [],
       "changeRequestRequirements": [],
       "standardRenewalRequirements": [
@@ -392,6 +404,9 @@
       "timeGroup": "EMEA",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": null,
       "newTenantRequirements": [],
       "changeRequestRequirements": [
         {
@@ -463,6 +478,9 @@
       "timeGroup": "APAC",
       "currentMilestone": "Not started",
       "projectAlerts": [],
+      "pocProjectIds": [],
+      "finalProjectId": null,
+      "wonAt": null,
       "newTenantRequirements": [
         {
           "id": "req-a-004",
@@ -509,6 +527,7 @@
     {
       "id": "proj-001",
       "pid": "P1040",
+      "projectSource": "FINAL",
       "accountName": "Agency Alpha",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -523,6 +542,7 @@
     {
       "id": "proj-p1041",
       "pid": "P1041",
+      "projectSource": "FINAL",
       "accountName": "Agency Alpha",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -537,6 +557,7 @@
     {
       "id": "proj-p1042",
       "pid": "P1042",
+      "projectSource": "FINAL",
       "accountName": "Agency Alpha",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -551,6 +572,7 @@
     {
       "id": "proj-p1050",
       "pid": "P1050",
+      "projectSource": "FINAL",
       "accountName": "Bureau Beta",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -565,6 +587,7 @@
     {
       "id": "proj-p1051",
       "pid": "P1051",
+      "projectSource": "FINAL",
       "accountName": "Bureau Beta",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -579,6 +602,7 @@
     {
       "id": "proj-p1060",
       "pid": "P1060",
+      "projectSource": "FINAL",
       "accountName": "Corp Gamma",
       "mainType": "DELIVERY",
       "subType": "NEW",
@@ -593,6 +617,7 @@
     {
       "id": "proj-p1061",
       "pid": "P1061",
+      "projectSource": "FINAL",
       "accountName": "Corp Gamma",
       "mainType": "DELIVERY",
       "subType": "NEW",

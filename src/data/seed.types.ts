@@ -6,10 +6,11 @@ export type ProgressStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE'
 export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
 export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
-export type OpportunityStage = 'OPEN' | 'WON' | 'LOST'
+export type OpportunityStage = 'OPEN' | 'WON'
 export type RequirementType = 'A' | 'B' | 'C'
 export type RequirementDeployTarget = 'NEW_SYSTEM' | 'EXISTING_SID'
 export type YesNo = 'YES' | 'NO' | ''
+export type ProjectSource = 'POC' | 'FINAL'
 
 export type SystemClass = 'CUSTOMER' | 'POC_DEMO_TRAINING'
 export type SystemPurpose =
@@ -69,6 +70,7 @@ export interface Project {
   id: string
   pid: string
   opportunityId?: string
+  projectSource: ProjectSource
   accountName: string
   mainType: ProjectMainType
   subType: ProjectSubType
@@ -158,6 +160,9 @@ export interface Opportunity {
   newTenantRequirements: NewTenantRequirement[]
   changeRequestRequirements: ChangeRequestRequirement[]
   standardRenewalRequirements: StandardRenewalRequirement[]
+  pocProjectIds: string[]
+  finalProjectId: string | null
+  wonAt?: string | null
   createdAt: string
   updatedAt: string
 }

@@ -1,16 +1,56 @@
-import type { AppDataState } from '@/data/seed.types'
+import type { AppDataState, Opportunity, Project } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
+function projectSourceFor(project: Project): Project['projectSource'] {
+  return project.projectSource ?? (project.mainType === 'POC' ? 'POC' : 'FINAL')
+}
+
+function normalizeProject(project: Project): Project {
+  return {
+    ...project,
+    projectSource: projectSourceFor(project),
+  }
+}
+
+function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
+  const linkedProjects = projects.filter((project) => project.opportunityId === opportunity.opportunityId)
+  const pocProjectIds = Array.from(
+    new Set([
+      ...(Array.isArray(opportunity.pocProjectIds) ? opportunity.pocProjectIds : []),
+      ...linkedProjects
+        .filter((project) => projectSourceFor(project) === 'POC')
+        .map((project) => project.id),
+    ]),
+  )
+  const finalProjectId =
+    opportunity.finalProjectId ??
+    linkedProjects.find((project) => projectSourceFor(project) === 'FINAL')?.id ??
+    null
+
+  return {
+    ...opportunity,
+    stage: opportunity.stage === 'WON' ? 'WON' : 'OPEN',
+    pocProjectIds,
+    finalProjectId,
+    wonAt: opportunity.wonAt ?? (opportunity.stage === 'WON' ? opportunity.updatedAt : null),
+  }
+}
+
 function normalizeState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
+  const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProject) : seedState.projects.map(normalizeProject)
+  const opportunities = Array.isArray(state.opportunities)
+    ? state.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
+    : seedState.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
   const normalizedState = {
     ...state,
     salesManagers: Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers,
     accounts: Array.isArray(state.accounts) ? state.accounts : seedState.accounts,
-    opportunities: Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities,
+    opportunities,
+    projects,
     systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
     tenants: Array.isArray(state.tenants) ? state.tenants : seedState.tenants,
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
