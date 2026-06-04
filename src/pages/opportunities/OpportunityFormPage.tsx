@@ -101,15 +101,11 @@ function rowValue(row: RequirementRow, key: string): unknown {
 
 function moduleQuantityLabel(key: string): string | null {
   const labels: Record<string, string> = {
-    topicAnalyses: 'Topic Analysis',
     tangles: 'Tangles',
     tanglesGo: 'Tangles Go',
     webloc: 'Webloc',
     webeye: 'Webeye',
     ingest: 'Ingest',
-    standardMonitors: 'Std. Monitors',
-    fullMonitors: 'Full Monitors',
-    topicMonitors: 'Topic Monitors',
   }
   return labels[key] ?? null
 }

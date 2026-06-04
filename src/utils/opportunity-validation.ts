@@ -126,15 +126,11 @@ const INTEGER_FIELD_LABELS: Array<[string, string]> = [
 ]
 
 const MODULE_QUANTITY_FIELD_LABELS: Array<[string, string]> = [
-  ['topicAnalyses', 'Topic Analysis'],
   ['tangles', 'Tangles'],
   ['tanglesGo', 'Tangles Go'],
   ['webloc', 'Webloc'],
   ['webeye', 'Webeye'],
   ['ingest', 'Ingest'],
-  ['standardMonitors', 'Std. Monitors'],
-  ['fullMonitors', 'Full Monitors'],
-  ['topicMonitors', 'Topic Monitors'],
 ]
 
 function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirement): ValidationMessage[] {
