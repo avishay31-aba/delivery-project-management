@@ -171,6 +171,25 @@ function validateModuleQuantitiesDoNotExceedUsers(
   })
 }
 
+function validateLicensesDoNotExceedUsers(
+  row: NewTenantRequirement | ChangeRequestRequirement,
+  gridName: string,
+  rowIndex: number,
+): ValidationMessage[] {
+  const values = row as unknown as Record<string, unknown>
+  const users = values.users
+  const licenses = values.licenses
+
+  return typeof users === 'number' && typeof licenses === 'number' && licenses > users
+    ? [
+        {
+          level: 'error' as const,
+          message: `${gridName} row ${rowIndex + 1}: Licenses cannot exceed number of users.`,
+        },
+      ]
+    : []
+}
+
 function validateRequiredGridFields(
   row: NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement,
   columns: RequirementColumnMetadata[],
@@ -217,6 +236,7 @@ export function validateRequirementA(
   return [
     ...messages,
     ...validateIntegerFields(row),
+    ...validateLicensesDoNotExceedUsers(row, 'Grid A', rowIndex),
     ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid A', rowIndex),
   ]
 }
@@ -247,6 +267,7 @@ export function validateRequirementB(
   return [
     ...messages,
     ...validateIntegerFields(row),
+    ...validateLicensesDoNotExceedUsers(row, 'Grid B', rowIndex),
     ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid B', rowIndex),
   ]
 }
@@ -270,12 +291,22 @@ export function validateRequirementC(
 
 export function validateRequirementTenantUniqueness(opportunity: Opportunity): ValidationMessage[] {
   const messages: ValidationMessage[] = []
+  const duplicateExistingSystem = findDuplicateValue(
+    opportunity.newTenantRequirements
+      .filter((requirement) => requirement.deployTarget === 'EXISTING_SID')
+      .map((requirement) => requirement.existingSystemId ?? '')
+      .filter(Boolean),
+  )
   const duplicateChangeTenant = findDuplicateValue(
     opportunity.changeRequestRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
   )
   const duplicateRenewalTenant = findDuplicateValue(
     opportunity.standardRenewalRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
   )
+
+  if (duplicateExistingSystem) {
+    messages.push({ level: 'error', message: 'The same existing system cannot appear more than once in Grid A.' })
+  }
 
   if (duplicateChangeTenant) {
     messages.push({ level: 'error', message: 'The same existing tenant cannot appear more than once in Grid B.' })

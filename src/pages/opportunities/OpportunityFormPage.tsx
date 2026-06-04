@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import {
   getOpportunityMetadata,
   getVisibleRequirementTypes,
@@ -320,6 +321,7 @@ function RequirementGrid({
   countryOptions,
   saveMessages,
   isTenantOptionDisabled,
+  isSystemOptionDisabled,
   onAddRow,
   onDeleteRow,
   onUpdateRow,
@@ -335,6 +337,7 @@ function RequirementGrid({
   countryOptions: string[]
   saveMessages: string[]
   isTenantOptionDisabled: (kind: RequirementGridKind, rowId: string, tenantId: string) => boolean
+  isSystemOptionDisabled: (rowId: string, systemId: string) => boolean
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
@@ -363,6 +366,11 @@ function RequirementGrid({
           message.startsWith(prefix) &&
           (message.includes('Tangles or Webloc') ||
             message.includes(`${moduleLabel} - Module quantity cannot exceed number of users.`)),
+      )
+    }
+    if (column.key === 'licenses') {
+      return saveMessages.some(
+        (message) => message.startsWith(prefix) && message.includes('Licenses cannot exceed number of users.'),
       )
     }
     if (moduleLabel) {
@@ -466,11 +474,14 @@ function RequirementGrid({
             disabled={sidSystems.length === 0}
           >
             <option value="">{sidSystems.length > 0 ? 'Select SID' : 'No eligible SIDs'}</option>
-            {sidSystems.map((system) => (
-              <option key={system.id} value={system.id}>
-                {system.sid} - {system.hostingType}
-              </option>
-            ))}
+            {sidSystems.map((system) => {
+              const alreadySelected = isSystemOptionDisabled(row.id, system.id)
+              return (
+                <option key={system.id} value={system.id} disabled={alreadySelected}>
+                  {system.sid} - {system.hostingType}{alreadySelected ? ' - Already selected' : ''}
+                </option>
+              )
+            })}
           </select>
           {sidSystems.length === 0 ? (
             <span className="block max-w-44 text-[10px] leading-tight text-sf-text-muted">
@@ -489,11 +500,14 @@ function RequirementGrid({
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
           <option value="">Select tenant</option>
-          {accountTenants.map((tenant) => (
-            <option key={tenant.id} value={tenant.id} disabled={isTenantOptionDisabled(kind, row.id, tenant.id)}>
-              {tenantOptionText(tenant, accountTenants, sidSystems)}
-            </option>
-          ))}
+          {accountTenants.map((tenant) => {
+            const alreadySelected = isTenantOptionDisabled(kind, row.id, tenant.id)
+            return (
+              <option key={tenant.id} value={tenant.id} disabled={alreadySelected}>
+                {tenantOptionText(tenant, accountTenants, sidSystems)}{alreadySelected ? ' | Already selected' : ''}
+              </option>
+            )
+          })}
         </select>
       )
     }
@@ -683,6 +697,7 @@ export function OpportunityFormPage() {
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
+  const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
 
   useEffect(() => {
     setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
@@ -729,8 +744,12 @@ export function OpportunityFormPage() {
   }
 
   function tenantAction(tenantId: string): ExistingActionValue {
-    const hasChange = currentDraft.changeRequestRequirements.some((requirement) => requirement.tenantId === tenantId)
-    const hasRenewal = currentDraft.standardRenewalRequirements.some((requirement) => requirement.tenantId === tenantId)
+    const hasChange =
+      visibleRequirementTypes.includes('B') &&
+      currentDraft.changeRequestRequirements.some((requirement) => requirement.tenantId === tenantId)
+    const hasRenewal =
+      visibleRequirementTypes.includes('C') &&
+      currentDraft.standardRenewalRequirements.some((requirement) => requirement.tenantId === tenantId)
 
     if (hasChange && hasRenewal) return combinedRenewalActionLabel(currentDraft)
     if (hasChange) return changeActionLabel(currentDraft)
@@ -739,11 +758,21 @@ export function OpportunityFormPage() {
   }
 
   function systemAction(systemId: string): ExistingActionValue {
-    return currentDraft.newTenantRequirements.some(
-      (requirement) => requirement.deployTarget === 'EXISTING_SID' && requirement.existingSystemId === systemId,
-    )
+    return visibleRequirementTypes.includes('A') &&
+      currentDraft.newTenantRequirements.some(
+        (requirement) => requirement.deployTarget === 'EXISTING_SID' && requirement.existingSystemId === systemId,
+      )
       ? 'New tenant'
       : 'Not selected'
+  }
+
+  function systemSelectionDisabled(rowId: string, systemId: string): boolean {
+    return currentDraft.newTenantRequirements.some(
+      (requirement) =>
+        requirement.id !== rowId &&
+        requirement.deployTarget === 'EXISTING_SID' &&
+        requirement.existingSystemId === systemId,
+    )
   }
 
   function tenantSelectionDisabled(kind: RequirementGridKind, rowId: string, tenantId: string): boolean {
@@ -944,7 +973,8 @@ export function OpportunityFormPage() {
     window.requestAnimationFrame(() => window.scrollTo(scrollX, scrollY))
   }
 
-  function saveChanges() {
+  function saveChanges(options: { stayOnPage?: boolean } = {}) {
+    setIsSaveMenuOpen(false)
     const messages = validateOpportunity(currentDraft, { accounts, systems, tenants })
       .filter((message) => message.level === 'error')
       .map((message) => message.message)
@@ -984,7 +1014,9 @@ export function OpportunityFormPage() {
       existingOpportunityId: currentSavedOpportunity.opportunityId,
     })
     setSaveMessages([])
-    navigate('/opportunities')
+    if (!options.stayOnPage) {
+      navigate('/opportunities')
+    }
   }
 
   function renderHeaderField(field: OpportunityHeaderField) {
@@ -1179,7 +1211,7 @@ export function OpportunityFormPage() {
 
     return (
       <span className={actionBadgeClassName(action)}>
-        <span>{actionBadgeIcon(action)}</span>
+        <span className="font-semibold">{actionBadgeIcon(action)}</span>
         <span>{action}</span>
       </span>
     )
@@ -1206,7 +1238,6 @@ export function OpportunityFormPage() {
             <thead className="bg-sf-surface-alt text-left">
               <tr>
                 <th className="border border-sf-border px-2 py-1 font-semibold">Action Chosen</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Action Indicator</th>
                 <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
                 <th className="border border-sf-border px-2 py-1 font-semibold">Tenant Name</th>
                 <th className="border border-sf-border px-2 py-1 font-semibold">SID</th>
@@ -1221,7 +1252,6 @@ export function OpportunityFormPage() {
                 const action = tenantAction(tenant.id)
                 return (
                   <tr key={`tenant-${tenant.id}`}>
-                    <td className="border border-sf-border px-2 py-1">{action === 'Not selected' ? '' : action}</td>
                     <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
                     <td className="border border-sf-border px-2 py-1">{tenant.tid}</td>
                     <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
@@ -1237,7 +1267,6 @@ export function OpportunityFormPage() {
                 const action = systemAction(system.id)
                 return (
                   <tr key={`system-${system.id}`}>
-                    <td className="border border-sf-border px-2 py-1">{action === 'Not selected' ? '' : action}</td>
                     <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
                     <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1" />
@@ -1253,7 +1282,7 @@ export function OpportunityFormPage() {
               })}
               {accountTenants.length === 0 && systemOnlyRows.length === 0 ? (
                 <tr>
-                  <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={colSpan + 1}>
+                  <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={colSpan}>
                     No existing tenants or systems for this customer.
                   </td>
                 </tr>
@@ -1287,9 +1316,37 @@ export function OpportunityFormPage() {
           <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={cancelChanges}>
             Cancel
           </button>
-          <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={saveChanges}>
-            Save
-          </button>
+          <div className="relative inline-flex">
+            <button
+              type="button"
+              className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+              onClick={() => saveChanges()}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white hover:opacity-90"
+              aria-haspopup="menu"
+              aria-expanded={isSaveMenuOpen}
+              title="Save actions"
+              onClick={() => setIsSaveMenuOpen((current) => !current)}
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {isSaveMenuOpen ? (
+              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded border border-sf-border bg-white py-1 text-sm shadow-lg" role="menu">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-sf-text hover:bg-sf-surface-alt"
+                  role="menuitem"
+                  onClick={() => saveChanges({ stayOnPage: true })}
+                >
+                  Apply Changes
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1397,6 +1454,7 @@ export function OpportunityFormPage() {
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
                 isTenantOptionDisabled={tenantSelectionDisabled}
+                isSystemOptionDisabled={systemSelectionDisabled}
                 onAddRow={() => addRequirement('A')}
                 onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
@@ -1416,6 +1474,7 @@ export function OpportunityFormPage() {
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
                 isTenantOptionDisabled={tenantSelectionDisabled}
+                isSystemOptionDisabled={systemSelectionDisabled}
                 onAddRow={() => addRequirement('B')}
                 onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
@@ -1435,6 +1494,7 @@ export function OpportunityFormPage() {
                 countryOptions={countryOptions}
                 saveMessages={saveMessages}
                 isTenantOptionDisabled={tenantSelectionDisabled}
+                isSystemOptionDisabled={systemSelectionDisabled}
                 onAddRow={() => addRequirement('C')}
                 onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
