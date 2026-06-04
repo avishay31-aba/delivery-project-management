@@ -31,7 +31,6 @@ import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } f
 import {
   getAccountSystems,
   getAccountTenants,
-  getHiddenRequirementTypesWithRows,
   getOpportunityExistingSidSystems,
   resolveTenantSid,
   validateOpportunity,
@@ -42,6 +41,7 @@ type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | Standard
 type OpportunityDetailTab = 'requirements' | 'project'
 type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
 type PendingSave = { stayOnPage?: boolean }
+type PendingOpportunityTypeChange = { type: OpportunityType; subType: OpportunitySubType }
 type ExistingActionValue =
   | 'Not selected'
   | 'New tenant'
@@ -766,6 +766,7 @@ export function OpportunityFormPage() {
   const [projectChanges, setProjectChanges] = useState<ProjectLifecycleChange[]>([])
   const [pendingWonSave, setPendingWonSave] = useState<PendingSave | null>(null)
   const [pendingPocSave, setPendingPocSave] = useState<PendingSave | null>(null)
+  const [pendingOpportunityTypeChange, setPendingOpportunityTypeChange] = useState<PendingOpportunityTypeChange | null>(null)
 
   useEffect(() => {
     setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
@@ -811,7 +812,6 @@ export function OpportunityFormPage() {
         : [],
     [draft, projects, savedOpportunity?.opportunityId],
   )
-  const hiddenRequirementTypes = useMemo(() => (draft ? getHiddenRequirementTypesWithRows(draft) : []), [draft])
   const countryOptions = useMemo(
     () => Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort(),
     [accounts],
@@ -949,10 +949,39 @@ export function OpportunityFormPage() {
     })
   }
 
+  function hasRequirementRows(): boolean {
+    return (
+      currentDraft.newTenantRequirements.length > 0 ||
+      currentDraft.changeRequestRequirements.length > 0 ||
+      currentDraft.standardRenewalRequirements.length > 0
+    )
+  }
+
+  function applyOpportunityTypeChange(nextChange: PendingOpportunityTypeChange, deleteIrrelevantRequirements: boolean) {
+    const visibleTypes = new Set(getVisibleRequirementTypes(nextChange.type, nextChange.subType))
+    patchDraft({
+      type: nextChange.type,
+      subType: nextChange.subType,
+      ...(deleteIrrelevantRequirements && !visibleTypes.has('A') ? { newTenantRequirements: [] } : {}),
+      ...(deleteIrrelevantRequirements && !visibleTypes.has('B') ? { changeRequestRequirements: [] } : {}),
+      ...(deleteIrrelevantRequirements && !visibleTypes.has('C') ? { standardRenewalRequirements: [] } : {}),
+    })
+    setPendingOpportunityTypeChange(null)
+  }
+
+  function requestOpportunityTypeChange(nextChange: PendingOpportunityTypeChange) {
+    if (nextChange.type === currentDraft.type && nextChange.subType === currentDraft.subType) return
+    if (!hasRequirementRows()) {
+      applyOpportunityTypeChange(nextChange, false)
+      return
+    }
+    setPendingOpportunityTypeChange(nextChange)
+  }
+
   function updateType(type: OpportunityType) {
     const nextSubTypes = SUB_TYPE_OPTIONS[type]
     const nextSubType = nextSubTypes.includes(currentDraft.subType) ? currentDraft.subType : nextSubTypes[0]
-    patchDraft({ type, subType: nextSubType })
+    requestOpportunityTypeChange({ type, subType: nextSubType })
   }
 
   function addRequirement(kind: RequirementGridKind) {
@@ -1191,7 +1220,12 @@ export function OpportunityFormPage() {
           <select
             className={headerControlClassName(headerChanged('subType'), true, headerMissing(field.key))}
             value={currentDraft.subType}
-            onChange={(event) => patchDraft({ subType: event.target.value as OpportunitySubType })}
+            onChange={(event) =>
+              requestOpportunityTypeChange({
+                type: currentDraft.type,
+                subType: event.target.value as OpportunitySubType,
+              })
+            }
           >
             {SUB_TYPE_OPTIONS[currentDraft.type].map((subType) => (
               <option key={subType} value={subType}>
@@ -1588,6 +1622,43 @@ export function OpportunityFormPage() {
         </div>
       ) : null}
 
+      {pendingOpportunityTypeChange ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-base font-semibold text-sf-text">Opportunity Type Change</h2>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              Changing the Opportunity Type/Subtype may make existing requirement records irrelevant.
+            </p>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              What would you like to do with the existing requirement records?
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={() => setPendingOpportunityTypeChange(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={() => applyOpportunityTypeChange(pendingOpportunityTypeChange, false)}
+              >
+                Keep Existing Requirements
+              </button>
+              <button
+                type="button"
+                className="rounded border border-red-200 bg-red-50 px-3 py-1 text-sm text-red-700 hover:bg-red-100"
+                onClick={() => applyOpportunityTypeChange(pendingOpportunityTypeChange, true)}
+              >
+                Delete Existing Requirements
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="sf-card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1627,13 +1698,6 @@ export function OpportunityFormPage() {
       </section>
 
       {renderExistingTenantsAndSystemsSection()}
-
-      {saveMessages.length > 0 && hiddenRequirementTypes.length > 0 ? (
-        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Hidden requirement rows are preserved for Grid {hiddenRequirementTypes.join(', ')}. Change the type/subtype back
-          or manually delete irrelevant rows later.
-        </div>
-      ) : null}
 
       <section className="sf-card overflow-hidden">
         <div className="flex border-b border-sf-border bg-sf-surface-alt">
