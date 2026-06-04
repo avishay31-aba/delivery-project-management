@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useState } from 'react'
+import { type KeyboardEvent, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, Plus, RefreshCw } from 'lucide-react'
@@ -64,6 +64,7 @@ const YES_NO_OPTIONS: YesNo[] = ['', 'YES', 'NO']
 const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
 const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
 const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
+const EMPTY_PROJECT_CHANGES: ProjectLifecycleChange[] = []
 
 function cloneOpportunity(opportunity: Opportunity): Opportunity {
   const clone = JSON.parse(JSON.stringify(opportunity)) as Opportunity
@@ -752,9 +753,12 @@ export function OpportunityFormPage() {
   const saveOpportunityWithProjectSync = useAppStore((state) => state.saveOpportunityWithProjectSync)
   const storedProjectChanges = useAppStore((state) => {
     const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === opportunityId)
-    return opportunity ? state.projectLifecycleChangesByOpportunityId[opportunity.id] ?? [] : []
+    return opportunity ? state.projectLifecycleChangesByOpportunityId[opportunity.id] ?? EMPTY_PROJECT_CHANGES : EMPTY_PROJECT_CHANGES
   })
-  const savedOpportunity = opportunities.find((candidate) => candidate.opportunityId === opportunityId)
+  const savedOpportunity = useMemo(
+    () => opportunities.find((candidate) => candidate.opportunityId === opportunityId),
+    [opportunities, opportunityId],
+  )
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
@@ -772,14 +776,31 @@ export function OpportunityFormPage() {
     setProjectChanges([])
   }, [opportunityId])
 
-  const metadata = draft ? getOpportunityMetadata(draft.type, draft.subType) : null
-  const visibleRequirementTypes = draft ? getVisibleRequirementTypes(draft.type, draft.subType) : []
-  const account = draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined
-  const sidSystems = draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []
-  const accountSystems = draft ? getAccountSystems(draft.accountId, systems) : []
-  const accountTenants = draft ? getAccountTenants(draft.accountId, tenants) : []
-  const createdProjects = draft
-    ? projects.filter((project) => {
+  const metadata = useMemo(() => (draft ? getOpportunityMetadata(draft.type, draft.subType) : null), [draft])
+  const visibleRequirementTypes = useMemo(
+    () => (draft ? getVisibleRequirementTypes(draft.type, draft.subType) : []),
+    [draft],
+  )
+  const account = useMemo(
+    () => (draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined),
+    [accounts, draft],
+  )
+  const sidSystems = useMemo(
+    () => (draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []),
+    [accounts, draft, systems],
+  )
+  const accountSystems = useMemo(
+    () => (draft ? getAccountSystems(draft.accountId, systems) : []),
+    [draft, systems],
+  )
+  const accountTenants = useMemo(
+    () => (draft ? getAccountTenants(draft.accountId, tenants) : []),
+    [draft, tenants],
+  )
+  const createdProjects = useMemo(
+    () =>
+      draft
+        ? projects.filter((project) => {
         const linkedIds = new Set([...(draft.pocProjectIds ?? []), draft.finalProjectId].filter(Boolean))
         const isExplicitlyLinked = linkedIds.has(project.id)
         const isLegacyLinked =
@@ -787,9 +808,14 @@ export function OpportunityFormPage() {
           Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId)
         return isExplicitlyLinked || isLegacyLinked
       })
-    : []
-  const hiddenRequirementTypes = draft ? getHiddenRequirementTypesWithRows(draft) : []
-  const countryOptions = Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort()
+        : [],
+    [draft, projects, savedOpportunity?.opportunityId],
+  )
+  const hiddenRequirementTypes = useMemo(() => (draft ? getHiddenRequirementTypesWithRows(draft) : []), [draft])
+  const countryOptions = useMemo(
+    () => Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort(),
+    [accounts],
+  )
   const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
 
   if (!savedOpportunity || !draft || !metadata) {
