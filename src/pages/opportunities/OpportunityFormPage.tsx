@@ -292,19 +292,6 @@ function actionBadgeClassName(action: ExistingActionValue): string {
   return `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[action]}`
 }
 
-function actionBadgeIcon(action: ExistingActionValue): string {
-  const icons: Record<ExistingActionValue, string> = {
-    'Not selected': '-',
-    'New tenant': '+',
-    'Upsell change': 'UP',
-    'Downsell change': 'DN',
-    'Standard renewal': 'RN',
-    'Renewal + upsell': 'RN UP',
-    'Renewal + downsell': 'RN DN',
-  }
-  return icons[action]
-}
-
 function RequirementGrid({
   title,
   kind,
@@ -460,6 +447,8 @@ function RequirementGrid({
       if (requirement.deployTarget !== 'EXISTING_SID') {
         return <span className="text-xs text-sf-text-muted">New System</span>
       }
+      const availableSystems = sidSystems.filter((system) => !isSystemOptionDisabled(row.id, system.id))
+      const alreadySelectedSystems = sidSystems.filter((system) => isSystemOptionDisabled(row.id, system.id))
 
       return (
         <>
@@ -470,14 +459,21 @@ function RequirementGrid({
             disabled={sidSystems.length === 0}
           >
             <option value="">{sidSystems.length > 0 ? 'Select SID' : 'No eligible SIDs'}</option>
-            {sidSystems.map((system) => {
-              const alreadySelected = isSystemOptionDisabled(row.id, system.id)
-              return (
-                <option key={system.id} value={system.id} disabled={alreadySelected}>
-                  {system.sid} - {system.hostingType}{alreadySelected ? ' - Already selected' : ''}
-                </option>
-              )
-            })}
+            {availableSystems.map((system) => (
+              <option key={system.id} value={system.id}>
+                {system.sid} - {system.hostingType}
+              </option>
+            ))}
+            {alreadySelectedSystems.length > 0 ? (
+              <option value="" disabled>
+                ---------- Already selected ----------
+              </option>
+            ) : null}
+            {alreadySelectedSystems.map((system) => (
+              <option key={system.id} value={system.id} disabled>
+                {system.sid} - {system.hostingType} - Already selected
+              </option>
+            ))}
           </select>
           {sidSystems.length === 0 ? (
             <span className="block max-w-44 text-[10px] leading-tight text-sf-text-muted">
@@ -489,6 +485,9 @@ function RequirementGrid({
     }
 
     if (column.key === 'tenantId' && (kind === 'B' || kind === 'C')) {
+      const availableTenants = accountTenants.filter((tenant) => !isTenantOptionDisabled(kind, row.id, tenant.id))
+      const alreadySelectedTenants = accountTenants.filter((tenant) => isTenantOptionDisabled(kind, row.id, tenant.id))
+
       return (
         <select
           className={fieldClassName(isChanged, isMissing, 'h-7 w-72 text-xs')}
@@ -496,14 +495,21 @@ function RequirementGrid({
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
           <option value="">Select tenant</option>
-          {accountTenants.map((tenant) => {
-            const alreadySelected = isTenantOptionDisabled(kind, row.id, tenant.id)
-            return (
-              <option key={tenant.id} value={tenant.id} disabled={alreadySelected}>
-                {tenantOptionText(tenant, accountTenants, sidSystems)}{alreadySelected ? ' | Already selected' : ''}
-              </option>
-            )
-          })}
+          {availableTenants.map((tenant) => (
+            <option key={tenant.id} value={tenant.id}>
+              {tenantOptionText(tenant, accountTenants, sidSystems)}
+            </option>
+          ))}
+          {alreadySelectedTenants.length > 0 ? (
+            <option value="" disabled>
+              ---------- Already selected ----------
+            </option>
+          ) : null}
+          {alreadySelectedTenants.map((tenant) => (
+            <option key={tenant.id} value={tenant.id} disabled>
+              {tenantOptionText(tenant, accountTenants, sidSystems)} | Already selected
+            </option>
+          ))}
         </select>
       )
     }
@@ -1201,16 +1207,7 @@ export function OpportunityFormPage() {
   }
 
   function renderActionBadge(action: ExistingActionValue) {
-    if (action === 'Not selected') {
-      return <span className={actionBadgeClassName(action)}>{action}</span>
-    }
-
-    return (
-      <span className={actionBadgeClassName(action)}>
-        <span className="font-semibold">{actionBadgeIcon(action)}</span>
-        <span>{action}</span>
-      </span>
-    )
+    return <span className={actionBadgeClassName(action)}>{action}</span>
   }
 
   function renderExistingTenantsAndSystemsSection() {
@@ -1479,7 +1476,7 @@ export function OpportunityFormPage() {
 
             {visibleRequirementTypes.includes('C') ? (
               <RequirementGrid
-                title="Grid C: Standard Renewal Requirements"
+                title="Tenants to Renew"
                 kind="C"
                 columns={requirementCColumns}
                 draft={currentDraft}
