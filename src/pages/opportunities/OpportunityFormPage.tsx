@@ -1,7 +1,7 @@
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, Plus, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import {
   getOpportunityMetadata,
   getVisibleRequirementTypes,
@@ -42,6 +42,7 @@ type OpportunityDetailTab = 'requirements' | 'project'
 type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
 type PendingSave = { stayOnPage?: boolean }
 type PendingOpportunityTypeChange = { type: OpportunityType; subType: OpportunitySubType }
+type CollapsibleSectionId = 'opportunityHeader' | 'existingSystems' | 'gridA' | 'gridB' | 'gridC' | 'createdProject'
 type ExistingActionValue =
   | 'Not selected'
   | 'New tenant'
@@ -65,6 +66,14 @@ const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
 const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
 const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
 const EMPTY_PROJECT_CHANGES: ProjectLifecycleChange[] = []
+const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
+  opportunityHeader: false,
+  existingSystems: false,
+  gridA: false,
+  gridB: false,
+  gridC: false,
+  createdProject: false,
+}
 
 function cloneOpportunity(opportunity: Opportunity): Opportunity {
   const clone = JSON.parse(JSON.stringify(opportunity)) as Opportunity
@@ -298,9 +307,46 @@ function actionBadgeClassName(action: ExistingActionValue): string {
   return `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[action]}`
 }
 
+function CollapsibleSection({
+  title,
+  subtitle,
+  collapsed,
+  onToggle,
+  children,
+  className = 'sf-card space-y-3 p-3',
+  headerActions,
+}: {
+  title: string
+  subtitle?: string
+  collapsed: boolean
+  onToggle: () => void
+  children: ReactNode
+  className?: string
+  headerActions?: ReactNode
+}) {
+  const Indicator = collapsed ? ChevronRight : ChevronDown
+
+  return (
+    <section className={className}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
+          <Indicator className="mt-0.5 h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
+          <span>
+            <span className="block text-lg font-semibold text-sf-text">{title}</span>
+            {subtitle ? <span className="block text-sm text-sf-text-muted">{subtitle}</span> : null}
+          </span>
+        </button>
+        {headerActions ? <div className="flex flex-wrap items-center gap-2">{headerActions}</div> : null}
+      </div>
+      {collapsed ? null : children}
+    </section>
+  )
+}
+
 function RequirementGrid({
   title,
   kind,
+  collapsed,
   columns,
   draft,
   saved,
@@ -315,9 +361,11 @@ function RequirementGrid({
   onAddRow,
   onDeleteRow,
   onUpdateRow,
+  onToggleCollapsed,
 }: {
   title: string
   kind: RequirementGridKind
+  collapsed: boolean
   columns: RequirementColumnMetadata[]
   draft: Opportunity
   saved: Opportunity
@@ -332,6 +380,7 @@ function RequirementGrid({
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
+  onToggleCollapsed: () => void
 }) {
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const rows =
@@ -416,7 +465,7 @@ function RequirementGrid({
         <button
           type="button"
           data-multiselect-trigger={pickerId}
-          className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-xs')}
+          className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-sm')}
           title={selected.join('; ')}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect()
@@ -450,7 +499,7 @@ function RequirementGrid({
                 style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
               >
                 {options.map((option) => (
-                  <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-sf-surface-alt">
+                  <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-sm hover:bg-sf-surface-alt">
                     <input type="checkbox" checked={draftSelected.includes(option)} onChange={() => toggleOption(option)} />
                     <span>{option}</span>
                   </label>
@@ -471,14 +520,14 @@ function RequirementGrid({
       const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
       const tenant = accountTenants.find((candidate) => candidate.id === tenantId)
       const value = column.key === 'tenantName' ? (tenant ? tenantDisplayName(tenant) : '') : tenant?.deliveryPid ?? ''
-      return <span className="text-xs text-sf-text-muted">{value}</span>
+      return <span className="text-sm text-sf-text-muted">{value}</span>
     }
 
     if (column.key === 'deployTarget' && kind === 'A') {
       const requirement = row as NewTenantRequirement
       return (
         <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-xs')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-sm')}
           value={requirement.deployTarget}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value as RequirementDeployTarget)}
         >
@@ -491,7 +540,7 @@ function RequirementGrid({
     if (column.key === 'existingSystemId' && kind === 'A') {
       const requirement = row as NewTenantRequirement
       if (requirement.deployTarget !== 'EXISTING_SID') {
-        return <span className="text-xs text-sf-text-muted">New System</span>
+        return <span className="text-sm text-sf-text-muted">New System</span>
       }
       const availableSystems = sidSystems.filter((system) => !isSystemOptionDisabled(row.id, system.id))
       const alreadySelectedSystems = sidSystems.filter((system) => isSystemOptionDisabled(row.id, system.id))
@@ -499,7 +548,7 @@ function RequirementGrid({
       return (
         <>
           <select
-            className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
+            className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-sm')}
             value={requirement.existingSystemId ?? ''}
             onChange={(event) => onUpdateRow(row.id, column.key, event.target.value || null)}
             disabled={sidSystems.length === 0}
@@ -536,7 +585,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-72 text-xs')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-72 text-sm')}
           value={(row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -563,7 +612,7 @@ function RequirementGrid({
     if (column.key === 'systemId' && (kind === 'B' || kind === 'C')) {
       const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
       return (
-        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
+        <span className={isChanged ? 'bg-yellow-100 px-1 text-sm' : 'text-sm text-sf-text-muted'}>
           {resolveTenantSid(tenantId, accountTenants, sidSystems)}
         </span>
       )
@@ -574,7 +623,7 @@ function RequirementGrid({
       const tenantWarrantyRecords = warrantyRecords.filter((record) => record.tenantId === requirement.tenantId)
       return (
         <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-xs')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-sm')}
           value={requirement.warrantyRecordId}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -590,7 +639,7 @@ function RequirementGrid({
 
     if (!column.editable) {
       return (
-        <span className={isChanged ? 'bg-yellow-100 px-1 text-xs' : 'text-xs text-sf-text-muted'}>
+        <span className={isChanged ? 'bg-yellow-100 px-1 text-sm' : 'text-sm text-sf-text-muted'}>
           {textValue(rowValue(row, column.key))}
         </span>
       )
@@ -610,7 +659,7 @@ function RequirementGrid({
 
       return (
         <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-xs')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-sm')}
           value={textValue(rowValue(row, column.key))}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
@@ -636,7 +685,7 @@ function RequirementGrid({
     if (column.inputType === 'integer') {
       return (
         <input
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-24 text-xs')}
+          className={fieldClassName(isChanged, isMissing, 'h-7 w-24 text-sm')}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -653,7 +702,7 @@ function RequirementGrid({
 
     return (
       <input
-        className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-xs')}
+        className={fieldClassName(isChanged, isMissing, 'h-7 w-36 text-sm')}
         value={textValue(rowValue(row, column.key))}
         onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
       />
@@ -661,13 +710,14 @@ function RequirementGrid({
   }
 
   return (
-    <section className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-sf-text">{title}</h2>
-          <p className="text-xs text-sf-text-muted">Each row represents one tenant requirement from Excel section 3.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <CollapsibleSection
+      title={title}
+      subtitle="Each row represents one tenant requirement from Excel section 3."
+      collapsed={collapsed}
+      onToggle={onToggleCollapsed}
+      className="space-y-2"
+      headerActions={
+        <>
           {kind === 'B' || kind === 'C' ? (
             <button
               type="button"
@@ -680,25 +730,26 @@ function RequirementGrid({
           <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
             {kind === 'B' ? 'Select and Change Tenant' : kind === 'C' ? 'Select Tenant' : '+ Add Tenant Requirement'}
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-xs leading-tight">
+        <table className="min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
-                <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom font-semibold text-sf-text">
+                <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
                   <span>
                     {column.label}
                     {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
                     {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
                   </span>
                   {column.key !== 'existingSystemId' ? (
-                    <span className="block text-[11px] font-normal text-sf-text-muted">{column.group}</span>
+                    <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
                   ) : null}
                   {column.requiredWhen && column.key !== 'existingSystemId' ? (
-                    <span className="block max-w-40 whitespace-normal text-[10px] font-normal leading-tight text-red-700">
+                    <span className="block max-w-40 whitespace-normal text-xs font-normal leading-tight text-red-700">
                       {column.requiredWhen}
                     </span>
                   ) : null}
@@ -711,11 +762,11 @@ function RequirementGrid({
             {rows.map((row, rowIndex) => (
               <tr key={row.id} className="hover:bg-sf-surface-alt">
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-sf-border px-1.5 py-px align-top">
+                  <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm">
                     {renderCell(row, column, rowIndex)}
                   </td>
                 ))}
-                <td className="border border-sf-border px-1.5 py-px align-top">
+                <td className="border border-sf-border px-1.5 py-px align-top text-sm">
                   <button
                     type="button"
                     className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
@@ -736,7 +787,7 @@ function RequirementGrid({
           </tbody>
         </table>
       </div>
-    </section>
+    </CollapsibleSection>
   )
 }
 
@@ -767,6 +818,7 @@ export function OpportunityFormPage() {
   const [pendingWonSave, setPendingWonSave] = useState<PendingSave | null>(null)
   const [pendingPocSave, setPendingPocSave] = useState<PendingSave | null>(null)
   const [pendingOpportunityTypeChange, setPendingOpportunityTypeChange] = useState<PendingOpportunityTypeChange | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
     setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
@@ -833,6 +885,10 @@ export function OpportunityFormPage() {
   function patchDraft(patch: Partial<Opportunity>) {
     setDraft((current) => (current ? { ...current, ...patch } : current))
     setSaveMessages([])
+  }
+
+  function toggleSection(sectionId: CollapsibleSectionId) {
+    setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
   }
 
   function headerChanged(field: keyof Opportunity): boolean {
@@ -1421,28 +1477,25 @@ export function OpportunityFormPage() {
     const colSpan = 8
 
     return (
-      <section className="sf-card space-y-3 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-sf-text">Customer Existing Tenants / Systems</h2>
-            <p className="text-sm text-sf-text-muted">
-              Existing tenant and system references for {account?.accountName ?? 'the selected account'}.
-            </p>
-          </div>
-        </div>
+      <CollapsibleSection
+        title="Customer Existing Tenants / Systems"
+        subtitle={`Existing tenant and system references for ${account?.accountName ?? 'the selected account'}.`}
+        collapsed={collapsedSections.existingSystems}
+        onToggle={() => toggleSection('existingSystems')}
+      >
 
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-xs leading-tight">
+          <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Action Chosen</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">TID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Tenant Name</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">SID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Delivery PID</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Current product/config summary</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Warranty status</th>
-                <th className="border border-sf-border px-2 py-1 font-semibold">Warranty end date</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Action Chosen</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">TID</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Tenant Name</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">SID</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Delivery PID</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Current product/config summary</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Warranty status</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Warranty end date</th>
               </tr>
             </thead>
             <tbody>
@@ -1488,7 +1541,7 @@ export function OpportunityFormPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </CollapsibleSection>
     )
   }
 
@@ -1659,16 +1712,17 @@ export function OpportunityFormPage() {
         </div>
       ) : null}
 
-      <section className="sf-card space-y-3 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-sf-text">Opportunity header</h2>
-            <p className="text-sm text-sf-text-muted">Excel section 2 metadata with Opportunity naming and Project status excluded.</p>
-          </div>
-          <span className="rounded-full border border-sf-border px-2 py-0.5 text-xs text-sf-text-muted">
+      <CollapsibleSection
+        title="Opportunity header"
+        subtitle="Excel section 2 metadata with Opportunity naming and Project status excluded."
+        collapsed={collapsedSections.opportunityHeader}
+        onToggle={() => toggleSection('opportunityHeader')}
+        headerActions={
+          <span className="rounded-full border border-sf-border px-2 py-0.5 text-sm text-sf-text-muted">
             Account/End User: {account?.accountName ?? 'Not set'}
           </span>
-        </div>
+        }
+      >
         <div className="space-y-3">
           <div className="flex flex-wrap items-start gap-3">
             {renderHeaderFields(lineOneKeys)}
@@ -1682,20 +1736,20 @@ export function OpportunityFormPage() {
           <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineThreeKeys)}</div>
 
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Commercial terms</h3>
+            <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Commercial terms</h3>
             <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(commercialTermKeys)}</div>
           </div>
 
           {operationalMetadataFields.length > 0 ? (
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase text-sf-text-muted">Operational metadata</h3>
+              <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Operational metadata</h3>
               <div className="flex flex-wrap items-start gap-3">
                 {operationalMetadataFields.map(renderHeaderField)}
               </div>
             </div>
           ) : null}
         </div>
-      </section>
+      </CollapsibleSection>
 
       {renderExistingTenantsAndSystemsSection()}
 
@@ -1704,7 +1758,7 @@ export function OpportunityFormPage() {
           <button
             type="button"
             className={[
-              'border-b-2 px-4 py-2 text-sm font-semibold',
+              'border-b-2 px-4 py-2 text-base font-semibold',
               activeDetailTab === 'requirements'
                 ? 'border-sf-brand bg-white text-sf-text'
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
@@ -1717,7 +1771,7 @@ export function OpportunityFormPage() {
           <button
             type="button"
             className={[
-              'border-b-2 px-4 py-2 text-sm font-semibold',
+              'border-b-2 px-4 py-2 text-base font-semibold',
               activeDetailTab === 'project'
                 ? 'border-sf-brand bg-white text-sf-text'
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
@@ -1736,6 +1790,7 @@ export function OpportunityFormPage() {
               <RequirementGrid
                 title="Grid A: New Tenant Requirements"
                 kind="A"
+                collapsed={collapsedSections.gridA}
                 columns={requirementAColumns}
                 draft={currentDraft}
                 saved={currentSavedOpportunity}
@@ -1749,6 +1804,7 @@ export function OpportunityFormPage() {
                 onAddRow={() => addRequirement('A')}
                 onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
+                onToggleCollapsed={() => toggleSection('gridA')}
               />
             ) : null}
 
@@ -1756,6 +1812,7 @@ export function OpportunityFormPage() {
               <RequirementGrid
                 title="Grid B: Change Request Requirements"
                 kind="B"
+                collapsed={collapsedSections.gridB}
                 columns={requirementBColumns}
                 draft={currentDraft}
                 saved={currentSavedOpportunity}
@@ -1770,6 +1827,7 @@ export function OpportunityFormPage() {
                 onAddRow={() => addRequirement('B')}
                 onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
+                onToggleCollapsed={() => toggleSection('gridB')}
               />
             ) : null}
 
@@ -1777,6 +1835,7 @@ export function OpportunityFormPage() {
               <RequirementGrid
                 title="Tenants to Renew"
                 kind="C"
+                collapsed={collapsedSections.gridC}
                 columns={requirementCColumns}
                 draft={currentDraft}
                 saved={currentSavedOpportunity}
@@ -1791,54 +1850,62 @@ export function OpportunityFormPage() {
                 onAddRow={() => addRequirement('C')}
                 onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
+                onToggleCollapsed={() => toggleSection('gridC')}
               />
             ) : null}
           </div>
         ) : (
           <div className="space-y-2 p-3" role="tabpanel" aria-label="Created Project">
-            {createdProjects.length > 0 ? (
-              <div className="overflow-x-auto rounded border border-sf-border bg-white">
-                <table className="min-w-full border-collapse text-sm">
-                  <thead className="bg-sf-surface-alt text-left">
-                    <tr>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Change Status</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">PID</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Type</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Subtype</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Project Status</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Created Date</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Updated Date</th>
-                      <th className="border border-sf-border px-2 py-1 font-semibold">Link to Project</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {createdProjects.map((project) => (
-                      <tr
-                        key={project.id}
-                        className={project.progressStatus === 'DONE' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-green-50 hover:bg-green-100'}
-                      >
-                        <td className="border border-sf-border px-2 py-1">{renderProjectChangeBadge(projectChangeStatus(project.id))}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.pid}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.mainType}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.subType}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.progressStatus}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.createdAt}</td>
-                        <td className="border border-sf-border px-2 py-1">{project.updatedAt}</td>
-                        <td className="border border-sf-border px-2 py-1">
-                          <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
-                            Open project
-                          </Link>
-                        </td>
+            <CollapsibleSection
+              title="Created Project"
+              collapsed={collapsedSections.createdProject}
+              onToggle={() => toggleSection('createdProject')}
+              className="space-y-2"
+            >
+              {createdProjects.length > 0 ? (
+                <div className="overflow-x-auto rounded border border-sf-border bg-white">
+                  <table className="min-w-full border-collapse text-sm">
+                    <thead className="bg-sf-surface-alt text-left">
+                      <tr>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Change Status</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">PID</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Project Type</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Project Subtype</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Project Status</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Created Date</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Updated Date</th>
+                        <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Link to Project</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-                No project created yet.
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {createdProjects.map((project) => (
+                        <tr
+                          key={project.id}
+                          className={project.progressStatus === 'DONE' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-green-50 hover:bg-green-100'}
+                        >
+                          <td className="border border-sf-border px-2 py-1 text-sm">{renderProjectChangeBadge(projectChangeStatus(project.id))}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.pid}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.mainType}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.subType}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.progressStatus}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.createdAt}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{project.updatedAt}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">
+                            <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                              Open project
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+                  No project created yet.
+                </div>
+              )}
+            </CollapsibleSection>
           </div>
         )}
         </div>
