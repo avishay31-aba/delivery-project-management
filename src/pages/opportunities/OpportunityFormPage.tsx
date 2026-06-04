@@ -40,7 +40,7 @@ import {
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project'
-type ActiveMultiSelect = { id: string; left: number; top: number; width: number }
+type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
 type PendingSave = { stayOnPage?: boolean }
 type ExistingActionValue =
   | 'Not selected'
@@ -310,6 +310,7 @@ function RequirementGrid({
   saveMessages,
   isTenantOptionDisabled,
   isSystemOptionDisabled,
+  onSelectAllTenants,
   onAddRow,
   onDeleteRow,
   onUpdateRow,
@@ -326,6 +327,7 @@ function RequirementGrid({
   saveMessages: string[]
   isTenantOptionDisabled: (kind: RequirementGridKind, rowId: string, tenantId: string) => boolean
   isSystemOptionDisabled: (rowId: string, systemId: string) => boolean
+  onSelectAllTenants?: () => void
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
@@ -337,6 +339,26 @@ function RequirementGrid({
       : kind === 'B'
         ? draft.changeRequestRequirements
         : draft.standardRenewalRequirements
+
+  useEffect(() => {
+    if (!activeMultiSelect) return
+    const active = activeMultiSelect
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null
+      if (
+        target?.closest(`[data-multiselect-picker="${active.id}"]`) ||
+        target?.closest(`[data-multiselect-trigger="${active.id}"]`)
+      ) {
+        return
+      }
+      onUpdateRow(active.rowId, active.columnKey, active.selected)
+      setActiveMultiSelect(null)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [activeMultiSelect, onUpdateRow])
 
   function cellChanged(row: RequirementRow, key: string): boolean {
     const savedRow = findRequirement(saved, kind, row.id)
@@ -376,28 +398,45 @@ function RequirementGrid({
     const isChanged = cellChanged(row, column.key)
     const pickerId = `${row.id}:${column.key}`
     const isOpen = activeMultiSelect?.id === pickerId
+    const draftSelected = isOpen ? activeMultiSelect.selected : selected
 
     function toggleOption(option: string) {
-      const nextSelected = selected.includes(option)
-        ? selected.filter((value) => value !== option)
-        : [...selected, option]
-      onUpdateRow(row.id, column.key, nextSelected)
-      setActiveMultiSelect(null)
+      setActiveMultiSelect((current) => {
+        if (!current || current.id !== pickerId) return current
+        const nextSelected = current.selected.includes(option)
+          ? current.selected.filter((value) => value !== option)
+          : [...current.selected, option]
+        return { ...current, selected: nextSelected }
+      })
     }
 
     return (
       <>
         <button
           type="button"
+          data-multiselect-trigger={pickerId}
           className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-xs')}
           title={selected.join('; ')}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect()
-            setActiveMultiSelect((current) =>
-              current?.id === pickerId
-                ? null
-                : { id: pickerId, left: rect.left, top: rect.bottom + 4, width: Math.max(rect.width, 224) },
-            )
+            setActiveMultiSelect((current) => {
+              if (current?.id === pickerId) {
+                onUpdateRow(current.rowId, current.columnKey, current.selected)
+                return null
+              }
+              if (current) {
+                onUpdateRow(current.rowId, current.columnKey, current.selected)
+              }
+              return {
+                id: pickerId,
+                rowId: row.id,
+                columnKey: column.key,
+                selected,
+                left: rect.left,
+                top: rect.bottom + 4,
+                width: Math.max(rect.width, 224),
+              }
+            })
           }}
         >
           {selected.length > 0 ? selected.join('; ') : 'Select'}
@@ -405,12 +444,13 @@ function RequirementGrid({
         {isOpen
           ? createPortal(
               <div
+                data-multiselect-picker={pickerId}
                 className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
                 style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
               >
                 {options.map((option) => (
                   <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-sf-surface-alt">
-                    <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
+                    <input type="checkbox" checked={draftSelected.includes(option)} onChange={() => toggleOption(option)} />
                     <span>{option}</span>
                   </label>
                 ))}
@@ -626,9 +666,20 @@ function RequirementGrid({
           <h2 className="text-sm font-semibold text-sf-text">{title}</h2>
           <p className="text-xs text-sf-text-muted">Each row represents one tenant requirement from Excel section 3.</p>
         </div>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
-          {kind === 'B' ? 'Select and Change Tenant' : kind === 'C' ? 'Select Tenant' : '+ Add Tenant Requirement'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {kind === 'B' || kind === 'C' ? (
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+              onClick={onSelectAllTenants}
+            >
+              Select All
+            </button>
+          ) : null}
+          <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
+            {kind === 'B' ? 'Select and Change Tenant' : kind === 'C' ? 'Select Tenant' : '+ Add Tenant Requirement'}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
@@ -699,6 +750,10 @@ export function OpportunityFormPage() {
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const projects = useAppStore((state) => state.projects)
   const saveOpportunityWithProjectSync = useAppStore((state) => state.saveOpportunityWithProjectSync)
+  const storedProjectChanges = useAppStore((state) => {
+    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === opportunityId)
+    return opportunity ? state.projectLifecycleChangesByOpportunityId[opportunity.id] ?? [] : []
+  })
   const savedOpportunity = opportunities.find((candidate) => candidate.opportunityId === opportunityId)
   const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
   const [saveMessages, setSaveMessages] = useState<string[]>([])
@@ -846,8 +901,8 @@ export function OpportunityFormPage() {
       accountId: ['Account is required.'],
       salesManagerId: ['Sales Manager / Deal Owner is required.'],
       deliveryDate: ['Delivery date is required.'],
-      pocStartDate: ['Start Date is required.'],
-      pocEndDate: ['End Date is required.'],
+      pocStartDate: ['Start Date is required.', 'POC End Date cannot be earlier than POC Start Date.'],
+      pocEndDate: ['End Date is required.', 'POC End Date cannot be earlier than POC Start Date.'],
       warrantyRecordId: ['Warranty record to extend is required.'],
     }
     return (labels[fieldKey] ?? []).some((message) => saveMessages.includes(message))
@@ -1013,6 +1068,46 @@ export function OpportunityFormPage() {
     if (!options.stayOnPage) {
       navigate('/opportunities')
     }
+  }
+
+  function selectAllTenants(kind: 'B' | 'C') {
+    const selectedTenantIds = new Set(
+      kind === 'B'
+        ? currentDraft.changeRequestRequirements.map((requirement) => requirement.tenantId).filter(Boolean)
+        : currentDraft.standardRenewalRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
+    )
+    const tenantsToAdd = accountTenants.filter((tenant) => !selectedTenantIds.has(tenant.id))
+
+    if (tenantsToAdd.length === 0) return
+
+    if (kind === 'B') {
+      patchDraft({
+        changeRequestRequirements: [
+          ...currentDraft.changeRequestRequirements,
+          ...tenantsToAdd.map((tenant, index) =>
+            createRequirementB(
+              currentDraft.changeRequestRequirements.length + index,
+              tenant,
+              currentDraft.country,
+            ),
+          ),
+        ],
+      })
+      return
+    }
+
+    patchDraft({
+      standardRenewalRequirements: [
+        ...currentDraft.standardRenewalRequirements,
+        ...tenantsToAdd.map((tenant, index) =>
+          createRequirementC(
+            currentDraft.standardRenewalRequirements.length + index,
+            tenant,
+            warrantyRecords.find((record) => record.tenantId === tenant.id),
+          ),
+        ),
+      ],
+    })
   }
 
   function saveChanges(options: PendingSave = {}) {
@@ -1238,7 +1333,8 @@ export function OpportunityFormPage() {
   }
 
   function projectChangeStatus(projectId: string): ProjectLifecycleChange['changeStatus'] | null {
-    return projectChanges.find((change) => change.projectId === projectId)?.changeStatus ?? null
+    const currentChanges = projectChanges.length > 0 ? projectChanges : storedProjectChanges
+    return currentChanges.find((change) => change.projectId === projectId)?.changeStatus ?? null
   }
 
   function renderProjectChangeBadge(changeStatus: ProjectLifecycleChange['changeStatus'] | null) {
@@ -1580,6 +1676,7 @@ export function OpportunityFormPage() {
                 saveMessages={saveMessages}
                 isTenantOptionDisabled={tenantSelectionDisabled}
                 isSystemOptionDisabled={systemSelectionDisabled}
+                onSelectAllTenants={() => selectAllTenants('B')}
                 onAddRow={() => addRequirement('B')}
                 onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
@@ -1600,6 +1697,7 @@ export function OpportunityFormPage() {
                 saveMessages={saveMessages}
                 isTenantOptionDisabled={tenantSelectionDisabled}
                 isSystemOptionDisabled={systemSelectionDisabled}
+                onSelectAllTenants={() => selectAllTenants('C')}
                 onAddRow={() => addRequirement('C')}
                 onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
                 onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}

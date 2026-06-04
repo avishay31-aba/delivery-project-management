@@ -337,6 +337,15 @@ export function validateOpportunityHeader(opportunity: Opportunity, context: Opp
     messages.push({ level: 'error', message: 'End Date is required.' })
   }
 
+  if (
+    opportunity.type === 'POC' &&
+    opportunity.pocStartDate &&
+    opportunity.pocEndDate &&
+    opportunity.pocEndDate < opportunity.pocStartDate
+  ) {
+    messages.push({ level: 'error', message: 'POC End Date cannot be earlier than POC Start Date.' })
+  }
+
   if (visibleHeaderKeys.has('warrantyRecordId') && !opportunity.warrantyRecordId?.trim()) {
     messages.push({ level: 'error', message: 'Warranty record to extend is required.' })
   }

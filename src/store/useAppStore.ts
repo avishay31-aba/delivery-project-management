@@ -16,6 +16,7 @@ import {
 } from '@/store/persistence'
 
 interface AppStore extends AppDataState {
+  projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
   initialize: () => void
   saveToStorage: () => void
   resetToSeed: () => void
@@ -90,6 +91,7 @@ function findFinalProject(opportunity: Opportunity, savedOpportunity: Opportunit
 export const useAppStore = create<AppStore>((set, get) => ({
   ...createInitialState(),
   hydrated: false,
+  projectLifecycleChangesByOpportunityId: {},
 
   initialize: () => {
     const persisted = loadPersistedState()
@@ -119,7 +121,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   resetToSeed: () => {
     clearPersistedState()
-    set({ ...createInitialState(), hydrated: true })
+    set({ ...createInitialState(), hydrated: true, projectLifecycleChangesByOpportunityId: {} })
   },
 
   updateProject: (id, patch) => {
@@ -316,6 +318,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => ({
       idCounters,
       projects,
+      projectLifecycleChangesByOpportunityId: {
+        ...currentState.projectLifecycleChangesByOpportunityId,
+        [nextOpportunity.id]: projectChanges,
+      },
       opportunities: currentState.opportunities.map((candidate) =>
         candidate.id === savedOpportunity.id ? nextOpportunity : candidate,
       ),
