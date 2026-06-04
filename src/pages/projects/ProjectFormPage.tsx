@@ -1,13 +1,267 @@
-import { useParams } from 'react-router-dom'
-import { projectsApi } from '@/api/projects'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  getProjectFormMetadata,
+  projectTabLabel,
+  type ProjectFormTab,
+  type ProjectHeaderFieldMetadata,
+  type ProjectRequirementSectionKind,
+  type ProjectRequirementSectionMetadata,
+} from '@/config/project-form-metadata'
+import type {
+  ChangeRequestRequirement,
+  NewTenantRequirement,
+  Opportunity,
+  Project,
+  StandardRenewalRequirement,
+  System,
+  Tenant,
+} from '@/data/seed.types'
+import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import { PageHeader } from '@/components/record'
-import { PlaceholderCard } from '@/components/ui'
+import { FormField, PlaceholderCard } from '@/components/ui'
+import { useAppStore } from '@/store/useAppStore'
+
+type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
+type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
+
+const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
+  projectHeader: false,
+  tenantRequirements: false,
+  milestones: false,
+  tasks: false,
+  systemsTenants: false,
+  engagementCircles: false,
+  documents: false,
+}
+
+function cloneProject(project: Project): Project {
+  return JSON.parse(JSON.stringify(project)) as Project
+}
+
+function valuesEqual(first: unknown, second: unknown): boolean {
+  return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
+}
+
+function textValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  return value == null ? '' : String(value)
+}
+
+function inputClassName(isChanged: boolean, extra = ''): string {
+  return [
+    'rounded border border-sf-border px-2 py-1 leading-tight',
+    isChanged ? 'bg-yellow-100' : 'bg-white',
+    extra,
+  ].join(' ')
+}
+
+function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): string {
+  return [
+    inputClassName(isChanged, extra),
+    isMissing ? 'border-red-500 ring-1 ring-red-500' : '',
+  ].join(' ')
+}
+
+function rowValue(row: RequirementRow, key: string): unknown {
+  return (row as unknown as Record<string, unknown>)[key]
+}
+
+function tenantDisplayName(tenant: Tenant): string {
+  return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
+}
+
+function resolveSystemSid(systemId: string | null | undefined, systems: System[]): string {
+  if (!systemId) return ''
+  return systems.find((system) => system.id === systemId)?.sid ?? ''
+}
+
+function resolveTenant(tenantId: string, tenants: Tenant[]): Tenant | undefined {
+  return tenants.find((tenant) => tenant.id === tenantId)
+}
+
+function CollapsibleSection({
+  title,
+  subtitle,
+  collapsed,
+  onToggle,
+  children,
+  className = 'sf-card space-y-3 p-3',
+}: {
+  title: string
+  subtitle?: string
+  collapsed: boolean
+  onToggle: () => void
+  children: ReactNode
+  className?: string
+}) {
+  const Indicator = collapsed ? ChevronRight : ChevronDown
+
+  return (
+    <section className={className}>
+      <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
+        <Indicator className="mt-0.5 h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
+        <span>
+          <span className="block text-lg font-semibold text-sf-text">{title}</span>
+          {subtitle ? <span className="block text-sm text-sf-text-muted">{subtitle}</span> : null}
+        </span>
+      </button>
+      {collapsed ? null : children}
+    </section>
+  )
+}
+
+function readonlyCellValue(
+  row: RequirementRow,
+  column: RequirementColumnMetadata,
+  kind: ProjectRequirementSectionKind,
+  tenants: Tenant[],
+  systems: System[],
+): string {
+  if (column.key === 'existingSystemId' && kind === 'A') {
+    const requirement = row as NewTenantRequirement
+    if (requirement.deployTarget !== 'EXISTING_SID') return 'New System'
+    return resolveSystemSid(requirement.existingSystemId, systems)
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'tenantId') {
+    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant ? tenantDisplayName(tenant) : ''
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'tenantName') {
+    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant?.tenantName ?? ''
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'systemId') {
+    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return resolveSystemSid(tenant?.systemId ?? rowValue(row, column.key) as string, systems)
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'deliveryPid') {
+    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant?.deliveryPid ?? ''
+  }
+
+  return textValue(rowValue(row, column.key))
+}
+
+function RequirementSection({
+  section,
+  opportunity,
+  tenants,
+  systems,
+}: {
+  section: ProjectRequirementSectionMetadata
+  opportunity: Opportunity | undefined
+  tenants: Tenant[]
+  systems: System[]
+}) {
+  const rows =
+    section.kind === 'A'
+      ? opportunity?.newTenantRequirements ?? []
+      : section.kind === 'B'
+        ? opportunity?.changeRequestRequirements ?? []
+        : opportunity?.standardRenewalRequirements ?? []
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h3 className="text-lg font-semibold text-sf-text">{section.title}</h3>
+        {section.description ? <p className="text-sm text-sf-text-muted">{section.description}</p> : null}
+      </div>
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <table className="min-w-full border-collapse text-sm leading-tight">
+            <thead className="bg-sf-surface-alt text-left">
+              <tr>
+                {section.columns.map((column) => (
+                  <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                    <span>{column.label}</span>
+                    {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span> : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-sf-surface-alt">
+                  {section.columns.map((column) => (
+                    <td key={column.key} className="border border-sf-border px-1.5 py-1 align-top text-sm text-sf-text">
+                      {readonlyCellValue(row, column, section.kind, tenants, systems)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+          No {section.title.toLowerCase()} received from the linked Opportunity.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function tabSectionId(tab: ProjectFormTab): CollapsibleSectionId {
+  const ids: Record<ProjectFormTab, CollapsibleSectionId> = {
+    tenantRequirements: 'tenantRequirements',
+    milestones: 'milestones',
+    tasks: 'tasks',
+    systemsTenants: 'systemsTenants',
+    engagementCircles: 'engagementCircles',
+    documents: 'documents',
+  }
+  return ids[tab]
+}
 
 export function ProjectFormPage() {
   const { pid } = useParams<{ pid: string }>()
-  const project = pid ? projectsApi.getByPid(pid) : undefined
+  const navigate = useNavigate()
+  const projects = useAppStore((state) => state.projects)
+  const opportunities = useAppStore((state) => state.opportunities)
+  const accounts = useAppStore((state) => state.accounts)
+  const salesManagers = useAppStore((state) => state.salesManagers)
+  const tenants = useAppStore((state) => state.tenants)
+  const systems = useAppStore((state) => state.systems)
+  const updateProject = useAppStore((state) => state.updateProject)
+  const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
+  const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProject(savedProject) : null)
+  const [activeTab, setActiveTab] = useState<ProjectFormTab>('tenantRequirements')
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const [saveMessages, setSaveMessages] = useState<string[]>([])
+  const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
-  if (!project) {
+  useEffect(() => {
+    setDraft(savedProject ? cloneProject(savedProject) : null)
+  }, [savedProject])
+
+  const currentDraft = draft ?? savedProject
+  const metadata = currentDraft ? getProjectFormMetadata(currentDraft.mainType, currentDraft.subType) : null
+  const linkedOpportunity = useMemo(() => {
+    if (!currentDraft) return undefined
+    return opportunities.find(
+      (opportunity) =>
+        opportunity.opportunityId === currentDraft.opportunityId ||
+        opportunity.id === currentDraft.opportunityId ||
+        opportunity.pocProjectIds.includes(currentDraft.id) ||
+        opportunity.finalProjectId === currentDraft.id,
+    )
+  }, [currentDraft, opportunities])
+  const account = linkedOpportunity ? accounts.find((candidate) => candidate.id === linkedOpportunity.accountId) : undefined
+  const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
+  const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
+  const missingFields = new Set<string>()
+
+  if (currentDraft && !currentDraft.opportunityName.trim()) {
+    missingFields.add('opportunityName')
+  }
+
+  if (!currentDraft || !metadata || !savedProject) {
     return (
       <PlaceholderCard
         title="Project not found"
@@ -16,35 +270,280 @@ export function ProjectFormPage() {
     )
   }
 
+  const projectDraft = currentDraft
+  const persistedProject = savedProject
+  const formMetadata = metadata
+
+  function toggleSection(sectionId: CollapsibleSectionId) {
+    setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
+  }
+
+  function fieldChanged(key: ProjectHeaderFieldMetadata['key']): boolean {
+    if (key === 'pocStartDate' || key === 'pocEndDate' || key === 'warrantyServiceMonths' || key === 'currentMilestone' || key === 'projectAlerts') {
+      return false
+    }
+    return !valuesEqual(headerFieldValue(persistedProject, key), headerFieldValue(projectDraft, key))
+  }
+
+  function headerFieldValue(project: Project, key: ProjectHeaderFieldMetadata['key']): string {
+    switch (key) {
+      case 'accountName':
+        return account?.accountName ?? project.accountName
+      case 'region':
+        return linkedOpportunity?.region ?? account?.region ?? ''
+      case 'country':
+        return linkedOpportunity?.country ?? account?.country ?? ''
+      case 'state':
+        return linkedOpportunity?.state ?? account?.state ?? ''
+      case 'timeZone':
+        return linkedOpportunity?.timeZone ?? account?.timeZone ?? ''
+      case 'timeGroup':
+        return linkedOpportunity?.timeGroup ?? account?.timeGroup ?? ''
+      case 'pocStartDate':
+        return linkedOpportunity?.pocStartDate ?? ''
+      case 'pocEndDate':
+        return linkedOpportunity?.pocEndDate ?? ''
+      case 'warrantyServiceMonths':
+        return textValue(linkedOpportunity?.warrantyServiceMonths)
+      case 'currentMilestone':
+        return linkedOpportunity?.currentMilestone ?? ''
+      case 'projectAlerts':
+        return linkedOpportunity?.projectAlerts?.join(', ') ?? ''
+      case 'reportToDirect':
+      case 'reportToLevel2':
+        return ''
+      case 'dealOwner':
+        return salesManager?.name ?? project.dealOwner
+      default:
+        return textValue(project[key as keyof Project])
+    }
+  }
+
+  function updateDraftField(key: keyof Project, value: string | null) {
+    setDraft((current) => (current ? { ...current, [key]: value } : current))
+    setSaveMessages([])
+  }
+
+  function validateProject(): string[] {
+    const messages: string[] = []
+    if (!projectDraft.opportunityName.trim()) messages.push('Project name is required.')
+    return messages
+  }
+
+  function saveProject(stayOnPage: boolean) {
+    const messages = validateProject()
+    if (messages.length > 0) {
+      setSaveMessages(messages)
+      return
+    }
+
+    updateProject(projectDraft.id, {
+      opportunityName: projectDraft.opportunityName.trim(),
+      deliveryDate: projectDraft.deliveryDate,
+    })
+    setSaveMessages(['Project saved.'])
+    if (!stayOnPage) navigate('/projects')
+  }
+
+  function revertProject() {
+    setDraft(cloneProject(persistedProject))
+    setSaveMessages([])
+  }
+
+  function cancelProject() {
+    setDraft(cloneProject(persistedProject))
+    navigate('/projects')
+  }
+
+  function renderHeaderField(field: ProjectHeaderFieldMetadata) {
+    const isChanged = fieldChanged(field.key)
+    const isMissing = missingFields.has(field.key)
+    const value = headerFieldValue(projectDraft, field.key)
+    const label = (
+      <>
+        {field.label}
+        {field.required ? <span className="ml-0.5 text-red-600">*</span> : null}
+      </>
+    )
+
+    if (!field.editable) {
+      return (
+        <FormField key={field.key} label={label} controlWidthClassName="w-44">
+          <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+        </FormField>
+      )
+    }
+
+    if (field.inputType === 'date') {
+      return (
+        <FormField key={field.key} label={label} controlWidthClassName="w-40">
+          <input
+            className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
+            type="date"
+            value={value}
+            onChange={(event) => updateDraftField(field.key as keyof Project, event.target.value || null)}
+          />
+        </FormField>
+      )
+    }
+
+    return (
+      <FormField key={field.key} label={label} controlWidthClassName="w-64">
+        <input
+          className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
+          value={value}
+          onChange={(event) => updateDraftField(field.key as keyof Project, event.target.value)}
+        />
+      </FormField>
+    )
+  }
+
+  function renderActionButtons() {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative inline-flex">
+          <button
+            type="button"
+            className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+            onClick={() => saveProject(false)}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
+            aria-label="More save actions"
+            aria-expanded={saveMenuOpen}
+            onClick={() => setSaveMenuOpen((current) => !current)}
+          >
+            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+          </button>
+          {saveMenuOpen ? (
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded border border-sf-border bg-white py-1 shadow-lg">
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm text-sf-text hover:bg-sf-surface-alt"
+                onClick={() => {
+                  setSaveMenuOpen(false)
+                  saveProject(true)
+                }}
+              >
+                Apply Changes
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
+          Revert
+        </button>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={cancelProject}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  function renderTenantRequirementsTab() {
+    return (
+      <CollapsibleSection
+        title="Tenant Requirements"
+        subtitle={`Read-only live requirements from ${linkedOpportunity?.opportunityName ?? 'the linked Opportunity'}.`}
+        collapsed={collapsedSections.tenantRequirements}
+        onToggle={() => toggleSection('tenantRequirements')}
+        className="space-y-3 p-3"
+      >
+        {linkedOpportunity ? (
+          <div className="space-y-4">
+            {formMetadata.requirementSections.map((section) => (
+              <RequirementSection key={section.kind} section={section} opportunity={linkedOpportunity} tenants={tenants} systems={systems} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No linked Opportunity found for this Project.
+          </div>
+        )}
+      </CollapsibleSection>
+    )
+  }
+
+  function renderPlaceholderTab(tab: ProjectFormTab) {
+    const sectionId = tabSectionId(tab)
+    return (
+      <CollapsibleSection
+        title={projectTabLabel(tab)}
+        subtitle={
+          tab === 'milestones' || tab === 'tasks'
+            ? `Template reference: ${formMetadata.milestoneTemplate}. Editing is planned for a later phase.`
+            : 'Execution workflow will be implemented in a later phase.'
+        }
+        collapsed={collapsedSections[sectionId]}
+        onToggle={() => toggleSection(sectionId)}
+        className="space-y-3 p-3"
+      >
+        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+          {projectTabLabel(tab)} workspace is not editable in this MVP scope.
+        </div>
+      </CollapsibleSection>
+    )
+  }
+
   return (
     <div>
       <PageHeader
-        title={`Project ${project.pid}`}
-        subtitle={`${project.mainType} · ${project.subType} — form shell (Phase D)`}
+        title={`Project ${projectDraft.pid}`}
+        subtitle={`${projectDraft.mainType} / ${projectDraft.subType} - ${formMetadata.sourceSheet}`}
+        actions={renderActionButtons()}
       />
-      <PlaceholderCard
-        title="Project form"
-        description="Sticky header, tabs, and grids will be implemented in later phases."
+
+      {saveMessages.length > 0 ? (
+        <div className={saveMessages.some((message) => message.includes('required')) ? 'mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'mb-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
+          {saveMessages.map((message) => (
+            <div key={message}>{message}</div>
+          ))}
+        </div>
+      ) : null}
+
+      <CollapsibleSection
+        title="Project header"
+        subtitle="Excel section 2 metadata for this Project type/subtype."
+        collapsed={collapsedSections.projectHeader}
+        onToggle={() => toggleSection('projectHeader')}
       >
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-sf-text-muted">Account</dt>
-            <dd className="font-medium">{project.accountName}</dd>
-          </div>
-          <div>
-            <dt className="text-sf-text-muted">Delivery date</dt>
-            <dd className="font-medium">{project.deliveryDate ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-sf-text-muted">Progress</dt>
-            <dd className="font-medium">{project.progressStatus}</dd>
-          </div>
-          <div>
-            <dt className="text-sf-text-muted">Opportunity</dt>
-            <dd className="font-medium">{project.opportunityName}</dd>
-          </div>
-        </dl>
-      </PlaceholderCard>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(0, 8).map(renderHeaderField)}</div>
+          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(8, 15).map(renderHeaderField)}</div>
+          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(15).map(renderHeaderField)}</div>
+          {linkedOpportunity ? (
+            <Link className="text-sm font-medium text-sf-brand hover:underline" to={`/opportunities/${linkedOpportunity.opportunityId}`}>
+              Open linked Opportunity
+            </Link>
+          ) : null}
+        </div>
+      </CollapsibleSection>
+
+      <div className="mt-4 rounded border border-sf-border bg-sf-surface">
+        <div className="flex flex-wrap border-b border-sf-border">
+          {formMetadata.tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={[
+                'border-b-2 px-4 py-2 text-base font-semibold',
+                activeTab === tab
+                  ? 'border-sf-brand bg-white text-sf-text'
+                  : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+              ].join(' ')}
+              onClick={() => setActiveTab(tab)}
+            >
+              {projectTabLabel(tab)}
+            </button>
+          ))}
+        </div>
+        <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
+          {activeTab === 'tenantRequirements' ? renderTenantRequirementsTab() : renderPlaceholderTab(activeTab)}
+        </div>
+      </div>
     </div>
   )
 }
