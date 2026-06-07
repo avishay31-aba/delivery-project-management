@@ -28,6 +28,7 @@ import type {
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
+import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   getAccountSystems,
   getAccountTenants,
@@ -810,7 +811,16 @@ export function OpportunityFormPage() {
     () => opportunities.find((candidate) => candidate.opportunityId === opportunityId),
     [opportunities, opportunityId],
   )
-  const [draft, setDraft] = useState<Opportunity | null>(() => (savedOpportunity ? cloneOpportunity(savedOpportunity) : null))
+  const {
+    value: draft,
+    setValue: setDraft,
+    reset: resetDraft,
+    undo,
+    canUndo,
+  } = useUndoHistory<Opportunity | null>(savedOpportunity ? cloneOpportunity(savedOpportunity) : null, {
+    clone: (value) => (value ? cloneOpportunity(value) : value),
+    isEqual: valuesEqual,
+  })
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
@@ -821,9 +831,9 @@ export function OpportunityFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
-    setDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
+    resetDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
     setSaveMessages([])
-  }, [savedOpportunity])
+  }, [resetDraft, savedOpportunity])
 
   useEffect(() => {
     setProjectChanges([])
@@ -1152,14 +1162,19 @@ export function OpportunityFormPage() {
   }
 
   function discardChanges() {
-    setDraft(cloneOpportunity(currentSavedOpportunity))
+    resetDraft(cloneOpportunity(currentSavedOpportunity))
     setSaveMessages([])
   }
 
   function cancelChanges() {
-    setDraft(cloneOpportunity(currentSavedOpportunity))
+    resetDraft(cloneOpportunity(currentSavedOpportunity))
     setSaveMessages([])
     navigate('/opportunities')
+  }
+
+  function undoLastChange() {
+    undo()
+    setSaveMessages([])
   }
 
   function switchDetailTab(nextTab: OpportunityDetailTab) {
@@ -1171,7 +1186,7 @@ export function OpportunityFormPage() {
 
   function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
-    setDraft(cloneOpportunity(result.opportunity))
+    resetDraft(cloneOpportunity(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
     setPendingPocSave(null)
@@ -1545,6 +1560,83 @@ export function OpportunityFormPage() {
     )
   }
 
+  function renderRequirementGrid(kind: RequirementGridKind) {
+    if (kind === 'A') {
+      return (
+        <RequirementGrid
+          key={kind}
+          title="Grid A: New Tenant Requirements"
+          kind="A"
+          collapsed={collapsedSections.gridA}
+          columns={requirementAColumns}
+          draft={currentDraft}
+          saved={currentSavedOpportunity}
+          accountTenants={accountTenants}
+          sidSystems={sidSystems}
+          warrantyRecords={warrantyRecords}
+          countryOptions={countryOptions}
+          saveMessages={saveMessages}
+          isTenantOptionDisabled={tenantSelectionDisabled}
+          isSystemOptionDisabled={systemSelectionDisabled}
+          onAddRow={() => addRequirement('A')}
+          onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
+          onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
+          onToggleCollapsed={() => toggleSection('gridA')}
+        />
+      )
+    }
+
+    if (kind === 'B') {
+      return (
+        <RequirementGrid
+          key={kind}
+          title="Grid B: Change Request Requirements"
+          kind="B"
+          collapsed={collapsedSections.gridB}
+          columns={requirementBColumns}
+          draft={currentDraft}
+          saved={currentSavedOpportunity}
+          accountTenants={accountTenants}
+          sidSystems={sidSystems}
+          warrantyRecords={warrantyRecords}
+          countryOptions={countryOptions}
+          saveMessages={saveMessages}
+          isTenantOptionDisabled={tenantSelectionDisabled}
+          isSystemOptionDisabled={systemSelectionDisabled}
+          onSelectAllTenants={() => selectAllTenants('B')}
+          onAddRow={() => addRequirement('B')}
+          onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
+          onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
+          onToggleCollapsed={() => toggleSection('gridB')}
+        />
+      )
+    }
+
+    return (
+      <RequirementGrid
+        key={kind}
+        title="Tenants to Renew"
+        kind="C"
+        collapsed={collapsedSections.gridC}
+        columns={requirementCColumns}
+        draft={currentDraft}
+        saved={currentSavedOpportunity}
+        accountTenants={accountTenants}
+        sidSystems={sidSystems}
+        warrantyRecords={warrantyRecords}
+        countryOptions={countryOptions}
+        saveMessages={saveMessages}
+        isTenantOptionDisabled={tenantSelectionDisabled}
+        isSystemOptionDisabled={systemSelectionDisabled}
+        onSelectAllTenants={() => selectAllTenants('C')}
+        onAddRow={() => addRequirement('C')}
+        onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
+        onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
+        onToggleCollapsed={() => toggleSection('gridC')}
+      />
+    )
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -1557,6 +1649,14 @@ export function OpportunityFormPage() {
           {isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!canUndo}
+            onClick={undoLastChange}
+          >
+            Undo
+          </button>
           <button
             type="button"
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
@@ -1786,73 +1886,7 @@ export function OpportunityFormPage() {
         <div className="min-h-[60vh]">
         {activeDetailTab === 'requirements' ? (
           <div className="space-y-4 p-3" role="tabpanel" aria-label="Tenant Requirements">
-            {visibleRequirementTypes.includes('A') ? (
-              <RequirementGrid
-                title="Grid A: New Tenant Requirements"
-                kind="A"
-                collapsed={collapsedSections.gridA}
-                columns={requirementAColumns}
-                draft={currentDraft}
-                saved={currentSavedOpportunity}
-                accountTenants={accountTenants}
-                sidSystems={sidSystems}
-                warrantyRecords={warrantyRecords}
-                countryOptions={countryOptions}
-                saveMessages={saveMessages}
-                isTenantOptionDisabled={tenantSelectionDisabled}
-                isSystemOptionDisabled={systemSelectionDisabled}
-                onAddRow={() => addRequirement('A')}
-                onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
-                onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
-                onToggleCollapsed={() => toggleSection('gridA')}
-              />
-            ) : null}
-
-            {visibleRequirementTypes.includes('B') ? (
-              <RequirementGrid
-                title="Grid B: Change Request Requirements"
-                kind="B"
-                collapsed={collapsedSections.gridB}
-                columns={requirementBColumns}
-                draft={currentDraft}
-                saved={currentSavedOpportunity}
-                accountTenants={accountTenants}
-                sidSystems={sidSystems}
-                warrantyRecords={warrantyRecords}
-                countryOptions={countryOptions}
-                saveMessages={saveMessages}
-                isTenantOptionDisabled={tenantSelectionDisabled}
-                isSystemOptionDisabled={systemSelectionDisabled}
-                onSelectAllTenants={() => selectAllTenants('B')}
-                onAddRow={() => addRequirement('B')}
-                onDeleteRow={(rowId) => deleteRequirement('B', rowId)}
-                onUpdateRow={(rowId, key, value) => updateRequirement('B', rowId, key, value)}
-                onToggleCollapsed={() => toggleSection('gridB')}
-              />
-            ) : null}
-
-            {visibleRequirementTypes.includes('C') ? (
-              <RequirementGrid
-                title="Tenants to Renew"
-                kind="C"
-                collapsed={collapsedSections.gridC}
-                columns={requirementCColumns}
-                draft={currentDraft}
-                saved={currentSavedOpportunity}
-                accountTenants={accountTenants}
-                sidSystems={sidSystems}
-                warrantyRecords={warrantyRecords}
-                countryOptions={countryOptions}
-                saveMessages={saveMessages}
-                isTenantOptionDisabled={tenantSelectionDisabled}
-                isSystemOptionDisabled={systemSelectionDisabled}
-                onSelectAllTenants={() => selectAllTenants('C')}
-                onAddRow={() => addRequirement('C')}
-                onDeleteRow={(rowId) => deleteRequirement('C', rowId)}
-                onUpdateRow={(rowId, key, value) => updateRequirement('C', rowId, key, value)}
-                onToggleCollapsed={() => toggleSection('gridC')}
-              />
-            ) : null}
+            {visibleRequirementTypes.map((kind) => renderRequirementGrid(kind))}
           </div>
         ) : (
           <div className="space-y-2 p-3" role="tabpanel" aria-label="Created Project">

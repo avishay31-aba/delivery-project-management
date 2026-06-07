@@ -209,7 +209,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Upsell',
       headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
-      visibleRequirementTypes: ['A', 'B', 'C'],
+      visibleRequirementTypes: ['C', 'B', 'A'],
     },
   ],
   [
@@ -217,7 +217,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Down Sell',
       headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
-      visibleRequirementTypes: ['B', 'C'],
+      visibleRequirementTypes: ['C', 'B'],
     },
   ],
 ])

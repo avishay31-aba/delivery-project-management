@@ -177,7 +177,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Upsell',
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
-      requirementSections: [NEW_TENANT_SECTION, CHANGE_REQUEST_SECTION, STANDARD_RENEWAL_SECTION],
+      requirementSections: [STANDARD_RENEWAL_SECTION, CHANGE_REQUEST_SECTION, NEW_TENANT_SECTION],
       tabs: PROJECT_TABS,
       milestoneTemplate: 'Renewal upsell template by requirement mix',
     },
@@ -187,7 +187,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Down Sell',
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
-      requirementSections: [CHANGE_REQUEST_SECTION, STANDARD_RENEWAL_SECTION],
+      requirementSections: [STANDARD_RENEWAL_SECTION, CHANGE_REQUEST_SECTION],
       tabs: PROJECT_TABS,
       milestoneTemplate: 'Renewal downsell template',
     },
