@@ -390,6 +390,11 @@ function RequirementGrid({
       : kind === 'B'
         ? draft.changeRequestRequirements
         : draft.standardRenewalRequirements
+  const availableTenantCount =
+    kind === 'B' || kind === 'C'
+      ? accountTenants.filter((tenant) => !isTenantOptionDisabled(kind, '', tenant.id)).length
+      : accountTenants.length
+  const tenantSelectionLimitReached = (kind === 'B' || kind === 'C') && availableTenantCount === 0
 
   useEffect(() => {
     if (!activeMultiSelect) return
@@ -722,18 +727,29 @@ function RequirementGrid({
           {kind === 'B' || kind === 'C' ? (
             <button
               type="button"
-              className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+              className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={tenantSelectionLimitReached}
               onClick={onSelectAllTenants}
             >
               Select All
             </button>
           ) : null}
-          <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={onAddRow}>
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={tenantSelectionLimitReached}
+            onClick={onAddRow}
+          >
             {kind === 'B' ? 'Select and Change Tenant' : kind === 'C' ? 'Select Tenant' : '+ Add Tenant Requirement'}
           </button>
         </>
       }
     >
+      {tenantSelectionLimitReached ? (
+        <div className="rounded border border-sf-border bg-sf-surface-alt px-3 py-2 text-sm text-sf-text-muted">
+          All existing tenants for this account have already been selected.
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
         <table className="min-w-full border-collapse text-sm leading-tight">
@@ -962,7 +978,7 @@ export function OpportunityFormPage() {
       (requirement) => requirement.id !== rowId && requirement.tenantId === tenantId,
     )
 
-    return kind === 'B' ? duplicateInChangeGrid : duplicateInRenewalGrid
+    return duplicateInChangeGrid || duplicateInRenewalGrid
   }
 
   function firstAvailableTenant(kind: 'B' | 'C'): Tenant | undefined {
@@ -1067,6 +1083,7 @@ export function OpportunityFormPage() {
     }
 
     if (kind === 'B') {
+      if (!firstTenant) return
       patchDraft({
         changeRequestRequirements: [
           ...currentDraft.changeRequestRequirements,
@@ -1076,6 +1093,7 @@ export function OpportunityFormPage() {
       return
     }
 
+    if (!firstTenant) return
     patchDraft({
       standardRenewalRequirements: [
         ...currentDraft.standardRenewalRequirements,
@@ -1197,12 +1215,7 @@ export function OpportunityFormPage() {
   }
 
   function selectAllTenants(kind: 'B' | 'C') {
-    const selectedTenantIds = new Set(
-      kind === 'B'
-        ? currentDraft.changeRequestRequirements.map((requirement) => requirement.tenantId).filter(Boolean)
-        : currentDraft.standardRenewalRequirements.map((requirement) => requirement.tenantId).filter(Boolean),
-    )
-    const tenantsToAdd = accountTenants.filter((tenant) => !selectedTenantIds.has(tenant.id))
+    const tenantsToAdd = accountTenants.filter((tenant) => !tenantSelectionDisabled(kind, '', tenant.id))
 
     if (tenantsToAdd.length === 0) return
 
