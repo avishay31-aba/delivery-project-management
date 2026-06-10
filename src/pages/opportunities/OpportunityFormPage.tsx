@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import {
+  PRODUCT_OPTIONS,
+  HOSTING_OPTIONS,
+  cloudPlatformOptionsForHosting,
+} from '@/config/cloud-platform-metadata'
+import {
   getOpportunityMetadata,
   getVisibleRequirementTypes,
   requirementAColumns,
@@ -59,9 +64,6 @@ const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   RENEWAL: ['STANDARD', 'UPSELL', 'DOWN_SELL'],
 }
 
-const HOSTING_OPTIONS = ['SaaS', 'On premise', 'Hybrid']
-const CLOUD_PLATFORM_OPTIONS = ['Local', 'Azure', 'AWS', "Customer's VPC", 'Azure Gov']
-const PRODUCT_OPTIONS = ['Tangles', 'Tangles Light', 'Weaver', 'Webloc', 'Trapdoor', 'Lynx', 'DataAPI']
 const YES_NO_OPTIONS: YesNo[] = ['', 'YES', 'NO']
 const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
 const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
@@ -151,8 +153,8 @@ function createBaseRequirement(requirementId: string): Omit<
   return {
     id: `req-${crypto.randomUUID()}`,
     requirementId,
-    hostingType: 'SaaS',
-    cloudPlatform: 'Azure',
+    hostingType: 'Cloud',
+    cloudPlatform: 'AWS',
     productType: 'Tangles',
     mapCenter: '',
     licenses: null,
@@ -176,7 +178,7 @@ function createBaseRequirement(requirementId: string): Omit<
     apiMonthlyQty: null,
     aiFeatures: [],
     additionalFeatures: [],
-    standardMonitors: null,
+    standardMonitors: 10,
     fullMonitors: null,
     topicMonitors: null,
   }
@@ -195,8 +197,8 @@ function tenantConfigurationPatch(tenant?: Tenant): Partial<NewTenantRequirement
   if (!tenant) return {}
 
   return {
-    hostingType: tenant.hostingType ?? 'SaaS',
-    cloudPlatform: tenant.cloudPlatform ?? 'Azure',
+    hostingType: tenant.hostingType ?? 'Cloud',
+    cloudPlatform: tenant.cloudPlatform ?? 'AWS',
     productType: tenant.productType,
     mapCenter: tenant.mapCenter ?? tenant.country,
     licenses: numericOrNull(tenant.licenses),
@@ -652,21 +654,24 @@ function RequirementGrid({
     }
 
     if (column.inputType === 'picklist') {
+      const currentHosting = textValue(rowValue(row, 'hostingType'))
       const options =
         column.key === 'hostingType'
           ? HOSTING_OPTIONS
           : column.key === 'cloudPlatform'
-            ? CLOUD_PLATFORM_OPTIONS
+            ? cloudPlatformOptionsForHosting(currentHosting)
             : column.key === 'productType'
               ? PRODUCT_OPTIONS
               : column.key === 'mapCenter'
                 ? [...countryOptions, 'Add new...']
                 : YES_NO_OPTIONS
+      const isDisabled = column.key === 'cloudPlatform' && options.length === 0
 
       return (
         <select
           className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-sm')}
-          value={textValue(rowValue(row, column.key))}
+          value={isDisabled ? '' : textValue(rowValue(row, column.key))}
+          disabled={isDisabled}
           onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
         >
           {options.map((option) => (
@@ -1121,13 +1126,18 @@ export function OpportunityFormPage() {
   }
 
   function updateRequirement(kind: RequirementGridKind, rowId: string, key: string, value: string | string[] | number | null) {
+    const configurationPatch =
+      key === 'hostingType' && value === 'On premise'
+        ? { [key]: value, cloudPlatform: '' }
+        : { [key]: value }
+
     if (kind === 'A') {
       const nextRows = currentDraft.newTenantRequirements.map((row) => {
         if (row.id !== rowId) return row
         const patch =
           key === 'deployTarget' && value === 'NEW_SYSTEM'
             ? { deployTarget: value, existingSystemId: null }
-            : { [key]: value }
+            : configurationPatch
         return { ...row, ...patch } as NewTenantRequirement
       })
       patchDraft({ newTenantRequirements: nextRows })
@@ -1140,7 +1150,7 @@ export function OpportunityFormPage() {
         row.id === rowId
           ? ({
               ...row,
-              [key]: value,
+              ...configurationPatch,
               ...(key === 'tenantId' && selectedTenant
                 ? { ...tenantConfigurationPatch(selectedTenant), systemId: selectedTenant.systemId }
                 : {}),
@@ -1160,7 +1170,7 @@ export function OpportunityFormPage() {
       row.id === rowId
         ? ({
             ...row,
-            [key]: value,
+            ...configurationPatch,
             ...(key === 'tenantId' && selectedTenant
               ? {
                   ...tenantConfigurationPatch(selectedTenant),

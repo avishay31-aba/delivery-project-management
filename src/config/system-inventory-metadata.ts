@@ -1,3 +1,5 @@
+import { PRODUCT_OPTIONS } from '@/config/cloud-platform-metadata'
+
 export type SystemInventorySource = 'Production' | 'Reused Internal Systems'
 
 export interface SystemInventoryHeaderField {
@@ -23,7 +25,6 @@ export interface SystemInventoryMetadata {
   tabs: SystemInventoryTab[]
 }
 
-export const PRODUCT_OPTIONS = ['Tangles', 'Tangles Light', 'Webloc', 'Weaver', 'Trapdoor', 'Lynx', 'DataAPI']
 export const REGION_OPTIONS = ['NA', 'EU', 'APAC']
 export const REUSED_PURPOSE_OPTIONS = ['POC', 'Demo', 'Training', 'Support']
 export const REUSED_STATUS_OPTIONS = ['Available', 'Occupied', 'Obsolete']
@@ -46,7 +47,6 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
   headerFields: [
     { key: 'sid', label: 'SID', editable: false, source: '1. Sticky Title', line: 1, inputType: 'readonly' },
     { key: 'purpose', label: 'Purpose', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
-    { key: 'productType', label: 'Product', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: PRODUCT_OPTIONS },
     { key: 'logo', label: 'Logo', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
     { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 1, inputType: 'integer' },
     {

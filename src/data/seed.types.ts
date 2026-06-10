@@ -95,6 +95,8 @@ export interface OpportunityRequirementBase {
   requirementId: string
   hostingType: string
   cloudPlatform: string
+  csp?: string
+  cloudRegion?: string
   productType: string
   mapCenter: string
   licenses: number | null
@@ -193,6 +195,8 @@ export interface System {
   productType: string
   hostingType: string
   cloudPlatform?: string
+  csp?: string
+  cloudRegion?: string
   mapCenter?: string
   region?: string
   country?: string
@@ -219,6 +223,8 @@ export interface Tenant {
   productType: string
   hostingType?: string
   cloudPlatform?: string
+  csp?: string
+  cloudRegion?: string
   mapCenter?: string
   licenses?: number | null
   users?: number | null
@@ -264,6 +270,8 @@ export interface ProductionSystemInventoryItem {
   productType: string
   hostingType: string
   cloudPlatform?: string
+  csp?: string
+  cloudRegion?: string
   mapCenter?: string
   region?: string
   country?: string
@@ -273,6 +281,30 @@ export interface ProductionSystemInventoryItem {
   linkedProjects?: string[]
   operationalStatus: string
   tenantCount: number
+  licenses?: number | null
+  users?: number | null
+  concurrentSearches?: number | null
+  dailySearches?: number | null
+  monthlySearches?: number | null
+  concurrentAnalyses?: number | null
+  topicAnalyses?: number | null
+  dailyAnalyses?: number | null
+  monthlyAnalyses?: number | null
+  standardMonitors?: number | null
+  fullMonitors?: number | null
+  topicMonitors?: number | null
+  tangles?: number | null
+  tanglesGo?: number | null
+  webloc?: number | null
+  webeye?: number | null
+  ingest?: number | null
+  blockchain?: YesNo
+  crossSystemFeatures?: string[]
+  apiEnabled?: YesNo
+  apiDailyQty?: number | null
+  apiMonthlyQty?: number | null
+  aiFeatures?: string[]
+  additionalFeatures?: string[]
   alerts: string[]
   createdAt: string
   updatedAt: string
@@ -290,6 +322,8 @@ export interface ReusedInternalSystem {
   productType: string
   hostingType: string
   cloudPlatform?: string
+  csp?: string
+  cloudRegion?: string
   mapCenter?: string
   usedInRegion?: string
   timeGroup: string
@@ -298,6 +332,30 @@ export interface ReusedInternalSystem {
   occupationEndDate?: string | null
   currentProjectIds: string[]
   tenantCount: number
+  licenses?: number | null
+  users?: number | null
+  concurrentSearches?: number | null
+  dailySearches?: number | null
+  monthlySearches?: number | null
+  concurrentAnalyses?: number | null
+  topicAnalyses?: number | null
+  dailyAnalyses?: number | null
+  monthlyAnalyses?: number | null
+  standardMonitors?: number | null
+  fullMonitors?: number | null
+  topicMonitors?: number | null
+  tangles?: number | null
+  tanglesGo?: number | null
+  webloc?: number | null
+  webeye?: number | null
+  ingest?: number | null
+  blockchain?: YesNo
+  crossSystemFeatures?: string[]
+  apiEnabled?: YesNo
+  apiDailyQty?: number | null
+  apiMonthlyQty?: number | null
+  aiFeatures?: string[]
+  additionalFeatures?: string[]
   alerts: string[]
   operationalStatus: string
   createdAt: string

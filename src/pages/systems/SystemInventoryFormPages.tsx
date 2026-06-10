@@ -3,6 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
+import {
+  PRODUCT_OPTIONS,
+  HOSTING_OPTIONS,
+  cloudPlatformOptionsForHosting,
+  cloudRegionOptionsForCloudPlatform,
+  cspOptionsForCloudPlatform,
+  requiresCloudRegion,
+} from '@/config/cloud-platform-metadata'
 import { requirementAColumns } from '@/config/opportunity-metadata'
 import {
   productionSystemMetadata,
@@ -23,10 +31,14 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   tabs: false,
 }
 
-const SYSTEM_CONFIGURATION_COLUMNS = requirementAColumns.slice(3)
+const ENVIRONMENT_CONFIGURATION_COLUMNS = [
+  requirementAColumns.find((column) => column.key === 'hostingType'),
+  requirementAColumns.find((column) => column.key === 'cloudPlatform'),
+  { key: 'csp', label: 'CSP', group: 'Environment', editable: true, inputType: 'picklist' },
+  { key: 'cloudRegion', label: 'Cloud Region', group: 'Environment', editable: true, inputType: 'picklist' },
+].filter((column): column is NonNullable<typeof column> => Boolean(column))
+const APPLICATION_CONFIGURATION_COLUMNS = requirementAColumns.slice(3).filter((column) => column.key !== 'hostingType' && column.key !== 'cloudPlatform')
 const PICKLIST_OPTIONS: Record<string, string[]> = {
-  hostingType: ['SaaS', 'On premise', 'Hybrid'],
-  cloudPlatform: ['Azure', 'AWS', 'GCP', 'Local', "Customer's VPC"],
   mapCenter: ['USA', 'Canada', 'Germany', 'UK', 'Australia', 'Japan', 'Singapore', 'Israel'],
   blockchain: ['Yes', 'No'],
   apiEnabled: ['Yes', 'No'],
@@ -44,11 +56,20 @@ const PRODUCT_LOGOS: Record<string, string> = {
 
 const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
   On: 'bg-green-500',
-  Off: 'bg-slate-400',
+  Off: 'bg-red-500',
   'Access blocked': 'bg-amber-500',
   'Service blocked': 'bg-orange-500',
-  Deleted: 'bg-red-500',
+  Deleted: 'bg-gray-500',
   Canceled: 'bg-purple-500',
+}
+
+const OPERATIONAL_STATUS_COLORS: Record<string, string> = {
+  On: '#22c55e',
+  Off: '#ef4444',
+  'Access blocked': '#f59e0b',
+  'Service blocked': '#f97316',
+  Deleted: '#6b7280',
+  Canceled: '#a855f7',
 }
 
 function cloneRecord<T extends InventoryRecord>(record: T): T {
@@ -151,6 +172,18 @@ function OperationalStatusIndicator({ value }: { value: string }) {
   )
 }
 
+function statusOptionLabel(value: string): string {
+  const labels: Record<string, string> = {
+    On: '● On',
+    Off: '● Off',
+    'Access blocked': '● Access blocked',
+    'Service blocked': '● Service blocked',
+    Deleted: '● Deleted',
+    Canceled: '● Canceled',
+  }
+  return labels[value] ?? value
+}
+
 function InventoryForm<T extends InventoryRecord>({
   record,
   records,
@@ -195,10 +228,15 @@ function InventoryForm<T extends InventoryRecord>({
   function updateField(key: string, value: unknown) {
     setDraft((current) => {
       if (!current) return current
-      const nextValue = key === 'productType' ? value : value
-      const next = { ...current, [key]: nextValue }
+      const next = { ...current, [key]: value }
       if (key === 'productType') {
         return { ...next, logo: PRODUCT_LOGOS[String(value)] ?? 'SYS' } as T
+      }
+      if (key === 'hostingType') {
+        return { ...next, cloudPlatform: '', csp: '', cloudRegion: '' } as T
+      }
+      if (key === 'cloudPlatform') {
+        return { ...next, csp: '', cloudRegion: '' } as T
       }
       return next as T
     })
@@ -229,9 +267,14 @@ function InventoryForm<T extends InventoryRecord>({
       }
     }
 
-    if (url.includes(' ')) {
+    if (url && (!/^https?:\/\/\S+$/.test(url) || url.includes(' '))) {
       invalidFields.add('url')
-      nextMessages.push('URL cannot contain spaces.')
+      nextMessages.push('URL must start with http:// or https:// and contain no spaces.')
+    }
+
+    if (requiresCloudRegion(textValue(readRecordValue(activeDraft, 'cloudPlatform'))) && !textValue(readRecordValue(activeDraft, 'cloudRegion'))) {
+      invalidFields.add('cloudRegion')
+      nextMessages.push('Cloud Region is required when Cloud Platform is AWS, AWS Gov, Azure, or Azure Gov.')
     }
 
     return nextMessages
@@ -266,7 +309,12 @@ function InventoryForm<T extends InventoryRecord>({
     const value = derivedValue(activeDraft, field.key, projects, tenants)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
-    const width = field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'linkedProjects' ? 'w-80' : 'w-48'
+    const width =
+      field.key === 'url'
+        ? 'w-96'
+        : field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'linkedProjects'
+          ? 'w-80'
+          : 'w-48'
 
     if (!field.editable) {
       return (
@@ -284,7 +332,9 @@ function InventoryForm<T extends InventoryRecord>({
           <div className="space-y-1">
             <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
               {(field.options ?? []).map((option) => (
-                <option key={option} value={option}>{option}</option>
+                <option key={option} value={option} style={field.key === 'operationalStatus' ? { color: OPERATIONAL_STATUS_COLORS[option] } : undefined}>
+                  {field.key === 'operationalStatus' ? statusOptionLabel(option) : option}
+                </option>
               ))}
             </select>
             {field.key === 'operationalStatus' ? <OperationalStatusIndicator value={value} /> : null}
@@ -311,12 +361,34 @@ function InventoryForm<T extends InventoryRecord>({
   function renderConfigurationCell(key: string, inputType?: string) {
     const value = textValue(readRecordValue(activeDraft, key))
     const isChanged = fieldChanged(key)
+    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
+    const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+
+    if (key === 'cloudPlatform' && hostingType === 'On premise') {
+      return <input className={fieldClassName(isChanged)} value="" disabled />
+    }
+
+    if (key === 'csp' && !cloudPlatform) return null
+    if (key === 'cloudRegion' && (!cloudPlatform || cloudPlatform === "Customer's datacenter")) return null
 
     if (inputType === 'picklist') {
+      const options =
+        key === 'hostingType'
+          ? HOSTING_OPTIONS
+          : key === 'cloudPlatform'
+            ? cloudPlatformOptionsForHosting(hostingType)
+            : key === 'csp'
+              ? cspOptionsForCloudPlatform(cloudPlatform)
+              : key === 'cloudRegion'
+                ? cloudRegionOptionsForCloudPlatform(cloudPlatform)
+                : key === 'productType'
+                  ? PRODUCT_OPTIONS
+                  : PICKLIST_OPTIONS[key] ?? []
+      const isDisabled = key === 'cloudPlatform' && options.length === 0
       return (
-        <select className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(key, event.target.value)}>
+        <select className={fieldClassName(isChanged, invalidFields.has(key) && messages.length > 0)} value={isDisabled ? '' : value} disabled={isDisabled} onChange={(event) => updateField(key, event.target.value)}>
           <option value="" />
-          {(PICKLIST_OPTIONS[key] ?? []).map((option) => (
+          {options.map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
@@ -404,32 +476,74 @@ function InventoryForm<T extends InventoryRecord>({
 
       <CollapsibleSection
         title="System Configuration"
-        subtitle="Uses the same configuration field structure as Opportunity tenant requirements from Hosting onward."
+        subtitle="Environment fields are separated from Application fields while preserving Opportunity tenant configuration structure."
         collapsed={collapsedSections.configuration}
         onToggle={() => toggleSection('configuration')}
       >
-        <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-sm leading-tight">
-            <thead className="bg-sf-surface-alt text-left">
-              <tr>
-                {SYSTEM_CONFIGURATION_COLUMNS.map((column) => (
-                  <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                    <span>{column.label}</span>
-                    <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {SYSTEM_CONFIGURATION_COLUMNS.map((column) => (
-                  <td key={column.key} className="min-w-36 border border-sf-border px-1.5 py-1 align-top">
-                    {renderConfigurationCell(column.key, column.inputType)}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-sf-text">Environment</h3>
+            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {ENVIRONMENT_CONFIGURATION_COLUMNS.map((column) => {
+                      const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+                      if ((column.key === 'csp' || column.key === 'cloudRegion') && !cloudPlatform) return null
+                      if (column.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
+                      return (
+                        <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                          <span>{column.label}</span>
+                          <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {ENVIRONMENT_CONFIGURATION_COLUMNS.map((column) => {
+                      const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+                      if ((column.key === 'csp' || column.key === 'cloudRegion') && !cloudPlatform) return null
+                      if (column.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
+                      return (
+                        <td key={column.key} className="min-w-44 border border-sf-border px-1.5 py-1 align-top">
+                          {renderConfigurationCell(column.key, column.inputType)}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-sf-text">Application</h3>
+            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {APPLICATION_CONFIGURATION_COLUMNS.map((column) => (
+                      <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                        <span>{column.label}</span>
+                        <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {APPLICATION_CONFIGURATION_COLUMNS.map((column) => (
+                      <td key={column.key} className="min-w-36 border border-sf-border px-1.5 py-1 align-top">
+                        {renderConfigurationCell(column.key, column.inputType)}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </CollapsibleSection>
 
