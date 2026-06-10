@@ -630,14 +630,140 @@
       "updatedAt": "2026-05-20T10:00:00.000Z"
     }
   ],
+  "productionSystemInventory": [
+    {
+      "id": "prod-inv-001",
+      "sid": "S1401",
+      "source": "Production",
+      "purpose": "Delivery",
+      "productType": "Tangles",
+      "hostingType": "SaaS",
+      "cloudPlatform": "Azure",
+      "region": "EMEA",
+      "country": "Germany",
+      "state": "Berlin",
+      "timeGroup": "EMEA",
+      "operationalStatus": "On",
+      "tenantCount": 0,
+      "alerts": [],
+      "createdAt": "2026-05-21T10:00:00.000Z",
+      "updatedAt": "2026-05-21T10:00:00.000Z"
+    },
+    {
+      "id": "prod-inv-002",
+      "sid": "S1402",
+      "source": "Production",
+      "purpose": "Delivery",
+      "productType": "Tangles",
+      "hostingType": "On premise",
+      "cloudPlatform": "Local",
+      "region": "AMER",
+      "country": "USA",
+      "state": "Virginia",
+      "timeGroup": "AMER",
+      "operationalStatus": "On",
+      "tenantCount": 0,
+      "alerts": [],
+      "createdAt": "2026-05-22T10:00:00.000Z",
+      "updatedAt": "2026-05-22T10:00:00.000Z"
+    },
+    {
+      "id": "prod-inv-003",
+      "sid": "S1403",
+      "source": "Production",
+      "purpose": "Delivery",
+      "productType": "Weaver",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "Customer's VPC",
+      "region": "APAC",
+      "country": "Australia",
+      "state": "New South Wales",
+      "timeGroup": "APAC",
+      "operationalStatus": "On",
+      "tenantCount": 0,
+      "alerts": [],
+      "createdAt": "2026-05-23T10:00:00.000Z",
+      "updatedAt": "2026-05-23T10:00:00.000Z"
+    }
+  ],
+  "reusedInternalSystems": [
+    {
+      "id": "reused-001",
+      "machineId": "M202",
+      "source": "Reused Internal Systems",
+      "purpose": "POC",
+      "status": "Occupied",
+      "productType": "Tangles",
+      "hostingType": "SaaS",
+      "cloudPlatform": "Azure",
+      "usedInRegion": "EMEA",
+      "occupationStartDate": "2026-06-01",
+      "occupationEndDate": "2026-06-30",
+      "currentProjectIds": [
+        "proj-001"
+      ],
+      "tenantCount": 0,
+      "alerts": [],
+      "operationalStatus": "On",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "updatedAt": "2026-06-01T10:00:00.000Z"
+    },
+    {
+      "id": "reused-002",
+      "machineId": "M203",
+      "source": "Reused Internal Systems",
+      "purpose": "Demo",
+      "status": "Available",
+      "productType": "Tangles",
+      "hostingType": "SaaS",
+      "cloudPlatform": "AWS",
+      "usedInRegion": "AMER",
+      "occupationStartDate": null,
+      "occupationEndDate": null,
+      "currentProjectIds": [],
+      "tenantCount": 0,
+      "alerts": [],
+      "operationalStatus": "On",
+      "createdAt": "2026-03-02T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "reused-003",
+      "machineId": "M204",
+      "source": "Reused Internal Systems",
+      "purpose": "Training",
+      "status": "Available",
+      "productType": "Weaver",
+      "hostingType": "On premise",
+      "cloudPlatform": "Local",
+      "usedInRegion": "EMEA",
+      "occupationStartDate": null,
+      "occupationEndDate": null,
+      "currentProjectIds": [],
+      "tenantCount": 0,
+      "alerts": [],
+      "operationalStatus": "On",
+      "createdAt": "2026-03-03T10:00:00.000Z",
+      "updatedAt": "2026-05-20T10:00:00.000Z"
+    }
+  ],
   "systems": [
     {
       "id": "sys-001",
       "accountId": "acct-vet-001",
       "sid": "S1101",
       "machineId": null,
+      "source": "Production",
+      "linkedProjectIds": [
+        "proj-001",
+        "proj-p1041"
+      ],
+      "tenantIds": [
+        "ten-001",
+        "ten-002"
+      ],
       "systemClass": "CUSTOMER",
-      "purpose": "CUSTOMER",
+      "purpose": "Delivery",
       "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "SaaS",
@@ -657,8 +783,15 @@
       "accountId": "acct-vet-001",
       "sid": "S1102",
       "machineId": null,
+      "source": "Production",
+      "linkedProjectIds": [
+        "proj-p1042"
+      ],
+      "tenantIds": [
+        "ten-003"
+      ],
       "systemClass": "CUSTOMER",
-      "purpose": "CUSTOMER",
+      "purpose": "Delivery",
       "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "SaaS",
@@ -678,8 +811,17 @@
       "accountId": "acct-vet-002",
       "sid": "S1201",
       "machineId": null,
+      "source": "Production",
+      "linkedProjectIds": [
+        "proj-p1050",
+        "proj-p1051"
+      ],
+      "tenantIds": [
+        "ten-004",
+        "ten-005"
+      ],
       "systemClass": "CUSTOMER",
-      "purpose": "CUSTOMER",
+      "purpose": "Delivery",
       "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "On premise",
@@ -699,8 +841,15 @@
       "accountId": "acct-vet-003",
       "sid": "S1301",
       "machineId": null,
+      "source": "Production",
+      "linkedProjectIds": [
+        "proj-p1061"
+      ],
+      "tenantIds": [
+        "ten-007"
+      ],
       "systemClass": "CUSTOMER",
-      "purpose": "CUSTOMER",
+      "purpose": "Delivery",
       "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "Hybrid",
@@ -720,8 +869,15 @@
       "accountId": "acct-vet-003",
       "sid": "S1302",
       "machineId": null,
+      "source": "Production",
+      "linkedProjectIds": [
+        "proj-p1060"
+      ],
+      "tenantIds": [
+        "ten-006"
+      ],
       "systemClass": "CUSTOMER",
-      "purpose": "CUSTOMER",
+      "purpose": "Delivery",
       "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "SaaS",
@@ -739,19 +895,47 @@
     {
       "id": "sys-006",
       "accountId": null,
-      "sid": null,
-      "machineId": "p202",
+      "sid": "S1501",
+      "machineId": "M202",
+      "source": "Reused Internal Systems",
+      "linkedProjectIds": [
+        "proj-001"
+      ],
+      "tenantIds": [],
       "systemClass": "POC_DEMO_TRAINING",
-      "purpose": "AVAILABLE",
-      "availability": "AVAILABLE",
+      "purpose": "POC",
+      "availability": "OCCUPIED",
       "productType": "Tangles",
       "hostingType": "SaaS",
       "timeGroup": "EMEA",
-      "operationalStatus": "Available",
+      "operationalStatus": "On",
       "createdAt": "2026-03-01T10:00:00.000Z",
-      "updatedAt": "2026-05-01T10:00:00.000Z",
+      "updatedAt": "2026-06-01T10:00:00.000Z",
       "salesManagerId": null,
-      "deliveryPid": "",
+      "deliveryPid": "P1040",
+      "cloudPlatform": "Azure"
+    },
+    {
+      "id": "sys-007",
+      "accountId": null,
+      "sid": "S1502",
+      "machineId": "M202",
+      "source": "Reused Internal Systems",
+      "linkedProjectIds": [
+        "proj-p1041"
+      ],
+      "tenantIds": [],
+      "systemClass": "POC_DEMO_TRAINING",
+      "purpose": "POC",
+      "availability": "OCCUPIED",
+      "productType": "Tangles",
+      "hostingType": "SaaS",
+      "timeGroup": "EMEA",
+      "operationalStatus": "On",
+      "createdAt": "2026-04-01T10:00:00.000Z",
+      "updatedAt": "2026-04-20T10:00:00.000Z",
+      "salesManagerId": null,
+      "deliveryPid": "P1041",
       "cloudPlatform": "Azure"
     }
   ],
@@ -1207,6 +1391,18 @@
       "projectId": "proj-p1061",
       "systemId": "sys-004",
       "allocatedAt": "2026-05-20T10:00:00.000Z"
+    },
+    {
+      "id": "ps-reused-001",
+      "projectId": "proj-001",
+      "systemId": "sys-006",
+      "allocatedAt": "2026-06-01T10:00:00.000Z"
+    },
+    {
+      "id": "ps-reused-002",
+      "projectId": "proj-p1041",
+      "systemId": "sys-007",
+      "allocatedAt": "2026-04-01T10:00:00.000Z"
     }
   ],
   "projectTenants": [
@@ -1248,8 +1444,8 @@
   ],
   "idCounters": {
     "pid": 1061,
-    "sid": 1302,
+    "sid": 1502,
     "tid": 2302,
-    "mid": 202
+    "mid": 204
   }
 }

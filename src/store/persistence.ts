@@ -51,6 +51,12 @@ function normalizeState(state: AppDataState): AppDataState {
     accounts: Array.isArray(state.accounts) ? state.accounts : seedState.accounts,
     opportunities,
     projects,
+    productionSystemInventory: Array.isArray(state.productionSystemInventory)
+      ? state.productionSystemInventory
+      : seedState.productionSystemInventory,
+    reusedInternalSystems: Array.isArray(state.reusedInternalSystems)
+      ? state.reusedInternalSystems
+      : seedState.reusedInternalSystems,
     systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
     tenants: Array.isArray(state.tenants) ? state.tenants : seedState.tenants,
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,

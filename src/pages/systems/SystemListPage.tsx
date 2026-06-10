@@ -2,46 +2,29 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { createSystemColumns } from '@/config/system-columns'
+import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
 
 export function SystemListPage() {
-const navigate = useNavigate()
-const systems = useAppStore((s) => s.systems)
-const accounts = useAppStore((s) => s.accounts)
-const salesManagers = useAppStore((s) => s.salesManagers)
-const tenants = useAppStore((s) => s.tenants)
-const updateSystem = useAppStore((s) => s.updateSystem)
-const createSystem = useAppStore((s) => s.createSystem)
-const systemListColumns = createSystemColumns(accounts, salesManagers, tenants)
+  const navigate = useNavigate()
+  const systems = useAppStore((s) => s.systems)
+  const projects = useAppStore((s) => s.projects)
+  const tenants = useAppStore((s) => s.tenants)
+  const projectSystems = useAppStore((s) => s.projectSystems)
+  const allocatedSystemIds = new Set(projectSystems.map((link) => link.systemId))
+  const allocatedSystems = systems.filter((system) => Boolean(system.sid) && allocatedSystemIds.has(system.id))
+  const systemListColumns = createAllocatedSystemColumns(projects, tenants)
 
-return (
-<div>
-<PageHeader title="Systems" subtitle="Customer and POC systems" />
+  return (
+    <div>
+      <PageHeader title="Allocated Systems" subtitle="Allocated systems only. Production rows show SID; reused internal rows show SID plus MID." />
 
-  <DataDashboard
-    title="System list"
-    dashboardScope="systems"
-    rows={systems}
-    columns={systemListColumns}
-    toolbar={
-      <button
-        type="button"
-        className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
-        onClick={() => {
-          const system = createSystem()
-          navigate(`/systems/${system.sid ?? system.machineId}`)
-        }}
-      >
-        + New System
-      </button>
-    }
-    onEdit={(row, columnId, value) => {
-      const column = systemListColumns.find((col) => col.id === columnId)
-      if (!column?.editKey) return
-      updateSystem(row.id, { [column.editKey]: value } as never)
-    }}
-    onRowClick={(row) => navigate(`/systems/${row.sid ?? row.machineId}`)}
-  />
-</div>
-)
+      <DataDashboard
+        title="Allocated Systems"
+        dashboardScope="systems"
+        rows={allocatedSystems}
+        columns={systemListColumns}
+        onRowClick={(row) => navigate(`/systems/${row.sid ?? row.machineId}`)}
+      />
+    </div>
+  )
 }

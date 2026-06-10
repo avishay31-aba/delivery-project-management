@@ -13,14 +13,21 @@ export type YesNo = 'YES' | 'NO' | ''
 export type ProjectSource = 'POC' | 'FINAL'
 
 export type SystemClass = 'CUSTOMER' | 'POC_DEMO_TRAINING'
+export type SystemSource = 'Production' | 'Reused Internal Systems'
 export type SystemPurpose =
-  | 'AVAILABLE'
+  | 'Delivery'
+  | 'Available'
   | 'POC'
+  | 'Demo'
+  | 'Training'
+  | 'Support'
+  | 'AVAILABLE'
   | 'DEMO'
   | 'TRAINING'
   | 'SUPPORT'
   | 'CUSTOMER'
 export type AvailabilityStatus = 'AVAILABLE' | 'OCCUPIED' | 'OBSOLETE'
+export type ReusedInternalSystemStatus = 'Available' | 'Occupied' | 'Obsolete'
 
 export type TenantType = 'CUSTOMER' | 'POC' | 'PENLINK_INTERNAL'
 export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
@@ -174,6 +181,9 @@ export interface System {
   sid: string | null
   deliveryPid?: string | null
   machineId: string | null
+  source?: SystemSource
+  linkedProjectIds?: string[]
+  tenantIds?: string[]
   systemClass: SystemClass
   purpose: SystemPurpose
   availability: AvailabilityStatus
@@ -238,6 +248,45 @@ export interface Tenant {
   updatedAt: string
 }
 
+export interface ProductionSystemInventoryItem {
+  id: string
+  sid: string
+  source: 'Production'
+  purpose: 'Delivery'
+  productType: string
+  hostingType: string
+  cloudPlatform?: string
+  region?: string
+  country?: string
+  state?: string
+  timeGroup: string
+  operationalStatus: string
+  tenantCount: number
+  alerts: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ReusedInternalSystem {
+  id: string
+  machineId: string
+  source: 'Reused Internal Systems'
+  purpose: 'POC' | 'Demo' | 'Training' | 'Support'
+  status: ReusedInternalSystemStatus
+  productType: string
+  hostingType: string
+  cloudPlatform?: string
+  usedInRegion?: string
+  occupationStartDate?: string | null
+  occupationEndDate?: string | null
+  currentProjectIds: string[]
+  tenantCount: number
+  alerts: string[]
+  operationalStatus: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface WarrantyRecord {
   warrantyRecordId: string
   tenantId: string
@@ -269,6 +318,8 @@ export interface AppDataState {
   accounts: Account[]
   opportunities: Opportunity[]
   projects: Project[]
+  productionSystemInventory: ProductionSystemInventoryItem[]
+  reusedInternalSystems: ReusedInternalSystem[]
   systems: System[]
   tenants: Tenant[]
   warrantyRecords: WarrantyRecord[]

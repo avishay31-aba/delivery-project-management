@@ -7,6 +7,12 @@ import { ProjectListPage } from '@/pages/projects/ProjectListPage'
 import { ProjectFormPage } from '@/pages/projects/ProjectFormPage'
 import { SystemListPage } from '@/pages/systems/SystemListPage'
 import { SystemFormPage } from '@/pages/systems/SystemFormPage'
+import { ProductionSystemInventoryPage } from '@/pages/systems/ProductionSystemInventoryPage'
+import { ReusedInternalSystemsInventoryPage } from '@/pages/systems/ReusedInternalSystemsInventoryPage'
+import {
+  ProductionSystemInventoryFormPage,
+  ReusedInternalSystemFormPage,
+} from '@/pages/systems/SystemInventoryFormPages'
 import { TenantListPage } from '@/pages/tenants/TenantListPage'
 import { TenantFormPage } from '@/pages/tenants/TenantFormPage'
 
@@ -23,6 +29,10 @@ export const router = createBrowserRouter([
       { path: 'projects', element: <ProjectListPage /> },
       { path: 'projects/:pid', element: <ProjectFormPage /> },
       { path: 'systems', element: <SystemListPage /> },
+      { path: 'systems/production-inventory', element: <ProductionSystemInventoryPage /> },
+      { path: 'systems/production-inventory/:sid', element: <ProductionSystemInventoryFormPage /> },
+      { path: 'systems/reused-internal', element: <ReusedInternalSystemsInventoryPage /> },
+      { path: 'systems/reused-internal/:mid', element: <ReusedInternalSystemFormPage /> },
       { path: 'systems/:sid', element: <SystemFormPage /> },
       { path: 'tenants', element: <TenantListPage /> },
       { path: 'tenants/:tid', element: <TenantFormPage /> },

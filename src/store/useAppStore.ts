@@ -23,11 +23,15 @@ interface AppStore extends AppDataState {
   hydrated: boolean
 
   updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>) => void
+  updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>) => void
+  updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
+  createProductionSystemInventoryItem: () => AppDataState['productionSystemInventory'][number]
+  createReusedInternalSystem: () => AppDataState['reusedInternalSystems'][number]
   saveOpportunityWithProjectSync: (
     opportunity: Opportunity,
     savedOpportunity: Opportunity,
@@ -107,6 +111,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       accounts: state.accounts,
       opportunities: state.opportunities,
       projects: state.projects,
+      productionSystemInventory: state.productionSystemInventory,
+      reusedInternalSystems: state.reusedInternalSystems,
       systems: state.systems,
       tenants: state.tenants,
       warrantyRecords: state.warrantyRecords,
@@ -146,6 +152,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       tenants: state.tenants.map((t) =>
         t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
+      ),
+    }))
+    get().saveToStorage()
+  },
+
+  updateProductionSystemInventoryItem: (id, patch) => {
+    set((state) => ({
+      productionSystemInventory: state.productionSystemInventory.map((system) =>
+        system.id === id ? { ...system, ...patch, updatedAt: new Date().toISOString() } : system,
+      ),
+    }))
+    get().saveToStorage()
+  },
+
+  updateReusedInternalSystem: (id, patch) => {
+    set((state) => ({
+      reusedInternalSystems: state.reusedInternalSystems.map((system) =>
+        system.id === id ? { ...system, ...patch, updatedAt: new Date().toISOString() } : system,
       ),
     }))
     get().saveToStorage()
@@ -227,6 +251,69 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((s) => ({ idCounters, projects: [project, ...s.projects] }))
     get().saveToStorage()
     return project
+  },
+
+  createProductionSystemInventoryItem: () => {
+    const state = get()
+    const { counters: idCounters, id: nextSid } = incrementCounter(state.idCounters, 'sid')
+    const now = new Date().toISOString()
+    const system: AppDataState['productionSystemInventory'][number] = {
+      id: `prod-sys-${crypto.randomUUID()}`,
+      sid: nextSid,
+      source: 'Production',
+      purpose: 'Delivery',
+      productType: 'Tangles',
+      hostingType: 'SaaS',
+      cloudPlatform: 'Azure',
+      region: '',
+      country: '',
+      state: '',
+      timeGroup: '',
+      operationalStatus: 'On',
+      tenantCount: 0,
+      alerts: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    set((currentState) => ({
+      idCounters,
+      productionSystemInventory: [system, ...currentState.productionSystemInventory],
+    }))
+    get().saveToStorage()
+    return system
+  },
+
+  createReusedInternalSystem: () => {
+    const state = get()
+    const { counters: idCounters, id: nextMid } = incrementCounter(state.idCounters, 'mid')
+    const now = new Date().toISOString()
+    const system: AppDataState['reusedInternalSystems'][number] = {
+      id: `reused-sys-${crypto.randomUUID()}`,
+      machineId: nextMid,
+      source: 'Reused Internal Systems',
+      purpose: 'POC',
+      status: 'Available',
+      productType: 'Tangles',
+      hostingType: 'SaaS',
+      cloudPlatform: 'Azure',
+      usedInRegion: '',
+      occupationStartDate: null,
+      occupationEndDate: null,
+      currentProjectIds: [],
+      tenantCount: 0,
+      alerts: [],
+      operationalStatus: 'On',
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    set((currentState) => ({
+      idCounters,
+      reusedInternalSystems: [system, ...currentState.reusedInternalSystems],
+    }))
+    get().saveToStorage()
+    return system
   },
 
   saveOpportunityWithProjectSync: (opportunity, savedOpportunity, options) => {

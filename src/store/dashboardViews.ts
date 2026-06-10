@@ -10,7 +10,14 @@ export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
 export const FULL_DASHBOARD_VIEW_ID = 'full-dashboard'
 export const FULL_DASHBOARD_VIEW_NAME = 'Full Dashboard'
 
-export type DashboardViewScope = 'opportunities' | 'projects' | 'systems' | 'tenants' | 'customers'
+export type DashboardViewScope =
+  | 'opportunities'
+  | 'projects'
+  | 'systems'
+  | 'productionSystemInventory'
+  | 'reusedInternalSystems'
+  | 'tenants'
+  | 'customers'
 
 export interface SavedDashboardViewState {
   columnOrder: ColumnOrderState
@@ -44,7 +51,15 @@ export interface RuntimeDashboardView extends SavedDashboardView {
   isDefault: boolean
 }
 
-const DASHBOARD_SCOPES: DashboardViewScope[] = ['opportunities', 'projects', 'systems', 'tenants', 'customers']
+const DASHBOARD_SCOPES: DashboardViewScope[] = [
+  'opportunities',
+  'projects',
+  'systems',
+  'productionSystemInventory',
+  'reusedInternalSystems',
+  'tenants',
+  'customers',
+]
 
 function createEmptyScopeViews(): DashboardViewsForScope {
   return {
@@ -60,6 +75,8 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
       opportunities: createEmptyScopeViews(),
       projects: createEmptyScopeViews(),
       systems: createEmptyScopeViews(),
+      productionSystemInventory: createEmptyScopeViews(),
+      reusedInternalSystems: createEmptyScopeViews(),
       tenants: createEmptyScopeViews(),
       customers: createEmptyScopeViews(),
     },
@@ -163,6 +180,8 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
     dashboards: {
       opportunities: sanitizeScopeViews(value.dashboards.opportunities),
       projects: sanitizeScopeViews(value.dashboards.projects),
+      productionSystemInventory: sanitizeScopeViews(value.dashboards.productionSystemInventory),
+      reusedInternalSystems: sanitizeScopeViews(value.dashboards.reusedInternalSystems),
       systems: sanitizeScopeViews(value.dashboards.systems),
       tenants: sanitizeScopeViews(value.dashboards.tenants),
       customers: sanitizeScopeViews(value.dashboards.customers),

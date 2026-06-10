@@ -228,6 +228,8 @@ export function ProjectFormPage() {
   const salesManagers = useAppStore((state) => state.salesManagers)
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
+  const projectSystems = useAppStore((state) => state.projectSystems)
+  const projectTenants = useAppStore((state) => state.projectTenants)
   const updateProject = useAppStore((state) => state.updateProject)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProject(savedProject) : null)
@@ -254,6 +256,19 @@ export function ProjectFormPage() {
   }, [currentDraft, opportunities])
   const account = linkedOpportunity ? accounts.find((candidate) => candidate.id === linkedOpportunity.accountId) : undefined
   const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
+  const linkedSystems = useMemo(() => {
+    if (!currentDraft) return []
+    const linkedSystemIds = new Set(projectSystems.filter((link) => link.projectId === currentDraft.id).map((link) => link.systemId))
+    return systems.filter((system) => linkedSystemIds.has(system.id))
+  }, [currentDraft, projectSystems, systems])
+  const linkedTenants = useMemo(() => {
+    if (!currentDraft) return []
+    const linkedTenantIds = new Set(projectTenants.filter((link) => link.projectId === currentDraft.id).map((link) => link.tenantId))
+    linkedSystems.forEach((system) => {
+      tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
+    })
+    return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
+  }, [currentDraft, linkedSystems, projectTenants, tenants])
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
 
@@ -488,6 +503,106 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderSystemsTenantsTab() {
+    return (
+      <CollapsibleSection
+        title="Systems and Tenants"
+        subtitle="Read-only foundation for linked systems and hosted tenants. Allocation workflow is planned for a later phase."
+        collapsed={collapsedSections.systemsTenants}
+        onToggle={() => toggleSection('systemsTenants')}
+        className="space-y-3 p-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-sf-text-muted">
+            Systems and tenants linked to this Project are shown for execution context only.
+          </p>
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm font-semibold text-sf-text-muted"
+            disabled
+          >
+            System Allocation
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-sf-text">Linked Systems</h3>
+          {linkedSystems.length > 0 ? (
+            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {['SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode'].map((label) => (
+                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedSystems.map((system) => (
+                    <tr key={system.id} className="hover:bg-sf-surface-alt">
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.sid ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.machineId ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.source ?? (system.machineId ? 'Reused Internal Systems' : 'Production')}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+              No systems are linked to this Project yet.
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-sf-text">Linked Tenants</h3>
+          {linkedTenants.length > 0 ? (
+            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {['TID', 'Tenant Name', 'System SID', 'Delivery PID', 'Product', 'Hosting', 'Operational Mode'].map((label) => (
+                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linkedTenants.map((tenant) => {
+                    const system = systems.find((candidate) => candidate.id === tenant.systemId)
+                    return (
+                      <tr key={tenant.id} className="hover:bg-sf-surface-alt">
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tid}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantName}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system?.sid ?? ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.deliveryPid}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+              No tenants are linked to this Project yet.
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+    )
+  }
+
   return (
     <div>
       <PageHeader
@@ -541,7 +656,11 @@ export function ProjectFormPage() {
           ))}
         </div>
         <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
-          {activeTab === 'tenantRequirements' ? renderTenantRequirementsTab() : renderPlaceholderTab(activeTab)}
+          {activeTab === 'tenantRequirements'
+            ? renderTenantRequirementsTab()
+            : activeTab === 'systemsTenants'
+              ? renderSystemsTenantsTab()
+              : renderPlaceholderTab(activeTab)}
         </div>
       </div>
     </div>

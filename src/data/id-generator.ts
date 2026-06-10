@@ -40,12 +40,28 @@ function maxMachineCounter(values: Array<string | null | undefined>, minimum: nu
   }, minimum)
 }
 
-export function deriveIdCountersFromRecords(state: Pick<AppDataState, 'projects' | 'systems' | 'tenants'>): IdCounters {
+export function deriveIdCountersFromRecords(
+  state: Pick<AppDataState, 'projects' | 'systems' | 'tenants'> &
+    Partial<Pick<AppDataState, 'productionSystemInventory' | 'reusedInternalSystems'>>,
+): IdCounters {
   return {
     pid: maxCounter(state.projects.map((project) => project.pid), ID_PREFIXES.pid, MINIMUM_SEED_COUNTERS.pid),
-    sid: maxCounter(state.systems.map((system) => system.sid), ID_PREFIXES.sid, MINIMUM_SEED_COUNTERS.sid),
+    sid: maxCounter(
+      [
+        ...state.systems.map((system) => system.sid),
+        ...(state.productionSystemInventory ?? []).map((system) => system.sid),
+      ],
+      ID_PREFIXES.sid,
+      MINIMUM_SEED_COUNTERS.sid,
+    ),
     tid: maxCounter(state.tenants.map((tenant) => tenant.tid), ID_PREFIXES.tid, MINIMUM_SEED_COUNTERS.tid),
-    mid: maxMachineCounter(state.systems.map((system) => system.machineId), MINIMUM_SEED_COUNTERS.mid),
+    mid: maxMachineCounter(
+      [
+        ...state.systems.map((system) => system.machineId),
+        ...(state.reusedInternalSystems ?? []).map((system) => system.machineId),
+      ],
+      MINIMUM_SEED_COUNTERS.mid,
+    ),
   }
 }
 

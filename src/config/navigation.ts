@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, FolderKanban, Server, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, FolderKanban, Server, ServerCog, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -28,10 +28,22 @@ export const mainNavigation: NavItem[] = [
     description: 'Delivery project list',
   },
   {
+    label: 'Production Inventory',
+    path: '/systems/production-inventory',
+    icon: ServerCog,
+    description: 'Available production systems',
+  },
+  {
+    label: 'Reused Internal Systems',
+    path: '/systems/reused-internal',
+    icon: ServerCog,
+    description: 'POC, demo, training, and support machines',
+  },
+  {
     label: 'Systems',
     path: '/systems',
     icon: Server,
-    description: 'System list',
+    description: 'Allocated systems dashboard',
   },
   {
     label: 'Tenants',
