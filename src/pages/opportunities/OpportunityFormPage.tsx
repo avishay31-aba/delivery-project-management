@@ -978,7 +978,8 @@ export function OpportunityFormPage() {
       (requirement) => requirement.id !== rowId && requirement.tenantId === tenantId,
     )
 
-    return duplicateInChangeGrid || duplicateInRenewalGrid
+    if (kind === 'B') return duplicateInChangeGrid
+    return duplicateInRenewalGrid
   }
 
   function firstAvailableTenant(kind: 'B' | 'C'): Tenant | undefined {
@@ -1040,13 +1041,16 @@ export function OpportunityFormPage() {
   }
 
   function applyOpportunityTypeChange(nextChange: PendingOpportunityTypeChange, deleteIrrelevantRequirements: boolean) {
-    const visibleTypes = new Set(getVisibleRequirementTypes(nextChange.type, nextChange.subType))
     patchDraft({
       type: nextChange.type,
       subType: nextChange.subType,
-      ...(deleteIrrelevantRequirements && !visibleTypes.has('A') ? { newTenantRequirements: [] } : {}),
-      ...(deleteIrrelevantRequirements && !visibleTypes.has('B') ? { changeRequestRequirements: [] } : {}),
-      ...(deleteIrrelevantRequirements && !visibleTypes.has('C') ? { standardRenewalRequirements: [] } : {}),
+      ...(deleteIrrelevantRequirements
+        ? {
+            newTenantRequirements: [],
+            changeRequestRequirements: [],
+            standardRenewalRequirements: [],
+          }
+        : {}),
     })
     setPendingOpportunityTypeChange(null)
   }
