@@ -187,13 +187,18 @@ export interface System {
   systemClass: SystemClass
   purpose: SystemPurpose
   availability: AvailabilityStatus
+  logo?: string
+  url?: string
+  cognitoRegion?: string
   productType: string
   hostingType: string
   cloudPlatform?: string
+  mapCenter?: string
   region?: string
   country?: string
   state?: string
   timeGroup: string
+  timeGroupAlert?: string
   operationalStatus: string
   createdAt: string
   updatedAt: string
@@ -253,13 +258,19 @@ export interface ProductionSystemInventoryItem {
   sid: string
   source: 'Production'
   purpose: 'Delivery'
+  logo?: string
+  url?: string
+  cognitoRegion?: string
   productType: string
   hostingType: string
   cloudPlatform?: string
+  mapCenter?: string
   region?: string
   country?: string
   state?: string
   timeGroup: string
+  timeGroupAlert?: string
+  linkedProjects?: string[]
   operationalStatus: string
   tenantCount: number
   alerts: string[]
@@ -273,10 +284,16 @@ export interface ReusedInternalSystem {
   source: 'Reused Internal Systems'
   purpose: 'POC' | 'Demo' | 'Training' | 'Support'
   status: ReusedInternalSystemStatus
+  logo?: string
+  url?: string
+  cognitoRegion?: string
   productType: string
   hostingType: string
   cloudPlatform?: string
+  mapCenter?: string
   usedInRegion?: string
+  timeGroup: string
+  timeGroupAlert?: string
   occupationStartDate?: string | null
   occupationEndDate?: string | null
   currentProjectIds: string[]

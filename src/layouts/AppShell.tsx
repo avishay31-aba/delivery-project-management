@@ -6,7 +6,9 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 function resolveHeaderTitle(pathname: string): string {
-  const match = mainNavigation.find((item) => pathname.startsWith(item.path))
+  const match = mainNavigation
+    .filter((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
+    .sort((first, second) => second.path.length - first.path.length)[0]
   return match ? match.label : 'Delivery Project Management'
 }
 

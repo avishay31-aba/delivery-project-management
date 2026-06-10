@@ -5,6 +5,9 @@ export interface SystemInventoryHeaderField {
   label: string
   editable: boolean
   source: string
+  line: number
+  inputType?: 'text' | 'date' | 'integer' | 'picklist' | 'readonly'
+  options?: string[]
 }
 
 export interface SystemInventoryTab {
@@ -20,6 +23,13 @@ export interface SystemInventoryMetadata {
   tabs: SystemInventoryTab[]
 }
 
+export const PRODUCT_OPTIONS = ['Tangles', 'Tangles Light', 'Webloc', 'Weaver', 'Trapdoor', 'Lynx', 'DataAPI']
+export const REGION_OPTIONS = ['NA', 'EU', 'APAC']
+export const REUSED_PURPOSE_OPTIONS = ['POC', 'Demo', 'Training', 'Support']
+export const REUSED_STATUS_OPTIONS = ['Available', 'Occupied', 'Obsolete']
+export const REUSED_OPERATIONAL_STATUS_OPTIONS = ['On', 'Off', 'Access blocked', 'Service blocked', 'Deleted']
+export const PRODUCTION_OPERATIONAL_STATUS_OPTIONS = [...REUSED_OPERATIONAL_STATUS_OPTIONS, 'Canceled']
+
 const SYSTEM_TABS: SystemInventoryTab[] = [
   { id: 'tenant', label: 'Tenant' },
   { id: 'infrastructure', label: 'Infrastructure' },
@@ -34,19 +44,26 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
   sourceSheet: 'System form-Customer',
   titleLabel: 'SID',
   headerFields: [
-    { key: 'sid', label: 'SID', editable: false, source: '1. Sticky Title' },
-    { key: 'source', label: 'Source', editable: false, source: '2. Header' },
-    { key: 'purpose', label: 'Purpose', editable: false, source: '2. Header' },
-    { key: 'productType', label: 'Product', editable: true, source: '2. Header' },
-    { key: 'tenantCount', label: '# Tenants', editable: false, source: '2. Header' },
-    { key: 'operationalStatus', label: 'Operational mode', editable: true, source: '2. Header' },
-    { key: 'alerts', label: 'Alerts', editable: false, source: '2. Header' },
-    { key: 'region', label: 'Region', editable: true, source: '2. Header' },
-    { key: 'country', label: 'Country', editable: true, source: '2. Header' },
-    { key: 'state', label: 'State', editable: true, source: '2. Header' },
-    { key: 'timeGroup', label: 'Time group', editable: true, source: '2. Header' },
-    { key: 'hostingType', label: 'Hosting', editable: true, source: 'Infrastructure' },
-    { key: 'cloudPlatform', label: 'Cloud Platform', editable: true, source: 'Infrastructure' },
+    { key: 'sid', label: 'SID', editable: false, source: '1. Sticky Title', line: 1, inputType: 'readonly' },
+    { key: 'purpose', label: 'Purpose', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
+    { key: 'productType', label: 'Product', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: PRODUCT_OPTIONS },
+    { key: 'logo', label: 'Logo', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
+    { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 1, inputType: 'integer' },
+    {
+      key: 'operationalStatus',
+      label: 'Operational Status',
+      editable: true,
+      source: '2. Header',
+      line: 1,
+      inputType: 'picklist',
+      options: PRODUCTION_OPERATIONAL_STATUS_OPTIONS,
+    },
+    { key: 'alerts', label: 'Alert', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
+    { key: 'url', label: 'URL', editable: true, source: '2. Header', line: 2, inputType: 'text' },
+    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 2, inputType: 'picklist', options: REGION_OPTIONS },
+    { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
+    { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
+    { key: 'linkedProjects', label: 'Linked Projects', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
   ],
   tabs: SYSTEM_TABS,
 }
@@ -56,20 +73,29 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
   sourceSheet: 'System form-POC-Demo-Training',
   titleLabel: 'MID',
   headerFields: [
-    { key: 'machineId', label: 'MID', editable: false, source: '1. Sticky Title' },
-    { key: 'source', label: 'Source', editable: false, source: '2. Header' },
-    { key: 'purpose', label: 'Purpose', editable: true, source: '2. Header' },
-    { key: 'status', label: 'Availability status', editable: true, source: '2. Header' },
-    { key: 'operationalStatus', label: 'Operational mode', editable: true, source: '2. Header' },
-    { key: 'alerts', label: 'Alerts', editable: false, source: '2. Header' },
-    { key: 'productType', label: 'Product', editable: true, source: '2. Header' },
-    { key: 'tenantCount', label: '# Tenants', editable: false, source: '2. Header' },
-    { key: 'usedInRegion', label: 'Used in Region', editable: true, source: 'POC/Training/Demo pool' },
-    { key: 'occupationStartDate', label: 'Occupation start date', editable: true, source: 'POC/Training/Demo pool' },
-    { key: 'occupationEndDate', label: 'Occupation end date', editable: true, source: 'POC/Training/Demo pool' },
-    { key: 'currentProjectIds', label: 'Current Project', editable: false, source: '2. Header' },
-    { key: 'hostingType', label: 'Hosting', editable: true, source: 'Infrastructure' },
-    { key: 'cloudPlatform', label: 'Cloud Platform', editable: true, source: 'Infrastructure' },
+    { key: 'machineId', label: 'MID', editable: true, source: '1. Sticky Title', line: 1, inputType: 'text' },
+    { key: 'purpose', label: 'Purpose', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: REUSED_PURPOSE_OPTIONS },
+    { key: 'status', label: 'Availability Status', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: REUSED_STATUS_OPTIONS },
+    {
+      key: 'operationalStatus',
+      label: 'Operational Status',
+      editable: true,
+      source: '2. Header',
+      line: 1,
+      inputType: 'picklist',
+      options: REUSED_OPERATIONAL_STATUS_OPTIONS,
+    },
+    { key: 'alerts', label: 'Alerts', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
+    { key: 'productType', label: 'Product', editable: true, source: '2. Header', line: 2, inputType: 'picklist', options: PRODUCT_OPTIONS },
+    { key: 'logo', label: 'Logo', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
+    { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 2, inputType: 'integer' },
+    { key: 'url', label: 'URL', editable: true, source: '2. Header', line: 3, inputType: 'text' },
+    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS },
+    { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
+    { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
+    { key: 'usedInRegion', label: 'Used in Region', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'picklist', options: REGION_OPTIONS },
+    { key: 'occupationStartDate', label: 'Occupation Start Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
+    { key: 'occupationEndDate', label: 'Occupation End Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
   ],
   tabs: SYSTEM_TABS,
 }
