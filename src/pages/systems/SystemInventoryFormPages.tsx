@@ -24,6 +24,7 @@ import { useAppStore } from '@/store/useAppStore'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
+type InfrastructureInnerTab = 'environment' | 'infrastructure'
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   header: false,
@@ -31,13 +32,18 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   tabs: false,
 }
 
-const ENVIRONMENT_CONFIGURATION_COLUMNS = [
-  requirementAColumns.find((column) => column.key === 'hostingType'),
-  requirementAColumns.find((column) => column.key === 'cloudPlatform'),
-  { key: 'csp', label: 'CSP', group: 'Environment', editable: true, inputType: 'picklist' },
-  { key: 'cloudRegion', label: 'Cloud Region', group: 'Environment', editable: true, inputType: 'picklist' },
-].filter((column): column is NonNullable<typeof column> => Boolean(column))
 const APPLICATION_CONFIGURATION_COLUMNS = requirementAColumns.slice(3).filter((column) => column.key !== 'hostingType' && column.key !== 'cloudPlatform')
+const ENVIRONMENT_FIELDS = [
+  { key: 'hostingType', label: 'Hosting', inputType: 'picklist' },
+  { key: 'cloudPlatform', label: 'Cloud Platform', inputType: 'picklist' },
+  { key: 'csp', label: 'CSP', inputType: 'picklist' },
+  { key: 'cloudRegion', label: 'Cloud Region', inputType: 'picklist' },
+]
+const INFRASTRUCTURE_IDENTIFIER_FIELDS = [
+  { key: 'statisticsId', label: 'Statistics ID' },
+  { key: 'authId', label: 'Auth ID' },
+  { key: 'rdmId', label: 'RDM ID' },
+]
 const PICKLIST_OPTIONS: Record<string, string[]> = {
   mapCenter: ['USA', 'Canada', 'Germany', 'UK', 'Australia', 'Japan', 'Singapore', 'Israel'],
   blockchain: ['Yes', 'No'],
@@ -163,25 +169,60 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
   return textValue(readRecordValue(record, key))
 }
 
-function OperationalStatusIndicator({ value }: { value: string }) {
+function OperationalStatusBadge({ value }: { value: string }) {
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium text-sf-text-muted">
-      <span className={`h-2.5 w-2.5 rounded-full ${OPERATIONAL_STATUS_STYLES[value] ?? 'bg-slate-300'}`} aria-hidden="true" />
+    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold" style={{ color: OPERATIONAL_STATUS_COLORS[value] ?? '#64748b' }}>
+      <span className={['h-2.5 w-2.5 rounded-full', OPERATIONAL_STATUS_STYLES[value] ?? 'bg-slate-300'].join(' ')} aria-hidden="true" />
       {value || 'Not set'}
     </span>
   )
 }
 
-function statusOptionLabel(value: string): string {
-  const labels: Record<string, string> = {
-    On: '● On',
-    Off: '● Off',
-    'Access blocked': '● Access blocked',
-    'Service blocked': '● Service blocked',
-    Deleted: '● Deleted',
-    Canceled: '● Canceled',
-  }
-  return labels[value] ?? value
+function OperationalStatusSelect({
+  value,
+  options,
+  isChanged,
+  isInvalid,
+  onChange,
+}: {
+  value: string
+  options: string[]
+  isChanged: boolean
+  isInvalid: boolean
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className={[fieldClassName(isChanged, isInvalid), 'flex items-center justify-between gap-2 text-left'].join(' ')}
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        <OperationalStatusBadge value={value} />
+        <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-20 mt-1 w-full rounded border border-sf-border bg-white py-1 shadow-lg">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className="flex w-full items-center px-2 py-1 text-left hover:bg-sf-surface-alt"
+              onClick={() => {
+                onChange(option)
+                setOpen(false)
+              }}
+            >
+              <OperationalStatusBadge value={option} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function InventoryForm<T extends InventoryRecord>({
@@ -204,6 +245,7 @@ function InventoryForm<T extends InventoryRecord>({
   const tenants = useAppStore((state) => state.tenants)
   const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
+  const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -327,18 +369,27 @@ function InventoryForm<T extends InventoryRecord>({
     }
 
     if (field.inputType === 'picklist') {
+      if (field.key === 'operationalStatus') {
+        return (
+          <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+            <OperationalStatusSelect
+              value={value}
+              options={field.options ?? []}
+              isChanged={isChanged}
+              isInvalid={isInvalid}
+              onChange={(nextValue) => updateField(field.key, nextValue)}
+            />
+          </FormField>
+        )
+      }
+
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={width}>
-          <div className="space-y-1">
-            <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
-              {(field.options ?? []).map((option) => (
-                <option key={option} value={option} style={field.key === 'operationalStatus' ? { color: OPERATIONAL_STATUS_COLORS[option] } : undefined}>
-                  {field.key === 'operationalStatus' ? statusOptionLabel(option) : option}
-                </option>
-              ))}
-            </select>
-            {field.key === 'operationalStatus' ? <OperationalStatusIndicator value={value} /> : null}
-          </div>
+          <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
+            {(field.options ?? []).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
         </FormField>
       )
     }
@@ -409,6 +460,106 @@ function InventoryForm<T extends InventoryRecord>({
     return <input className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(key, event.target.value)} />
   }
 
+  function renderEnvironmentField(field: { key: string; label: string; inputType?: string }) {
+    const value = textValue(readRecordValue(activeDraft, field.key))
+    const isChanged = fieldChanged(field.key)
+    const isInvalid = invalidFields.has(field.key) && messages.length > 0
+    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
+    const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+
+    if ((field.key === 'csp' || field.key === 'cloudRegion') && !cloudPlatform) return null
+    if (field.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
+
+    const options =
+      field.key === 'hostingType'
+        ? HOSTING_OPTIONS
+        : field.key === 'cloudPlatform'
+          ? cloudPlatformOptionsForHosting(hostingType)
+          : field.key === 'csp'
+            ? cspOptionsForCloudPlatform(cloudPlatform)
+            : field.key === 'cloudRegion'
+              ? cloudRegionOptionsForCloudPlatform(cloudPlatform)
+              : []
+    const isDisabled = field.key === 'cloudPlatform' && options.length === 0
+
+    return (
+      <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
+        <select
+          className={fieldClassName(isChanged, isInvalid)}
+          value={isDisabled ? '' : value}
+          disabled={isDisabled}
+          onChange={(event) => updateField(field.key, event.target.value)}
+        >
+          <option value="" />
+          {options.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </FormField>
+    )
+  }
+
+  function renderIdentifierField(field: { key: string; label: string }) {
+    const value = textValue(readRecordValue(activeDraft, field.key))
+    const isChanged = fieldChanged(field.key)
+
+    return (
+      <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
+        <input className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+      </FormField>
+    )
+  }
+
+  function renderInfrastructureTab() {
+    const innerTabs: Array<{ id: InfrastructureInnerTab; label: string }> = [
+      { id: 'environment', label: 'Environment' },
+      { id: 'infrastructure', label: 'Infrastructure' },
+    ]
+
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
+          {innerTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={[
+                'border-b-2 px-4 py-2 text-sm font-semibold',
+                activeInfrastructureTab === tab.id
+                  ? 'border-sf-brand bg-white text-sf-text'
+                  : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+              ].join(' ')}
+              onClick={() => setActiveInfrastructureTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeInfrastructureTab === 'environment' ? (
+          <div className="space-y-4">
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold text-sf-text">Hosting</h3>
+              <div className="flex flex-wrap items-start gap-3">
+                {ENVIRONMENT_FIELDS.map(renderEnvironmentField)}
+              </div>
+            </section>
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold text-sf-text">Identifiers</h3>
+              <div className="flex flex-wrap items-start gap-3">
+                {INFRASTRUCTURE_IDENTIFIER_FIELDS.map(renderIdentifierField)}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            Infrastructure workspace is reserved for later system execution phases.
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap items-center gap-2">
@@ -475,53 +626,14 @@ function InventoryForm<T extends InventoryRecord>({
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="System Configuration"
-        subtitle="Environment fields are separated from Application fields while preserving Opportunity tenant configuration structure."
+        title="Application Configuration"
+        subtitle="Application and product configuration fields aligned with Opportunity tenant requirements."
         collapsed={collapsedSections.configuration}
         onToggle={() => toggleSection('configuration')}
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-sf-text">Environment</h3>
-            <div className="overflow-x-auto rounded border border-sf-border bg-white">
-              <table className="min-w-full border-collapse text-sm leading-tight">
-                <thead className="bg-sf-surface-alt text-left">
-                  <tr>
-                    {ENVIRONMENT_CONFIGURATION_COLUMNS.map((column) => {
-                      const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
-                      if ((column.key === 'csp' || column.key === 'cloudRegion') && !cloudPlatform) return null
-                      if (column.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
-                      return (
-                        <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                          <span>{column.label}</span>
-                          <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {ENVIRONMENT_CONFIGURATION_COLUMNS.map((column) => {
-                      const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
-                      if ((column.key === 'csp' || column.key === 'cloudRegion') && !cloudPlatform) return null
-                      if (column.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
-                      return (
-                        <td key={column.key} className="min-w-44 border border-sf-border px-1.5 py-1 align-top">
-                          {renderConfigurationCell(column.key, column.inputType)}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-sf-text">Application</h3>
-            <div className="overflow-x-auto rounded border border-sf-border bg-white">
-              <table className="min-w-full border-collapse text-sm leading-tight">
+        <div className="space-y-2">
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="w-max border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
                     {APPLICATION_CONFIGURATION_COLUMNS.map((column) => (
@@ -542,7 +654,6 @@ function InventoryForm<T extends InventoryRecord>({
                   </tr>
                 </tbody>
               </table>
-            </div>
           </div>
         </div>
       </CollapsibleSection>
@@ -572,7 +683,9 @@ function InventoryForm<T extends InventoryRecord>({
             ))}
           </div>
           <div className="min-h-48 p-4 text-sm text-sf-text-muted" role="tabpanel" aria-label={metadata.tabs.find((tab) => tab.id === activeTab)?.label}>
-            {metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.
+            {activeTab === 'infrastructure'
+              ? renderInfrastructureTab()
+              : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>

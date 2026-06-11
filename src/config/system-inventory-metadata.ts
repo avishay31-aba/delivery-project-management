@@ -32,8 +32,8 @@ export const REUSED_OPERATIONAL_STATUS_OPTIONS = ['On', 'Off', 'Access blocked',
 export const PRODUCTION_OPERATIONAL_STATUS_OPTIONS = [...REUSED_OPERATIONAL_STATUS_OPTIONS, 'Canceled']
 
 const SYSTEM_TABS: SystemInventoryTab[] = [
-  { id: 'tenant', label: 'Tenant' },
   { id: 'infrastructure', label: 'Infrastructure' },
+  { id: 'tenant', label: 'Tenant' },
   { id: 'versionUpdate', label: 'Version update' },
   { id: 'usage', label: 'Usage' },
   { id: 'configurationHistory', label: 'Configuration history' },

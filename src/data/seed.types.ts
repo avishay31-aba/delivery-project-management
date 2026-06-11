@@ -97,6 +97,9 @@ export interface OpportunityRequirementBase {
   cloudPlatform: string
   csp?: string
   cloudRegion?: string
+  statisticsId?: string
+  authId?: string
+  rdmId?: string
   productType: string
   mapCenter: string
   licenses: number | null
@@ -197,6 +200,9 @@ export interface System {
   cloudPlatform?: string
   csp?: string
   cloudRegion?: string
+  statisticsId?: string
+  authId?: string
+  rdmId?: string
   mapCenter?: string
   region?: string
   country?: string
@@ -225,6 +231,9 @@ export interface Tenant {
   cloudPlatform?: string
   csp?: string
   cloudRegion?: string
+  statisticsId?: string
+  authId?: string
+  rdmId?: string
   mapCenter?: string
   licenses?: number | null
   users?: number | null
