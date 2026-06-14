@@ -442,6 +442,11 @@ function HeaderMenu<T extends { id: string }>({
   const hiddenColumnCount = hiddenColumns.length
   const [showRestoreColumns, setShowRestoreColumns] = useState(false)
   const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([])
+  const selectedFilterValues = Array.isArray(column.getFilterValue())
+    ? (column.getFilterValue() as string[])
+    : column.getFilterValue()
+      ? [String(column.getFilterValue())]
+      : []
 
   const updateMenuPosition = useCallback(() => {
     const triggerElement = menuButtonRef.current
@@ -539,6 +544,21 @@ function HeaderMenu<T extends { id: string }>({
     onClose()
   }
 
+  function toggleFilterValue(value: string) {
+    const nextValues = selectedFilterValues.includes(value)
+      ? selectedFilterValues.filter((selectedValue) => selectedValue !== value)
+      : [...selectedFilterValues, value]
+    column.setFilterValue(nextValues.length > 0 ? nextValues : undefined)
+  }
+
+  function selectAllFilterValues() {
+    column.setFilterValue(filterOptions.length > 0 ? filterOptions : undefined)
+  }
+
+  function clearFilterValues() {
+    column.setFilterValue(undefined)
+  }
+
   return (
     <div ref={menuWrapperRef} className="relative inline-block" onClick={(event) => event.stopPropagation()}>
       <button
@@ -559,19 +579,48 @@ function HeaderMenu<T extends { id: string }>({
         >
           <label className="block space-y-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
             <span>Filter</span>
-            <select
-              className="w-full rounded border border-sf-border px-2 py-1 text-sm font-normal normal-case text-sf-text"
-              disabled={!column.getCanFilter()}
-              value={(column.getFilterValue() as string) ?? ''}
-              onChange={(event) => column.setFilterValue(event.target.value || undefined)}
-            >
-              <option value="">All</option>
-              {filterOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            <div className="rounded border border-sf-border bg-white p-2 text-sm font-normal normal-case text-sf-text">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-sf-text-muted">
+                  {selectedFilterValues.length > 0 ? `${selectedFilterValues.length} selected` : 'All values'}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="rounded border border-sf-border px-1.5 py-0.5 text-xs hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+                    disabled={!column.getCanFilter() || filterOptions.length === 0}
+                    onClick={selectAllFilterValues}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-sf-border px-1.5 py-0.5 text-xs hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+                    disabled={!column.getCanFilter() || selectedFilterValues.length === 0}
+                    onClick={clearFilterValues}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+                {filterOptions.length > 0 ? (
+                  filterOptions.map((option) => (
+                    <label key={option} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-sf-surface-alt">
+                      <input
+                        type="checkbox"
+                        disabled={!column.getCanFilter()}
+                        checked={selectedFilterValues.includes(option)}
+                        onChange={() => toggleFilterValue(option)}
+                      />
+                      <span className="truncate" title={option}>{option}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="px-1.5 py-1 text-xs text-sf-text-muted">No filter values</p>
+                )}
+              </div>
+            </div>
           </label>
 
           <div className="space-y-1 border-t border-sf-border pt-2">
@@ -728,7 +777,11 @@ export function DataDashboard<T extends { id: string }>({
         enableColumnFilter: column.filterable !== false,
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true
-          return String(row.getValue(columnId) ?? '') === String(filterValue)
+          const rowValue = String(row.getValue(columnId) ?? '')
+          if (Array.isArray(filterValue)) {
+            return filterValue.length === 0 || filterValue.map(String).includes(rowValue)
+          }
+          return rowValue === String(filterValue)
         },
         cell: ({ row }) => {
           const raw = String(column.getValue(row.original) ?? '')
