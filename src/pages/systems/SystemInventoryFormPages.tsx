@@ -38,12 +38,20 @@ const ENVIRONMENT_FIELDS = [
   { key: 'cloudPlatform', label: 'Cloud Platform', inputType: 'picklist' },
   { key: 'csp', label: 'CSP', inputType: 'picklist' },
   { key: 'cloudRegion', label: 'Cloud Region', inputType: 'picklist' },
+  { key: 'performanceTier', label: 'Performance Tier', inputType: 'picklist' },
 ]
 const INFRASTRUCTURE_IDENTIFIER_FIELDS = [
   { key: 'statisticsId', label: 'Statistics ID' },
   { key: 'authId', label: 'Auth ID' },
   { key: 'rdmId', label: 'RDM ID' },
 ]
+const ACCESS_DETAIL_FIELDS = [
+  { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
+  { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
+  { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
+]
+const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
+const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
 const PICKLIST_OPTIONS: Record<string, string[]> = {
   mapCenter: ['USA', 'Canada', 'Germany', 'UK', 'Australia', 'Japan', 'Singapore', 'Israel'],
   blockchain: ['Yes', 'No'],
@@ -280,6 +288,9 @@ function InventoryForm<T extends InventoryRecord>({
       if (key === 'cloudPlatform') {
         return { ...next, csp: '', cloudRegion: '' } as T
       }
+      if (key === 'vpnEnabled' && value !== 'YES') {
+        return { ...next, vpnType: '' } as T
+      }
       return next as T
     })
     setMessages([])
@@ -322,6 +333,30 @@ function InventoryForm<T extends InventoryRecord>({
     return nextMessages
   }
 
+  function sanitizedDraftForSave(): T {
+    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
+    const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+    const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
+    const next = { ...activeDraft } as T & Record<string, unknown>
+
+    if (hostingType === 'On premise') {
+      next.cloudPlatform = ''
+      next.csp = ''
+      next.cloudRegion = ''
+    } else if (!cloudPlatform) {
+      next.csp = ''
+      next.cloudRegion = ''
+    } else if (cloudPlatform === "Customer's datacenter") {
+      next.cloudRegion = ''
+    }
+
+    if (vpnEnabled !== 'YES') {
+      next.vpnType = ''
+    }
+
+    return next as T
+  }
+
   validate()
   const isDirty = !valuesEqual(activeRecord, activeDraft)
   const lines = new Map<number, SystemInventoryHeaderField[]>()
@@ -337,14 +372,15 @@ function InventoryForm<T extends InventoryRecord>({
       return
     }
 
-    onSave(activeDraft.id, activeDraft as Partial<T>)
+    const nextDraft = sanitizedDraftForSave()
+    onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
     if (!stayOnPage) {
       navigate(dashboardPath)
       return
     }
-    navigate(recordPath(activeDraft), { replace: true })
+    navigate(recordPath(nextDraft), { replace: true })
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
@@ -467,19 +503,18 @@ function InventoryForm<T extends InventoryRecord>({
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
 
+    if (field.key === 'cloudPlatform' && hostingType === 'On premise') return null
     if ((field.key === 'csp' || field.key === 'cloudRegion') && !cloudPlatform) return null
     if (field.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
 
-    const options =
-      field.key === 'hostingType'
-        ? HOSTING_OPTIONS
-        : field.key === 'cloudPlatform'
-          ? cloudPlatformOptionsForHosting(hostingType)
-          : field.key === 'csp'
-            ? cspOptionsForCloudPlatform(cloudPlatform)
-            : field.key === 'cloudRegion'
-              ? cloudRegionOptionsForCloudPlatform(cloudPlatform)
-              : []
+    const optionsByKey: Record<string, string[]> = {
+      hostingType: HOSTING_OPTIONS,
+      cloudPlatform: cloudPlatformOptionsForHosting(hostingType),
+      csp: cspOptionsForCloudPlatform(cloudPlatform),
+      cloudRegion: cloudRegionOptionsForCloudPlatform(cloudPlatform),
+      performanceTier: PERFORMANCE_TIER_OPTIONS,
+    }
+    const options = optionsByKey[field.key] ?? []
     const isDisabled = field.key === 'cloudPlatform' && options.length === 0
 
     return (
@@ -506,6 +541,46 @@ function InventoryForm<T extends InventoryRecord>({
     return (
       <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
         <input className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+      </FormField>
+    )
+  }
+
+  function renderAccessDetailField(field: { key: string; label: string; inputType?: string }) {
+    const value = textValue(readRecordValue(activeDraft, field.key))
+    const isChanged = fieldChanged(field.key)
+    const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
+
+    if (field.key === 'vpnType' && vpnEnabled !== 'YES') return null
+
+    if (field.inputType === 'yesNo') {
+      return (
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-36">
+          <div className={[fieldClassName(isChanged), 'flex items-center gap-3'].join(' ')}>
+            {['YES', 'NO'].map((option) => (
+              <label key={option} className="inline-flex items-center gap-1 text-sm">
+                <input
+                  type="radio"
+                  name={`${activeRecord.id}-${field.key}`}
+                  value={option}
+                  checked={value === option}
+                  onChange={() => updateField(field.key, option)}
+                />
+                <span>{option === 'YES' ? 'Yes' : 'No'}</span>
+              </label>
+            ))}
+          </div>
+        </FormField>
+      )
+    }
+
+    return (
+      <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
+        <select className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
+          <option value="" />
+          {VPN_TYPE_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
       </FormField>
     )
   }
@@ -548,6 +623,12 @@ function InventoryForm<T extends InventoryRecord>({
               <h3 className="text-lg font-semibold text-sf-text">Identifiers</h3>
               <div className="flex flex-wrap items-start gap-3">
                 {INFRASTRUCTURE_IDENTIFIER_FIELDS.map(renderIdentifierField)}
+              </div>
+            </section>
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
+              <div className="flex flex-wrap items-start gap-3">
+                {ACCESS_DETAIL_FIELDS.map(renderAccessDetailField)}
               </div>
             </section>
           </div>

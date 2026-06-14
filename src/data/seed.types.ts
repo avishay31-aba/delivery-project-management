@@ -100,6 +100,10 @@ export interface OpportunityRequirementBase {
   statisticsId?: string
   authId?: string
   rdmId?: string
+  performanceTier?: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled?: YesNo
+  vpnType?: string
+  ipRestrictionEnabled?: YesNo
   productType: string
   mapCenter: string
   licenses: number | null
@@ -203,6 +207,10 @@ export interface System {
   statisticsId?: string
   authId?: string
   rdmId?: string
+  performanceTier?: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled?: YesNo
+  vpnType?: string
+  ipRestrictionEnabled?: YesNo
   mapCenter?: string
   region?: string
   country?: string
@@ -234,6 +242,10 @@ export interface Tenant {
   statisticsId?: string
   authId?: string
   rdmId?: string
+  performanceTier?: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled?: YesNo
+  vpnType?: string
+  ipRestrictionEnabled?: YesNo
   mapCenter?: string
   licenses?: number | null
   users?: number | null
@@ -282,6 +294,10 @@ export interface ProductionSystemInventoryItem {
   csp?: string
   cloudRegion?: string
   mapCenter?: string
+  performanceTier?: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled?: YesNo
+  vpnType?: string
+  ipRestrictionEnabled?: YesNo
   region?: string
   country?: string
   state?: string
@@ -334,6 +350,10 @@ export interface ReusedInternalSystem {
   csp?: string
   cloudRegion?: string
   mapCenter?: string
+  performanceTier?: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled?: YesNo
+  vpnType?: string
+  ipRestrictionEnabled?: YesNo
   usedInRegion?: string
   timeGroup: string
   timeGroupAlert?: string
