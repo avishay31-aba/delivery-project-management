@@ -386,6 +386,8 @@ function RequirementGrid({
   onToggleCollapsed: () => void
 }) {
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
+  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>({})
+  const [pendingAddNew, setPendingAddNew] = useState<{ rowId: string; key: string; value: string } | null>(null)
   const rows =
     kind === 'A'
       ? draft.newTenantRequirements
@@ -517,6 +519,52 @@ function RequirementGrid({
             )
           : null}
       </>
+    )
+  }
+
+  function optionsWithCustom(key: string, options: string[]): string[] {
+    return [...options.filter((option) => option !== 'Add new...'), ...(customPicklistOptions[key] ?? []), ...(options.includes('Add new...') ? ['Add new...'] : [])]
+  }
+
+  function handlePicklistChange(rowId: string, key: string, value: string) {
+    if (value === 'Add new...') {
+      setPendingAddNew({ rowId, key, value: '' })
+      return
+    }
+    onUpdateRow(rowId, key, value)
+  }
+
+  function renderAddNewEditor(rowId: string, key: string) {
+    if (pendingAddNew?.rowId !== rowId || pendingAddNew.key !== key) return null
+
+    return (
+      <div className="mt-1 flex w-40 items-center gap-1">
+        <input
+          className="h-7 min-w-0 flex-1 rounded border border-sf-border px-2 py-1 text-sm"
+          value={pendingAddNew.value}
+          autoFocus
+          onChange={(event) => setPendingAddNew({ rowId, key, value: event.target.value })}
+        />
+        <button
+          type="button"
+          className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white"
+          onClick={() => {
+            const nextValue = pendingAddNew.value.trim()
+            if (!nextValue) return
+            setCustomPicklistOptions((current) => ({
+              ...current,
+              [key]: Array.from(new Set([...(current[key] ?? []), nextValue])),
+            }))
+            onUpdateRow(rowId, key, nextValue)
+            setPendingAddNew(null)
+          }}
+        >
+          Add
+        </button>
+        <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setPendingAddNew(null)}>
+          Cancel
+        </button>
+      </div>
     )
   }
 
@@ -668,18 +716,21 @@ function RequirementGrid({
       const isDisabled = column.key === 'cloudPlatform' && options.length === 0
 
       return (
-        <select
-          className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-sm')}
-          value={isDisabled ? '' : textValue(rowValue(row, column.key))}
-          disabled={isDisabled}
-          onChange={(event) => onUpdateRow(row.id, column.key, event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option || 'Not set'}
-            </option>
-          ))}
-        </select>
+        <>
+          <select
+            className={fieldClassName(isChanged, isMissing, 'h-7 w-40 text-sm')}
+            value={isDisabled ? '' : textValue(rowValue(row, column.key))}
+            disabled={isDisabled}
+            onChange={(event) => handlePicklistChange(row.id, column.key, event.target.value)}
+          >
+            {optionsWithCustom(column.key, options).map((option) => (
+              <option key={option} value={option}>
+                {option || 'Not set'}
+              </option>
+            ))}
+          </select>
+          {renderAddNewEditor(row.id, column.key)}
+        </>
       )
     }
 

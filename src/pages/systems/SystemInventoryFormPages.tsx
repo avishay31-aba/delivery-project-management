@@ -19,10 +19,10 @@ import {
   type SystemInventoryMetadata,
 } from '@/config/system-inventory-metadata'
 import { timeGroupForCountry } from '@/config/time-groups'
-import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, Tenant } from '@/data/seed.types'
+import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 
-type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem
+type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
 type InfrastructureInnerTab = 'environment' | 'infrastructure'
 
@@ -46,6 +46,7 @@ const INFRASTRUCTURE_IDENTIFIER_FIELDS = [
   { key: 'rdmId', label: 'RDM ID' },
 ]
 const ACCESS_DETAIL_FIELDS = [
+  { key: 'url', label: 'URL', inputType: 'text' },
   { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
   { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
   { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
@@ -66,6 +67,16 @@ const PRODUCT_LOGOS: Record<string, string> = {
   Trapdoor: 'Tr',
   Lynx: 'L',
   DataAPI: 'API',
+}
+
+const PRODUCT_LOGO_COLORS: Record<string, string> = {
+  Tangles: 'bg-blue-600',
+  'Tangles Light': 'bg-cyan-600',
+  Webloc: 'bg-emerald-600',
+  Weaver: 'bg-violet-600',
+  Trapdoor: 'bg-amber-600',
+  Lynx: 'bg-rose-600',
+  DataAPI: 'bg-slate-700',
 }
 
 const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
@@ -154,7 +165,11 @@ function deriveLinkedProjects(record: InventoryRecord, projects: Project[]): str
 }
 
 function deriveTenantCount(record: InventoryRecord, tenants: Tenant[]): number {
-  if ('sid' in record) return tenants.filter((tenant) => tenant.systemId === record.id).length || record.tenantCount || 0
+  if ('sid' in record) {
+    const hostedTenantCount = tenants.filter((tenant) => tenant.systemId === record.id).length
+    const storedTenantCount = 'tenantCount' in record ? record.tenantCount : 0
+    return hostedTenantCount || storedTenantCount || 0
+  }
   return record.tenantCount || 0
 }
 
@@ -256,6 +271,8 @@ function InventoryForm<T extends InventoryRecord>({
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
+  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>({})
+  const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
@@ -302,6 +319,52 @@ function InventoryForm<T extends InventoryRecord>({
 
   function fieldChanged(key: string): boolean {
     return !valuesEqual(readRecordValue(activeRecord, key), readRecordValue(activeDraft, key))
+  }
+
+  function optionsWithCustom(key: string, options: string[]): string[] {
+    return [...options.filter((option) => option !== 'Add new...'), ...(customPicklistOptions[key] ?? []), ...(options.includes('Add new...') ? ['Add new...'] : [])]
+  }
+
+  function handlePicklistChange(key: string, value: string) {
+    if (value === 'Add new...') {
+      setPendingAddNew({ key, value: '' })
+      return
+    }
+    updateField(key, value)
+  }
+
+  function renderAddNewEditor(key: string) {
+    if (pendingAddNew?.key !== key) return null
+
+    return (
+      <div className="mt-1 flex items-center gap-1">
+        <input
+          className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+          value={pendingAddNew.value}
+          autoFocus
+          onChange={(event) => setPendingAddNew({ key, value: event.target.value })}
+        />
+        <button
+          type="button"
+          className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white"
+          onClick={() => {
+            const nextValue = pendingAddNew.value.trim()
+            if (!nextValue) return
+            setCustomPicklistOptions((current) => ({
+              ...current,
+              [key]: Array.from(new Set([...(current[key] ?? []), nextValue])),
+            }))
+            updateField(key, nextValue)
+            setPendingAddNew(null)
+          }}
+        >
+          Add
+        </button>
+        <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setPendingAddNew(null)}>
+          Cancel
+        </button>
+      </div>
+    )
   }
 
   function validate(): string[] {
@@ -395,6 +458,19 @@ function InventoryForm<T extends InventoryRecord>({
           : 'w-48'
 
     if (!field.editable) {
+      if (field.key === 'logo') {
+        const productType = textValue(readRecordValue(activeDraft, 'productType'))
+        return (
+          <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+            <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+              <span className={['inline-flex h-6 min-w-6 items-center justify-center rounded text-xs font-bold text-white', PRODUCT_LOGO_COLORS[productType] ?? 'bg-slate-500'].join(' ')}>
+                {value || 'SYS'}
+              </span>
+            </div>
+          </FormField>
+        )
+      }
+
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={width}>
           <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
@@ -523,13 +599,14 @@ function InventoryForm<T extends InventoryRecord>({
           className={fieldClassName(isChanged, isInvalid)}
           value={isDisabled ? '' : value}
           disabled={isDisabled}
-          onChange={(event) => updateField(field.key, event.target.value)}
+          onChange={(event) => handlePicklistChange(field.key, event.target.value)}
         >
           <option value="" />
-          {options.map((option) => (
+          {optionsWithCustom(field.key, options).map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
+        {renderAddNewEditor(field.key)}
       </FormField>
     )
   }
@@ -551,6 +628,14 @@ function InventoryForm<T extends InventoryRecord>({
     const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
 
     if (field.key === 'vpnType' && vpnEnabled !== 'YES') return null
+
+    if (field.inputType === 'text') {
+      return (
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-96">
+          <input className={fieldClassName(isChanged, invalidFields.has(field.key) && messages.length > 0)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+        </FormField>
+      )
+    }
 
     if (field.inputType === 'yesNo') {
       return (
@@ -575,12 +660,13 @@ function InventoryForm<T extends InventoryRecord>({
 
     return (
       <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
-        <select className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
+        <select className={fieldClassName(isChanged)} value={value} onChange={(event) => handlePicklistChange(field.key, event.target.value)}>
           <option value="" />
-          {VPN_TYPE_OPTIONS.map((option) => (
+          {optionsWithCustom(field.key, VPN_TYPE_OPTIONS).map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
+        {renderAddNewEditor(field.key)}
       </FormField>
     )
   }
@@ -627,8 +713,10 @@ function InventoryForm<T extends InventoryRecord>({
             </section>
             <section className="space-y-2">
               <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
-              <div className="flex flex-wrap items-start gap-3">
-                {ACCESS_DETAIL_FIELDS.map(renderAccessDetailField)}
+              <div className="space-y-3">
+                {ACCESS_DETAIL_FIELDS.map((field) => (
+                  <div key={field.key}>{renderAccessDetailField(field)}</div>
+                ))}
               </div>
             </section>
           </div>
@@ -776,34 +864,52 @@ function InventoryForm<T extends InventoryRecord>({
 
 export function ProductionSystemInventoryFormPage() {
   const { sid } = useParams<{ sid: string }>()
-  const records = useAppStore((state) => state.productionSystemInventory)
+  const inventoryRecords = useAppStore((state) => state.productionSystemInventory)
+  const allocatedRecords = useAppStore((state) => state.systems.filter((system) => system.source !== 'Reused Internal Systems'))
+  const updateInventoryRecord = useAppStore((state) => state.updateProductionSystemInventoryItem)
+  const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
+  const records = [...inventoryRecords, ...allocatedRecords]
   const record = records.find((system) => system.sid === sid)
-  const updateRecord = useAppStore((state) => state.updateProductionSystemInventoryItem)
 
   return (
     <InventoryForm
       record={record}
       records={records}
       metadata={productionSystemMetadata}
-      onSave={updateRecord}
+      onSave={(id, patch) => {
+        if (inventoryRecords.some((system) => system.id === id)) {
+          updateInventoryRecord(id, patch as Partial<ProductionSystemInventoryItem>)
+          return
+        }
+        updateAllocatedRecord(id, patch as Partial<System>)
+      }}
       dashboardPath="/systems/production-inventory"
-      recordPath={(system) => `/systems/production-inventory/${system.sid}`}
+      recordPath={(system) => `/systems/production-inventory/${system.sid ?? ''}`}
     />
   )
 }
 
 export function ReusedInternalSystemFormPage() {
   const { mid } = useParams<{ mid: string }>()
-  const records = useAppStore((state) => state.reusedInternalSystems)
+  const inventoryRecords = useAppStore((state) => state.reusedInternalSystems)
+  const allocatedRecords = useAppStore((state) => state.systems.filter((system) => system.source === 'Reused Internal Systems'))
+  const updateInventoryRecord = useAppStore((state) => state.updateReusedInternalSystem)
+  const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
+  const records = [...inventoryRecords, ...allocatedRecords]
   const record = records.find((system) => system.machineId === mid)
-  const updateRecord = useAppStore((state) => state.updateReusedInternalSystem)
 
   return (
     <InventoryForm
       record={record}
       records={records}
       metadata={reusedInternalSystemMetadata}
-      onSave={updateRecord}
+      onSave={(id, patch) => {
+        if (inventoryRecords.some((system) => system.id === id)) {
+          updateInventoryRecord(id, patch as Partial<ReusedInternalSystem>)
+          return
+        }
+        updateAllocatedRecord(id, patch as Partial<System>)
+      }}
       dashboardPath="/systems/reused-internal"
       recordPath={(system) => `/systems/reused-internal/${system.machineId}`}
     />

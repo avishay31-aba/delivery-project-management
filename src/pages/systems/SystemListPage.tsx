@@ -23,7 +23,13 @@ export function SystemListPage() {
         dashboardScope="systems"
         rows={allocatedSystems}
         columns={systemListColumns}
-        onRowClick={(row) => navigate(`/systems/${row.sid ?? row.machineId}`)}
+        onRowClick={(row) => {
+          if (row.source === 'Reused Internal Systems' && row.machineId) {
+            navigate(`/systems/reused-internal/${row.machineId}`)
+            return
+          }
+          navigate(`/systems/production-inventory/${row.sid}`)
+        }}
       />
     </div>
   )
