@@ -23,18 +23,18 @@ export function createCustomerColumns(
   warrantyRecords: WarrantyRecord[],
 ): DashboardColumn<Account>[] {
   return [
-    { id: 'accountCode', label: 'Customer / Account ID', getValue: (row) => row.accountCode },
-    { id: 'accountName', label: 'Customer / Account Name', getValue: (row) => row.accountName },
+    { id: 'accountCode', label: 'Customer / Account ID', getValue: (row) => row.accountCode, editKey: 'accountCode' },
+    { id: 'accountName', label: 'Customer / Account Name', getValue: (row) => row.accountName, editKey: 'accountName' },
     { id: 'customerType', label: 'Customer Type', getValue: (row) => row.customerType === 'VETERAN_CUSTOMER' ? 'Veteran' : 'New' },
     {
       id: 'salesManager',
       label: 'Sales Manager / Deal Owner',
       getValue: (row) => salesManagers.find((manager) => manager.id === row.salesManagerId)?.name ?? '',
     },
-    { id: 'region', label: 'Region', getValue: (row) => row.region },
-    { id: 'country', label: 'Country', getValue: (row) => row.country },
-    { id: 'state', label: 'State', getValue: (row) => row.state },
-    { id: 'timeZone', label: 'Time Zone', getValue: (row) => row.timeZone },
+    { id: 'region', label: 'Region', getValue: (row) => row.region, editKey: 'region' },
+    { id: 'country', label: 'Country', getValue: (row) => row.country, editKey: 'country' },
+    { id: 'state', label: 'State', getValue: (row) => row.state, editKey: 'state' },
+    { id: 'timeZone', label: 'Time Zone', getValue: (row) => row.timeZone, editKey: 'timeZone' },
     {
       id: 'systemCount',
       label: 'Number of Systems',

@@ -27,6 +27,7 @@ interface AppStore extends AppDataState {
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
+  updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
@@ -152,6 +153,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       tenants: state.tenants.map((t) =>
         t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
+      ),
+    }))
+    get().saveToStorage()
+  },
+
+  updateAccount: (id, patch) => {
+    set((state) => ({
+      accounts: state.accounts.map((account) =>
+        account.id === id ? { ...account, ...patch, updatedAt: new Date().toISOString() } : account,
       ),
     }))
     get().saveToStorage()

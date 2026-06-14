@@ -15,18 +15,18 @@ export function createOpportunityColumns(
     salesManagers.find((salesManager) => salesManager.id === salesManagerId)?.name ?? salesManagerId
 
   return [
-    { id: 'opportunityId', label: 'Opportunity ID', getValue: (row) => row.opportunityId },
-    { id: 'opportunityName', label: 'Opportunity Name', getValue: (row) => row.opportunityName },
-    { id: 'stage', label: 'Stage', getValue: (row) => row.stage },
+    { id: 'opportunityId', label: 'Opportunity ID', getValue: (row) => row.opportunityId, editKey: 'opportunityId' },
+    { id: 'opportunityName', label: 'Opportunity Name', getValue: (row) => row.opportunityName, editKey: 'opportunityName' },
+    { id: 'stage', label: 'Stage', getValue: (row) => row.stage, editKey: 'stage' },
     { id: 'account', label: 'Account', getValue: (row) => accountName(row.accountId) },
     { id: 'salesManager', label: 'Sales Manager', getValue: (row) => salesManagerName(row.salesManagerId) },
-    { id: 'type', label: 'Opportunity Type', getValue: (row) => row.type },
-    { id: 'subType', label: 'Opportunity Sub Type', getValue: (row) => row.subType },
-    { id: 'region', label: 'Region', getValue: (row) => row.region },
-    { id: 'country', label: 'Country', getValue: (row) => row.country },
-    { id: 'deliveryDate', label: 'Delivery Date', getValue: (row) => row.deliveryDate ?? '' },
-    { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '' },
-    { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '' },
+    { id: 'type', label: 'Opportunity Type', getValue: (row) => row.type, editKey: 'type' },
+    { id: 'subType', label: 'Opportunity Sub Type', getValue: (row) => row.subType, editKey: 'subType' },
+    { id: 'region', label: 'Region', getValue: (row) => row.region, editKey: 'region' },
+    { id: 'country', label: 'Country', getValue: (row) => row.country, editKey: 'country' },
+    { id: 'deliveryDate', label: 'Delivery Date', getValue: (row) => row.deliveryDate ?? '', editKey: 'deliveryDate' },
+    { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editKey: 'pocStartDate' },
+    { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '', editKey: 'pocEndDate' },
     {
       id: 'visibleRequirementTypes',
       label: 'Visible Requirement Types',

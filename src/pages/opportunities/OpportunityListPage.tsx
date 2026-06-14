@@ -20,6 +20,7 @@ export function OpportunityListPage() {
   const systems = useAppStore((state) => state.systems)
   const tenants = useAppStore((state) => state.tenants)
   const createOpportunity = useAppStore((state) => state.createOpportunity)
+  const updateOpportunity = useAppStore((state) => state.updateOpportunity)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newOpportunityType, setNewOpportunityType] = useState<OpportunityType>('POC')
   const [newOpportunitySubType, setNewOpportunitySubType] = useState<OpportunitySubType>('FREE')
@@ -98,6 +99,7 @@ export function OpportunityListPage() {
         dashboardScope="opportunities"
         rows={opportunities}
         columns={columns}
+        enableInlineEditing={false}
         toolbar={
           <button
             type="button"
@@ -110,6 +112,11 @@ export function OpportunityListPage() {
         getRowClassName={(row) =>
           row.stage === 'OPEN' ? 'bg-red-50 hover:bg-red-100' : ''
         }
+        onEdit={(row, columnId, value) => {
+          const column = columns.find((candidate) => candidate.id === columnId)
+          if (!column?.editKey) return
+          updateOpportunity(row.id, { [column.editKey]: value } as never)
+        }}
         onRowClick={(row) => navigate(`/opportunities/${row.opportunityId}`)}
       />
     </div>

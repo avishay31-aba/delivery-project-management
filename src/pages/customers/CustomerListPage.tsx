@@ -9,6 +9,7 @@ export function CustomerListPage() {
   const systems = useAppStore((state) => state.systems)
   const tenants = useAppStore((state) => state.tenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
+  const updateAccount = useAppStore((state) => state.updateAccount)
   const columns = createCustomerColumns(salesManagers, systems, tenants, warrantyRecords)
 
   return (
@@ -20,6 +21,12 @@ export function CustomerListPage() {
         dashboardScope="customers"
         rows={accounts}
         columns={columns}
+        enableInlineEditing={false}
+        onEdit={(row, columnId, value) => {
+          const column = columns.find((candidate) => candidate.id === columnId)
+          if (!column?.editKey) return
+          updateAccount(row.id, { [column.editKey]: value } as never)
+        }}
       />
     </div>
   )

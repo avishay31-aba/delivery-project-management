@@ -8,6 +8,7 @@ export function ProductionSystemInventoryPage() {
   const navigate = useNavigate()
   const systems = useAppStore((state) => state.productionSystemInventory)
   const createSystem = useAppStore((state) => state.createProductionSystemInventoryItem)
+  const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
 
   return (
     <div>
@@ -32,6 +33,12 @@ export function ProductionSystemInventoryPage() {
             + New Production System
           </button>
         }
+        enableInlineEditing={false}
+        onEdit={(row, columnId, value) => {
+          const column = productionSystemInventoryColumns.find((candidate) => candidate.id === columnId)
+          if (!column?.editKey) return
+          updateSystem(row.id, { [column.editKey]: value } as never)
+        }}
         onRowClick={(row) => navigate(`/systems/production-inventory/${row.sid}`)}
       />
     </div>

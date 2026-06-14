@@ -8,6 +8,7 @@ export function ProjectListPage() {
 const navigate = useNavigate()
 const projects = useAppStore((s) => s.projects)
 const createProject = useAppStore((s) => s.createProject)
+const updateProject = useAppStore((s) => s.updateProject)
 
 return (
 <div>
@@ -18,6 +19,7 @@ return (
     dashboardScope="projects"
     rows={projects}
     columns={projectListColumns}
+    enableInlineEditing={false}
     toolbar={
       <button
         type="button"
@@ -35,6 +37,11 @@ return (
         ? 'bg-blue-50 hover:bg-blue-100'
         : 'bg-green-50 hover:bg-green-100'
     }
+    onEdit={(row, columnId, value) => {
+      const column = projectListColumns.find((candidate) => candidate.id === columnId)
+      if (!column?.editKey) return
+      updateProject(row.id, { [column.editKey]: value } as never)
+    }}
     onRowClick={(row) => navigate(`/projects/${row.pid}`)}
   />
 </div>
