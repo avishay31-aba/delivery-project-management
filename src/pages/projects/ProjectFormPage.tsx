@@ -14,6 +14,8 @@ import type {
   NewTenantRequirement,
   Opportunity,
   Project,
+  ProjectMainType,
+  ProjectSubType,
   StandardRenewalRequirement,
   System,
   Tenant,
@@ -70,6 +72,28 @@ function rowValue(row: RequirementRow, key: string): unknown {
 
 function tenantDisplayName(tenant: Tenant): string {
   return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
+}
+
+function projectStatusLabel(status: string): string {
+  return status === 'DONE' ? 'Done' : 'Open'
+}
+
+function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
+  const isDone = status === 'DONE'
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sf-text">
+      <span className={[large ? 'h-5 w-5' : 'h-3.5 w-3.5', isDone ? 'bg-blue-500' : 'bg-green-500', 'inline-block rounded-sm shadow-sm'].join(' ')} aria-hidden="true" />
+      <span>{projectStatusLabel(status)}</span>
+    </span>
+  )
+}
+
+function projectTypeForOpportunity(opportunity: Opportunity): { mainType: ProjectMainType; subType: ProjectSubType } {
+  if (opportunity.type === 'POC') return { mainType: 'POC', subType: 'NONE' }
+  if (opportunity.type === 'DELIVERY') return { mainType: 'DELIVERY', subType: opportunity.subType === 'UPSELL' ? 'UPSELL' : 'NEW' }
+  if (opportunity.subType === 'UPSELL') return { mainType: 'RENEWAL', subType: 'UPSELL' }
+  if (opportunity.subType === 'DOWN_SELL') return { mainType: 'RENEWAL', subType: 'DOWN_SELL' }
+  return { mainType: 'RENEWAL', subType: 'STANDARD' }
 }
 
 function resolveSystemSid(systemId: string | null | undefined, systems: System[]): string {
@@ -233,7 +257,7 @@ export function ProjectFormPage() {
   const updateProject = useAppStore((state) => state.updateProject)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProject(savedProject) : null)
-  const [activeTab, setActiveTab] = useState<ProjectFormTab>('tenantRequirements')
+  const [activeTab, setActiveTab] = useState<ProjectFormTab>('systemsTenants')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -288,6 +312,7 @@ export function ProjectFormPage() {
   const projectDraft = currentDraft
   const persistedProject = savedProject
   const formMetadata = metadata
+  const visibleTabs = formMetadata.tabs.filter((tab) => tab !== 'tenantRequirements')
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
@@ -335,7 +360,25 @@ export function ProjectFormPage() {
   }
 
   function updateDraftField(key: keyof Project, value: string | null) {
-    setDraft((current) => (current ? { ...current, [key]: value } : current))
+    setDraft((current) => {
+      if (!current) return current
+      if (key === 'opportunityId') {
+        const selectedOpportunity = opportunities.find(
+          (opportunity) => opportunity.opportunityId === value || opportunity.id === value || `${opportunity.opportunityId} - ${opportunity.opportunityName}` === value,
+        )
+        if (!selectedOpportunity) return { ...current, [key]: value || undefined }
+        const projectType = projectTypeForOpportunity(selectedOpportunity)
+        return {
+          ...current,
+          opportunityId: selectedOpportunity.opportunityId,
+          opportunityName: selectedOpportunity.opportunityName,
+          mainType: projectType.mainType,
+          subType: projectType.subType,
+          deliveryDate: selectedOpportunity.deliveryDate,
+        }
+      }
+      return { ...current, [key]: value }
+    })
     setSaveMessages([])
   }
 
@@ -353,7 +396,10 @@ export function ProjectFormPage() {
     }
 
     updateProject(projectDraft.id, {
+      opportunityId: projectDraft.opportunityId,
       opportunityName: projectDraft.opportunityName.trim(),
+      mainType: projectDraft.mainType,
+      subType: projectDraft.subType,
       deliveryDate: projectDraft.deliveryDate,
     })
     setSaveMessages(['Project saved.'])
@@ -384,7 +430,29 @@ export function ProjectFormPage() {
     if (!field.editable) {
       return (
         <FormField key={field.key} label={label} controlWidthClassName="w-44">
-          <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+          <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+            {field.key === 'progressStatus' ? <ProjectStatusBadge status={projectDraft.progressStatus} /> : value || '-'}
+          </div>
+        </FormField>
+      )
+    }
+
+    if (field.key === 'opportunityId') {
+      return (
+        <FormField key={field.key} label={label} controlWidthClassName="w-72">
+          <input
+            className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
+            value={value}
+            list="project-opportunity-options"
+            onChange={(event) => updateDraftField('opportunityId', event.target.value)}
+          />
+          <datalist id="project-opportunity-options">
+            {opportunities.map((opportunity) => (
+              <option key={opportunity.id} value={opportunity.opportunityId}>
+                {opportunity.opportunityName}
+              </option>
+            ))}
+          </datalist>
         </FormField>
       )
     }
@@ -606,7 +674,12 @@ export function ProjectFormPage() {
   return (
     <div>
       <PageHeader
-        title={`Project ${projectDraft.pid}`}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <ProjectStatusBadge status={projectDraft.progressStatus} large />
+            <span>{`Project ${projectDraft.pid}`}</span>
+          </span>
+        }
         subtitle={`${projectDraft.mainType} / ${projectDraft.subType} - ${formMetadata.sourceSheet}`}
         actions={renderActionButtons()}
       />
@@ -637,9 +710,13 @@ export function ProjectFormPage() {
         </div>
       </CollapsibleSection>
 
+      <div className="mt-4">
+        {renderTenantRequirementsTab()}
+      </div>
+
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
         <div className="flex flex-wrap border-b border-sf-border">
-          {formMetadata.tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -656,9 +733,7 @@ export function ProjectFormPage() {
           ))}
         </div>
         <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
-          {activeTab === 'tenantRequirements'
-            ? renderTenantRequirementsTab()
-            : activeTab === 'systemsTenants'
+          {activeTab === 'systemsTenants'
               ? renderSystemsTenantsTab()
               : renderPlaceholderTab(activeTab)}
         </div>

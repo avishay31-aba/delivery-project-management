@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
@@ -21,6 +21,7 @@ import {
 import { timeGroupForCountry } from '@/config/time-groups'
 import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
+import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
@@ -88,14 +89,28 @@ const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
   Canceled: 'bg-purple-500',
 }
 
-const OPERATIONAL_STATUS_COLORS: Record<string, string> = {
-  On: '#22c55e',
-  Off: '#ef4444',
-  'Access blocked': '#f59e0b',
-  'Service blocked': '#f97316',
-  Deleted: '#6b7280',
-  Canceled: '#a855f7',
-}
+const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_COLUMNS.filter((column) => column.key !== 'existingSystemId' && column.key !== 'deployTarget')
+const INTEGER_SUMMARY_KEYS = new Set([
+  'licenses',
+  'users',
+  'concurrentSearches',
+  'dailySearches',
+  'monthlySearches',
+  'concurrentAnalyses',
+  'topicAnalyses',
+  'dailyAnalyses',
+  'monthlyAnalyses',
+  'standardMonitors',
+  'fullMonitors',
+  'topicMonitors',
+  'tangles',
+  'tanglesGo',
+  'webloc',
+  'webeye',
+  'ingest',
+  'apiDailyQty',
+  'apiMonthlyQty',
+])
 
 function cloneRecord<T extends InventoryRecord>(record: T): T {
   return JSON.parse(JSON.stringify(record)) as T
@@ -194,10 +209,20 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
 
 function OperationalStatusBadge({ value }: { value: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold" style={{ color: OPERATIONAL_STATUS_COLORS[value] ?? '#64748b' }}>
+    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
       <span className={['h-2.5 w-2.5 rounded-full', OPERATIONAL_STATUS_STYLES[value] ?? 'bg-slate-300'].join(' ')} aria-hidden="true" />
       {value || 'Not set'}
     </span>
+  )
+}
+
+function LargeStatusIcon({ status }: { status: string }) {
+  return (
+    <span
+      className={['inline-block h-5 w-5 rounded-full align-middle shadow-sm ring-2 ring-white', OPERATIONAL_STATUS_STYLES[status] ?? 'bg-slate-300'].join(' ')}
+      title={status || 'Not set'}
+      aria-label={`Operational status: ${status || 'Not set'}`}
+    />
   )
 }
 
@@ -271,9 +296,11 @@ function InventoryForm<T extends InventoryRecord>({
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
-  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>({})
+  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
+  const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
+  const navigationBlocker = useBlocker(isDirty)
 
   useEffect(() => {
     setDraft(record ? cloneRecord(record) : null)
@@ -350,10 +377,7 @@ function InventoryForm<T extends InventoryRecord>({
           onClick={() => {
             const nextValue = pendingAddNew.value.trim()
             if (!nextValue) return
-            setCustomPicklistOptions((current) => ({
-              ...current,
-              [key]: Array.from(new Set([...(current[key] ?? []), nextValue])),
-            }))
+            setCustomPicklistOptions((current) => addCustomPicklistOption(current, key, nextValue))
             updateField(key, nextValue)
             setPendingAddNew(null)
           }}
@@ -421,7 +445,6 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   validate()
-  const isDirty = !valuesEqual(activeRecord, activeDraft)
   const lines = new Map<number, SystemInventoryHeaderField[]>()
   metadata.headerFields.forEach((field) => {
     lines.set(field.line, [...(lines.get(field.line) ?? []), field])
@@ -444,6 +467,20 @@ function InventoryForm<T extends InventoryRecord>({
       return
     }
     navigate(recordPath(nextDraft), { replace: true })
+  }
+
+  function saveBlockedNavigation() {
+    const nextMessages = validate()
+    if (nextMessages.length > 0) {
+      setMessages(nextMessages)
+      navigationBlocker.reset?.()
+      return
+    }
+
+    const nextDraft = sanitizedDraftForSave()
+    onSave(nextDraft.id, nextDraft as Partial<T>)
+    setMessages(['System inventory record saved.'])
+    navigationBlocker.proceed?.()
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
@@ -671,6 +708,116 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function hostedTenantsForDraft(): Tenant[] {
+    return tenants.filter((tenant) => tenant.systemId === activeRecord.id)
+  }
+
+  function tenantSummaryValue(key: string, hostedTenants: Tenant[]): string {
+    if (hostedTenants.length === 0) return '-'
+    if (INTEGER_SUMMARY_KEYS.has(key)) {
+      return String(
+        hostedTenants.reduce((total, tenant) => {
+          const value = (tenant as unknown as Record<string, unknown>)[key]
+          return total + (typeof value === 'number' ? value : 0)
+        }, 0),
+      )
+    }
+
+    const values = hostedTenants
+      .flatMap((tenant) => {
+        const value = (tenant as unknown as Record<string, unknown>)[key]
+        return Array.isArray(value) ? value : [value]
+      })
+      .map((value) => textValue(value).trim())
+      .filter(Boolean)
+
+    return Array.from(new Set(values)).join('; ') || '-'
+  }
+
+  function renderTenantTab() {
+    const hostedTenants = hostedTenantsForDraft()
+
+    return (
+      <div className="space-y-4">
+        <section className="space-y-2">
+          <h3 className="text-lg font-semibold text-sf-text">Hosted Tenants</h3>
+          {hostedTenants.length > 0 ? (
+            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {[
+                      'TID',
+                      'Customer / End User Name',
+                      'Tenant Name',
+                      'Delivery PID',
+                      'Product',
+                      'Hosting',
+                      'Cloud Platform',
+                      'Users',
+                      'Licenses',
+                      'Operational Status',
+                    ].map((label) => (
+                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hostedTenants.map((tenant) => (
+                    <tr key={tenant.id} className="hover:bg-sf-surface-alt">
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tid}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tenantName ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.deliveryPid ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.productType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.hostingType ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.cloudPlatform ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.users ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.licenses ?? '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.operationalStatus}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+              No tenants are hosted in this system.
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="w-max border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {APPLICATION_SUMMARY_FIELDS.map((column) => (
+                    <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {APPLICATION_SUMMARY_FIELDS.map((column) => (
+                    <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
+                      {tenantSummaryValue(column.key, hostedTenants)}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   function renderInfrastructureTab() {
     const innerTabs: Array<{ id: InfrastructureInnerTab; label: string }> = [
       { id: 'environment', label: 'Environment' },
@@ -700,6 +847,14 @@ function InventoryForm<T extends InventoryRecord>({
         {activeInfrastructureTab === 'environment' ? (
           <div className="space-y-4">
             <section className="space-y-2">
+              <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
+              <div className="space-y-3">
+                {ACCESS_DETAIL_FIELDS.map((field) => (
+                  <div key={field.key}>{renderAccessDetailField(field)}</div>
+                ))}
+              </div>
+            </section>
+            <section className="space-y-2">
               <h3 className="text-lg font-semibold text-sf-text">Hosting</h3>
               <div className="flex flex-wrap items-start gap-3">
                 {ENVIRONMENT_FIELDS.map(renderEnvironmentField)}
@@ -709,14 +864,6 @@ function InventoryForm<T extends InventoryRecord>({
               <h3 className="text-lg font-semibold text-sf-text">Identifiers</h3>
               <div className="flex flex-wrap items-start gap-3">
                 {INFRASTRUCTURE_IDENTIFIER_FIELDS.map(renderIdentifierField)}
-              </div>
-            </section>
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
-              <div className="space-y-3">
-                {ACCESS_DETAIL_FIELDS.map((field) => (
-                  <div key={field.key}>{renderAccessDetailField(field)}</div>
-                ))}
               </div>
             </section>
           </div>
@@ -766,7 +913,12 @@ function InventoryForm<T extends InventoryRecord>({
   return (
     <div className="space-y-4">
       <PageHeader
-        title={`${metadata.titleLabel} ${derivedValue(activeDraft, metadata.source === 'Production' ? 'sid' : 'machineId', projects, tenants)}`}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <LargeStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
+            <span>{`${metadata.titleLabel} ${derivedValue(activeDraft, metadata.source === 'Production' ? 'sid' : 'machineId', projects, tenants)}`}</span>
+          </span>
+        }
         subtitle={metadata.sourceSheet}
         actions={renderActionButtons()}
       />
@@ -854,10 +1006,34 @@ function InventoryForm<T extends InventoryRecord>({
           <div className="min-h-48 p-4 text-sm text-sf-text-muted" role="tabpanel" aria-label={metadata.tabs.find((tab) => tab.id === activeTab)?.label}>
             {activeTab === 'infrastructure'
               ? renderInfrastructureTab()
-              : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+              : activeTab === 'tenant'
+                ? renderTenantTab()
+                : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>
+
+      {navigationBlocker.state === 'blocked' ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-sf-text">Unsaved changes</h2>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              You have unsaved system changes. What would you like to do before leaving this form?
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={saveBlockedNavigation}>
+                Save Changes
+              </button>
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.proceed?.()}>
+                Discard Changes
+              </button>
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.reset?.()}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -41,6 +41,7 @@ import {
   resolveTenantSid,
   validateOpportunity,
 } from '@/utils/opportunity-validation'
+import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -386,7 +387,7 @@ function RequirementGrid({
   onToggleCollapsed: () => void
 }) {
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
-  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>({})
+  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ rowId: string; key: string; value: string } | null>(null)
   const rows =
     kind === 'A'
@@ -551,10 +552,7 @@ function RequirementGrid({
           onClick={() => {
             const nextValue = pendingAddNew.value.trim()
             if (!nextValue) return
-            setCustomPicklistOptions((current) => ({
-              ...current,
-              [key]: Array.from(new Set([...(current[key] ?? []), nextValue])),
-            }))
+            setCustomPicklistOptions((current) => addCustomPicklistOption(current, key, nextValue))
             onUpdateRow(rowId, key, nextValue)
             setPendingAddNew(null)
           }}

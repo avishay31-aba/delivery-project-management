@@ -70,7 +70,7 @@ const REPORTING_FIELDS: ProjectHeaderFieldMetadata[] = [
 ]
 
 const LOCATION_FIELDS: ProjectHeaderFieldMetadata[] = [
-  { key: 'opportunityId', label: 'Opportunity (name and ID)', editable: false, source: '2. Header' },
+  { key: 'opportunityId', label: 'Opportunity (name and ID)', editable: true, source: '2. Header', inputType: 'text' },
   { key: 'accountName', label: 'Account (end user)', editable: false, source: '2. Header' },
   { key: 'region', label: 'Region', editable: false, source: '2. Header' },
   { key: 'country', label: 'Country', editable: false, source: '2. Header' },
