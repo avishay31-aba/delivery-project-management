@@ -1,10 +1,9 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useBlocker, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Ban, ChevronDown, ChevronRight, CircleCheck, LockKeyhole, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import {
-  PRODUCT_OPTIONS,
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
   cloudRegionOptionsForCloudPlatform,
@@ -48,18 +47,12 @@ const INFRASTRUCTURE_IDENTIFIER_FIELDS = [
 ]
 const ACCESS_DETAIL_FIELDS = [
   { key: 'url', label: 'URL', inputType: 'text' },
+  { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
   { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
   { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
-  { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
 ]
 const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
 const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
-const PICKLIST_OPTIONS: Record<string, string[]> = {
-  mapCenter: ['USA', 'Canada', 'Germany', 'UK', 'Australia', 'Japan', 'Singapore', 'Israel'],
-  blockchain: ['Yes', 'No'],
-  apiEnabled: ['Yes', 'No'],
-}
-
 const PRODUCT_LOGOS: Record<string, string> = {
   Tangles: 'T',
   'Tangles Light': 'TL',
@@ -71,13 +64,13 @@ const PRODUCT_LOGOS: Record<string, string> = {
 }
 
 const PRODUCT_LOGO_COLORS: Record<string, string> = {
-  Tangles: 'bg-blue-600',
-  'Tangles Light': 'bg-cyan-600',
-  Webloc: 'bg-emerald-600',
-  Weaver: 'bg-violet-600',
-  Trapdoor: 'bg-amber-600',
-  Lynx: 'bg-rose-600',
-  DataAPI: 'bg-slate-700',
+  Tangles: 'text-blue-600',
+  'Tangles Light': 'text-cyan-600',
+  Webloc: 'text-emerald-600',
+  Weaver: 'text-violet-600',
+  Trapdoor: 'text-amber-600',
+  Lynx: 'text-rose-600',
+  DataAPI: 'text-slate-700',
 }
 
 const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
@@ -87,6 +80,14 @@ const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
   'Service blocked': 'bg-orange-500',
   Deleted: 'bg-gray-500',
   Canceled: 'bg-purple-500',
+}
+const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
+  On: 'text-green-500',
+  Off: 'text-red-500',
+  'Access blocked': 'text-amber-500',
+  'Service blocked': 'text-orange-500',
+  Deleted: 'text-gray-500',
+  Canceled: 'text-purple-500',
 }
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_COLUMNS.filter((column) => column.key !== 'existingSystemId' && column.key !== 'deployTarget')
@@ -208,9 +209,24 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
 }
 
 function OperationalStatusBadge({ value }: { value: string }) {
+  const Icon =
+    value === 'On'
+      ? CircleCheck
+      : value === 'Off'
+        ? PowerOff
+        : value === 'Access blocked'
+          ? LockKeyhole
+          : value === 'Service blocked'
+            ? ShieldX
+            : value === 'Deleted'
+              ? Trash2
+              : value === 'Canceled'
+                ? Ban
+                : ServerOff
+
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <span className={['h-2.5 w-2.5 rounded-full', OPERATIONAL_STATUS_STYLES[value] ?? 'bg-slate-300'].join(' ')} aria-hidden="true" />
+      <Icon className={['h-4 w-4', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
       {value || 'Not set'}
     </span>
   )
@@ -499,11 +515,9 @@ function InventoryForm<T extends InventoryRecord>({
         const productType = textValue(readRecordValue(activeDraft, 'productType'))
         return (
           <FormField key={field.key} label={field.label} controlWidthClassName={width}>
-            <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-              <span className={['inline-flex h-6 min-w-6 items-center justify-center rounded text-xs font-bold text-white', PRODUCT_LOGO_COLORS[productType] ?? 'bg-slate-500'].join(' ')}>
-                {value || 'SYS'}
-              </span>
-            </div>
+            <span className={['inline-flex h-10 min-w-10 items-center justify-center text-2xl font-black', PRODUCT_LOGO_COLORS[productType] ?? 'text-slate-500'].join(' ')}>
+              {value || 'SYS'}
+            </span>
           </FormField>
         )
       }
@@ -556,57 +570,6 @@ function InventoryForm<T extends InventoryRecord>({
         <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
       </FormField>
     )
-  }
-
-  function renderConfigurationCell(key: string, inputType?: string) {
-    const value = textValue(readRecordValue(activeDraft, key))
-    const isChanged = fieldChanged(key)
-    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
-    const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
-
-    if (key === 'cloudPlatform' && hostingType === 'On premise') {
-      return <input className={fieldClassName(isChanged)} value="" disabled />
-    }
-
-    if (key === 'csp' && !cloudPlatform) return null
-    if (key === 'cloudRegion' && (!cloudPlatform || cloudPlatform === "Customer's datacenter")) return null
-
-    if (inputType === 'picklist') {
-      const options =
-        key === 'hostingType'
-          ? HOSTING_OPTIONS
-          : key === 'cloudPlatform'
-            ? cloudPlatformOptionsForHosting(hostingType)
-            : key === 'csp'
-              ? cspOptionsForCloudPlatform(cloudPlatform)
-              : key === 'cloudRegion'
-                ? cloudRegionOptionsForCloudPlatform(cloudPlatform)
-                : key === 'productType'
-                  ? PRODUCT_OPTIONS
-                  : PICKLIST_OPTIONS[key] ?? []
-      const isDisabled = key === 'cloudPlatform' && options.length === 0
-      return (
-        <select className={fieldClassName(isChanged, invalidFields.has(key) && messages.length > 0)} value={isDisabled ? '' : value} disabled={isDisabled} onChange={(event) => updateField(key, event.target.value)}>
-          <option value="" />
-          {options.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      )
-    }
-
-    if (inputType === 'integer') {
-      return (
-        <input
-          className={fieldClassName(isChanged)}
-          inputMode="numeric"
-          value={value}
-          onChange={(event) => updateField(key, event.target.value === '' ? null : Number(event.target.value.replace(/\D/g, '')))}
-        />
-      )
-    }
-
-    return <input className={fieldClassName(isChanged)} value={value} onChange={(event) => updateField(key, event.target.value)} />
   }
 
   function renderEnvironmentField(field: { key: string; label: string; inputType?: string }) {
@@ -848,10 +811,8 @@ function InventoryForm<T extends InventoryRecord>({
           <div className="space-y-4">
             <section className="space-y-2">
               <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
-              <div className="space-y-3">
-                {ACCESS_DETAIL_FIELDS.map((field) => (
-                  <div key={field.key}>{renderAccessDetailField(field)}</div>
-                ))}
+              <div className="flex flex-wrap items-start gap-3">
+                {ACCESS_DETAIL_FIELDS.map(renderAccessDetailField)}
               </div>
             </section>
             <section className="space-y-2">
@@ -943,39 +904,6 @@ function InventoryForm<T extends InventoryRecord>({
               {fields.map(renderHeaderField)}
             </div>
           ))}
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="Application Configuration"
-        subtitle="Application and product configuration fields aligned with Opportunity tenant requirements."
-        collapsed={collapsedSections.configuration}
-        onToggle={() => toggleSection('configuration')}
-      >
-        <div className="space-y-2">
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
-              <table className="w-max border-collapse text-sm leading-tight">
-                <thead className="bg-sf-surface-alt text-left">
-                  <tr>
-                    {APPLICATION_CONFIGURATION_COLUMNS.map((column) => (
-                      <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                        <span>{column.label}</span>
-                        <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    {APPLICATION_CONFIGURATION_COLUMNS.map((column) => (
-                      <td key={column.key} className="min-w-36 border border-sf-border px-1.5 py-1 align-top">
-                        {renderConfigurationCell(column.key, column.inputType)}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-          </div>
         </div>
       </CollapsibleSection>
 

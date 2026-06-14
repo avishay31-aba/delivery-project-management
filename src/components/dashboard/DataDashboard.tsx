@@ -47,6 +47,7 @@ export interface DashboardColumn<T> {
   filterable?: boolean
   groupable?: boolean
   editable?: boolean
+  replaceable?: boolean
   options?: string[]
 }
 
@@ -699,6 +700,7 @@ export function DataDashboard<T extends { id: string }>({
   const [replaceColumnId, setReplaceColumnId] = useState(columns.find((column) => column.editable)?.id ?? columns[0]?.id ?? '')
   const [replaceFindValue, setReplaceFindValue] = useState('')
   const [replaceValue, setReplaceValue] = useState('')
+  const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
@@ -797,7 +799,7 @@ export function DataDashboard<T extends { id: string }>({
     ? !areDashboardViewStatesEqual(currentDashboardViewState, selectedDashboardView.state, sourceColumnIds)
     : false
   const replaceColumns = useMemo(
-    () => columns.filter((column) => column.editable && onEdit),
+    () => columns.filter((column) => (column.replaceable ?? column.editable) && onEdit),
     [columns, onEdit],
   )
   const replaceColumn = replaceColumns.find((column) => column.id === replaceColumnId) ?? replaceColumns[0]
@@ -1173,6 +1175,7 @@ function clearGlobalSearch() {
     rows
       .filter((row) => String(replaceColumn.getValue(row) ?? '') === replaceFindValue)
       .forEach((row) => onEdit(row, replaceColumn.id, replaceValue))
+    setIsReplaceDialogOpen(false)
   }
 
   return (
@@ -1194,6 +1197,60 @@ function clearGlobalSearch() {
           onUpdateExisting={saveExistingView}
           onSetDefault={setSelectedViewAsDefault}
         />
+      ) : null}
+      {isReplaceDialogOpen && replaceColumns.length > 0 ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-sf-text">Search & Replace</h2>
+            <p className="mt-1 text-sm text-sf-text-muted">Replace exact matches in one selected dashboard field.</p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm font-medium text-sf-text">
+                Field / Column
+                <select
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceColumn?.id ?? ''}
+                  onChange={(event) => setReplaceColumnId(event.target.value)}
+                >
+                  {replaceColumns.map((column) => (
+                    <option key={column.id} value={column.id}>{column.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-sf-text">
+                Exact value to find
+                <input
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceFindValue}
+                  onChange={(event) => setReplaceFindValue(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-medium text-sf-text">
+                New value
+                <input
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceValue}
+                  onChange={(event) => setReplaceValue(event.target.value)}
+                />
+              </label>
+              <div className="rounded border border-sf-border bg-sf-surface-alt px-3 py-2 text-sm text-sf-text-muted">
+                {replaceMatchCount} exact match{replaceMatchCount === 1 ? '' : 'es'} found.
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!replaceColumn || !replaceFindValue || replaceMatchCount === 0}
+                onClick={applyReplaceAll}
+              >
+                Apply Replacement
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sf-text-muted">
@@ -1308,40 +1365,9 @@ function clearGlobalSearch() {
           </button>
 
           {replaceColumns.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-sm">
-              <span className="font-medium text-sf-text-muted">Replace</span>
-              <select
-                className="rounded border border-sf-border px-1 py-0.5"
-                value={replaceColumn?.id ?? ''}
-                onChange={(event) => setReplaceColumnId(event.target.value)}
-              >
-                {replaceColumns.map((column) => (
-                  <option key={column.id} value={column.id}>{column.label}</option>
-                ))}
-              </select>
-              <input
-                className="w-32 rounded border border-sf-border px-1 py-0.5"
-                placeholder="Exact value"
-                value={replaceFindValue}
-                onChange={(event) => setReplaceFindValue(event.target.value)}
-              />
-              <span className="text-sf-text-muted">with</span>
-              <input
-                className="w-32 rounded border border-sf-border px-1 py-0.5"
-                placeholder="New value"
-                value={replaceValue}
-                onChange={(event) => setReplaceValue(event.target.value)}
-              />
-              <button
-                type="button"
-                className="rounded border border-sf-border px-2 py-0.5 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
-                disabled={!replaceColumn || !replaceFindValue || replaceMatchCount === 0}
-                title={`${replaceMatchCount} exact match${replaceMatchCount === 1 ? '' : 'es'}`}
-                onClick={applyReplaceAll}
-              >
-                Replace All ({replaceMatchCount})
-              </button>
-            </div>
+            <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(true)}>
+              Search & Replace
+            </button>
           ) : null}
         </div>
 

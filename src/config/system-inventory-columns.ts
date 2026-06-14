@@ -64,11 +64,11 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       label: 'Hosted Tenants',
       getValue: (row) => join(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.tid)),
     },
-    { id: 'productType', label: 'Product', getValue: (row) => row.productType },
-    { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType },
-    { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
-    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup },
-    { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus },
+    { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },
+    { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
+    { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
+    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true },
+    { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editKey: 'operationalStatus', replaceable: true },
     { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt },
   ]
 }

@@ -8,7 +8,6 @@ export function ReusedInternalSystemsInventoryPage() {
   const navigate = useNavigate()
   const systems = useAppStore((state) => state.reusedInternalSystems)
   const createSystem = useAppStore((state) => state.createReusedInternalSystem)
-  const updateSystem = useAppStore((state) => state.updateReusedInternalSystem)
 
   return (
     <div>
@@ -33,11 +32,6 @@ export function ReusedInternalSystemsInventoryPage() {
             + New Reused Internal System
           </button>
         }
-        onEdit={(row, columnId, value) => {
-          const column = reusedInternalSystemColumns.find((candidate) => candidate.id === columnId)
-          if (!column?.editKey) return
-          updateSystem(row.id, { [column.editKey]: value } as never)
-        }}
         onRowClick={(row) => navigate(`/systems/reused-internal/${row.machineId}`)}
       />
     </div>
