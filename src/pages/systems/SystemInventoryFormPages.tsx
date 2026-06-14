@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/record'
@@ -865,11 +865,12 @@ function InventoryForm<T extends InventoryRecord>({
 export function ProductionSystemInventoryFormPage() {
   const { sid } = useParams<{ sid: string }>()
   const inventoryRecords = useAppStore((state) => state.productionSystemInventory)
-  const allocatedRecords = useAppStore((state) => state.systems.filter((system) => system.source !== 'Reused Internal Systems'))
+  const systems = useAppStore((state) => state.systems)
   const updateInventoryRecord = useAppStore((state) => state.updateProductionSystemInventoryItem)
   const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
-  const records = [...inventoryRecords, ...allocatedRecords]
-  const record = records.find((system) => system.sid === sid)
+  const allocatedRecords = useMemo(() => systems.filter((system) => system.source !== 'Reused Internal Systems'), [systems])
+  const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
+  const record = useMemo(() => records.find((system) => system.sid === sid), [records, sid])
 
   return (
     <InventoryForm
@@ -892,11 +893,12 @@ export function ProductionSystemInventoryFormPage() {
 export function ReusedInternalSystemFormPage() {
   const { mid } = useParams<{ mid: string }>()
   const inventoryRecords = useAppStore((state) => state.reusedInternalSystems)
-  const allocatedRecords = useAppStore((state) => state.systems.filter((system) => system.source === 'Reused Internal Systems'))
+  const systems = useAppStore((state) => state.systems)
   const updateInventoryRecord = useAppStore((state) => state.updateReusedInternalSystem)
   const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
-  const records = [...inventoryRecords, ...allocatedRecords]
-  const record = records.find((system) => system.machineId === mid)
+  const allocatedRecords = useMemo(() => systems.filter((system) => system.source === 'Reused Internal Systems'), [systems])
+  const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
+  const record = useMemo(() => records.find((system) => system.machineId === mid), [records, mid])
 
   return (
     <InventoryForm
