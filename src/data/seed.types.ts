@@ -34,6 +34,7 @@ export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
 export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
 export type AllocationStatus = 'ALLOCATED' | 'DEALLOCATED'
 export type AllocationType = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
+export type TenantFormType = 'POC' | 'CUSTOMER'
 
 export interface IdCounters {
   pid: number
@@ -196,6 +197,7 @@ export interface Opportunity {
   timeGroup: string
   currentMilestone: string
   projectAlerts: string[]
+  engagementCircles?: EngagementCircleContact[]
   newTenantRequirements: NewTenantRequirement[]
   changeRequestRequirements: ChangeRequestRequirement[]
   standardRenewalRequirements: StandardRenewalRequirement[]
@@ -204,6 +206,15 @@ export interface Opportunity {
   wonAt?: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface EngagementCircleContact {
+  id: string
+  subject: string
+  role: string
+  userName: string
+  email: string
+  phone?: string
 }
 
 export interface System {
@@ -259,6 +270,16 @@ export interface Tenant {
   operationalStatus: string
   contractStatus?: TenantContractStatus
   hostedSystemHistory?: TenantHostedSystemHistory[]
+  tenantFormType?: TenantFormType
+  hostedSystemId?: string
+  hostingSid?: string
+  configuration?: TenantConfiguration
+  hostingSnapshot?: TenantHostingSnapshot
+  engagementCircle?: EngagementCircleContact[]
+  remarks?: TenantRemark[]
+  configurationHistory?: TenantConfigurationHistoryRecord[]
+  warranties?: TenantWarranty[]
+  documents?: TenantDocument[]
   productType: string
   hostingType?: string
   cloudPlatform?: string
@@ -303,6 +324,99 @@ export interface Tenant {
   pocEndDate: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface TenantConfiguration {
+  product: string
+  licenses: number | null
+  users: number | null
+  concurrentSearches: number | null
+  dailySearches: number | null
+  monthlySearches: number | null
+  concurrentAnalyses: number | null
+  dailyAnalyses: number | null
+  monthlyAnalyses: number | null
+  topicAnalyses: number | null
+  standardMonitors: number | null
+  fullMonitors: number | null
+  topicMonitors: number | null
+  mapCenter: string
+  tanglesGo: number | null
+  webloc: number | null
+  webeye: number | null
+  ingest: number | null
+  blockchain: YesNo
+  crossSystemFeatures: string[]
+  apiEnabled: YesNo
+  apiDailyQty: number | null
+  apiMonthlyQty: number | null
+  aiFeatures: string[]
+  additionalFeatures: string[]
+}
+
+export interface TenantHostingSnapshot {
+  currentSystem: boolean
+  sid: string
+  operationalStatus: string
+  machineNumber: string
+  versionNumber: string
+  hostingType: string
+  url: string
+  performanceTier: 'STANDARD' | 'POWERED' | ''
+  vpnEnabled: YesNo
+  vpnType: string
+  ipRestrictionEnabled: YesNo
+  platform: string
+  csp: string
+  awsRegion: string
+  azureRegion: string
+}
+
+export interface TenantRemark {
+  id: string
+  recordId: string
+  timestamp: string
+  author: string
+  type: string
+  content: string
+  dueDate: string | null
+  eventCreated: boolean
+}
+
+export interface TenantConfigurationHistoryRecord {
+  id: string
+  recordId: string
+  timestamp: string
+  recordedBy: string
+  configuration: TenantConfiguration
+}
+
+export interface TenantWarranty {
+  id: string
+  warrantyId: string
+  firstWarranty: boolean
+  predecessor: string
+  successor: string
+  accountId: string
+  relatedProjectId: string
+  warrantyType: string
+  opportunityId: string
+  startDate: string | null
+  endDate: string | null
+  durationDays: number | null
+  daysBeforeExpiration: number | null
+  warrantyStatus: WarrantyStatus
+  alerts: string
+  remark: string
+}
+
+export interface TenantDocument {
+  id: string
+  fileName: string
+  fileType: string
+  fileSize: number
+  uploadedAt: string
+  objectUrl?: string
 }
 
 export interface TenantHostedSystemHistory {
