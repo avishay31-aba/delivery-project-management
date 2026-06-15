@@ -27,15 +27,12 @@ type ConfigKey = keyof TenantConfiguration
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type WarrantyKey = keyof Pick<
   TenantWarranty,
-  | 'firstWarranty'
   | 'predecessor'
   | 'relatedProjectId'
-  | 'warrantyType'
-  | 'opportunityId'
   | 'startDate'
   | 'endDate'
-  | 'warrantyStatus'
-  | 'alerts'
+  | 'noWarranty'
+  | 'outOfContract'
   | 'remark'
 >
 
@@ -48,7 +45,6 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
 ]
 
 const YES_NO_OPTIONS: YesNo[] = ['', 'YES', 'NO']
-const WARRANTY_STATUS_OPTIONS: WarrantyStatus[] = ['NOT_SET', 'PLANNED', 'VALID', 'PENDING', 'RENEWED', 'EXPIRED', 'NO_WARRANTY']
 const REMARK_TYPES = ['Note', 'Warranty', 'Temporary change', 'Permanent change', 'Task']
 const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
 const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
@@ -116,17 +112,39 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function textValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join('; ')
+  if (Array.isArray(value)) return value.join(';')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return value == null ? '' : String(value)
 }
 
 function numberFromInput(value: string): number | null {
-  return value === '' ? null : Number(value)
+  if (value === '') return null
+  return Math.max(0, Number(value))
+}
+
+function splitMultiValue(value: string): string[] {
+  return value
+    .split(';')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function formatLocalTimestamp(value = new Date()): string {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  const hour = String(value.getHours()).padStart(2, '0')
+  const minute = String(value.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function tenantFormType(tenant: Tenant): TenantFormType {
   return tenant.tenantFormType ?? (tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER')
+}
+
+function tenantFormTypeForSystem(system: System): TenantFormType {
+  if (system.systemClass === 'POC_DEMO_TRAINING' || system.source === 'Reused Internal Systems') return 'POC'
+  return 'CUSTOMER'
 }
 
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
@@ -196,6 +214,54 @@ function daysBeforeExpiration(endDate: string | null): number | null {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return Math.ceil((end.valueOf() - today.valueOf()) / 86_400_000)
+}
+
+function warrantyTypeForProject(project?: Project): string {
+  if (!project) return ''
+  if (project.mainType === 'DELIVERY' && project.subType === 'UPSELL') return 'Upsell'
+  if (project.mainType === 'RENEWAL') return project.subType === 'UPSELL' ? 'Upsell' : 'Renewal'
+  return 'Delivery'
+}
+
+function displayWarrantyStatus(status: WarrantyStatus): string {
+  const labels: Record<WarrantyStatus, string> = {
+    NOT_SET: 'Not set yet',
+    PLANNED: 'Planned',
+    VALID: 'Valid',
+    PENDING: 'Pending',
+    RENEWED: 'Renewed',
+    EXPIRED: 'Expired',
+    NO_WARRANTY: 'No warranty',
+    OUT_OF_CONTRACT: 'Out of contract',
+    OBSOLETE: 'Obsolete',
+  }
+  return labels[status]
+}
+
+function licenseNumber(sid: string, pid: string): string {
+  if (sid && pid) return `${pid}${sid}`
+  if (sid) return sid
+  return ''
+}
+
+function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
+  if (warranty.noWarranty === 'YES') return 'NO_WARRANTY'
+  if (warranty.outOfContract === 'YES') return 'OUT_OF_CONTRACT'
+  if (hasSuccessor) return 'RENEWED'
+  if (!warranty.startDate && !warranty.endDate) return 'NOT_SET'
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = warranty.startDate ? new Date(warranty.startDate) : null
+  const end = warranty.endDate ? new Date(warranty.endDate) : null
+  if (start && today < start) return 'PLANNED'
+  if (end) {
+    const daysLeft = daysBeforeExpiration(warranty.endDate)
+    if (daysLeft != null && daysLeft < 0) return 'EXPIRED'
+    if (daysLeft != null && daysLeft < 90) return 'PENDING'
+    if (!start || today >= start) return 'VALID'
+  }
+  return 'NOT_SET'
 }
 
 function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string }>, systems: System[]): Project | undefined {
@@ -323,6 +389,8 @@ export function TenantFormPage() {
   const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
+  const [editingRemarkIds, setEditingRemarkIds] = useState<string[]>([])
+  const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
   const navigationBlocker = useBlocker(isDirty)
 
@@ -341,14 +409,46 @@ export function TenantFormPage() {
 
   const persistedTenant = savedTenant
   const tenantDraft = draft
+  const activeSystem = systems.find((candidate) => candidate.id === (tenantDraft.hostedSystemId ?? tenantDraft.systemId)) ?? system
   const project = resolveProject(tenantDraft, projects, projectTenants, systems)
   const opportunity = resolveOpportunity(project, opportunities)
   const inheritedEngagementCircle = tenantDraft.engagementCircle?.length
     ? tenantDraft.engagementCircle
     : opportunity?.engagementCircles ?? []
   const formType = tenantFormType(tenantDraft)
-  const configuration = configurationFromTenant(tenantDraft, system)
-  const hosting = hostingFromSystem(tenantDraft, system)
+  const configuration = configurationFromTenant(tenantDraft, activeSystem)
+  const hosting = hostingFromSystem(tenantDraft, activeSystem)
+  const relatedProjects = projects.filter(
+    (candidate) =>
+      projectTenants.some((link) => link.tenantId === tenantDraft.id && link.projectId === candidate.id) ||
+      candidate.pid === tenantDraft.deliveryPid ||
+      Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
+  )
+  const allTenantWarrantyOptions = tenants.flatMap((tenant) =>
+    (tenant.warranties ?? []).map((warranty) => ({ tenant, warranty })),
+  )
+
+  function computedWarranties(source: TenantWarranty[]): TenantWarranty[] {
+    return source.map((warranty, index) => {
+      const selectedProject = projects.find((candidate) => candidate.id === warranty.relatedProjectId)
+      const successor = source
+        .find((candidate) => candidate.predecessor.split(';').map((item) => item.trim()).includes(`${warranty.warrantyId}${tenantDraft.tid}`))
+        ?.warrantyId ?? warranty.successor ?? ''
+      const status = calculateWarrantyStatus(warranty, Boolean(successor))
+      return {
+        ...warranty,
+        firstWarranty: index === 0,
+        accountId: tenantDraft.accountId,
+        warrantyType: warrantyTypeForProject(selectedProject),
+        opportunityId: selectedProject?.opportunityId ?? '',
+        successor,
+        durationDays: daysBetween(warranty.startDate, warranty.endDate),
+        daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
+        warrantyStatus: status,
+        alerts: status === 'PENDING' ? 'Expiring soon' : '',
+      }
+    })
+  }
 
   function updateConfiguration(key: ConfigKey, value: string | string[] | number | null) {
     setDraft((current) => {
@@ -356,7 +456,7 @@ export function TenantFormPage() {
       return {
         ...current,
         configuration: {
-          ...configurationFromTenant(current, system),
+          ...configurationFromTenant(current, activeSystem),
           [key]: value,
         },
       }
@@ -364,8 +464,54 @@ export function TenantFormPage() {
     setMessages([])
   }
 
+  function updateTenantType(nextType: TenantFormType) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
+            tenantFormType: nextType,
+          }
+        : current,
+    )
+    setMessages([])
+  }
+
+  function attachSystem(nextSystemId: string) {
+    const nextSystem = systems.find((candidate) => candidate.id === nextSystemId)
+    const nextProject = nextSystem?.linkedProjectIds?.[0]
+      ? projects.find((candidate) => candidate.id === nextSystem.linkedProjectIds?.[0])
+      : undefined
+    const nextType = nextSystem ? tenantFormTypeForSystem(nextSystem) : tenantFormType(tenantDraft)
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            systemId: nextSystemId,
+            hostedSystemId: nextSystemId,
+            hostingSid: nextSystem?.sid ?? '',
+            deliveryPid: nextProject?.pid ?? '',
+            tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
+            tenantFormType: nextType,
+            productType: nextSystem?.productType ?? current.productType,
+            hostedSystemHistory: nextSystemId
+              ? [
+                  ...(current.hostedSystemHistory ?? []),
+                  { systemId: nextSystemId, startedAt: new Date().toISOString(), endedAt: null, reason: 'Moved' as const },
+                ]
+              : current.hostedSystemHistory ?? [],
+          }
+        : current,
+    )
+    setMessages([])
+  }
+
   function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
-    updateTenant(persistedTenant.id, tenantPatchFromDraft(tenantDraft, persistedTenant, system))
+    const normalizedDraft = {
+      ...tenantDraft,
+      warranties: computedWarranties(tenantDraft.warranties ?? []),
+    }
+    updateTenant(persistedTenant.id, tenantPatchFromDraft(normalizedDraft, persistedTenant, activeSystem))
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()
@@ -392,13 +538,25 @@ export function TenantFormPage() {
     })
   }
 
+  function saveRemark(id: string) {
+    const remarks = tenantDraft.remarks ?? []
+    updateTenant(persistedTenant.id, { remarks })
+    setEditingRemarkIds((current) => current.filter((remarkId) => remarkId !== id))
+    setMessages([`Remark ${remarks.find((remark) => remark.id === id)?.recordId ?? ''} saved.`])
+  }
+
+  function editRemark(id: string) {
+    setEditingRemarkIds((current) => (current.includes(id) ? current : [...current, id]))
+  }
+
   function addRemark() {
-    const now = new Date().toISOString()
+    const now = formatLocalTimestamp()
+    const remarkId = `tenant-remark-${crypto.randomUUID()}`
     setDraft((current) => {
       if (!current) return current
       const remarks = current.remarks ?? []
       const remark: TenantRemark = {
-        id: `tenant-remark-${crypto.randomUUID()}`,
+        id: remarkId,
         recordId: `R-${String(remarks.length + 1).padStart(3, '0')}`,
         timestamp: now,
         author: 'Current user',
@@ -409,10 +567,13 @@ export function TenantFormPage() {
       }
       return { ...current, remarks: [...remarks, remark] }
     })
+    setEditingRemarkIds((current) => [...current, remarkId])
   }
 
   function deleteRemark(id: string) {
-    setDraft((current) => (current ? { ...current, remarks: (current.remarks ?? []).filter((remark) => remark.id !== id) } : current))
+    const remarks = (tenantDraft.remarks ?? []).filter((remark) => remark.id !== id)
+    setDraft((current) => (current ? { ...current, remarks } : current))
+    updateTenant(persistedTenant.id, { remarks })
   }
 
   function updateWarranty(id: string, key: WarrantyKey, value: string | boolean | null) {
@@ -452,10 +613,36 @@ export function TenantFormPage() {
         durationDays: null,
         daysBeforeExpiration: null,
         warrantyStatus: 'NOT_SET',
+        noWarranty: 'NO',
+        outOfContract: 'NO',
         alerts: '',
         remark: '',
       }
       return { ...current, warranties: [...warranties, warranty] }
+    })
+  }
+
+  function applyPredecessor(warrantyId: string) {
+    const selection = predecessorSelections[warrantyId]
+    if (!selection?.tenantId || !selection.warrantyId) return
+    const selectedTenant = tenants.find((candidate) => candidate.id === selection.tenantId)
+    if (!selectedTenant) return
+    const predecessorValue = `${selection.warrantyId}${selectedTenant.tid}`
+    setDraft((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        warranties: (current.warranties ?? []).map((warranty) => {
+          if (warranty.id !== warrantyId) return warranty
+          const currentValues = splitMultiValue(warranty.predecessor)
+          return {
+            ...warranty,
+            predecessor: currentValues.includes(predecessorValue)
+              ? warranty.predecessor
+              : [...currentValues, predecessorValue].join(';'),
+          }
+        }),
+      }
     })
   }
 
@@ -524,16 +711,54 @@ export function TenantFormPage() {
   function renderHeaderField(label: string, value: ReactNode, width = 'w-44') {
     return (
       <FormField label={label} controlWidthClassName={width}>
-        <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+        <div className="min-h-8 px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+      </FormField>
+    )
+  }
+
+  function renderTenantTypeField() {
+    return (
+      <FormField label="Tenant Type" controlWidthClassName="w-44">
+        <select
+          className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
+          value={formType}
+          onChange={(event) => updateTenantType(event.target.value as TenantFormType)}
+        >
+          <option value="POC">POC</option>
+          <option value="CUSTOMER">Customer</option>
+        </select>
+      </FormField>
+    )
+  }
+
+  function renderHostingSidField() {
+    return (
+      <FormField label="Hosting SID" controlWidthClassName="w-52">
+        {tenantDraft.systemId ? (
+          <div className="min-h-8 px-2 py-1 text-sm text-sf-text">{hosting.sid || '-'}</div>
+        ) : (
+          <select
+            className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
+            value={tenantDraft.systemId}
+            onChange={(event) => attachSystem(event.target.value)}
+          >
+            <option value="">No system linked</option>
+            {systems.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.sid ?? candidate.machineId ?? candidate.id} - {candidate.productType}
+              </option>
+            ))}
+          </select>
+        )}
       </FormField>
     )
   }
 
   function renderHeader() {
     const commonFields = [
-      renderHeaderField('Tenant Type', formType === 'POC' ? 'POC Tenant' : 'Customer Tenant'),
+      renderTenantTypeField(),
       renderHeaderField('Operational mode', tenantDraft.operationalStatus),
-      formType === 'CUSTOMER' ? renderHeaderField('License Number', `${tenantDraft.tid}${hosting.sid}${tenantDraft.deliveryPid || ''}` || 'Not set yet', 'w-56') : null,
+      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(hosting.sid, tenantDraft.deliveryPid ?? ''), 'w-56') : null,
       formType === 'CUSTOMER' ? renderHeaderField('Warranty status', tenantDraft.warrantyStatus) : null,
       renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : ''),
     ].filter(Boolean)
@@ -551,15 +776,15 @@ export function TenantFormPage() {
           {formType === 'POC' ? renderHeaderField('POC End Date', tenantDraft.pocEndDate ?? opportunity?.pocEndDate ?? '') : null}
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderHeaderField('Account / End User', tenantDraft.accountName)}
-          {renderHeaderField('Region', opportunity?.region ?? system?.region ?? '')}
-          {renderHeaderField('Country', tenantDraft.country || opportunity?.country || system?.country || '')}
-          {renderHeaderField('State', opportunity?.state ?? system?.state ?? '')}
+          {renderHeaderField('Account / End User', tenantDraft.accountName || project?.accountName || '')}
+          {renderHeaderField('Region', opportunity?.region ?? activeSystem?.region ?? '')}
+          {renderHeaderField('Country', tenantDraft.country || opportunity?.country || activeSystem?.country || '')}
+          {renderHeaderField('State', opportunity?.state ?? activeSystem?.state ?? '')}
           {renderHeaderField('Time Zone', opportunity?.timeZone ?? '')}
-          {renderHeaderField('Time Group', tenantDraft.timeGroup || opportunity?.timeGroup || system?.timeGroup || '')}
+          {renderHeaderField('Time Group', tenantDraft.timeGroup || opportunity?.timeGroup || activeSystem?.timeGroup || '')}
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderHeaderField('Hosting SID', hosting.sid)}
+          {renderHostingSidField()}
           {renderHeaderField('Hosting System Operational status', hosting.operationalStatus)}
           {renderHeaderField('Hosting System version', hosting.versionNumber)}
         </div>
@@ -569,23 +794,12 @@ export function TenantFormPage() {
 
   function renderMultiSelect(field: (typeof CONFIGURATION_FIELDS)[number], selected: string[]) {
     return (
-      <div className="min-w-56 space-y-1">
-        {(field.options ?? []).map((option) => (
-          <label key={option} className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={selected.includes(option)}
-              onChange={() =>
-                updateConfiguration(
-                  field.key,
-                  selected.includes(option) ? selected.filter((value) => value !== option) : [...selected, option],
-                )
-              }
-            />
-            <span>{option}</span>
-          </label>
-        ))}
-      </div>
+      <input
+        className="h-8 w-72 rounded border border-sf-border px-2 py-1"
+        value={selected.join(';')}
+        list={`${field.key}-options`}
+        onChange={(event) => updateConfiguration(field.key, splitMultiValue(event.target.value))}
+      />
     )
   }
 
@@ -615,6 +829,7 @@ export function TenantFormPage() {
                       <input
                         className="h-8 w-24 rounded border border-sf-border px-2 py-1"
                         type="number"
+                        min={0}
                         value={value == null ? '' : String(value)}
                         onChange={(event) => updateConfiguration(field.key, numberFromInput(event.target.value))}
                       />
@@ -722,33 +937,55 @@ export function TenantFormPage() {
               </tr>
             </thead>
             <tbody>
-              {remarks.map((remark) => (
-                <tr key={remark.id}>
-                  <td className="border border-sf-border px-1.5 py-1">{remark.recordId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{remark.timestamp}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{remark.author}</td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={remark.type} onChange={(event) => updateRemark(remark.id, 'type', event.target.value)}>
-                      {REMARK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                  </td>
-                  <td className="min-w-96 border border-sf-border px-1.5 py-1">
-                    <textarea className="min-h-20 w-full rounded border border-sf-border px-2 py-1" value={remark.content} onChange={(event) => updateRemark(remark.id, 'content', event.target.value)} />
-                  </td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={remark.dueDate ?? ''} onChange={(event) => updateRemark(remark.id, 'dueDate', event.target.value || null)} />
-                  </td>
-                  <td className="border border-sf-border px-1.5 py-1 text-center">
-                    <input type="checkbox" checked={remark.eventCreated} onChange={(event) => updateRemark(remark.id, 'eventCreated', event.target.checked)} />
-                  </td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteRemark(remark.id)}>
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {remarks.map((remark) => {
+                const isEditing = editingRemarkIds.includes(remark.id)
+                return (
+                    <tr key={remark.id}>
+                      <td className="border border-sf-border px-1.5 py-1">{remark.recordId}</td>
+                      <td className="border border-sf-border px-1.5 py-1">{remark.timestamp}</td>
+                      <td className="border border-sf-border px-1.5 py-1">{remark.author}</td>
+                      <td className="border border-sf-border px-1.5 py-1">
+                        {isEditing ? (
+                          <select className="h-8 rounded border border-sf-border px-2 py-1" value={remark.type} onChange={(event) => updateRemark(remark.id, 'type', event.target.value)}>
+                            {REMARK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                          </select>
+                        ) : remark.type}
+                      </td>
+                      <td className="min-w-96 border border-sf-border px-1.5 py-1">
+                        {isEditing ? (
+                          <textarea className="min-h-20 w-full rounded border border-sf-border px-2 py-1" value={remark.content} onChange={(event) => updateRemark(remark.id, 'content', event.target.value)} />
+                        ) : remark.content}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1">
+                        {isEditing ? (
+                          <input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={remark.dueDate ?? ''} onChange={(event) => updateRemark(remark.id, 'dueDate', event.target.value || null)} />
+                        ) : remark.dueDate ?? ''}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-center">
+                        {isEditing ? (
+                          <input type="checkbox" checked={remark.eventCreated} onChange={(event) => updateRemark(remark.id, 'eventCreated', event.target.checked)} />
+                        ) : remark.eventCreated ? 'Yes' : 'No'}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1">
+                        <div className="flex gap-2">
+                          {isEditing ? (
+                            <button type="button" className="text-sf-brand hover:underline" onClick={() => saveRemark(remark.id)}>
+                              Save
+                            </button>
+                          ) : (
+                            <button type="button" className="text-sf-brand hover:underline" onClick={() => editRemark(remark.id)}>
+                              Edit
+                            </button>
+                          )}
+                          <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteRemark(remark.id)}>
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                )
+              })}
               {remarks.length === 0 ? (
                 <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={8}>No remarks yet.</td></tr>
               ) : null}
@@ -779,7 +1016,7 @@ export function TenantFormPage() {
   }
 
   function renderWarranties() {
-    const warranties = tenantDraft.warranties ?? []
+    const warranties = computedWarranties(tenantDraft.warranties ?? [])
     return (
       <section className="sf-card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -793,7 +1030,7 @@ export function TenantFormPage() {
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['Warranty ID', 'First', 'Predecessor', 'Successor', 'Account ID', 'Related Project ID', 'Warranty Type', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark', 'Action'].map((header) => (
+                {['Warranty ID', 'Warranty Type', 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'No Warranty', 'Out of Contract', 'Warranty Status', 'Alerts', 'Remark', 'Action'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
                 ))}
               </tr>
@@ -802,31 +1039,87 @@ export function TenantFormPage() {
               {warranties.map((warranty) => (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
-                  <td className="border border-sf-border px-1.5 py-1 text-center">
-                    <input type="checkbox" checked={warranty.firstWarranty} onChange={(event) => updateWarranty(warranty.id, 'firstWarranty', event.target.checked)} />
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
+                  <td className="border border-sf-border px-1.5 py-1 text-center">{warranty.firstWarranty ? 'Yes' : 'No'}</td>
+                  <td className="min-w-[24rem] border border-sf-border px-1.5 py-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <select
+                        className="h-8 rounded border border-sf-border px-2 py-1"
+                        value={predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id}
+                        onChange={(event) =>
+                          setPredecessorSelections((current) => ({
+                            ...current,
+                            [warranty.id]: { tenantId: event.target.value, warrantyId: '' },
+                          }))
+                        }
+                      >
+                        {tenants.map((tenant) => (
+                          <option key={tenant.id} value={tenant.id}>{tenant.tid}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="h-8 rounded border border-sf-border px-2 py-1"
+                        value={predecessorSelections[warranty.id]?.warrantyId ?? ''}
+                        onChange={(event) =>
+                          setPredecessorSelections((current) => ({
+                            ...current,
+                            [warranty.id]: {
+                              tenantId: current[warranty.id]?.tenantId ?? tenantDraft.id,
+                              warrantyId: event.target.value,
+                            },
+                          }))
+                        }
+                      >
+                        <option value="">Warranty ID</option>
+                        {allTenantWarrantyOptions
+                          .filter(({ tenant }) => tenant.id === (predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id))
+                          .map(({ tenant, warranty: option }) => (
+                            <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
+                              {option.warrantyId}
+                            </option>
+                          ))}
+                      </select>
+                      <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => applyPredecessor(warranty.id)}>
+                        Add
+                      </button>
+                    </div>
+                    <input className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1" value={warranty.predecessor} onChange={(event) => updateWarranty(warranty.id, 'predecessor', event.target.value)} />
                   </td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-40 rounded border border-sf-border px-2 py-1" value={warranty.predecessor} onChange={(event) => updateWarranty(warranty.id, 'predecessor', event.target.value)} /></td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.successor}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-40 rounded border border-sf-border px-2 py-1" value={warranty.relatedProjectId} onChange={(event) => updateWarranty(warranty.id, 'relatedProjectId', event.target.value)} /></td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-32 rounded border border-sf-border px-2 py-1" value={warranty.warrantyType} onChange={(event) => updateWarranty(warranty.id, 'warrantyType', event.target.value)} /></td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-40 rounded border border-sf-border px-2 py-1" value={warranty.opportunityId} onChange={(event) => updateWarranty(warranty.id, 'opportunityId', event.target.value)} /></td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <select className="h-8 w-56 rounded border border-sf-border px-2 py-1" value={warranty.relatedProjectId} onChange={(event) => updateWarranty(warranty.id, 'relatedProjectId', event.target.value)}>
+                      <option value="">Select project</option>
+                      {relatedProjects.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.opportunityName} - {candidate.pid}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={warranty.startDate ?? ''} onChange={(event) => updateWarranty(warranty.id, 'startDate', event.target.value || null)} /></td>
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={warranty.endDate ?? ''} onChange={(event) => updateWarranty(warranty.id, 'endDate', event.target.value || null)} /></td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={warranty.warrantyStatus} onChange={(event) => updateWarranty(warranty.id, 'warrantyStatus', event.target.value as WarrantyStatus)}>
-                      {WARRANTY_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={warranty.noWarranty === 'YES' ? 'YES' : 'NO'} onChange={(event) => updateWarranty(warranty.id, 'noWarranty', event.target.value as YesNo)}>
+                      {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
                   </td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-40 rounded border border-sf-border px-2 py-1" value={warranty.alerts} onChange={(event) => updateWarranty(warranty.id, 'alerts', event.target.value)} /></td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={warranty.outOfContract === 'YES' ? 'YES' : 'NO'} onChange={(event) => updateWarranty(warranty.id, 'outOfContract', event.target.value as YesNo)}>
+                      {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-48 rounded border border-sf-border px-2 py-1" value={warranty.remark} onChange={(event) => updateWarranty(warranty.id, 'remark', event.target.value)} /></td>
                   <td className="border border-sf-border px-1.5 py-1"><button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button></td>
                 </tr>
               ))}
               {warranties.length === 0 ? (
-                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={16}>No warranty records yet.</td></tr>
+                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={18}>No warranty records yet.</td></tr>
               ) : null}
             </tbody>
           </table>

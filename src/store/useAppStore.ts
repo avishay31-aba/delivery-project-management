@@ -86,6 +86,8 @@ function buildDefaultHostedTenant(
   systemId: string,
   now: string,
   account?: AppDataState['accounts'][number],
+  tenantType: Tenant['tenantType'] = 'CUSTOMER',
+  deliveryPid = '',
 ): AppDataState['tenants'][number] {
   return {
     id: `ten-${crypto.randomUUID()}`,
@@ -93,8 +95,10 @@ function buildDefaultHostedTenant(
     tenantName: `${tid} Default Tenant`,
     accountId: account?.id ?? '',
     systemId,
-    deliveryPid: '',
-    tenantType: 'CUSTOMER',
+    deliveryPid,
+    tenantType,
+    tenantFormType: tenantType === 'POC' ? 'POC' : 'CUSTOMER',
+    hostedSystemId: systemId,
     accountName: account?.accountName ?? '',
     country: account?.country ?? '',
     timeGroup: account?.timeGroup ?? '',
@@ -156,6 +160,9 @@ function copyRequirementToTenant(
     systemId,
     deliveryPid: project.pid,
     tenantType: project.mainType === 'POC' ? 'POC' : 'CUSTOMER',
+    tenantFormType: project.mainType === 'POC' ? 'POC' : 'CUSTOMER',
+    hostedSystemId: systemId,
+    sourceRequirementId: requirement.requirementId,
     accountName: project.accountName,
     country: '',
     timeGroup: '',
@@ -557,7 +564,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     }
-    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
+    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now, undefined, 'POC')
 
     set((currentState) => ({
       idCounters,
@@ -713,24 +720,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const { counters: idCounters, id: nextTid } = incrementCounter(state.idCounters, 'tid')
     const now = new Date().toISOString()
-    const defaultSystemId = state.systems[0]?.id ?? ''
 
     const tenant: AppDataState['tenants'][number] = {
       id: `ten-${crypto.randomUUID()}`,
       tid: nextTid,
-      tenantName: `${nextTid} ${state.accounts[0]?.accountName ?? ''}`.trim(),
-      accountId: state.accounts[0]?.id ?? '',
-      systemId: defaultSystemId,
+      tenantName: nextTid,
+      accountId: '',
+      systemId: '',
       deliveryPid: '',
       tenantType: 'CUSTOMER',
+      tenantFormType: 'CUSTOMER',
+      hostedSystemId: '',
+      hostingSid: '',
       accountName: '',
       country: '',
       timeGroup: '',
       operationalStatus: '',
       contractStatus: 'UNDER_CONTRACT',
-      hostedSystemHistory: defaultSystemId
-        ? [{ systemId: defaultSystemId, startedAt: now, endedAt: null, reason: 'Created' }]
-        : [],
+      hostedSystemHistory: [],
       productType: '',
       hostingType: '',
       cloudPlatform: '',

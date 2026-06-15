@@ -75,6 +75,7 @@ export type WarrantyStatus =
   | 'RENEWED'
   | 'EXPIRED'
   | 'NO_WARRANTY'
+  | 'OUT_OF_CONTRACT'
   | 'OBSOLETE'
 
 export interface Project {
@@ -273,6 +274,7 @@ export interface Tenant {
   tenantFormType?: TenantFormType
   hostedSystemId?: string
   hostingSid?: string
+  sourceRequirementId?: string
   configuration?: TenantConfiguration
   hostingSnapshot?: TenantHostingSnapshot
   engagementCircle?: EngagementCircleContact[]
@@ -406,6 +408,8 @@ export interface TenantWarranty {
   durationDays: number | null
   daysBeforeExpiration: number | null
   warrantyStatus: WarrantyStatus
+  noWarranty?: YesNo
+  outOfContract?: YesNo
   alerts: string
   remark: string
 }

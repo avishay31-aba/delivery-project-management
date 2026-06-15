@@ -151,7 +151,13 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
     engagementCircle: Array.isArray(tenant.engagementCircle) ? tenant.engagementCircle : [],
     remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
     configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
-    warranties: Array.isArray(tenant.warranties) ? tenant.warranties : [],
+    warranties: Array.isArray(tenant.warranties)
+      ? tenant.warranties.map((warranty) => ({
+          ...warranty,
+          noWarranty: warranty.noWarranty ?? 'NO',
+          outOfContract: warranty.outOfContract ?? 'NO',
+        }))
+      : [],
     documents: Array.isArray(tenant.documents) ? tenant.documents : [],
   }
 }
