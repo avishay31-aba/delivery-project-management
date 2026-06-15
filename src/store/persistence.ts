@@ -1,4 +1,4 @@
-import type { AppDataState, Opportunity, Project, Tenant } from '@/data/seed.types'
+import type { AppDataState, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, Tenant } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 
@@ -54,6 +54,28 @@ function normalizeTenant(tenant: Tenant): Tenant {
   }
 }
 
+function normalizeProjectSystemLink(link: ProjectSystemLink): ProjectSystemLink {
+  return {
+    ...link,
+    tenantIds: Array.isArray(link.tenantIds) ? link.tenantIds : [],
+    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
+    allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
+    sourceMachineId: link.sourceMachineId ?? null,
+    deallocatedAt: link.deallocatedAt ?? null,
+  }
+}
+
+function normalizeProjectTenantLink(link: ProjectTenantLink): ProjectTenantLink {
+  return {
+    ...link,
+    systemId: link.systemId ?? '',
+    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
+    allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
+    allocatedAt: link.allocatedAt ?? '',
+    deallocatedAt: link.deallocatedAt ?? null,
+  }
+}
+
 function normalizeState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
   const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProject) : seedState.projects.map(normalizeProject)
@@ -75,8 +97,12 @@ function normalizeState(state: AppDataState): AppDataState {
     systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
     tenants: Array.isArray(state.tenants) ? state.tenants.map(normalizeTenant) : seedState.tenants.map(normalizeTenant),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
-    projectSystems: Array.isArray(state.projectSystems) ? state.projectSystems : seedState.projectSystems,
-    projectTenants: Array.isArray(state.projectTenants) ? state.projectTenants : seedState.projectTenants,
+    projectSystems: Array.isArray(state.projectSystems)
+      ? state.projectSystems.map(normalizeProjectSystemLink)
+      : seedState.projectSystems.map(normalizeProjectSystemLink),
+    projectTenants: Array.isArray(state.projectTenants)
+      ? state.projectTenants.map(normalizeProjectTenantLink)
+      : seedState.projectTenants.map(normalizeProjectTenantLink),
   }
 
   return {

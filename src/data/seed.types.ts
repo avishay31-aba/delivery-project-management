@@ -32,6 +32,8 @@ export type ReusedInternalSystemStatus = 'Available' | 'Occupied' | 'Obsolete'
 export type TenantType = 'CUSTOMER' | 'POC' | 'PENLINK_INTERNAL'
 export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
 export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
+export type AllocationStatus = 'ALLOCATED' | 'DEALLOCATED'
+export type AllocationType = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
 
 export interface IdCounters {
   pid: number
@@ -436,13 +438,23 @@ export interface ProjectSystemLink {
   id: string
   projectId: string
   systemId: string
+  tenantIds?: string[]
+  allocationStatus?: AllocationStatus
+  allocationType?: AllocationType
+  sourceMachineId?: string | null
   allocatedAt: string
+  deallocatedAt?: string | null
 }
 
 export interface ProjectTenantLink {
   id: string
   projectId: string
   tenantId: string
+  systemId?: string
+  allocationStatus?: AllocationStatus
+  allocationType?: AllocationType
+  allocatedAt?: string
+  deallocatedAt?: string | null
 }
 
 /** Root shape persisted to localStorage */

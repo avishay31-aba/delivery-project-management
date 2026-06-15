@@ -5,7 +5,9 @@ import type {
   OpportunitySubType,
   OpportunityType,
   Project,
+  ProjectSystemLink,
   ProjectSubType,
+  Tenant,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
@@ -42,6 +44,10 @@ interface AppStore extends AppDataState {
   ) => OpportunityProjectSyncResult
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
+  allocateProductionSystemToProject: (projectId: string, productionSystemId: string, requirementIds?: string[]) => AllocationActionResult
+  allocateReusedInternalSystemToProject: (projectId: string, reusedSystemId: string, requirementIds?: string[]) => AllocationActionResult
+  linkExistingSystemToProject: (projectId: string, systemId: string, requirementIds?: string[]) => AllocationActionResult
+  deallocateProjectSystem: (allocationId: string) => AllocationActionResult
 }
 
 export type PocProjectSyncAction = 'UPDATE_EXISTING_POC' | 'CREATE_NEW_POC'
@@ -59,6 +65,12 @@ export interface ProjectLifecycleChange {
 export interface OpportunityProjectSyncResult {
   opportunity: Opportunity
   projectChanges: ProjectLifecycleChange[]
+}
+
+export interface AllocationActionResult {
+  ok: boolean
+  message: string
+  allocationId?: string
 }
 
 function uniqueValues(values: string[]): string[] {
@@ -127,6 +139,78 @@ function buildDefaultHostedTenant(
     createdAt: now,
     updatedAt: now,
   }
+}
+
+function copyRequirementToTenant(
+  requirement: NonNullable<Opportunity['newTenantRequirements']>[number],
+  project: Project,
+  systemId: string,
+  tid: string,
+  now: string,
+): Tenant {
+  return {
+    id: `ten-${crypto.randomUUID()}`,
+    tid,
+    tenantName: `${tid} ${project.accountName}`.trim(),
+    accountId: '',
+    systemId,
+    deliveryPid: project.pid,
+    tenantType: project.mainType === 'POC' ? 'POC' : 'CUSTOMER',
+    accountName: project.accountName,
+    country: '',
+    timeGroup: '',
+    operationalStatus: 'Active',
+    contractStatus: 'UNDER_CONTRACT',
+    hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
+    productType: requirement.productType,
+    hostingType: requirement.hostingType,
+    cloudPlatform: requirement.cloudPlatform,
+    csp: requirement.csp,
+    cloudRegion: requirement.cloudRegion,
+    statisticsId: requirement.statisticsId,
+    authId: requirement.authId,
+    rdmId: requirement.rdmId,
+    performanceTier: requirement.performanceTier,
+    vpnEnabled: requirement.vpnEnabled,
+    vpnType: requirement.vpnType,
+    ipRestrictionEnabled: requirement.ipRestrictionEnabled,
+    mapCenter: requirement.mapCenter,
+    licenses: requirement.licenses,
+    users: requirement.users,
+    concurrentSearches: requirement.concurrentSearches,
+    dailySearches: requirement.dailySearches,
+    monthlySearches: requirement.monthlySearches,
+    concurrentAnalyses: requirement.concurrentAnalyses,
+    topicAnalyses: requirement.topicAnalyses,
+    dailyAnalyses: requirement.dailyAnalyses,
+    monthlyAnalyses: requirement.monthlyAnalyses,
+    tangles: requirement.tangles,
+    tanglesGo: requirement.tanglesGo,
+    webloc: requirement.webloc,
+    webeye: requirement.webeye,
+    ingest: requirement.ingest,
+    blockchain: requirement.blockchain,
+    crossSystemFeatures: [...requirement.crossSystemFeatures],
+    apiEnabled: requirement.apiEnabled,
+    apiDailyQty: requirement.apiDailyQty,
+    apiMonthlyQty: requirement.apiMonthlyQty,
+    aiFeatures: [...requirement.aiFeatures],
+    additionalFeatures: [...requirement.additionalFeatures],
+    standardMonitors: requirement.standardMonitors,
+    fullMonitors: requirement.fullMonitors,
+    topicMonitors: requirement.topicMonitors,
+    warrantyStatus: 'NOT_SET',
+    warrantyStartDate: null,
+    warrantyEndDate: null,
+    pocStartDate: null,
+    pocEndDate: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
+  return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
 }
 
 function findLinkedPocProjects(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project[] {
@@ -687,5 +771,303 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((s) => ({ idCounters, tenants: [tenant, ...s.tenants] }))
     get().saveToStorage()
     return tenant
+  },
+
+  allocateProductionSystemToProject: (projectId, productionSystemId, requirementIds = []) => {
+    const state = get()
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const productionSystem = state.productionSystemInventory.find((candidate) => candidate.id === productionSystemId)
+    if (!project) return { ok: false, message: 'Project not found.' }
+    if (project.mainType === 'POC') return { ok: false, message: 'POC projects cannot allocate Production Inventory.' }
+    if (!productionSystem) return { ok: false, message: 'Production system not found.' }
+    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.systemId === productionSystemId)) {
+      return { ok: false, message: 'Production system is already actively allocated.' }
+    }
+    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.systemId === productionSystemId)) {
+      return { ok: false, message: 'This system is already allocated to the project.' }
+    }
+
+    const now = new Date().toISOString()
+    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+    let idCounters = state.idCounters
+    const tenantIds: string[] = []
+    const tenants = [...state.tenants]
+    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
+    requirements.forEach((requirement) => {
+      const nextTenantId = incrementCounter(idCounters, 'tid')
+      idCounters = nextTenantId.counters
+      const tenant = copyRequirementToTenant(requirement, project, productionSystem.id, nextTenantId.id, now)
+      tenantIds.push(tenant.id)
+      tenants.unshift(tenant)
+    })
+
+    const allocatedSystem = {
+      ...productionSystem,
+      accountId: null,
+      salesManagerId: null,
+      machineId: null,
+      systemClass: 'CUSTOMER' as const,
+      availability: 'OCCUPIED' as const,
+      linkedProjectIds: [projectId],
+      tenantIds,
+      createdAt: productionSystem.createdAt,
+      updatedAt: now,
+    }
+    const allocation: ProjectSystemLink = {
+      id: `alloc-${crypto.randomUUID()}`,
+      projectId,
+      systemId: allocatedSystem.id,
+      tenantIds,
+      allocationStatus: 'ALLOCATED',
+      allocationType: 'PRODUCTION',
+      sourceMachineId: null,
+      allocatedAt: now,
+      deallocatedAt: null,
+    }
+
+    set((current) => ({
+      idCounters,
+      productionSystemInventory: current.productionSystemInventory.filter((candidate) => candidate.id !== productionSystemId),
+      systems: [allocatedSystem, ...current.systems],
+      tenants,
+      projectSystems: [allocation, ...current.projectSystems],
+      projectTenants: [
+        ...tenantIds.map((tenantId) => ({
+          id: `proj-ten-${crypto.randomUUID()}`,
+          projectId,
+          tenantId,
+          systemId: allocatedSystem.id,
+          allocationStatus: 'ALLOCATED' as const,
+          allocationType: 'PRODUCTION' as const,
+          allocatedAt: now,
+          deallocatedAt: null,
+        })),
+        ...current.projectTenants,
+      ],
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Production system allocated.', allocationId: allocation.id }
+  },
+
+  allocateReusedInternalSystemToProject: (projectId, reusedSystemId, requirementIds = []) => {
+    const state = get()
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const reusedSystem = state.reusedInternalSystems.find((candidate) => candidate.id === reusedSystemId)
+    if (!project) return { ok: false, message: 'Project not found.' }
+    if (project.mainType !== 'POC') return { ok: false, message: 'Delivery and Renewal projects cannot allocate Reused Internal Systems.' }
+    if (!reusedSystem) return { ok: false, message: 'Reused internal system not found.' }
+    if (reusedSystem.status === 'Occupied') return { ok: false, message: 'Reused internal system is already occupied.' }
+    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.sourceMachineId === reusedSystem.machineId)) {
+      return { ok: false, message: 'This MID is already allocated to the project.' }
+    }
+
+    const now = new Date().toISOString()
+    const nextSystemId = incrementCounter(state.idCounters, 'sid')
+    let idCounters = nextSystemId.counters
+    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+    const tenantIds: string[] = []
+    const tenants = [...state.tenants]
+    const allocatedSystemId = `sys-${crypto.randomUUID()}`
+    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
+    requirements.forEach((requirement) => {
+      const nextTenantId = incrementCounter(idCounters, 'tid')
+      idCounters = nextTenantId.counters
+      const tenant = copyRequirementToTenant(requirement, project, allocatedSystemId, nextTenantId.id, now)
+      tenantIds.push(tenant.id)
+      tenants.unshift(tenant)
+    })
+
+    const allocatedSystem = {
+      id: allocatedSystemId,
+      accountId: null,
+      salesManagerId: null,
+      sid: nextSystemId.id,
+      deliveryPid: project.pid,
+      machineId: reusedSystem.machineId,
+      source: 'Reused Internal Systems' as const,
+      linkedProjectIds: [projectId],
+      tenantIds,
+      systemClass: 'POC_DEMO_TRAINING' as const,
+      purpose: reusedSystem.purpose,
+      availability: 'OCCUPIED' as const,
+      logo: reusedSystem.logo,
+      url: reusedSystem.url,
+      cognitoRegion: reusedSystem.cognitoRegion,
+      productType: reusedSystem.productType,
+      hostingType: reusedSystem.hostingType,
+      cloudPlatform: reusedSystem.cloudPlatform,
+      csp: reusedSystem.csp,
+      cloudRegion: reusedSystem.cloudRegion,
+      mapCenter: reusedSystem.mapCenter,
+      performanceTier: reusedSystem.performanceTier,
+      vpnEnabled: reusedSystem.vpnEnabled,
+      vpnType: reusedSystem.vpnType,
+      ipRestrictionEnabled: reusedSystem.ipRestrictionEnabled,
+      region: reusedSystem.usedInRegion,
+      country: '',
+      state: '',
+      timeGroup: reusedSystem.timeGroup,
+      timeGroupAlert: reusedSystem.timeGroupAlert,
+      operationalStatus: reusedSystem.operationalStatus,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const allocation: ProjectSystemLink = {
+      id: `alloc-${crypto.randomUUID()}`,
+      projectId,
+      systemId: allocatedSystem.id,
+      tenantIds,
+      allocationStatus: 'ALLOCATED',
+      allocationType: 'REUSED_INTERNAL',
+      sourceMachineId: reusedSystem.machineId,
+      allocatedAt: now,
+      deallocatedAt: null,
+    }
+
+    set((current) => ({
+      idCounters,
+      reusedInternalSystems: current.reusedInternalSystems.map((candidate) =>
+        candidate.id === reusedSystemId
+          ? {
+              ...candidate,
+              status: 'Occupied',
+              currentProjectIds: Array.from(new Set([...candidate.currentProjectIds, projectId])),
+              occupationStartDate: candidate.occupationStartDate ?? now,
+              occupationEndDate: null,
+              updatedAt: now,
+            }
+          : candidate,
+      ),
+      systems: [allocatedSystem, ...current.systems],
+      tenants,
+      projectSystems: [allocation, ...current.projectSystems],
+      projectTenants: [
+        ...tenantIds.map((tenantId) => ({
+          id: `proj-ten-${crypto.randomUUID()}`,
+          projectId,
+          tenantId,
+          systemId: allocatedSystem.id,
+          allocationStatus: 'ALLOCATED' as const,
+          allocationType: 'REUSED_INTERNAL' as const,
+          allocatedAt: now,
+          deallocatedAt: null,
+        })),
+        ...current.projectTenants,
+      ],
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Reused internal system allocated.', allocationId: allocation.id }
+  },
+
+  linkExistingSystemToProject: (projectId, systemId, requirementIds = []) => {
+    const state = get()
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const system = state.systems.find((candidate) => candidate.id === systemId)
+    if (!project) return { ok: false, message: 'Project not found.' }
+    if (project.mainType === 'POC') return { ok: false, message: 'POC projects cannot link existing production systems in F1.' }
+    if (!system) return { ok: false, message: 'Existing system not found.' }
+    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.systemId === systemId)) {
+      return { ok: false, message: 'This system is already allocated to the project.' }
+    }
+
+    const now = new Date().toISOString()
+    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+    let idCounters = state.idCounters
+    const tenantIds: string[] = []
+    const tenants = [...state.tenants]
+    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
+    requirements.forEach((requirement) => {
+      const nextTenantId = incrementCounter(idCounters, 'tid')
+      idCounters = nextTenantId.counters
+      const tenant = copyRequirementToTenant(requirement, project, systemId, nextTenantId.id, now)
+      tenantIds.push(tenant.id)
+      tenants.unshift(tenant)
+    })
+
+    const allocation: ProjectSystemLink = {
+      id: `alloc-${crypto.randomUUID()}`,
+      projectId,
+      systemId,
+      tenantIds,
+      allocationStatus: 'ALLOCATED',
+      allocationType: 'EXISTING_SYSTEM',
+      sourceMachineId: null,
+      allocatedAt: now,
+      deallocatedAt: null,
+    }
+
+    set((current) => ({
+      idCounters,
+      systems: current.systems.map((candidate) =>
+        candidate.id === systemId
+          ? {
+              ...candidate,
+              linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), projectId])),
+              tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
+              updatedAt: now,
+            }
+          : candidate,
+      ),
+      tenants,
+      projectSystems: [allocation, ...current.projectSystems],
+      projectTenants: [
+        ...tenantIds.map((tenantId) => ({
+          id: `proj-ten-${crypto.randomUUID()}`,
+          projectId,
+          tenantId,
+          systemId,
+          allocationStatus: 'ALLOCATED' as const,
+          allocationType: 'EXISTING_SYSTEM' as const,
+          allocatedAt: now,
+          deallocatedAt: null,
+        })),
+        ...current.projectTenants,
+      ],
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Existing system linked.', allocationId: allocation.id }
+  },
+
+  deallocateProjectSystem: (allocationId) => {
+    const state = get()
+    const allocation = state.projectSystems.find((candidate) => candidate.id === allocationId)
+    if (!allocation) return { ok: false, message: 'Allocation not found.' }
+    if (allocation.allocationStatus === 'DEALLOCATED') return { ok: false, message: 'Allocation is already deallocated.' }
+    const now = new Date().toISOString()
+
+    set((current) => ({
+      projectSystems: current.projectSystems.map((candidate) =>
+        candidate.id === allocationId
+          ? { ...candidate, allocationStatus: 'DEALLOCATED', deallocatedAt: now }
+          : candidate,
+      ),
+      projectTenants: current.projectTenants.map((candidate) =>
+        candidate.projectId === allocation.projectId && candidate.systemId === allocation.systemId && candidate.allocationStatus !== 'DEALLOCATED'
+          ? { ...candidate, allocationStatus: 'DEALLOCATED', deallocatedAt: now }
+          : candidate,
+      ),
+      systems: current.systems.map((system) =>
+        system.id === allocation.systemId
+          ? {
+              ...system,
+              linkedProjectIds: (system.linkedProjectIds ?? []).filter((projectId) => projectId !== allocation.projectId),
+              updatedAt: now,
+            }
+          : system,
+      ),
+      reusedInternalSystems: current.reusedInternalSystems.map((system) =>
+        allocation.allocationType === 'REUSED_INTERNAL' && system.machineId === allocation.sourceMachineId
+          ? {
+              ...system,
+              status: 'Available',
+              currentProjectIds: system.currentProjectIds.filter((projectId) => projectId !== allocation.projectId),
+              occupationEndDate: now,
+              updatedAt: now,
+            }
+          : system,
+      ),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'System deallocated from project.', allocationId }
   },
 }))
