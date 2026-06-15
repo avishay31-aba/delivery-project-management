@@ -67,6 +67,64 @@ function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType 
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
 }
 
+function buildDefaultHostedTenant(
+  tid: string,
+  systemId: string,
+  now: string,
+  account?: AppDataState['accounts'][number],
+): AppDataState['tenants'][number] {
+  return {
+    id: `ten-${crypto.randomUUID()}`,
+    tid,
+    tenantName: `${tid} Default Tenant`,
+    accountId: account?.id ?? '',
+    systemId,
+    deliveryPid: '',
+    tenantType: 'CUSTOMER',
+    accountName: account?.accountName ?? '',
+    country: account?.country ?? '',
+    timeGroup: account?.timeGroup ?? '',
+    operationalStatus: 'Active',
+    productType: 'Tangles',
+    hostingType: 'Cloud',
+    cloudPlatform: 'AWS',
+    csp: 'Automate IT',
+    cloudRegion: 'us-east-1 (N. Virginia)',
+    mapCenter: account?.country ?? '',
+    licenses: 1,
+    users: 1,
+    concurrentSearches: 1,
+    dailySearches: null,
+    monthlySearches: null,
+    concurrentAnalyses: 1,
+    topicAnalyses: null,
+    dailyAnalyses: null,
+    monthlyAnalyses: null,
+    tangles: null,
+    tanglesGo: null,
+    webloc: null,
+    webeye: null,
+    ingest: null,
+    blockchain: '',
+    crossSystemFeatures: [],
+    apiEnabled: '',
+    apiDailyQty: null,
+    apiMonthlyQty: null,
+    aiFeatures: [],
+    additionalFeatures: [],
+    standardMonitors: 1,
+    fullMonitors: null,
+    topicMonitors: null,
+    warrantyStatus: 'NOT_SET',
+    warrantyStartDate: null,
+    warrantyEndDate: null,
+    pocStartDate: null,
+    pocEndDate: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
 function findLinkedPocProjects(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project[] {
   const linkedIds = new Set(uniqueValues([...(opportunity.pocProjectIds ?? []), ...(savedOpportunity.pocProjectIds ?? [])]))
   const opportunityIds = new Set([opportunity.opportunityId, savedOpportunity.opportunityId])
@@ -265,7 +323,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createProductionSystemInventoryItem: () => {
     const state = get()
-    const { counters: idCounters, id: nextSid } = incrementCounter(state.idCounters, 'sid')
+    const nextSystemId = incrementCounter(state.idCounters, 'sid')
+    const nextTenantId = incrementCounter(nextSystemId.counters, 'tid')
+    const idCounters = nextTenantId.counters
+    const nextSid = nextSystemId.id
     const now = new Date().toISOString()
     const system: AppDataState['productionSystemInventory'][number] = {
       id: `prod-sys-${crypto.randomUUID()}`,
@@ -297,15 +358,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
       timeGroupAlert: '',
       linkedProjects: [],
       operationalStatus: 'On',
-      tenantCount: 0,
+      tenantCount: 1,
       alerts: [],
       createdAt: now,
       updatedAt: now,
     }
+    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
 
     set((currentState) => ({
       idCounters,
       productionSystemInventory: [system, ...currentState.productionSystemInventory],
+      tenants: [tenant, ...currentState.tenants],
     }))
     get().saveToStorage()
     return system
@@ -313,7 +376,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createReusedInternalSystem: () => {
     const state = get()
-    const { counters: idCounters, id: nextMid } = incrementCounter(state.idCounters, 'mid')
+    const nextMachineId = incrementCounter(state.idCounters, 'mid')
+    const nextTenantId = incrementCounter(nextMachineId.counters, 'tid')
+    const idCounters = nextTenantId.counters
+    const nextMid = nextMachineId.id
     const now = new Date().toISOString()
     const system: AppDataState['reusedInternalSystems'][number] = {
       id: `reused-sys-${crypto.randomUUID()}`,
@@ -345,16 +411,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       occupationStartDate: null,
       occupationEndDate: null,
       currentProjectIds: [],
-      tenantCount: 0,
+      tenantCount: 1,
       alerts: [],
       operationalStatus: 'On',
       createdAt: now,
       updatedAt: now,
     }
+    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
 
     set((currentState) => ({
       idCounters,
       reusedInternalSystems: [system, ...currentState.reusedInternalSystems],
+      tenants: [tenant, ...currentState.tenants],
     }))
     get().saveToStorage()
     return system
@@ -463,7 +531,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createSystem: () => {
     const state = get()
-    const { counters: idCounters, id: nextSid } = incrementCounter(state.idCounters, 'sid')
+    const nextSystemId = incrementCounter(state.idCounters, 'sid')
+    const nextTenantId = incrementCounter(nextSystemId.counters, 'tid')
+    const idCounters = nextTenantId.counters
+    const nextSid = nextSystemId.id
     const now = new Date().toISOString()
 
     const system: AppDataState['systems'][number] = {
@@ -476,9 +547,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       systemClass: 'CUSTOMER',
       purpose: 'CUSTOMER',
       availability: 'AVAILABLE',
-      productType: '',
-      hostingType: '',
-      cloudPlatform: '',
+      tenantIds: [],
+      productType: 'Tangles',
+      hostingType: 'Cloud',
+      cloudPlatform: 'AWS',
+      csp: 'Automate IT',
+      cloudRegion: 'us-east-1 (N. Virginia)',
       region: '',
       country: '',
       state: '',
@@ -487,8 +561,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     }
+    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
+    system.tenantIds = [tenant.id]
 
-    set((s) => ({ idCounters, systems: [system, ...s.systems] }))
+    set((s) => ({ idCounters, systems: [system, ...s.systems], tenants: [tenant, ...s.tenants] }))
     get().saveToStorage()
     return system
   },

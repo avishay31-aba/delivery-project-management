@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -80,9 +80,14 @@ function projectStatusLabel(status: string): string {
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
   const isDone = status === 'DONE'
+  const Icon = isDone ? CheckCircle2 : CirclePlay
+  if (large) {
+    return <Icon className={[isDone ? 'text-blue-500' : 'text-green-500', 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
+  }
+
   return (
     <span className="inline-flex items-center gap-1.5 text-sf-text">
-      <span className={[large ? 'h-5 w-5' : 'h-3.5 w-3.5', isDone ? 'bg-blue-500' : 'bg-green-500', 'inline-block rounded-sm shadow-sm'].join(' ')} aria-hidden="true" />
+      <Icon className={[isDone ? 'text-blue-500' : 'text-green-500', 'h-4 w-4'].join(' ')} aria-hidden="true" />
       <span>{projectStatusLabel(status)}</span>
     </span>
   )

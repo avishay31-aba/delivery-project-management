@@ -1,6 +1,23 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useBlocker, useNavigate, useParams } from 'react-router-dom'
-import { Ban, ChevronDown, ChevronRight, CircleCheck, LockKeyhole, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
+import {
+  Ban,
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  Crosshair,
+  Database,
+  DoorOpen,
+  Globe2,
+  Grid3X3,
+  LockKeyhole,
+  Network,
+  PowerOff,
+  ServerOff,
+  ShieldX,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import {
@@ -53,16 +70,6 @@ const ACCESS_DETAIL_FIELDS = [
 ]
 const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
 const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
-const PRODUCT_LOGOS: Record<string, string> = {
-  Tangles: 'T',
-  'Tangles Light': 'TL',
-  Webloc: 'Wb',
-  Weaver: 'Wv',
-  Trapdoor: 'Tr',
-  Lynx: 'L',
-  DataAPI: 'API',
-}
-
 const PRODUCT_LOGO_COLORS: Record<string, string> = {
   Tangles: 'text-blue-600',
   'Tangles Light': 'text-cyan-600',
@@ -71,6 +78,28 @@ const PRODUCT_LOGO_COLORS: Record<string, string> = {
   Trapdoor: 'text-amber-600',
   Lynx: 'text-rose-600',
   DataAPI: 'text-slate-700',
+}
+
+function ProductLogoIcon({ product }: { product: string }) {
+  const Icon =
+    product === 'Tangles'
+      ? Network
+      : product === 'Tangles Light'
+        ? Sparkles
+        : product === 'Webloc'
+          ? Globe2
+          : product === 'Weaver'
+            ? Grid3X3
+            : product === 'Trapdoor'
+              ? DoorOpen
+              : product === 'Lynx'
+                ? Crosshair
+                : product === 'DataAPI'
+                  ? Database
+                  : null
+
+  if (!Icon) return null
+  return <Icon className={['h-9 w-9', PRODUCT_LOGO_COLORS[product] ?? 'text-slate-500'].join(' ')} aria-label={`${product} logo`} />
 }
 
 const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
@@ -127,7 +156,6 @@ function textValue(value: unknown): string {
 }
 
 function readRecordValue(record: InventoryRecord, key: string): unknown {
-  if (key === 'logo') return PRODUCT_LOGOS[textValue(readRecordValue(record, 'productType'))] ?? 'SYS'
   return (record as unknown as Record<string, unknown>)[key]
 }
 
@@ -339,9 +367,6 @@ function InventoryForm<T extends InventoryRecord>({
     setDraft((current) => {
       if (!current) return current
       const next = { ...current, [key]: value }
-      if (key === 'productType') {
-        return { ...next, logo: PRODUCT_LOGOS[String(value)] ?? 'SYS' } as T
-      }
       if (key === 'hostingType') {
         return { ...next, cloudPlatform: '', csp: '', cloudRegion: '' } as T
       }
@@ -512,12 +537,10 @@ function InventoryForm<T extends InventoryRecord>({
 
     if (!field.editable) {
       if (field.key === 'logo') {
-        const productType = textValue(readRecordValue(activeDraft, 'productType'))
+        const productType = applicationSummaryProduct()
         return (
           <FormField key={field.key} label={field.label} controlWidthClassName={width}>
-            <span className={['inline-flex h-10 min-w-10 items-center justify-center text-2xl font-black', PRODUCT_LOGO_COLORS[productType] ?? 'text-slate-500'].join(' ')}>
-              {value || 'SYS'}
-            </span>
+            {productType ? <ProductLogoIcon product={productType} /> : null}
           </FormField>
         )
       }
@@ -673,6 +696,10 @@ function InventoryForm<T extends InventoryRecord>({
 
   function hostedTenantsForDraft(): Tenant[] {
     return tenants.filter((tenant) => tenant.systemId === activeRecord.id)
+  }
+
+  function applicationSummaryProduct(): string {
+    return hostedTenantsForDraft().find((tenant) => textValue(tenant.productType))?.productType ?? ''
   }
 
   function tenantSummaryValue(key: string, hostedTenants: Tenant[]): string {

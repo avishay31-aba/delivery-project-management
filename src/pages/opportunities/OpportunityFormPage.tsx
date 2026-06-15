@@ -460,6 +460,8 @@ function RequirementGrid({
     const pickerId = `${row.id}:${column.key}`
     const isOpen = activeMultiSelect?.id === pickerId
     const draftSelected = isOpen ? activeMultiSelect.selected : selected
+    const selectedText = selected.length > 0 ? selected.join('; ') : 'Select'
+    const triggerWidth = `${Math.min(48, Math.max(16, selectedText.length + 3))}ch`
 
     function toggleOption(option: string) {
       setActiveMultiSelect((current) => {
@@ -476,7 +478,8 @@ function RequirementGrid({
         <button
           type="button"
           data-multiselect-trigger={pickerId}
-          className={inputClassName(isChanged, 'min-h-7 w-44 truncate text-left text-sm')}
+          className={inputClassName(isChanged, 'h-7 min-w-56 max-w-[42rem] whitespace-nowrap text-left text-sm')}
+          style={{ width: triggerWidth }}
           title={selected.join('; ')}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect()
@@ -495,12 +498,12 @@ function RequirementGrid({
                 selected,
                 left: rect.left,
                 top: rect.bottom + 4,
-                width: Math.max(rect.width, 224),
+                width: Math.max(rect.width, 256),
               }
             })
           }}
         >
-          {selected.length > 0 ? selected.join('; ') : 'Select'}
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{selectedText}</span>
         </button>
         {isOpen
           ? createPortal(
