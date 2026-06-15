@@ -1,5 +1,10 @@
 import type { OpportunitySubType, OpportunityType, RequirementType } from '@/data/seed.types'
 
+export const YES_NO_OPTIONS = ['', 'YES', 'NO']
+export const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
+export const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
+export const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
+
 export interface OpportunityHeaderField {
   key:
     | 'opportunityName'

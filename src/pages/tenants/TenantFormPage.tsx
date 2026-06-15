@@ -1,11 +1,22 @@
-import { type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ChangeEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, FileText, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { FormField, PlaceholderCard } from '@/components/ui'
+import {
+  ADDITIONAL_FEATURE_OPTIONS,
+  AI_OPTIONS,
+  CROSS_SYSTEM_OPTIONS,
+  YES_NO_OPTIONS,
+  requirementAColumns,
+  type RequirementColumnMetadata,
+} from '@/config/opportunity-metadata'
+import { HOSTING_OPTIONS, cloudPlatformOptionsForHosting } from '@/config/cloud-platform-metadata'
 import type {
   EngagementCircleContact,
+  NewTenantRequirement,
   Opportunity,
   Project,
   System,
@@ -21,9 +32,12 @@ import type {
   YesNo,
 } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
+import { validateRequirementA } from '@/utils/opportunity-validation'
+import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
+type TenantConfigurationColumn = RequirementColumnMetadata & { configKey: ConfigKey }
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type WarrantyKey = keyof Pick<
   TenantWarranty,
@@ -35,6 +49,7 @@ type WarrantyKey = keyof Pick<
   | 'outOfContract'
   | 'remark'
 >
+type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
@@ -44,46 +59,14 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'documents', label: 'Documents' },
 ]
 
-const YES_NO_OPTIONS: YesNo[] = ['', 'YES', 'NO']
 const REMARK_TYPES = ['Note', 'Warranty', 'Temporary change', 'Permanent change', 'Task']
-const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
-const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
-const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
 
-const CONFIGURATION_FIELDS: Array<{
-  key: ConfigKey
-  label: string
-  group: string
-  type: 'text' | 'number' | 'yesNo' | 'multi'
-  options?: string[]
-  readOnly?: boolean
-}> = [
-  { key: 'product', label: 'Product', group: 'Core Details', type: 'text', readOnly: true },
-  { key: 'licenses', label: 'Licenses', group: 'Core Details', type: 'number' },
-  { key: 'users', label: 'Users', group: 'Core Details', type: 'number' },
-  { key: 'concurrentSearches', label: 'Con. Searches', group: 'Core Details', type: 'number' },
-  { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', type: 'number' },
-  { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', type: 'number' },
-  { key: 'concurrentAnalyses', label: 'Con. Analyses', group: 'Core Details', type: 'number' },
-  { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', type: 'number' },
-  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', type: 'number' },
-  { key: 'topicAnalyses', label: 'Topic analyses', group: 'Core Details', type: 'number' },
-  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Modules', type: 'number' },
-  { key: 'fullMonitors', label: 'Full monitors', group: 'Modules', type: 'number' },
-  { key: 'topicMonitors', label: 'Topic monitors', group: 'Modules', type: 'number' },
-  { key: 'mapCenter', label: 'Map Center', group: 'Modules', type: 'text' },
-  { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules', type: 'number' },
-  { key: 'webloc', label: 'Webloc', group: 'Modules', type: 'number' },
-  { key: 'webeye', label: 'Webeye', group: 'Modules', type: 'number' },
-  { key: 'ingest', label: 'Ingest', group: 'Modules', type: 'number' },
-  { key: 'blockchain', label: 'Blockchain', group: 'Modules', type: 'yesNo' },
-  { key: 'crossSystemFeatures', label: 'Cross System', group: 'Modules', type: 'multi', options: CROSS_SYSTEM_OPTIONS },
-  { key: 'apiEnabled', label: 'Enable', group: 'API', type: 'yesNo' },
-  { key: 'apiDailyQty', label: 'Daily Qty', group: 'API', type: 'number' },
-  { key: 'apiMonthlyQty', label: 'Monthly', group: 'API', type: 'number' },
-  { key: 'aiFeatures', label: 'AI', group: 'AI', type: 'multi', options: AI_OPTIONS },
-  { key: 'additionalFeatures', label: 'Additional features', group: 'Additional features', type: 'multi', options: ADDITIONAL_FEATURE_OPTIONS },
-]
+const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = requirementAColumns
+  .slice(5)
+  .map((column) => ({
+    ...column,
+    configKey: column.key === 'productType' ? 'product' : column.key as ConfigKey,
+  }))
 
 const HOSTING_FIELDS: Array<{ key: keyof TenantHostingSnapshot; label: string }> = [
   { key: 'currentSystem', label: 'Current system' },
@@ -112,14 +95,17 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function textValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(';')
+  if (Array.isArray(value)) return value.join('; ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return value == null ? '' : String(value)
 }
 
-function numberFromInput(value: string): number | null {
-  if (value === '') return null
-  return Math.max(0, Number(value))
+function digitString(value: unknown): string {
+  return value == null ? '' : String(value).replace(/\D/g, '')
+}
+
+function parseDigitValue(value: string): number | null {
+  return value === '' ? null : Number(value)
 }
 
 function splitMultiValue(value: string): string[] {
@@ -127,6 +113,12 @@ function splitMultiValue(value: string): string[] {
     .split(';')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  if (!/^\d$/.test(event.key)) event.preventDefault()
 }
 
 function formatLocalTimestamp(value = new Date()): string {
@@ -163,6 +155,7 @@ function configurationFromTenant(tenant: Tenant, system?: System): TenantConfigu
     fullMonitors: tenant.configuration?.fullMonitors ?? tenant.fullMonitors ?? null,
     topicMonitors: tenant.configuration?.topicMonitors ?? tenant.topicMonitors ?? null,
     mapCenter: tenant.configuration?.mapCenter ?? tenant.mapCenter ?? '',
+    tangles: tenant.configuration?.tangles ?? tenant.tangles ?? null,
     tanglesGo: tenant.configuration?.tanglesGo ?? tenant.tanglesGo ?? null,
     webloc: tenant.configuration?.webloc ?? tenant.webloc ?? null,
     webeye: tenant.configuration?.webeye ?? tenant.webeye ?? null,
@@ -264,6 +257,60 @@ function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean
   return 'NOT_SET'
 }
 
+function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
+  return configuration[column.configKey]
+}
+
+function buildRequirementAFromConfiguration(
+  tenant: Tenant,
+  configuration: TenantConfiguration,
+  system?: System,
+): NewTenantRequirement {
+  return {
+    id: `tenant-config-${tenant.id}`,
+    requirementId: tenant.sourceRequirementId ?? 'TENANT-CONFIG',
+    deployTarget: 'NEW_SYSTEM',
+    existingSystemId: null,
+    hostingType: system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0],
+    cloudPlatform: system?.cloudPlatform ?? tenant.cloudPlatform ?? cloudPlatformOptionsForHosting(system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0])[0] ?? '',
+    csp: system?.csp ?? tenant.csp,
+    cloudRegion: system?.cloudRegion ?? tenant.cloudRegion,
+    statisticsId: tenant.statisticsId,
+    authId: tenant.authId,
+    rdmId: tenant.rdmId,
+    performanceTier: system?.performanceTier ?? tenant.performanceTier,
+    vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled,
+    vpnType: system?.vpnType ?? tenant.vpnType,
+    ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled,
+    productType: configuration.product,
+    mapCenter: configuration.mapCenter,
+    licenses: configuration.licenses,
+    users: configuration.users,
+    concurrentSearches: configuration.concurrentSearches,
+    dailySearches: configuration.dailySearches,
+    monthlySearches: configuration.monthlySearches,
+    concurrentAnalyses: configuration.concurrentAnalyses,
+    topicAnalyses: configuration.topicAnalyses,
+    dailyAnalyses: configuration.dailyAnalyses,
+    monthlyAnalyses: configuration.monthlyAnalyses,
+    tangles: configuration.tangles,
+    tanglesGo: configuration.tanglesGo,
+    webloc: configuration.webloc,
+    webeye: configuration.webeye,
+    ingest: configuration.ingest,
+    blockchain: configuration.blockchain,
+    crossSystemFeatures: configuration.crossSystemFeatures,
+    apiEnabled: configuration.apiEnabled,
+    apiDailyQty: configuration.apiDailyQty,
+    apiMonthlyQty: configuration.apiMonthlyQty,
+    aiFeatures: configuration.aiFeatures,
+    additionalFeatures: configuration.additionalFeatures,
+    standardMonitors: configuration.standardMonitors,
+    fullMonitors: configuration.fullMonitors,
+    topicMonitors: configuration.topicMonitors,
+  }
+}
+
 function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string }>, systems: System[]): Project | undefined {
   const linkedProjectId = projectTenants.find((link) => link.tenantId === tenant.id)?.projectId
   if (linkedProjectId) return projects.find((project) => project.id === linkedProjectId)
@@ -326,6 +373,7 @@ function tenantPatchFromDraft(draft: Tenant, saved: Tenant, system?: System): Pa
     fullMonitors: configuration.fullMonitors,
     topicMonitors: configuration.topicMonitors,
     mapCenter: configuration.mapCenter,
+    tangles: configuration.tangles,
     tanglesGo: configuration.tanglesGo,
     webloc: configuration.webloc,
     webeye: configuration.webeye,
@@ -377,6 +425,7 @@ export function TenantFormPage() {
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
+  const accounts = useAppStore((state) => state.accounts)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
   const updateTenant = useAppStore((state) => state.updateTenant)
@@ -391,6 +440,9 @@ export function TenantFormPage() {
   const [messages, setMessages] = useState<string[]>([])
   const [editingRemarkIds, setEditingRemarkIds] = useState<string[]>([])
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
+  const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
+  const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
+  const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
   const navigationBlocker = useBlocker(isDirty)
 
@@ -412,12 +464,23 @@ export function TenantFormPage() {
   const activeSystem = systems.find((candidate) => candidate.id === (tenantDraft.hostedSystemId ?? tenantDraft.systemId)) ?? system
   const project = resolveProject(tenantDraft, projects, projectTenants, systems)
   const opportunity = resolveOpportunity(project, opportunities)
+  const canManageWarranties = Boolean(project && opportunity)
   const inheritedEngagementCircle = tenantDraft.engagementCircle?.length
     ? tenantDraft.engagementCircle
     : opportunity?.engagementCircles ?? []
   const formType = tenantFormType(tenantDraft)
   const configuration = configurationFromTenant(tenantDraft, activeSystem)
   const hosting = hostingFromSystem(tenantDraft, activeSystem)
+  const countryOptions = Array.from(
+    new Set(
+      [
+        ...accounts.map((account) => account.country),
+        opportunity?.country,
+        tenantDraft.country,
+        activeSystem?.country,
+      ].filter((value): value is string => Boolean(value)),
+    ),
+  ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = projects.filter(
     (candidate) =>
       projectTenants.some((link) => link.tenantId === tenantDraft.id && link.projectId === candidate.id) ||
@@ -448,6 +511,50 @@ export function TenantFormPage() {
         alerts: status === 'PENDING' ? 'Expiring soon' : '',
       }
     })
+  }
+
+  function validationOpportunity(): Opportunity {
+    const now = new Date().toISOString()
+    return opportunity ?? {
+      id: `tenant-config-opportunity-${tenantDraft.id}`,
+      opportunityId: project?.opportunityId ?? '',
+      opportunityName: project?.opportunityName ?? tenantDraft.tenantName ?? tenantDraft.tid,
+      stage: 'OPEN',
+      accountId: tenantDraft.accountId,
+      salesManagerId: '',
+      type: formType === 'POC' ? 'POC' : 'DELIVERY',
+      subType: formType === 'POC' ? 'PAID' : 'NEW',
+      deliveryDate: project?.deliveryDate ?? null,
+      pocStartDate: tenantDraft.pocStartDate ?? null,
+      pocEndDate: tenantDraft.pocEndDate ?? null,
+      warrantyServiceMonths: null,
+      region: activeSystem?.region ?? '',
+      country: tenantDraft.country,
+      state: activeSystem?.state ?? '',
+      timeZone: '',
+      timeGroup: tenantDraft.timeGroup,
+      currentMilestone: '',
+      projectAlerts: [],
+      engagementCircles: [],
+      newTenantRequirements: [],
+      changeRequestRequirements: [],
+      standardRenewalRequirements: [],
+      pocProjectIds: [],
+      finalProjectId: null,
+      wonAt: null,
+      createdAt: now,
+      updatedAt: now,
+    }
+  }
+
+  function validateTenantConfiguration(): string[] {
+    return validateRequirementA(
+      buildRequirementAFromConfiguration(tenantDraft, configuration, activeSystem),
+      validationOpportunity(),
+      { accounts, systems, tenants },
+    )
+      .filter((message) => message.level === 'error')
+      .map((message) => message.message.replace(/^Grid A row 1: /, 'Configuration: '))
   }
 
   function updateConfiguration(key: ConfigKey, value: string | string[] | number | null) {
@@ -507,6 +614,12 @@ export function TenantFormPage() {
   }
 
   function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
+    const nextMessages = validateTenantConfiguration()
+    if (nextMessages.length > 0) {
+      setMessages(nextMessages)
+      return
+    }
+
     const normalizedDraft = {
       ...tenantDraft,
       warranties: computedWarranties(tenantDraft.warranties ?? []),
@@ -595,6 +708,11 @@ export function TenantFormPage() {
   }
 
   function addWarranty() {
+    if (!canManageWarranties) {
+      setMessages(['Warranty can be managed only after the tenant is linked to a Project/Opportunity.'])
+      return
+    }
+
     setDraft((current) => {
       if (!current) return current
       const warranties = current.warranties ?? []
@@ -792,13 +910,174 @@ export function TenantFormPage() {
     )
   }
 
-  function renderMultiSelect(field: (typeof CONFIGURATION_FIELDS)[number], selected: string[]) {
+  function optionsWithCustom(key: ConfigKey, options: string[]): string[] {
+    return [
+      ...options.filter((option) => option !== 'Add new...'),
+      ...(customPicklistOptions[key] ?? []),
+      ...(options.includes('Add new...') ? ['Add new...'] : []),
+    ]
+  }
+
+  function configurationOptions(field: TenantConfigurationColumn): string[] {
+    if (field.key === 'mapCenter') return [...countryOptions, 'Add new...']
+    if (field.key === 'crossSystemFeatures') return CROSS_SYSTEM_OPTIONS
+    if (field.key === 'aiFeatures') return AI_OPTIONS
+    if (field.key === 'additionalFeatures') return ADDITIONAL_FEATURE_OPTIONS
+    if (field.inputType === 'picklist') return YES_NO_OPTIONS
+    return []
+  }
+
+  function handleConfigurationPicklistChange(field: TenantConfigurationColumn, value: string) {
+    if (value === 'Add new...') {
+      setPendingAddNew({ key: field.configKey, value: '' })
+      return
+    }
+    updateConfiguration(field.configKey, value)
+  }
+
+  function renderConfigurationAddNew(field: TenantConfigurationColumn) {
+    if (pendingAddNew?.key !== field.configKey) return null
+
+    return (
+      <div className="mt-1 flex w-40 items-center gap-1">
+        <input
+          className="h-7 min-w-0 flex-1 rounded border border-sf-border px-2 py-1 text-sm"
+          value={pendingAddNew.value}
+          autoFocus
+          onChange={(event) => setPendingAddNew({ key: field.configKey, value: event.target.value })}
+        />
+        <button
+          type="button"
+          className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white"
+          onClick={() => {
+            const nextValue = pendingAddNew.value.trim()
+            if (!nextValue) return
+            setCustomPicklistOptions((current) => addCustomPicklistOption(current, field.configKey, nextValue))
+            updateConfiguration(field.configKey, nextValue)
+            setPendingAddNew(null)
+          }}
+        >
+          Add
+        </button>
+        <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setPendingAddNew(null)}>
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  function renderMultiSelect(field: TenantConfigurationColumn, selected: string[]) {
+    const pickerId = `tenant-config:${field.configKey}`
+    const isOpen = activeMultiSelect?.id === pickerId
+    const selectedText = selected.length > 0 ? selected.join('; ') : 'Select'
+    const triggerWidth = `${Math.min(48, Math.max(16, selectedText.length + 3))}ch`
+    const options = configurationOptions(field)
+
+    function toggleOption(option: string) {
+      const nextSelected = selected.includes(option)
+        ? selected.filter((value) => value !== option)
+        : [...selected, option]
+      updateConfiguration(field.configKey, nextSelected)
+    }
+
+    return (
+      <>
+        <button
+          type="button"
+          className="h-7 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm"
+          style={{ width: triggerWidth }}
+          title={selected.join('; ')}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            setActiveMultiSelect((current) =>
+              current?.id === pickerId
+                ? null
+                : {
+                    id: pickerId,
+                    key: field.configKey,
+                    selected,
+                    left: rect.left,
+                    top: rect.bottom + 4,
+                    width: Math.max(rect.width, 256),
+                  },
+            )
+          }}
+        >
+          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{selectedText}</span>
+        </button>
+        {isOpen
+          ? createPortal(
+              <div
+                className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
+                style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
+              >
+                {options.map((option) => (
+                  <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-sm hover:bg-sf-surface-alt">
+                    <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
+                    <span>{option}</span>
+                  </label>
+                ))}
+              </div>,
+              document.body,
+            )
+          : null}
+      </>
+    )
+  }
+
+  function renderConfigurationCell(field: TenantConfigurationColumn) {
+    const value = configurationValue(configuration, field)
+    const isProduct = field.configKey === 'product'
+
+    if (isProduct) {
+      return <div className="min-h-7 px-1 py-1 text-sm text-sf-text">{textValue(value) || '-'}</div>
+    }
+
+    if (field.inputType === 'picklist') {
+      const options = configurationOptions(field)
+      return (
+        <>
+          <select
+            className="h-7 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm"
+            value={textValue(value)}
+            onChange={(event) => handleConfigurationPicklistChange(field, event.target.value)}
+          >
+            {optionsWithCustom(field.configKey, options).map((option) => (
+              <option key={option} value={option}>{option || 'Not set'}</option>
+            ))}
+          </select>
+          {renderConfigurationAddNew(field)}
+        </>
+      )
+    }
+
+    if (field.inputType === 'multiselect') {
+      return renderMultiSelect(field, Array.isArray(value) ? value : splitMultiValue(textValue(value)))
+    }
+
+    if (field.inputType === 'integer') {
+      return (
+        <input
+          className="h-7 w-24 rounded border border-sf-border px-2 py-1 text-sm"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={digitString(value)}
+          onKeyDown={preventNonDigitKey}
+          onPaste={(event) => {
+            event.preventDefault()
+            updateConfiguration(field.configKey, parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')))
+          }}
+          onChange={(event) => updateConfiguration(field.configKey, parseDigitValue(event.target.value.replace(/\D/g, '')))}
+        />
+      )
+    }
+
     return (
       <input
-        className="h-8 w-72 rounded border border-sf-border px-2 py-1"
-        value={selected.join(';')}
-        list={`${field.key}-options`}
-        onChange={(event) => updateConfiguration(field.key, splitMultiValue(event.target.value))}
+        className="h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+        value={textValue(value)}
+        onChange={(event) => updateConfiguration(field.configKey, event.target.value)}
       />
     )
   }
@@ -820,28 +1099,9 @@ export function TenantFormPage() {
           <tbody>
             <tr>
               {CONFIGURATION_FIELDS.map((field) => {
-                const value = configuration[field.key]
                 return (
                   <td key={field.key} className="border border-sf-border px-1.5 py-1 align-top">
-                    {field.readOnly ? (
-                      <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1">{textValue(value)}</div>
-                    ) : field.type === 'number' ? (
-                      <input
-                        className="h-8 w-24 rounded border border-sf-border px-2 py-1"
-                        type="number"
-                        min={0}
-                        value={value == null ? '' : String(value)}
-                        onChange={(event) => updateConfiguration(field.key, numberFromInput(event.target.value))}
-                      />
-                    ) : field.type === 'yesNo' ? (
-                      <select className="h-8 rounded border border-sf-border px-2 py-1" value={textValue(value)} onChange={(event) => updateConfiguration(field.key, event.target.value as YesNo)}>
-                        {YES_NO_OPTIONS.map((option) => <option key={option} value={option}>{option || '-'}</option>)}
-                      </select>
-                    ) : field.type === 'multi' ? (
-                      renderMultiSelect(field, Array.isArray(value) ? value : [])
-                    ) : (
-                      <input className="h-8 w-40 rounded border border-sf-border px-2 py-1" value={textValue(value)} onChange={(event) => updateConfiguration(field.key, event.target.value)} />
-                    )}
+                    {renderConfigurationCell(field)}
                   </td>
                 )
               })}
@@ -1007,7 +1267,7 @@ export function TenantFormPage() {
             record.recordId,
             record.timestamp,
             record.recordedBy,
-            ...CONFIGURATION_FIELDS.map((field) => textValue(record.configuration[field.key])),
+            ...CONFIGURATION_FIELDS.map((field) => textValue(configurationValue(record.configuration, field))),
           ])}
           emptyText="No configuration changes have been recorded for this POC tenant."
         />
@@ -1017,6 +1277,38 @@ export function TenantFormPage() {
 
   function renderWarranties() {
     const warranties = computedWarranties(tenantDraft.warranties ?? [])
+    if (!canManageWarranties) {
+      return (
+        <section className="sf-card space-y-3 p-3">
+          <h2 className="text-lg font-semibold text-sf-text">Warranties</h2>
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Warranty can be managed only after the tenant is linked to a Project/Opportunity.
+          </div>
+          <ReadonlyTable
+            headers={['Warranty ID', 'Warranty Type', 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark']}
+            rows={warranties.map((warranty) => [
+              warranty.warrantyId,
+              warranty.warrantyType,
+              warranty.firstWarranty ? 'Yes' : 'No',
+              warranty.predecessor,
+              warranty.successor,
+              warranty.accountId,
+              warranty.relatedProjectId,
+              warranty.opportunityId,
+              warranty.startDate ?? '',
+              warranty.endDate ?? '',
+              warranty.durationDays ?? '',
+              warranty.daysBeforeExpiration ?? '',
+              displayWarrantyStatus(warranty.warrantyStatus),
+              warranty.alerts,
+              warranty.remark,
+            ])}
+            emptyText="No warranty records are available for this tenant."
+          />
+        </section>
+      )
+    }
+
     return (
       <section className="sf-card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

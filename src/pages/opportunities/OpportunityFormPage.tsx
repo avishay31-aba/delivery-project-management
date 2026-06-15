@@ -8,6 +8,10 @@ import {
   cloudPlatformOptionsForHosting,
 } from '@/config/cloud-platform-metadata'
 import {
+  ADDITIONAL_FEATURE_OPTIONS,
+  AI_OPTIONS,
+  CROSS_SYSTEM_OPTIONS,
+  YES_NO_OPTIONS,
   getOpportunityMetadata,
   getVisibleRequirementTypes,
   requirementAColumns,
@@ -28,7 +32,6 @@ import type {
   System,
   Tenant,
   WarrantyRecord,
-  YesNo,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
@@ -65,10 +68,6 @@ const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   RENEWAL: ['STANDARD', 'UPSELL', 'DOWN_SELL'],
 }
 
-const YES_NO_OPTIONS: YesNo[] = ['', 'YES', 'NO']
-const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
-const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
-const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
 const EMPTY_PROJECT_CHANGES: ProjectLifecycleChange[] = []
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   opportunityHeader: false,

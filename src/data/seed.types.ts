@@ -343,6 +343,7 @@ export interface TenantConfiguration {
   fullMonitors: number | null
   topicMonitors: number | null
   mapCenter: string
+  tangles: number | null
   tanglesGo: number | null
   webloc: number | null
   webeye: number | null

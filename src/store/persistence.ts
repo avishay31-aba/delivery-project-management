@@ -94,6 +94,7 @@ function configurationFromTenant(tenant: Tenant): TenantConfiguration {
     fullMonitors: tenant.configuration?.fullMonitors ?? tenant.fullMonitors ?? null,
     topicMonitors: tenant.configuration?.topicMonitors ?? tenant.topicMonitors ?? null,
     mapCenter: tenant.configuration?.mapCenter ?? tenant.mapCenter ?? '',
+    tangles: tenant.configuration?.tangles ?? tenant.tangles ?? null,
     tanglesGo: tenant.configuration?.tanglesGo ?? tenant.tanglesGo ?? null,
     webloc: tenant.configuration?.webloc ?? tenant.webloc ?? null,
     webeye: tenant.configuration?.webeye ?? tenant.webeye ?? null,
