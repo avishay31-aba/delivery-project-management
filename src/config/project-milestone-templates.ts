@@ -23,6 +23,13 @@ export interface ProjectTemplateResolution {
   reason: string
 }
 
+export const PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS = {
+  mixedDeliveryHosting: 'Any on-prem/hybrid new tenant requirement selects the on-prem/hybrid delivery template.',
+  deliveryUpsellChangeOnly: 'Delivery upsell with change requests and no new tenant requirements selects the change-request-only template.',
+  renewalChangeOnly: 'Renewal upsell/down sell without new tenant requirements selects the renewal change-only template.',
+  mixedRenewalHosting: 'Any on-prem/hybrid new tenant requirement in renewal upsell selects the on-prem/hybrid renewal template.',
+} as const
+
 export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId, ProjectMilestoneTaskTemplate> = {
   "1": {
     "id": "1",
@@ -1852,19 +1859,21 @@ export function resolveProjectMilestoneTemplate(project: Project, opportunity: O
 
   if (project.mainType === 'DELIVERY') {
     if (project.subType === 'UPSELL' && includesChangeRequest && !includesNewTenant) {
-      return { templateId: '4', reason: 'Delivery upsell with change request only' }
+      return { templateId: '4', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.deliveryUpsellChangeOnly }
     }
+    // Mixed cloud/on-prem Delivery cases currently follow the workbook's "at least one server" row.
     return serverHostedNewTenant
-      ? { templateId: '3', reason: 'Delivery includes at least one on-prem/hybrid new tenant' }
+      ? { templateId: '3', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedDeliveryHosting }
       : { templateId: '2', reason: 'Delivery new tenant flow defaults to Cloud template' }
   }
 
   if (project.mainType === 'RENEWAL') {
     if (project.subType === 'STANDARD') return { templateId: '5', reason: 'Renewal standard' }
-    if (project.subType === 'DOWN_SELL') return { templateId: '6', reason: 'Renewal down sell change request flow' }
-    if (!includesNewTenant) return { templateId: '6', reason: 'Renewal upsell without new tenant requirements' }
+    if (project.subType === 'DOWN_SELL') return { templateId: '6', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
+    if (!includesNewTenant) return { templateId: '6', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
+    // Mixed cloud/on-prem Renewal cases currently follow the workbook's "at least one server" row.
     return serverHostedNewTenant
-      ? { templateId: '8', reason: 'Renewal upsell includes at least one on-prem/hybrid new tenant' }
+      ? { templateId: '8', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedRenewalHosting }
       : { templateId: '7', reason: 'Renewal upsell with cloud new tenant requirements' }
   }
 

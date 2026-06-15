@@ -353,6 +353,7 @@ function InventoryForm<T extends InventoryRecord>({
   const [messages, setMessages] = useState<string[]>([])
   const [movingTenantId, setMovingTenantId] = useState<string | null>(null)
   const [destinationSystemId, setDestinationSystemId] = useState('')
+  const [tenantPendingDelete, setTenantPendingDelete] = useState<Tenant | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -752,9 +753,13 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function handleDeleteTenant(tenant: Tenant) {
-    const confirmed = window.confirm(`Delete tenant ${tenant.tid} from this system? The tenant remains in tenant history and dashboards.`)
-    if (!confirmed) return
-    deleteTenantFromSystem(tenant.id)
+    setTenantPendingDelete(tenant)
+  }
+
+  function confirmTenantDelete() {
+    if (!tenantPendingDelete) return
+    deleteTenantFromSystem(tenantPendingDelete.id)
+    setTenantPendingDelete(null)
   }
 
   function handleMoveTenant(tenant: Tenant) {
@@ -1071,6 +1076,24 @@ function InventoryForm<T extends InventoryRecord>({
               </button>
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.reset?.()}>
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {tenantPendingDelete ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="delete-tenant-title">
+            <h2 id="delete-tenant-title" className="text-lg font-semibold text-sf-text">Delete tenant from system</h2>
+            <p className="mt-2 text-sm text-sf-text-muted">
+              Delete tenant {tenantPendingDelete.tid} from this system? The tenant remains in tenant history and dashboards, and its operational status will be set to Deleted.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setTenantPendingDelete(null)}>
+                Cancel
+              </button>
+              <button type="button" className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700" onClick={confirmTenantDelete}>
+                Delete
               </button>
             </div>
           </div>
