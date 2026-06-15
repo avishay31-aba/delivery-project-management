@@ -8,9 +8,11 @@ import {
   Crosshair,
   Database,
   DoorOpen,
+  Edit3,
   Globe2,
   Grid3X3,
   LockKeyhole,
+  MoveRight,
   Network,
   PowerOff,
   ServerOff,
@@ -102,14 +104,6 @@ function ProductLogoIcon({ product }: { product: string }) {
   return <Icon className={['h-9 w-9', PRODUCT_LOGO_COLORS[product] ?? 'text-slate-500'].join(' ')} aria-label={`${product} logo`} />
 }
 
-const OPERATIONAL_STATUS_STYLES: Record<string, string> = {
-  On: 'bg-green-500',
-  Off: 'bg-red-500',
-  'Access blocked': 'bg-amber-500',
-  'Service blocked': 'bg-orange-500',
-  Deleted: 'bg-gray-500',
-  Canceled: 'bg-purple-500',
-}
 const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
   On: 'text-green-500',
   Off: 'text-red-500',
@@ -120,6 +114,7 @@ const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
 }
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_COLUMNS.filter((column) => column.key !== 'existingSystemId' && column.key !== 'deployTarget')
+const TENANT_CONFIGURATION_FIELDS = requirementAColumns.slice(3)
 const INTEGER_SUMMARY_KEYS = new Set([
   'licenses',
   'users',
@@ -261,12 +256,23 @@ function OperationalStatusBadge({ value }: { value: string }) {
 }
 
 function LargeStatusIcon({ status }: { status: string }) {
+  const Icon =
+    status === 'On'
+      ? CircleCheck
+      : status === 'Off'
+        ? PowerOff
+        : status === 'Access blocked'
+          ? LockKeyhole
+          : status === 'Service blocked'
+            ? ShieldX
+            : status === 'Deleted'
+              ? Trash2
+              : status === 'Canceled'
+                ? Ban
+                : ServerOff
+
   return (
-    <span
-      className={['inline-block h-5 w-5 rounded-full align-middle shadow-sm ring-2 ring-white', OPERATIONAL_STATUS_STYLES[status] ?? 'bg-slate-300'].join(' ')}
-      title={status || 'Not set'}
-      aria-label={`Operational status: ${status || 'Not set'}`}
-    />
+    <Icon className={['h-8 w-8', OPERATIONAL_STATUS_ICON_STYLES[status] ?? 'text-slate-400'].join(' ')} aria-label={`Operational status: ${status || 'Not set'}`} />
   )
 }
 
@@ -335,11 +341,18 @@ function InventoryForm<T extends InventoryRecord>({
   const navigate = useNavigate()
   const projects = useAppStore((state) => state.projects)
   const tenants = useAppStore((state) => state.tenants)
+  const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
+  const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
+  const allocatedSystems = useAppStore((state) => state.systems)
+  const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
+  const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
+  const [movingTenantId, setMovingTenantId] = useState<string | null>(null)
+  const [destinationSystemId, setDestinationSystemId] = useState('')
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -724,60 +737,134 @@ function InventoryForm<T extends InventoryRecord>({
     return Array.from(new Set(values)).join('; ') || '-'
   }
 
+  function allDestinationSystems(): InventoryRecord[] {
+    return [...productionSystemInventory, ...reusedInternalSystems, ...allocatedSystems]
+      .filter((system) => system.id !== activeRecord.id)
+  }
+
+  function systemDisplayName(system: InventoryRecord): string {
+    const id = 'sid' in system ? system.sid : 'machineId' in system ? system.machineId : ''
+    return `${id || system.id} - ${system.productType || 'System'}`
+  }
+
+  function tenantFieldValue(tenant: Tenant, key: string): string {
+    return textValue((tenant as unknown as Record<string, unknown>)[key]) || '-'
+  }
+
+  function handleDeleteTenant(tenant: Tenant) {
+    const confirmed = window.confirm(`Delete tenant ${tenant.tid} from this system? The tenant remains in tenant history and dashboards.`)
+    if (!confirmed) return
+    deleteTenantFromSystem(tenant.id)
+  }
+
+  function handleMoveTenant(tenant: Tenant) {
+    if (!destinationSystemId) return
+    moveTenantToSystem(tenant.id, destinationSystemId)
+    setMovingTenantId(null)
+    setDestinationSystemId('')
+  }
+
+  function renderTenantRows(hostedTenants: Tenant[]) {
+    const destinationSystems = allDestinationSystems()
+
+    return hostedTenants.map((tenant) => (
+      <tr key={tenant.id} className="hover:bg-sf-surface-alt">
+        <td className="sticky left-0 z-10 min-w-52 border border-sf-border bg-white px-1.5 py-1 align-top text-sf-text">
+          <div className="flex flex-wrap gap-1">
+            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={() => navigate(`/tenants/${tenant.tid}`)}>
+              <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
+              Edit
+            </button>
+            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={() => handleDeleteTenant(tenant)}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Delete
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
+              onClick={() => {
+                setMovingTenantId(tenant.id)
+                setDestinationSystemId(destinationSystems[0]?.id ?? '')
+              }}
+            >
+              <MoveRight className="h-3.5 w-3.5" aria-hidden="true" />
+              Move
+            </button>
+          </div>
+          {movingTenantId === tenant.id ? (
+            <div className="mt-2 flex min-w-72 items-center gap-1">
+              <select className="h-8 min-w-52 rounded border border-sf-border px-2 py-1 text-xs" value={destinationSystemId} onChange={(event) => setDestinationSystemId(event.target.value)}>
+                {destinationSystems.map((system) => (
+                  <option key={system.id} value={system.id}>{systemDisplayName(system)}</option>
+                ))}
+              </select>
+              <button type="button" className="rounded bg-sf-brand px-2 py-1 text-xs font-semibold text-white disabled:opacity-50" disabled={!destinationSystemId} onClick={() => handleMoveTenant(tenant)}>
+                Apply
+              </button>
+              <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setMovingTenantId(null)}>
+                Cancel
+              </button>
+            </div>
+          ) : null}
+        </td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tid}</td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName || '-'}</td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.deliveryPid || '-'}</td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={tenant.operationalStatus} /></td>
+        {TENANT_CONFIGURATION_FIELDS.map((column) => (
+          <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
+            {tenantFieldValue(tenant, column.key)}
+          </td>
+        ))}
+      </tr>
+    ))
+  }
+
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft()
+    const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
+    const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
+    const tenantHeaders = [
+      'Action',
+      'TID',
+      'Customer / End User Name',
+      'Delivery PID',
+      'Operational Status',
+      ...TENANT_CONFIGURATION_FIELDS.map((column) => column.label),
+    ]
 
-    return (
-      <div className="space-y-4">
+    function renderHostedTenantSection(title: string, sectionTenants: Tenant[]) {
+      return (
         <section className="space-y-2">
-          <h3 className="text-lg font-semibold text-sf-text">Hosted Tenants</h3>
-          {hostedTenants.length > 0 ? (
+          <h3 className="text-lg font-semibold text-sf-text">{title}</h3>
+          {sectionTenants.length > 0 ? (
             <div className="overflow-x-auto rounded border border-sf-border bg-white">
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
-                    {[
-                      'TID',
-                      'Customer / End User Name',
-                      'Tenant Name',
-                      'Delivery PID',
-                      'Product',
-                      'Hosting',
-                      'Cloud Platform',
-                      'Users',
-                      'Licenses',
-                      'Operational Status',
-                    ].map((label) => (
+                    {tenantHeaders.map((label) => (
                       <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                         {label}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {hostedTenants.map((tenant) => (
-                    <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tid}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tenantName ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.deliveryPid ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.productType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.hostingType ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.cloudPlatform ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.users ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.licenses ?? '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.operationalStatus}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                <tbody>{renderTenantRows(sectionTenants)}</tbody>
               </table>
             </div>
           ) : (
             <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-              No tenants are hosted in this system.
+              No hosted tenants in this section.
             </div>
           )}
         </section>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {renderHostedTenantSection('Under Contract', underContractTenants)}
+        {renderHostedTenantSection('Out of Contract', outOfContractTenants)}
 
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>

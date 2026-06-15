@@ -31,6 +31,7 @@ export type ReusedInternalSystemStatus = 'Available' | 'Occupied' | 'Obsolete'
 
 export type TenantType = 'CUSTOMER' | 'POC' | 'PENLINK_INTERNAL'
 export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
+export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
 
 export interface IdCounters {
   pid: number
@@ -86,8 +87,28 @@ export interface Project {
   dealOwner: string
   opportunityName: string
   canceledAt: string | null
+  milestoneTemplateId?: string
+  milestones?: ProjectMilestone[]
+  tasks?: ProjectTask[]
   createdAt: string
   updatedAt: string
+}
+
+export interface ProjectMilestone {
+  id: string
+  name: string
+  order: number
+  status: ProgressStatus
+}
+
+export interface ProjectTask {
+  id: string
+  milestoneId: string
+  name: string
+  department: string
+  resource: string
+  status: Exclude<ProgressStatus, 'IN_PROGRESS'>
+  order: number
 }
 
 export interface OpportunityRequirementBase {
@@ -234,6 +255,8 @@ export interface Tenant {
   country: string
   timeGroup: string
   operationalStatus: string
+  contractStatus?: TenantContractStatus
+  hostedSystemHistory?: TenantHostedSystemHistory[]
   productType: string
   hostingType?: string
   cloudPlatform?: string
@@ -278,6 +301,13 @@ export interface Tenant {
   pocEndDate: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface TenantHostedSystemHistory {
+  systemId: string
+  startedAt: string
+  endedAt: string | null
+  reason: 'Created' | 'Moved' | 'Deleted'
 }
 
 export interface ProductionSystemInventoryItem {

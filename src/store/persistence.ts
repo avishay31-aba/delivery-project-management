@@ -1,4 +1,4 @@
-import type { AppDataState, Opportunity, Project } from '@/data/seed.types'
+import type { AppDataState, Opportunity, Project, Tenant } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 
@@ -39,6 +39,21 @@ function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Op
   }
 }
 
+function normalizeTenant(tenant: Tenant): Tenant {
+  const history =
+    tenant.hostedSystemHistory && tenant.hostedSystemHistory.length > 0
+      ? tenant.hostedSystemHistory
+      : tenant.systemId
+        ? [{ systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
+        : []
+
+  return {
+    ...tenant,
+    contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
+    hostedSystemHistory: history,
+  }
+}
+
 function normalizeState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
   const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProject) : seedState.projects.map(normalizeProject)
@@ -58,7 +73,7 @@ function normalizeState(state: AppDataState): AppDataState {
       ? state.reusedInternalSystems
       : seedState.reusedInternalSystems,
     systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
-    tenants: Array.isArray(state.tenants) ? state.tenants : seedState.tenants,
+    tenants: Array.isArray(state.tenants) ? state.tenants.map(normalizeTenant) : seedState.tenants.map(normalizeTenant),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     projectSystems: Array.isArray(state.projectSystems) ? state.projectSystems : seedState.projectSystems,
     projectTenants: Array.isArray(state.projectTenants) ? state.projectTenants : seedState.projectTenants,

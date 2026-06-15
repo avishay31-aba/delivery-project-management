@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -24,6 +24,11 @@ import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import { useAppStore } from '@/store/useAppStore'
+import {
+  PROJECT_MILESTONE_TASK_TEMPLATES,
+  buildProjectMilestonesAndTasks,
+  resolveProjectMilestoneTemplate,
+} from '@/config/project-milestone-templates'
 
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
@@ -75,22 +80,40 @@ function tenantDisplayName(tenant: Tenant): string {
 }
 
 function projectStatusLabel(status: string): string {
-  return status === 'DONE' ? 'Done' : 'Open'
+  if (status === 'DONE') return 'Done'
+  if (status === 'IN_PROGRESS') return 'In progress'
+  return 'Open'
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
   const isDone = status === 'DONE'
+  const isInProgress = status === 'IN_PROGRESS'
   const Icon = isDone ? CheckCircle2 : CirclePlay
   if (large) {
-    return <Icon className={[isDone ? 'text-blue-500' : 'text-green-500', 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    return <Icon className={[isDone ? 'text-blue-500' : isInProgress ? 'text-amber-500' : 'text-green-500', 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sf-text">
-      <Icon className={[isDone ? 'text-blue-500' : 'text-green-500', 'h-4 w-4'].join(' ')} aria-hidden="true" />
+      <Icon className={[isDone ? 'text-blue-500' : isInProgress ? 'text-amber-500' : 'text-green-500', 'h-4 w-4'].join(' ')} aria-hidden="true" />
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
+}
+
+function milestoneStatus(project: Project, milestoneId: string): Project['progressStatus'] {
+  const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
+  if (tasks.length === 0) return 'OPEN'
+  const doneCount = tasks.filter((task) => task.status === 'DONE').length
+  if (doneCount === 0) return 'OPEN'
+  if (doneCount === tasks.length) return 'DONE'
+  return 'IN_PROGRESS'
+}
+
+function milestoneProgress(project: Project, milestoneId: string): number {
+  const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
+  if (tasks.length === 0) return 0
+  return Math.round((tasks.filter((task) => task.status === 'DONE').length / tasks.length) * 100)
 }
 
 function projectTypeForOpportunity(opportunity: Opportunity): { mainType: ProjectMainType; subType: ProjectSubType } {
@@ -265,6 +288,7 @@ export function ProjectFormPage() {
   const [activeTab, setActiveTab] = useState<ProjectFormTab>('systemsTenants')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
@@ -304,6 +328,29 @@ export function ProjectFormPage() {
   if (currentDraft && !currentDraft.opportunityName.trim()) {
     missingFields.add('opportunityName')
   }
+
+  useEffect(() => {
+    setDraft((current) => {
+      if (!current) return current
+      const resolution = resolveProjectMilestoneTemplate(current, linkedOpportunity)
+      if (current.milestoneTemplateId === resolution.templateId && current.milestones?.length && current.tasks?.length) {
+        return current
+      }
+      const templateData = buildProjectMilestonesAndTasks(resolution.templateId)
+      return {
+        ...current,
+        milestoneTemplateId: resolution.templateId,
+        milestones: templateData.milestones,
+        tasks: templateData.tasks,
+      }
+    })
+  }, [
+    linkedOpportunity,
+    currentDraft?.id,
+    currentDraft?.mainType,
+    currentDraft?.subType,
+    currentDraft?.opportunityId,
+  ])
 
   if (!currentDraft || !metadata || !savedProject) {
     return (
@@ -406,6 +453,9 @@ export function ProjectFormPage() {
       mainType: projectDraft.mainType,
       subType: projectDraft.subType,
       deliveryDate: projectDraft.deliveryDate,
+      milestoneTemplateId: projectDraft.milestoneTemplateId,
+      milestones: projectDraft.milestones,
+      tasks: projectDraft.tasks,
     })
     setSaveMessages(['Project saved.'])
     if (!stayOnPage) navigate('/projects')
@@ -552,6 +602,252 @@ export function ProjectFormPage() {
           </div>
         )}
       </CollapsibleSection>
+    )
+  }
+
+  function updateMilestoneOrder(milestoneId: string, order: number) {
+    setDraft((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        milestones: (current.milestones ?? []).map((milestone) =>
+          milestone.id === milestoneId ? { ...milestone, order } : milestone,
+        ),
+      }
+    })
+    setSaveMessages([])
+  }
+
+  function updateTask(taskId: string, patch: Partial<NonNullable<Project['tasks']>[number]>) {
+    setDraft((current) => {
+      if (!current) return current
+      const tasks = (current.tasks ?? []).map((task) =>
+        task.id === taskId ? { ...task, ...patch } : task,
+      )
+      const statusForMilestone = (milestoneId: string): Project['progressStatus'] => {
+        const milestoneTasks = tasks.filter((task) => task.milestoneId === milestoneId)
+        if (milestoneTasks.length === 0) return 'OPEN'
+        const doneCount = milestoneTasks.filter((task) => task.status === 'DONE').length
+        if (doneCount === 0) return 'OPEN'
+        if (doneCount === milestoneTasks.length) return 'DONE'
+        return 'IN_PROGRESS'
+      }
+      return {
+        ...current,
+        tasks,
+        milestones: (current.milestones ?? []).map((milestone) => ({
+          ...milestone,
+          status: statusForMilestone(milestone.id),
+        })),
+      }
+    })
+    setSaveMessages([])
+  }
+
+  function orderedMilestones(project: Project) {
+    return [...(project.milestones ?? [])].sort((first, second) => first.order - second.order || first.name.localeCompare(second.name))
+  }
+
+  function orderedTasks(project: Project) {
+    const milestoneOrder = new Map(orderedMilestones(project).map((milestone, index) => [milestone.id, index]))
+    return [...(project.tasks ?? [])].sort((first, second) => {
+      const milestoneCompare = (milestoneOrder.get(first.milestoneId) ?? 0) - (milestoneOrder.get(second.milestoneId) ?? 0)
+      return milestoneCompare || first.order - second.order
+    })
+  }
+
+  function renderMilestonesTab() {
+    const sectionId = tabSectionId('milestones')
+    const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
+    const template = PROJECT_MILESTONE_TASK_TEMPLATES[resolution.templateId]
+    const milestones = orderedMilestones(projectDraft)
+
+    return (
+      <CollapsibleSection
+        title="Milestones"
+        subtitle={`${template.name} - ${resolution.reason}. Milestone order and task edits are local to this Project.`}
+        collapsed={collapsedSections[sectionId]}
+        onToggle={() => toggleSection(sectionId)}
+        className="space-y-3 p-3"
+      >
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+            Save as replacement template
+          </button>
+          <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+            Save as new template
+          </button>
+        </div>
+        {milestones.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['Order', 'Milestone', 'Status', 'Progress', 'Tasks'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {milestones.map((milestone) => {
+                  const status = milestoneStatus(projectDraft, milestone.id)
+                  const progress = milestoneProgress(projectDraft, milestone.id)
+                  const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestone.id).length ?? 0
+                  return (
+                    <tr key={milestone.id} className="hover:bg-sf-surface-alt">
+                      <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text">
+                        <input
+                          className="h-8 w-20 rounded border border-sf-border px-2 py-1 text-sm"
+                          type="number"
+                          min={1}
+                          value={milestone.order}
+                          onChange={(event) => updateMilestoneOrder(milestone.id, Number(event.target.value) || milestone.order)}
+                        />
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">
+                        <button type="button" className="font-medium text-sf-brand hover:underline" onClick={() => setSelectedMilestoneId(milestone.id)}>
+                          {milestone.name}
+                        </button>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
+                      <td className="w-44 border border-sf-border px-1.5 py-1 text-sf-text">
+                        <div className="h-2 overflow-hidden rounded-full bg-sf-surface-alt">
+                          <div className="h-full bg-sf-brand" style={{ width: `${progress}%` }} />
+                        </div>
+                        <span className="mt-1 block text-xs text-sf-text-muted">{progress}%</span>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{taskCount}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No milestone template rows resolved for this Project.
+          </div>
+        )}
+      </CollapsibleSection>
+    )
+  }
+
+  function renderTasksTab() {
+    const sectionId = tabSectionId('tasks')
+    const tasks = orderedTasks(projectDraft)
+    const milestonesById = new Map((projectDraft.milestones ?? []).map((milestone) => [milestone.id, milestone]))
+
+    return (
+      <CollapsibleSection
+        title="Tasks"
+        subtitle="Excel task template copied locally to this Project. Task order follows milestone order."
+        collapsed={collapsedSections[sectionId]}
+        onToggle={() => toggleSection(sectionId)}
+        className="space-y-3 p-3"
+      >
+        {tasks.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['Milestone', 'Task', 'Department', 'Resource', 'Status'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((task) => (
+                  <tr key={task.id} className="hover:bg-sf-surface-alt">
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={task.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No task template rows resolved for this Project.
+          </div>
+        )}
+      </CollapsibleSection>
+    )
+  }
+
+  function renderMilestoneDialog() {
+    if (!selectedMilestoneId) return null
+    const milestone = (projectDraft.milestones ?? []).find((candidate) => candidate.id === selectedMilestoneId)
+    if (!milestone) return null
+    const tasks = orderedTasks(projectDraft).filter((task) => task.milestoneId === milestone.id)
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded border border-sf-border bg-white shadow-xl">
+          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
+            <div>
+              <h2 className="text-xl font-semibold text-sf-text">{milestone.name}</h2>
+              <p className="text-sm text-sf-text-muted">Tasks in this milestone are local to Project {projectDraft.pid}.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close milestone form" onClick={() => setSelectedMilestoneId(null)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="max-h-[68vh] overflow-auto p-4">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['Task', 'Department', 'Resource', 'Status'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((task) => (
+                  <tr key={task.id}>
+                    <td className="min-w-80 border border-sf-border px-1.5 py-1">
+                      <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateTask(task.id, { name: event.target.value })} />
+                    </td>
+                    <td className="border border-sf-border px-1.5 py-1">
+                      <input className="h-8 w-44 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateTask(task.id, { department: event.target.value })} />
+                    </td>
+                    <td className="border border-sf-border px-1.5 py-1">
+                      <input className="h-8 w-44 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
+                    </td>
+                    <td className="border border-sf-border px-1.5 py-1">
+                      <select className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}>
+                        <option value="OPEN">Open</option>
+                        <option value="DONE">Done</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap justify-between gap-2 border-t border-sf-border p-4">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+                Save as replacement template
+              </button>
+              <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+                Save as new template
+              </button>
+            </div>
+            <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setSelectedMilestoneId(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -740,9 +1036,14 @@ export function ProjectFormPage() {
         <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
           {activeTab === 'systemsTenants'
               ? renderSystemsTenantsTab()
-              : renderPlaceholderTab(activeTab)}
+              : activeTab === 'milestones'
+                ? renderMilestonesTab()
+                : activeTab === 'tasks'
+                  ? renderTasksTab()
+                  : renderPlaceholderTab(activeTab)}
         </div>
       </div>
+      {renderMilestoneDialog()}
     </div>
   )
 }

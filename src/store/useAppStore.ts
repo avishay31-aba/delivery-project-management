@@ -27,6 +27,8 @@ interface AppStore extends AppDataState {
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
+  deleteTenantFromSystem: (id: string) => void
+  moveTenantToSystem: (id: string, destinationSystemId: string) => void
   updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
@@ -85,6 +87,8 @@ function buildDefaultHostedTenant(
     country: account?.country ?? '',
     timeGroup: account?.timeGroup ?? '',
     operationalStatus: 'Active',
+    contractStatus: 'UNDER_CONTRACT',
+    hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
     productType: 'Tangles',
     hostingType: 'Cloud',
     cloudPlatform: 'AWS',
@@ -212,6 +216,58 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenants: state.tenants.map((t) =>
         t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
       ),
+    }))
+    get().saveToStorage()
+  },
+
+  deleteTenantFromSystem: (id) => {
+    const now = new Date().toISOString()
+    set((state) => ({
+      tenants: state.tenants.map((tenant) => {
+        if (tenant.id !== id) return tenant
+        const history = tenant.hostedSystemHistory ?? [
+          { systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const },
+        ]
+        return {
+          ...tenant,
+          systemId: '',
+          operationalStatus: 'Deleted',
+          hostedSystemHistory: history.map((entry, index) =>
+            index === history.length - 1 && entry.endedAt == null
+              ? { ...entry, endedAt: now, reason: 'Deleted' as const }
+              : entry,
+          ),
+          updatedAt: now,
+        }
+      }),
+    }))
+    get().saveToStorage()
+  },
+
+  moveTenantToSystem: (id, destinationSystemId) => {
+    const now = new Date().toISOString()
+    set((state) => ({
+      tenants: state.tenants.map((tenant) => {
+        if (tenant.id !== id) return tenant
+        const history = tenant.hostedSystemHistory ?? [
+          { systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const },
+        ]
+        const closedHistory = history.map((entry, index) =>
+          index === history.length - 1 && entry.endedAt == null
+            ? { ...entry, endedAt: now, reason: 'Moved' as const }
+            : entry,
+        )
+        return {
+          ...tenant,
+          systemId: destinationSystemId,
+          contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
+          hostedSystemHistory: [
+            ...closedHistory,
+            { systemId: destinationSystemId, startedAt: now, endedAt: null, reason: 'Moved' as const },
+          ],
+          updatedAt: now,
+        }
+      }),
     }))
     get().saveToStorage()
   },
@@ -587,6 +643,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       country: '',
       timeGroup: '',
       operationalStatus: '',
+      contractStatus: 'UNDER_CONTRACT',
+      hostedSystemHistory: defaultSystemId
+        ? [{ systemId: defaultSystemId, startedAt: now, endedAt: null, reason: 'Created' }]
+        : [],
       productType: '',
       hostingType: '',
       cloudPlatform: '',
