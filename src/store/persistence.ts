@@ -3,13 +3,15 @@ import type {
   EngagementCircleContact,
   Opportunity,
   Project,
-  ProjectSystemLink,
-  ProjectTenantLink,
   Tenant,
 } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 import { applicationConfigurationFromTenant } from '@/domain/application-configuration'
+import {
+  normalizeProjectSystemLink,
+  normalizeProjectTenantLink,
+} from '@/domain/allocation-context'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
@@ -106,28 +108,6 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
         }))
       : [],
     documents: Array.isArray(tenant.documents) ? tenant.documents : [],
-  }
-}
-
-function normalizeProjectSystemLink(link: ProjectSystemLink): ProjectSystemLink {
-  return {
-    ...link,
-    tenantIds: Array.isArray(link.tenantIds) ? link.tenantIds : [],
-    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
-    allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
-    sourceMachineId: link.sourceMachineId ?? null,
-    deallocatedAt: link.deallocatedAt ?? null,
-  }
-}
-
-function normalizeProjectTenantLink(link: ProjectTenantLink): ProjectTenantLink {
-  return {
-    ...link,
-    systemId: link.systemId ?? '',
-    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
-    allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
-    allocatedAt: link.allocatedAt ?? '',
-    deallocatedAt: link.deallocatedAt ?? null,
   }
 }
 
