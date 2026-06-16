@@ -16,6 +16,11 @@ import type {
   System,
   Tenant,
 } from '@/data/seed.types'
+import {
+  validateApplicationConfigurationIntegerFields,
+  validateApplicationLicensesDoNotExceedUsers,
+  validateApplicationModuleQuantitiesDoNotExceedUsers,
+} from '@/domain/application-configuration'
 
 export interface ValidationMessage {
   level: 'error' | 'warning'
@@ -103,89 +108,6 @@ function findDuplicateValue(values: string[]): string | null {
   return null
 }
 
-const INTEGER_FIELD_LABELS: Array<[string, string]> = [
-  ['licenses', 'Licenses'],
-  ['users', 'Users'],
-  ['concurrentSearches', 'Concurrent searches'],
-  ['dailySearches', 'Daily searches'],
-  ['monthlySearches', 'Monthly searches'],
-  ['concurrentAnalyses', 'Concurrent analyses'],
-  ['topicAnalyses', 'Topic analysis'],
-  ['dailyAnalyses', 'Daily analyses'],
-  ['monthlyAnalyses', 'Monthly analyses'],
-  ['tangles', 'Tangles'],
-  ['tanglesGo', 'Tangles Go'],
-  ['webloc', 'Webloc'],
-  ['webeye', 'Webeye'],
-  ['ingest', 'Ingest'],
-  ['standardMonitors', 'Standard monitors'],
-  ['fullMonitors', 'Full monitors'],
-  ['topicMonitors', 'Topic monitors'],
-  ['apiDailyQty', 'API daily quantity'],
-  ['apiMonthlyQty', 'API monthly quantity'],
-]
-
-const MODULE_QUANTITY_FIELD_LABELS: Array<[string, string]> = [
-  ['tangles', 'Tangles'],
-  ['tanglesGo', 'Tangles Go'],
-  ['webloc', 'Webloc'],
-  ['webeye', 'Webeye'],
-  ['ingest', 'Ingest'],
-]
-
-function validateIntegerFields(row: NewTenantRequirement | ChangeRequestRequirement): ValidationMessage[] {
-  const values = row as unknown as Record<string, unknown>
-
-  return INTEGER_FIELD_LABELS.flatMap(([key, label]) => {
-    const value = values[key]
-
-    return value == null || value === '' || (typeof value === 'number' && Number.isInteger(value))
-      ? []
-      : [{ level: 'error' as const, message: `${label} must be an integer.` }]
-  })
-}
-
-function validateModuleQuantitiesDoNotExceedUsers(
-  row: NewTenantRequirement | ChangeRequestRequirement,
-  gridName: string,
-  rowIndex: number,
-): ValidationMessage[] {
-  const values = row as unknown as Record<string, unknown>
-  const users = values.users
-  if (typeof users !== 'number' || !Number.isInteger(users)) return []
-
-  return MODULE_QUANTITY_FIELD_LABELS.flatMap(([key, label]) => {
-    const value = values[key]
-    return typeof value === 'number' && value > users
-      ? [
-          {
-            level: 'error' as const,
-            message: `${gridName} row ${rowIndex + 1}: ${label} - Module quantity cannot exceed number of users.`,
-          },
-        ]
-      : []
-  })
-}
-
-function validateLicensesDoNotExceedUsers(
-  row: NewTenantRequirement | ChangeRequestRequirement,
-  gridName: string,
-  rowIndex: number,
-): ValidationMessage[] {
-  const values = row as unknown as Record<string, unknown>
-  const users = values.users
-  const licenses = values.licenses
-
-  return typeof users === 'number' && typeof licenses === 'number' && licenses > users
-    ? [
-        {
-          level: 'error' as const,
-          message: `${gridName} row ${rowIndex + 1}: Licenses cannot exceed number of users.`,
-        },
-      ]
-    : []
-}
-
 function validateRequiredGridFields(
   row: NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement,
   columns: RequirementColumnMetadata[],
@@ -231,9 +153,9 @@ export function validateRequirementA(
 
   return [
     ...messages,
-    ...validateIntegerFields(row),
-    ...validateLicensesDoNotExceedUsers(row, 'Grid A', rowIndex),
-    ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid A', rowIndex),
+    ...validateApplicationConfigurationIntegerFields(row as unknown as Record<string, unknown>),
+    ...validateApplicationLicensesDoNotExceedUsers(row as unknown as Record<string, unknown>, 'Grid A', rowIndex),
+    ...validateApplicationModuleQuantitiesDoNotExceedUsers(row as unknown as Record<string, unknown>, 'Grid A', rowIndex),
   ]
 }
 
@@ -262,9 +184,9 @@ export function validateRequirementB(
 
   return [
     ...messages,
-    ...validateIntegerFields(row),
-    ...validateLicensesDoNotExceedUsers(row, 'Grid B', rowIndex),
-    ...validateModuleQuantitiesDoNotExceedUsers(row, 'Grid B', rowIndex),
+    ...validateApplicationConfigurationIntegerFields(row as unknown as Record<string, unknown>),
+    ...validateApplicationLicensesDoNotExceedUsers(row as unknown as Record<string, unknown>, 'Grid B', rowIndex),
+    ...validateApplicationModuleQuantitiesDoNotExceedUsers(row as unknown as Record<string, unknown>, 'Grid B', rowIndex),
   ]
 }
 

@@ -37,6 +37,10 @@ import type {
 import { useAppStore } from '@/store/useAppStore'
 import { validateRequirementA } from '@/utils/opportunity-validation'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
+import {
+  applicationConfigurationFromTenant,
+  applicationConfigurationValue,
+} from '@/domain/application-configuration'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -138,34 +142,7 @@ function tenantFormTypeForSystem(system: System): TenantFormType {
 }
 
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
-  return {
-    product: system?.productType ?? tenant.configuration?.product ?? tenant.productType ?? '',
-    licenses: tenant.configuration?.licenses ?? tenant.licenses ?? null,
-    users: tenant.configuration?.users ?? tenant.users ?? null,
-    concurrentSearches: tenant.configuration?.concurrentSearches ?? tenant.concurrentSearches ?? null,
-    dailySearches: tenant.configuration?.dailySearches ?? tenant.dailySearches ?? null,
-    monthlySearches: tenant.configuration?.monthlySearches ?? tenant.monthlySearches ?? null,
-    concurrentAnalyses: tenant.configuration?.concurrentAnalyses ?? tenant.concurrentAnalyses ?? null,
-    dailyAnalyses: tenant.configuration?.dailyAnalyses ?? tenant.dailyAnalyses ?? null,
-    monthlyAnalyses: tenant.configuration?.monthlyAnalyses ?? tenant.monthlyAnalyses ?? null,
-    topicAnalyses: tenant.configuration?.topicAnalyses ?? tenant.topicAnalyses ?? null,
-    standardMonitors: tenant.configuration?.standardMonitors ?? tenant.standardMonitors ?? null,
-    fullMonitors: tenant.configuration?.fullMonitors ?? tenant.fullMonitors ?? null,
-    topicMonitors: tenant.configuration?.topicMonitors ?? tenant.topicMonitors ?? null,
-    mapCenter: tenant.configuration?.mapCenter ?? tenant.mapCenter ?? '',
-    tangles: tenant.configuration?.tangles ?? tenant.tangles ?? null,
-    tanglesGo: tenant.configuration?.tanglesGo ?? tenant.tanglesGo ?? null,
-    webloc: tenant.configuration?.webloc ?? tenant.webloc ?? null,
-    webeye: tenant.configuration?.webeye ?? tenant.webeye ?? null,
-    ingest: tenant.configuration?.ingest ?? tenant.ingest ?? null,
-    blockchain: tenant.configuration?.blockchain ?? tenant.blockchain ?? '',
-    crossSystemFeatures: tenant.configuration?.crossSystemFeatures ?? tenant.crossSystemFeatures ?? [],
-    apiEnabled: tenant.configuration?.apiEnabled ?? tenant.apiEnabled ?? '',
-    apiDailyQty: tenant.configuration?.apiDailyQty ?? tenant.apiDailyQty ?? null,
-    apiMonthlyQty: tenant.configuration?.apiMonthlyQty ?? tenant.apiMonthlyQty ?? null,
-    aiFeatures: tenant.configuration?.aiFeatures ?? tenant.aiFeatures ?? [],
-    additionalFeatures: tenant.configuration?.additionalFeatures ?? tenant.additionalFeatures ?? [],
-  }
+  return applicationConfigurationFromTenant(tenant, system?.productType)
 }
 
 function hostingFromSystem(tenant: Tenant, system?: System): TenantHostingSnapshot {
@@ -256,7 +233,7 @@ function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean
 }
 
 function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
-  return configuration[column.configKey]
+  return applicationConfigurationValue(configuration, column)
 }
 
 function buildRequirementAFromConfiguration(

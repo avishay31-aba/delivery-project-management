@@ -6,11 +6,11 @@ import type {
   ProjectSystemLink,
   ProjectTenantLink,
   Tenant,
-  TenantConfiguration,
   TenantHostingSnapshot,
 } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
+import { applicationConfigurationFromTenant } from '@/domain/application-configuration'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
@@ -78,37 +78,6 @@ function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Op
   }
 }
 
-function configurationFromTenant(tenant: Tenant): TenantConfiguration {
-  return {
-    product: tenant.configuration?.product ?? tenant.productType ?? '',
-    licenses: tenant.configuration?.licenses ?? tenant.licenses ?? null,
-    users: tenant.configuration?.users ?? tenant.users ?? null,
-    concurrentSearches: tenant.configuration?.concurrentSearches ?? tenant.concurrentSearches ?? null,
-    dailySearches: tenant.configuration?.dailySearches ?? tenant.dailySearches ?? null,
-    monthlySearches: tenant.configuration?.monthlySearches ?? tenant.monthlySearches ?? null,
-    concurrentAnalyses: tenant.configuration?.concurrentAnalyses ?? tenant.concurrentAnalyses ?? null,
-    dailyAnalyses: tenant.configuration?.dailyAnalyses ?? tenant.dailyAnalyses ?? null,
-    monthlyAnalyses: tenant.configuration?.monthlyAnalyses ?? tenant.monthlyAnalyses ?? null,
-    topicAnalyses: tenant.configuration?.topicAnalyses ?? tenant.topicAnalyses ?? null,
-    standardMonitors: tenant.configuration?.standardMonitors ?? tenant.standardMonitors ?? null,
-    fullMonitors: tenant.configuration?.fullMonitors ?? tenant.fullMonitors ?? null,
-    topicMonitors: tenant.configuration?.topicMonitors ?? tenant.topicMonitors ?? null,
-    mapCenter: tenant.configuration?.mapCenter ?? tenant.mapCenter ?? '',
-    tangles: tenant.configuration?.tangles ?? tenant.tangles ?? null,
-    tanglesGo: tenant.configuration?.tanglesGo ?? tenant.tanglesGo ?? null,
-    webloc: tenant.configuration?.webloc ?? tenant.webloc ?? null,
-    webeye: tenant.configuration?.webeye ?? tenant.webeye ?? null,
-    ingest: tenant.configuration?.ingest ?? tenant.ingest ?? null,
-    blockchain: tenant.configuration?.blockchain ?? tenant.blockchain ?? '',
-    crossSystemFeatures: tenant.configuration?.crossSystemFeatures ?? tenant.crossSystemFeatures ?? [],
-    apiEnabled: tenant.configuration?.apiEnabled ?? tenant.apiEnabled ?? '',
-    apiDailyQty: tenant.configuration?.apiDailyQty ?? tenant.apiDailyQty ?? null,
-    apiMonthlyQty: tenant.configuration?.apiMonthlyQty ?? tenant.apiMonthlyQty ?? null,
-    aiFeatures: tenant.configuration?.aiFeatures ?? tenant.aiFeatures ?? [],
-    additionalFeatures: tenant.configuration?.additionalFeatures ?? tenant.additionalFeatures ?? [],
-  }
-}
-
 function hostingSnapshotFromTenant(tenant: Tenant, systems: AppDataState['systems']): TenantHostingSnapshot {
   const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
   const platform = system?.cloudPlatform ?? tenant.cloudPlatform ?? ''
@@ -147,7 +116,7 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
     tenantFormType: tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
     hostedSystemId: tenant.hostedSystemId ?? tenant.systemId,
     hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
-    configuration: configurationFromTenant(tenant),
+    configuration: applicationConfigurationFromTenant(tenant),
     hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
     engagementCircle: Array.isArray(tenant.engagementCircle) ? tenant.engagementCircle : [],
     remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],

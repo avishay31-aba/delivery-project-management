@@ -45,6 +45,7 @@ import {
   validateOpportunity,
 } from '@/utils/opportunity-validation'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
+import { applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -136,10 +137,6 @@ function parseDigitValue(value: string): number | null {
   return value === '' ? null : Number(value)
 }
 
-function numericOrNull(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
 function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
   if (event.ctrlKey || event.metaKey || event.altKey) return
   if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
@@ -193,46 +190,11 @@ function createRequirementA(index: number, mapCenter = ''): NewTenantRequirement
   }
 }
 
-function tenantConfigurationPatch(tenant?: Tenant): Partial<NewTenantRequirement> {
-  if (!tenant) return {}
-
-  return {
-    hostingType: tenant.hostingType ?? 'Cloud',
-    cloudPlatform: tenant.cloudPlatform ?? 'AWS',
-    productType: tenant.productType,
-    mapCenter: tenant.mapCenter ?? tenant.country,
-    licenses: numericOrNull(tenant.licenses),
-    users: numericOrNull(tenant.users),
-    concurrentSearches: numericOrNull(tenant.concurrentSearches),
-    dailySearches: numericOrNull(tenant.dailySearches),
-    monthlySearches: numericOrNull(tenant.monthlySearches),
-    concurrentAnalyses: numericOrNull(tenant.concurrentAnalyses),
-    topicAnalyses: numericOrNull(tenant.topicAnalyses),
-    dailyAnalyses: numericOrNull(tenant.dailyAnalyses),
-    monthlyAnalyses: numericOrNull(tenant.monthlyAnalyses),
-    tangles: numericOrNull(tenant.tangles),
-    tanglesGo: numericOrNull(tenant.tanglesGo),
-    webloc: numericOrNull(tenant.webloc),
-    webeye: numericOrNull(tenant.webeye),
-    ingest: numericOrNull(tenant.ingest),
-    blockchain: tenant.blockchain ?? '',
-    crossSystemFeatures: tenant.crossSystemFeatures ?? [],
-    apiEnabled: tenant.apiEnabled ?? '',
-    apiDailyQty: numericOrNull(tenant.apiDailyQty),
-    apiMonthlyQty: numericOrNull(tenant.apiMonthlyQty),
-    aiFeatures: tenant.aiFeatures ?? [],
-    additionalFeatures: tenant.additionalFeatures ?? [],
-    standardMonitors: numericOrNull(tenant.standardMonitors),
-    fullMonitors: numericOrNull(tenant.fullMonitors),
-    topicMonitors: numericOrNull(tenant.topicMonitors),
-  }
-}
-
 function createRequirementB(index: number, tenant?: Tenant, mapCenter = ''): ChangeRequestRequirement {
   return {
     ...createBaseRequirement(`B-${String(index + 1).padStart(3, '0')}`),
     mapCenter,
-    ...tenantConfigurationPatch(tenant),
+    ...applicationConfigurationPatchFromTenant(tenant),
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
   }
@@ -242,7 +204,7 @@ function createRequirementC(index: number, tenant?: Tenant, warrantyRecord?: War
   return {
     id: `req-${crypto.randomUUID()}`,
     requirementId: `C-${String(index + 1).padStart(3, '0')}`,
-    ...tenantConfigurationPatch(tenant),
+    ...applicationConfigurationPatchFromTenant(tenant),
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
     warrantyRecordId: warrantyRecord?.warrantyRecordId ?? '',
@@ -1203,7 +1165,7 @@ export function OpportunityFormPage() {
               ...row,
               ...configurationPatch,
               ...(key === 'tenantId' && selectedTenant
-                ? { ...tenantConfigurationPatch(selectedTenant), systemId: selectedTenant.systemId }
+                ? { ...applicationConfigurationPatchFromTenant(selectedTenant), systemId: selectedTenant.systemId }
                 : {}),
             } as ChangeRequestRequirement)
           : row,
@@ -1224,7 +1186,7 @@ export function OpportunityFormPage() {
             ...configurationPatch,
             ...(key === 'tenantId' && selectedTenant
               ? {
-                  ...tenantConfigurationPatch(selectedTenant),
+                  ...applicationConfigurationPatchFromTenant(selectedTenant),
                   systemId: selectedTenant.systemId,
                   warrantyRecordId:
                     warrantyRecords.find((record) => record.tenantId === selectedTenant.id)?.warrantyRecordId ?? '',

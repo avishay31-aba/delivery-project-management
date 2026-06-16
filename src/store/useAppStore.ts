@@ -16,6 +16,7 @@ import {
   persistState,
   clearPersistedState,
 } from '@/store/persistence'
+import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
@@ -80,40 +81,6 @@ function uniqueValues(values: string[]): string[] {
 
 function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType {
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
-}
-
-function tenantConfigurationFromRequirement(
-  requirement: NonNullable<Opportunity['newTenantRequirements']>[number],
-  product: string,
-): NonNullable<Tenant['configuration']> {
-  return {
-    product,
-    licenses: requirement.licenses,
-    users: requirement.users,
-    concurrentSearches: requirement.concurrentSearches,
-    dailySearches: requirement.dailySearches,
-    monthlySearches: requirement.monthlySearches,
-    concurrentAnalyses: requirement.concurrentAnalyses,
-    dailyAnalyses: requirement.dailyAnalyses,
-    monthlyAnalyses: requirement.monthlyAnalyses,
-    topicAnalyses: requirement.topicAnalyses,
-    standardMonitors: requirement.standardMonitors,
-    fullMonitors: requirement.fullMonitors,
-    topicMonitors: requirement.topicMonitors,
-    mapCenter: requirement.mapCenter,
-    tangles: requirement.tangles,
-    tanglesGo: requirement.tanglesGo,
-    webloc: requirement.webloc,
-    webeye: requirement.webeye,
-    ingest: requirement.ingest,
-    blockchain: requirement.blockchain,
-    crossSystemFeatures: [...requirement.crossSystemFeatures],
-    apiEnabled: requirement.apiEnabled,
-    apiDailyQty: requirement.apiDailyQty,
-    apiMonthlyQty: requirement.apiMonthlyQty,
-    aiFeatures: [...requirement.aiFeatures],
-    additionalFeatures: [...requirement.additionalFeatures],
-  }
 }
 
 function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
@@ -295,8 +262,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const projectSystemLink = state.projectSystems.find(
       (link) => link.projectId === projectId && link.systemId === systemId && link.allocationStatus !== 'DEALLOCATED',
     )
-    const tenantType: Tenant['tenantType'] = project.mainType === 'POC' || system.systemClass === 'POC_DEMO_TRAINING' ? 'POC' : 'CUSTOMER'
-    const configuration = tenantConfigurationFromRequirement(requirement, system.productType)
+    const tenantType = project.mainType === 'POC' || system.systemClass === 'POC_DEMO_TRAINING' ? 'POC' : 'CUSTOMER'
+    const configuration = applicationConfigurationFromRequirement(requirement, system.productType)
     const tenant: Tenant = {
       id: `ten-${crypto.randomUUID()}`,
       tid: nextTenantId.id,
