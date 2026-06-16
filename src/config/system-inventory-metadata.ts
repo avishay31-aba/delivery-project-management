@@ -1,4 +1,11 @@
 import { PRODUCT_OPTIONS } from '@/config/cloud-platform-metadata'
+import {
+  PRODUCTION_OPERATIONAL_STATUS_OPTIONS,
+  REGION_OPTIONS,
+  REUSED_OPERATIONAL_STATUS_OPTIONS,
+  REUSED_PURPOSE_OPTIONS,
+  REUSED_STATUS_OPTIONS,
+} from '@/config/picklist-options'
 
 export type SystemInventorySource = 'Production' | 'Reused Internal Systems'
 
@@ -24,12 +31,6 @@ export interface SystemInventoryMetadata {
   headerFields: SystemInventoryHeaderField[]
   tabs: SystemInventoryTab[]
 }
-
-export const REGION_OPTIONS = ['NA', 'EU', 'APAC']
-export const REUSED_PURPOSE_OPTIONS = ['POC', 'Demo', 'Training', 'Support']
-export const REUSED_STATUS_OPTIONS = ['Available', 'Occupied', 'Obsolete']
-export const REUSED_OPERATIONAL_STATUS_OPTIONS = ['On', 'Off', 'Access blocked', 'Service blocked', 'Deleted']
-export const PRODUCTION_OPERATIONAL_STATUS_OPTIONS = [...REUSED_OPERATIONAL_STATUS_OPTIONS, 'Canceled']
 
 const SYSTEM_TABS: SystemInventoryTab[] = [
   { id: 'tenant', label: 'Tenant' },

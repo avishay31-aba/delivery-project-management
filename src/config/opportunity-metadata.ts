@@ -1,9 +1,17 @@
 import type { OpportunitySubType, OpportunityType, RequirementType } from '@/data/seed.types'
+import {
+  NEW_TENANT_REQUIREMENT_FIELDS,
+  TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
+  type SharedFieldMetadata,
+} from '@/config/application-configuration-fields'
+import {
+  ADDITIONAL_FEATURE_OPTIONS,
+  AI_OPTIONS,
+  CROSS_SYSTEM_OPTIONS,
+  YES_NO_OPTIONS,
+} from '@/config/picklist-options'
 
-export const YES_NO_OPTIONS = ['', 'YES', 'NO']
-export const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
-export const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
-export const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
+export { ADDITIONAL_FEATURE_OPTIONS, AI_OPTIONS, CROSS_SYSTEM_OPTIONS, YES_NO_OPTIONS }
 
 export interface OpportunityHeaderField {
   key:
@@ -29,16 +37,7 @@ export interface OpportunityHeaderField {
   source: string
 }
 
-export interface RequirementColumnMetadata {
-  key: string
-  label: string
-  group: string
-  editable: boolean
-  inputType?: 'text' | 'integer' | 'picklist' | 'multiselect'
-  options?: string[]
-  required?: boolean
-  requiredWhen?: string
-}
+export type RequirementColumnMetadata = SharedFieldMetadata
 
 export interface OpportunityMetadata {
   sourceSheet: string
@@ -104,45 +103,7 @@ const RENEWAL_CHANGE_HEADER_FIELDS: OpportunityHeaderField[] = [
   ...COMMON_HEADER_FIELDS.slice(3),
 ]
 
-export const requirementAColumns: RequirementColumnMetadata[] = [
-  { key: 'requirementId', label: 'Requirement ID', group: 'Tenant requirements', editable: true },
-  { key: 'deployTarget', label: 'New / Existing System', group: 'Environment', editable: true, inputType: 'picklist', required: true },
-  {
-    key: 'existingSystemId',
-    label: 'Existing System ID',
-    group: 'Environment',
-    editable: true,
-    requiredWhen: 'Required when New / Existing System = Existing System',
-  },
-  { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist', required: true },
-  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist', required: true },
-  { key: 'productType', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
-  { key: 'licenses', label: 'License', group: 'Core Details', editable: true, inputType: 'integer', required: true },
-  { key: 'users', label: 'Users', group: 'Core Details', editable: true, inputType: 'integer', required: true },
-  { key: 'concurrentSearches', label: 'Concurrent Searches', group: 'Core Details', editable: true, inputType: 'integer', required: true },
-  { key: 'concurrentAnalyses', label: 'Concurrent Analyses', group: 'Core Details', editable: true, inputType: 'integer', required: true },
-  { key: 'topicAnalyses', label: 'Topic Analysis', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'standardMonitors', label: 'Std. Monitors', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'fullMonitors', label: 'Full Monitors', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'topicMonitors', label: 'Topic Monitors', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'dailySearches', label: 'Daily Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'monthlySearches', label: 'Monthly Qty Searches', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'dailyAnalyses', label: 'Daily Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'monthlyAnalyses', label: 'Monthly Qty Analyses', group: 'Core Details', editable: true, inputType: 'integer' },
-  { key: 'mapCenter', label: 'Map Center', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
-  { key: 'tangles', label: 'Tangles', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'tanglesGo', label: 'Tangles Go', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'webloc', label: 'Webloc', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'webeye', label: 'Webeye', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'ingest', label: 'Ingest', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'crossSystemFeatures', label: 'Additional Sources', group: 'Additional Sources', editable: true, inputType: 'multiselect' },
-  { key: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
-  { key: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'apiMonthlyQty', label: 'API Monthly', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
-  { key: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
-]
+export const requirementAColumns: RequirementColumnMetadata[] = NEW_TENANT_REQUIREMENT_FIELDS
 
 export const requirementBColumns: RequirementColumnMetadata[] = [
   { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
@@ -150,7 +111,7 @@ export const requirementBColumns: RequirementColumnMetadata[] = [
   { key: 'tenantName', label: 'Tenant Name', group: 'Tenant requirements', editable: false },
   { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
   { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
-  ...requirementAColumns.slice(3),
+  ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
 ]
 
 export const requirementCColumns: RequirementColumnMetadata[] = [
@@ -161,7 +122,7 @@ export const requirementCColumns: RequirementColumnMetadata[] = [
   { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
   { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
   { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },
-  ...requirementAColumns.slice(3).map((column) => ({ ...column, editable: false, required: false, requiredWhen: undefined })),
+  ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((column) => ({ ...column, editable: false, required: false, requiredWhen: undefined })),
 ]
 
 function keyForOpportunity(type: OpportunityType, subType: OpportunitySubType): string {

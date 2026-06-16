@@ -10,9 +10,12 @@ import {
   AI_OPTIONS,
   CROSS_SYSTEM_OPTIONS,
   YES_NO_OPTIONS,
-  requirementAColumns,
   type RequirementColumnMetadata,
 } from '@/config/opportunity-metadata'
+import {
+  TENANT_CONFIGURATION_FIELDS,
+  type TenantConfigurationFieldMetadata,
+} from '@/config/application-configuration-fields'
 import { HOSTING_OPTIONS, cloudPlatformOptionsForHosting } from '@/config/cloud-platform-metadata'
 import type {
   EngagementCircleContact,
@@ -37,7 +40,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
-type TenantConfigurationColumn = RequirementColumnMetadata & { configKey: ConfigKey }
+type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type WarrantyKey = keyof Pick<
   TenantWarranty,
@@ -61,12 +64,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
 
 const REMARK_TYPES = ['Note', 'Warranty', 'Temporary change', 'Permanent change', 'Task']
 
-const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = requirementAColumns
-  .slice(5)
-  .map((column) => ({
-    ...column,
-    configKey: column.key === 'productType' ? 'product' : column.key as ConfigKey,
-  }))
+const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
 
 const HOSTING_FIELDS: Array<{ key: keyof TenantHostingSnapshot; label: string }> = [
   { key: 'currentSystem', label: 'Current system' },

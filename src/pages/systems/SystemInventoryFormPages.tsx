@@ -29,7 +29,15 @@ import {
   cspOptionsForCloudPlatform,
   requiresCloudRegion,
 } from '@/config/cloud-platform-metadata'
-import { requirementAColumns } from '@/config/opportunity-metadata'
+import {
+  APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
+  TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
+} from '@/config/application-configuration-fields'
+import {
+  PERFORMANCE_TIER_OPTIONS,
+  VPN_TYPE_OPTIONS,
+  YES_NO_REQUIRED_OPTIONS,
+} from '@/config/picklist-options'
 import {
   productionSystemMetadata,
   reusedInternalSystemMetadata,
@@ -51,7 +59,6 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   tabs: false,
 }
 
-const APPLICATION_CONFIGURATION_COLUMNS = requirementAColumns.slice(3).filter((column) => column.key !== 'hostingType' && column.key !== 'cloudPlatform')
 const ENVIRONMENT_FIELDS = [
   { key: 'hostingType', label: 'Hosting', inputType: 'picklist' },
   { key: 'cloudPlatform', label: 'Cloud Platform', inputType: 'picklist' },
@@ -70,8 +77,6 @@ const ACCESS_DETAIL_FIELDS = [
   { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
   { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
 ]
-const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
-const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
 const PRODUCT_LOGO_COLORS: Record<string, string> = {
   Tangles: 'text-blue-600',
   'Tangles Light': 'text-cyan-600',
@@ -113,8 +118,8 @@ const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
   Canceled: 'text-purple-500',
 }
 
-const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_COLUMNS.filter((column) => column.key !== 'existingSystemId' && column.key !== 'deployTarget')
-const TENANT_CONFIGURATION_FIELDS = requirementAColumns.slice(3)
+const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_SUMMARY_FIELDS
+const TENANT_CONFIGURATION_FIELDS = TENANT_REQUIREMENT_CONFIGURATION_FIELDS
 const INTEGER_SUMMARY_KEYS = new Set([
   'licenses',
   'users',
@@ -678,7 +683,7 @@ function InventoryForm<T extends InventoryRecord>({
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName="w-36">
           <div className={[fieldClassName(isChanged), 'flex items-center gap-3'].join(' ')}>
-            {['YES', 'NO'].map((option) => (
+            {YES_NO_REQUIRED_OPTIONS.map((option) => (
               <label key={option} className="inline-flex items-center gap-1 text-sm">
                 <input
                   type="radio"

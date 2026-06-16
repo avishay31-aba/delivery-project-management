@@ -1,5 +1,6 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
+import { REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 
 function join(values: Array<string | null | undefined>): string {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).join('; ')
@@ -24,8 +25,8 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
 export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[] = [
   { id: 'machineId', label: 'MID', getValue: (row) => row.machineId },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
-  { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: ['POC', 'Demo', 'Training', 'Support'] },
-  { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: ['Available', 'Occupied', 'Obsolete'] },
+  { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
+  { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: REUSED_STATUS_OPTIONS },
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
