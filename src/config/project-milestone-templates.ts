@@ -1,4 +1,5 @@
 import type { Opportunity, Project, ProjectMilestone, ProjectTask } from '@/data/seed.types'
+import { isServerHosting } from '@/domain/hosting-context'
 
 export type ProjectMilestoneTemplateId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8'
 
@@ -1832,11 +1833,6 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
     ]
   }
 } as Record<ProjectMilestoneTemplateId, ProjectMilestoneTaskTemplate>
-
-function isServerHosting(value: string | null | undefined): boolean {
-  const normalized = String(value ?? '').toLowerCase()
-  return normalized.includes('prem') || normalized.includes('hybrid') || normalized.includes('server')
-}
 
 function hasServerHostedNewTenant(opportunity: Opportunity | undefined): boolean {
   return Boolean(opportunity?.newTenantRequirements?.some((requirement) => isServerHosting(requirement.hostingType)))
