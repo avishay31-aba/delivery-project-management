@@ -14,11 +14,13 @@ import {
   LockKeyhole,
   MoveRight,
   Network,
+  Plus,
   PowerOff,
   ServerOff,
   ShieldX,
   Sparkles,
   Trash2,
+  X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
@@ -32,6 +34,8 @@ import {
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
   TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
+  type SharedFieldMetadata,
+  type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
 import {
   PERFORMANCE_TIER_OPTIONS,
@@ -45,7 +49,7 @@ import {
   type SystemInventoryMetadata,
 } from '@/config/system-inventory-metadata'
 import { timeGroupForCountry } from '@/config/time-groups'
-import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
+import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 
@@ -120,6 +124,7 @@ const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_SUMMARY_FIELDS
 const TENANT_CONFIGURATION_FIELDS = TENANT_REQUIREMENT_CONFIGURATION_FIELDS
+const APPLICATION_FIELD_BY_KEY = new Map(APPLICATION_CONFIGURATION_SUMMARY_FIELDS.map((field) => [field.key, field]))
 const INTEGER_SUMMARY_KEYS = new Set([
   'licenses',
   'users',
@@ -345,12 +350,15 @@ function InventoryForm<T extends InventoryRecord>({
 }) {
   const navigate = useNavigate()
   const projects = useAppStore((state) => state.projects)
+  const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
+  const projectSystems = useAppStore((state) => state.projectSystems)
   const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const allocatedSystems = useAppStore((state) => state.systems)
   const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
+  const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
@@ -359,6 +367,9 @@ function InventoryForm<T extends InventoryRecord>({
   const [movingTenantId, setMovingTenantId] = useState<string | null>(null)
   const [destinationSystemId, setDestinationSystemId] = useState('')
   const [tenantPendingDelete, setTenantPendingDelete] = useState<Tenant | null>(null)
+  const [addTenantOpen, setAddTenantOpen] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [selectedRequirementId, setSelectedRequirementId] = useState('')
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -714,19 +725,29 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function hostedTenantsForDraft(): Tenant[] {
-    return tenants.filter((tenant) => tenant.systemId === activeRecord.id)
+    return tenants.filter((tenant) => tenant.systemId === activeRecord.id || tenant.hostedSystemId === activeRecord.id)
   }
 
   function applicationSummaryProduct(): string {
-    return hostedTenantsForDraft().find((tenant) => textValue(tenant.productType))?.productType ?? ''
+    return textValue(readRecordValue(activeDraft, 'productType')) || (hostedTenantsForDraft().find((tenant) => textValue(tenant.configuration?.product ?? tenant.productType))?.productType ?? '')
   }
 
-  function tenantSummaryValue(key: string, hostedTenants: Tenant[]): string {
+  function tenantConfigurationValue(tenant: Tenant, field: SharedFieldMetadata): unknown {
+    const applicationField = APPLICATION_FIELD_BY_KEY.get(field.key) as TenantConfigurationFieldMetadata | undefined
+    if (applicationField) {
+      if (applicationField.configKey === 'product') return tenant.configuration?.product ?? tenant.productType
+      return tenant.configuration?.[applicationField.configKey] ?? (tenant as unknown as Record<string, unknown>)[field.key]
+    }
+    return (tenant as unknown as Record<string, unknown>)[field.key]
+  }
+
+  function tenantSummaryValue(field: TenantConfigurationFieldMetadata, hostedTenants: Tenant[]): string {
     if (hostedTenants.length === 0) return '-'
-    if (INTEGER_SUMMARY_KEYS.has(key)) {
+    if (field.configKey === 'product') return textValue(readRecordValue(activeDraft, 'productType')) || '-'
+    if (INTEGER_SUMMARY_KEYS.has(field.key)) {
       return String(
         hostedTenants.reduce((total, tenant) => {
-          const value = (tenant as unknown as Record<string, unknown>)[key]
+          const value = tenantConfigurationValue(tenant, field)
           return total + (typeof value === 'number' ? value : 0)
         }, 0),
       )
@@ -734,7 +755,7 @@ function InventoryForm<T extends InventoryRecord>({
 
     const values = hostedTenants
       .flatMap((tenant) => {
-        const value = (tenant as unknown as Record<string, unknown>)[key]
+        const value = tenantConfigurationValue(tenant, field)
         return Array.isArray(value) ? value : [value]
       })
       .map((value) => textValue(value).trim())
@@ -753,8 +774,62 @@ function InventoryForm<T extends InventoryRecord>({
     return `${id || system.id} - ${system.productType || 'System'}`
   }
 
-  function tenantFieldValue(tenant: Tenant, key: string): string {
-    return textValue((tenant as unknown as Record<string, unknown>)[key]) || '-'
+  function tenantFieldValue(tenant: Tenant, field: SharedFieldMetadata): string {
+    return textValue(tenantConfigurationValue(tenant, field)) || '-'
+  }
+
+  function projectOpportunity(project: Project): Opportunity | undefined {
+    return opportunities.find(
+      (opportunity) =>
+        opportunity.opportunityId === project.opportunityId ||
+        opportunity.id === project.opportunityId ||
+        opportunity.pocProjectIds.includes(project.id) ||
+        opportunity.finalProjectId === project.id,
+    )
+  }
+
+  function linkedProjectsForSystem(): Project[] {
+    const projectIds = new Set(
+      projectSystems
+        .filter((link) => link.systemId === activeRecord.id && link.allocationStatus !== 'DEALLOCATED')
+        .map((link) => link.projectId),
+    )
+    if ('linkedProjectIds' in activeRecord) {
+      activeRecord.linkedProjectIds?.forEach((projectId) => projectIds.add(projectId))
+    }
+    return projects.filter((project) => projectIds.has(project.id))
+  }
+
+  function newTenantRequirementsForProject(projectId: string): NewTenantRequirement[] {
+    const project = projects.find((candidate) => candidate.id === projectId)
+    if (!project) return []
+    return projectOpportunity(project)?.newTenantRequirements ?? []
+  }
+
+  function openAddTenantDialog() {
+    const linkedProjects = linkedProjectsForSystem()
+    const firstProjectId = linkedProjects[0]?.id ?? ''
+    const firstRequirementId = firstProjectId ? newTenantRequirementsForProject(firstProjectId)[0]?.id ?? '' : ''
+    setSelectedProjectId(firstProjectId)
+    setSelectedRequirementId(firstRequirementId)
+    setAddTenantOpen(true)
+    setMessages([])
+  }
+
+  function handleSelectedProjectChange(projectId: string) {
+    setSelectedProjectId(projectId)
+    setSelectedRequirementId(newTenantRequirementsForProject(projectId)[0]?.id ?? '')
+  }
+
+  function createTenantFromSelection() {
+    if (!selectedProjectId || !selectedRequirementId) return
+    const result = createTenantFromSystemRequirement(selectedProjectId, activeRecord.id, selectedRequirementId)
+    setMessages([result.message])
+    if (result.ok) {
+      setAddTenantOpen(false)
+      setSelectedProjectId('')
+      setSelectedRequirementId('')
+    }
   }
 
   function handleDeleteTenant(tenant: Tenant) {
@@ -823,7 +898,7 @@ function InventoryForm<T extends InventoryRecord>({
         <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={tenant.operationalStatus} /></td>
         {TENANT_CONFIGURATION_FIELDS.map((column) => (
           <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-            {tenantFieldValue(tenant, column.key)}
+            {tenantFieldValue(tenant, column)}
           </td>
         ))}
       </tr>
@@ -877,6 +952,26 @@ function InventoryForm<T extends InventoryRecord>({
         {renderHostedTenantSection('Out of Contract', outOfContractTenants)}
 
         <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-sf-text">Tenant Actions</h3>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+              disabled={linkedProjectsForSystem().length === 0}
+              onClick={openAddTenantDialog}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add Tenant
+            </button>
+          </div>
+          {linkedProjectsForSystem().length === 0 ? (
+            <div className="rounded border border-dashed border-sf-border bg-white p-3 text-sm text-sf-text-muted">
+              Link this system to a project before adding tenants.
+            </div>
+          ) : null}
+        </section>
+
+        <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
           <div className="overflow-x-auto rounded border border-sf-border bg-white">
             <table className="w-max border-collapse text-sm leading-tight">
@@ -893,7 +988,7 @@ function InventoryForm<T extends InventoryRecord>({
                 <tr>
                   {APPLICATION_SUMMARY_FIELDS.map((column) => (
                     <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-                      {tenantSummaryValue(column.key, hostedTenants)}
+                      {tenantSummaryValue(column, hostedTenants)}
                     </td>
                   ))}
                 </tr>
@@ -991,6 +1086,77 @@ function InventoryForm<T extends InventoryRecord>({
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigate(dashboardPath)}>
           Cancel
         </button>
+      </div>
+    )
+  }
+
+  function renderAddTenantDialog() {
+    if (!addTenantOpen) return null
+    const linkedProjects = linkedProjectsForSystem()
+    const selectedRequirements = newTenantRequirementsForProject(selectedProjectId)
+    const selectedProject = linkedProjects.find((project) => project.id === selectedProjectId)
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-xl rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
+          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
+            <div>
+              <h2 id="add-tenant-title" className="text-lg font-semibold text-sf-text">Add tenant</h2>
+              <p className="text-sm text-sf-text-muted">Create a tenant from a linked Project new tenant requirement.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close add tenant dialog" onClick={() => setAddTenantOpen(false)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="space-y-4 p-4">
+            <FormField label="PID" controlWidthClassName="w-full">
+              <select className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
+                {linkedProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.pid} - {project.opportunityName}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Tenant Requirement ID" controlWidthClassName="w-full">
+              <select
+                className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                value={selectedRequirementId}
+                disabled={selectedRequirements.length === 0}
+                onChange={(event) => setSelectedRequirementId(event.target.value)}
+              >
+                {selectedRequirements.length === 0 ? <option value="">No new tenant requirements</option> : null}
+                {selectedRequirements.map((requirement) => (
+                  <option key={requirement.id} value={requirement.id}>
+                    {requirement.requirementId} - {requirement.productType}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text-muted">
+              {selectedProject
+                ? `Only New Tenant Requirement rows from ${selectedProject.pid} are available here. Change Request and Standard Renewal rows are excluded.`
+                : 'No linked project is available for this system.'}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t border-sf-border p-4">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setAddTenantOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              disabled={!selectedProjectId || !selectedRequirementId}
+              onClick={createTenantFromSelection}
+            >
+              Create Tenant
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -1104,6 +1270,7 @@ function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       ) : null}
+      {renderAddTenantDialog()}
     </div>
   )
 }

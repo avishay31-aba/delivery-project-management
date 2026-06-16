@@ -31,6 +31,7 @@ interface AppStore extends AppDataState {
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
   deleteTenantFromSystem: (id: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
+  createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
   updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
@@ -216,6 +217,40 @@ function copyRequirementToTenant(
   }
 }
 
+function tenantConfigurationFromRequirement(
+  requirement: NonNullable<Opportunity['newTenantRequirements']>[number],
+  product: string,
+): NonNullable<Tenant['configuration']> {
+  return {
+    product,
+    licenses: requirement.licenses,
+    users: requirement.users,
+    concurrentSearches: requirement.concurrentSearches,
+    dailySearches: requirement.dailySearches,
+    monthlySearches: requirement.monthlySearches,
+    concurrentAnalyses: requirement.concurrentAnalyses,
+    dailyAnalyses: requirement.dailyAnalyses,
+    monthlyAnalyses: requirement.monthlyAnalyses,
+    topicAnalyses: requirement.topicAnalyses,
+    standardMonitors: requirement.standardMonitors,
+    fullMonitors: requirement.fullMonitors,
+    topicMonitors: requirement.topicMonitors,
+    mapCenter: requirement.mapCenter,
+    tangles: requirement.tangles,
+    tanglesGo: requirement.tanglesGo,
+    webloc: requirement.webloc,
+    webeye: requirement.webeye,
+    ingest: requirement.ingest,
+    blockchain: requirement.blockchain,
+    crossSystemFeatures: [...requirement.crossSystemFeatures],
+    apiEnabled: requirement.apiEnabled,
+    apiDailyQty: requirement.apiDailyQty,
+    apiMonthlyQty: requirement.apiMonthlyQty,
+    aiFeatures: [...requirement.aiFeatures],
+    additionalFeatures: [...requirement.additionalFeatures],
+  }
+}
+
 function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
   return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
 }
@@ -361,6 +396,138 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }),
     }))
     get().saveToStorage()
+  },
+
+  createTenantFromSystemRequirement: (projectId, systemId, requirementId) => {
+    const state = get()
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const system = state.systems.find((candidate) => candidate.id === systemId)
+    if (!project) return { ok: false, message: 'Project not found.' }
+    if (!system) return { ok: false, message: 'System not found.' }
+
+    const opportunity = state.opportunities.find(
+      (candidate) =>
+        candidate.opportunityId === project.opportunityId ||
+        candidate.id === project.opportunityId ||
+        candidate.pocProjectIds.includes(project.id) ||
+        candidate.finalProjectId === project.id,
+    )
+    const requirement = opportunity?.newTenantRequirements.find((candidate) => candidate.id === requirementId)
+    if (!requirement) return { ok: false, message: 'New tenant requirement not found for this project.' }
+
+    const alreadyLinked = state.tenants.some((tenant) => {
+      const linkedToProject = state.projectTenants.some(
+        (link) => link.projectId === projectId && link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED',
+      )
+      return linkedToProject && tenant.systemId === systemId && tenant.sourceRequirementId === requirement.requirementId
+    })
+    if (alreadyLinked) return { ok: false, message: 'A tenant already exists for this requirement on this system.' }
+
+    const account = opportunity ? state.accounts.find((candidate) => candidate.id === opportunity.accountId) : undefined
+    const nextTenantId = incrementCounter(state.idCounters, 'tid')
+    const idCounters = nextTenantId.counters
+    const now = new Date().toISOString()
+    const projectSystemLink = state.projectSystems.find(
+      (link) => link.projectId === projectId && link.systemId === systemId && link.allocationStatus !== 'DEALLOCATED',
+    )
+    const tenantType: Tenant['tenantType'] = project.mainType === 'POC' || system.systemClass === 'POC_DEMO_TRAINING' ? 'POC' : 'CUSTOMER'
+    const configuration = tenantConfigurationFromRequirement(requirement, system.productType)
+    const tenant: Tenant = {
+      id: `ten-${crypto.randomUUID()}`,
+      tid: nextTenantId.id,
+      tenantName: `${nextTenantId.id} ${project.accountName || (account?.accountName ?? '')}`.trim(),
+      accountId: account?.id ?? system.accountId ?? '',
+      systemId,
+      deliveryPid: project.pid,
+      tenantType,
+      tenantFormType: tenantType === 'POC' ? 'POC' : 'CUSTOMER',
+      hostedSystemId: systemId,
+      hostingSid: system.sid ?? '',
+      sourceRequirementId: requirement.requirementId,
+      configuration,
+      accountName: project.accountName || (account?.accountName ?? ''),
+      country: opportunity?.country ?? account?.country ?? system.country ?? '',
+      timeGroup: opportunity?.timeGroup ?? account?.timeGroup ?? system.timeGroup,
+      operationalStatus: 'Active',
+      contractStatus: 'UNDER_CONTRACT',
+      hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
+      productType: configuration.product,
+      hostingType: system.hostingType,
+      cloudPlatform: system.cloudPlatform,
+      csp: system.csp,
+      cloudRegion: system.cloudRegion,
+      statisticsId: requirement.statisticsId,
+      authId: requirement.authId,
+      rdmId: requirement.rdmId,
+      performanceTier: system.performanceTier,
+      vpnEnabled: system.vpnEnabled,
+      vpnType: system.vpnType,
+      ipRestrictionEnabled: system.ipRestrictionEnabled,
+      mapCenter: configuration.mapCenter,
+      licenses: configuration.licenses,
+      users: configuration.users,
+      concurrentSearches: configuration.concurrentSearches,
+      dailySearches: configuration.dailySearches,
+      monthlySearches: configuration.monthlySearches,
+      concurrentAnalyses: configuration.concurrentAnalyses,
+      topicAnalyses: configuration.topicAnalyses,
+      dailyAnalyses: configuration.dailyAnalyses,
+      monthlyAnalyses: configuration.monthlyAnalyses,
+      standardMonitors: configuration.standardMonitors,
+      fullMonitors: configuration.fullMonitors,
+      topicMonitors: configuration.topicMonitors,
+      tangles: configuration.tangles,
+      tanglesGo: configuration.tanglesGo,
+      webloc: configuration.webloc,
+      webeye: configuration.webeye,
+      ingest: configuration.ingest,
+      blockchain: configuration.blockchain,
+      crossSystemFeatures: [...configuration.crossSystemFeatures],
+      apiEnabled: configuration.apiEnabled,
+      apiDailyQty: configuration.apiDailyQty,
+      apiMonthlyQty: configuration.apiMonthlyQty,
+      aiFeatures: [...configuration.aiFeatures],
+      additionalFeatures: [...configuration.additionalFeatures],
+      warrantyStatus: 'NOT_SET',
+      warrantyStartDate: null,
+      warrantyEndDate: null,
+      pocStartDate: opportunity?.pocStartDate ?? null,
+      pocEndDate: opportunity?.pocEndDate ?? null,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const projectTenant = {
+      id: `proj-ten-${crypto.randomUUID()}`,
+      projectId,
+      tenantId: tenant.id,
+      systemId,
+      allocationStatus: 'ALLOCATED' as const,
+      allocationType: projectSystemLink?.allocationType ?? (system.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' as const : 'EXISTING_SYSTEM' as const),
+      allocatedAt: now,
+      deallocatedAt: null,
+    }
+
+    set((current) => ({
+      idCounters,
+      tenants: [tenant, ...current.tenants],
+      systems: current.systems.map((candidate) =>
+        candidate.id === systemId
+          ? {
+              ...candidate,
+              tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), tenant.id])),
+              updatedAt: now,
+            }
+          : candidate,
+      ),
+      projectSystems: current.projectSystems.map((link) =>
+        link.projectId === projectId && link.systemId === systemId && link.allocationStatus !== 'DEALLOCATED'
+          ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+          : link,
+      ),
+      projectTenants: [projectTenant, ...current.projectTenants],
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
   },
 
   updateAccount: (id, patch) => {
