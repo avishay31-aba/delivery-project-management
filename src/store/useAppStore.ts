@@ -18,7 +18,10 @@ import {
 } from '@/store/persistence'
 import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 import {
-  activeProjectSystemLinks,
+  validateExistingSystemLink,
+  validateProductionAllocation,
+  validateProjectSystemDeallocation,
+  validateReusedInternalAllocation,
   type AllocationActionResult,
 } from '@/domain/allocation-context'
 import {
@@ -755,15 +758,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const productionSystem = state.productionSystemInventory.find((candidate) => candidate.id === productionSystemId)
-    if (!project) return { ok: false, message: 'Project not found.' }
-    if (project.mainType === 'POC') return { ok: false, message: 'POC projects cannot allocate Production Inventory.' }
-    if (!productionSystem) return { ok: false, message: 'Production system not found.' }
-    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.systemId === productionSystemId)) {
-      return { ok: false, message: 'Production system is already actively allocated.' }
-    }
-    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.systemId === productionSystemId)) {
-      return { ok: false, message: 'This system is already allocated to the project.' }
-    }
+    const invalid = validateProductionAllocation({ projectId, systemId: productionSystemId }, state)
+    if (invalid) return invalid
+    if (!project || !productionSystem) return { ok: false, message: 'Production system not found.' }
 
     const now = new Date().toISOString()
     const tenantIds: string[] = []
@@ -805,13 +802,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const reusedSystem = state.reusedInternalSystems.find((candidate) => candidate.id === reusedSystemId)
-    if (!project) return { ok: false, message: 'Project not found.' }
-    if (project.mainType !== 'POC') return { ok: false, message: 'Delivery and Renewal projects cannot allocate Reused Internal Systems.' }
-    if (!reusedSystem) return { ok: false, message: 'Reused internal system not found.' }
-    if (reusedSystem.status === 'Occupied') return { ok: false, message: 'Reused internal system is already occupied.' }
-    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.sourceMachineId === reusedSystem.machineId)) {
-      return { ok: false, message: 'This MID is already allocated to the project.' }
-    }
+    const invalid = validateReusedInternalAllocation({ projectId, systemId: reusedSystemId }, state)
+    if (invalid) return invalid
+    if (!project || !reusedSystem) return { ok: false, message: 'Reused internal system not found.' }
 
     const now = new Date().toISOString()
     const nextSystemId = incrementCounter(state.idCounters, 'sid')
@@ -883,14 +876,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   linkExistingSystemToProject: (projectId, systemId) => {
     const state = get()
-    const project = state.projects.find((candidate) => candidate.id === projectId)
-    const system = state.systems.find((candidate) => candidate.id === systemId)
-    if (!project) return { ok: false, message: 'Project not found.' }
-    if (project.mainType === 'POC') return { ok: false, message: 'POC projects cannot link existing production systems in F1.' }
-    if (!system) return { ok: false, message: 'Existing system not found.' }
-    if (activeProjectSystemLinks(state.projectSystems).some((link) => link.projectId === projectId && link.systemId === systemId)) {
-      return { ok: false, message: 'This system is already allocated to the project.' }
-    }
+    const invalid = validateExistingSystemLink({ projectId, systemId }, state)
+    if (invalid) return invalid
 
     const now = new Date().toISOString()
     const tenantIds: string[] = []
@@ -927,8 +914,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   deallocateProjectSystem: (allocationId) => {
     const state = get()
     const allocation = state.projectSystems.find((candidate) => candidate.id === allocationId)
+    const invalid = validateProjectSystemDeallocation(allocationId, state.projectSystems)
+    if (invalid) return invalid
     if (!allocation) return { ok: false, message: 'Allocation not found.' }
-    if (allocation.allocationStatus === 'DEALLOCATED') return { ok: false, message: 'Allocation is already deallocated.' }
     const now = new Date().toISOString()
 
     set((current) => ({
