@@ -89,9 +89,29 @@ type ColumnDropPlacement = 'before' | 'after'
 const FLOATING_MENU_VIEWPORT_PADDING = 8
 const FLOATING_MENU_TRIGGER_GAP = 4
 const COLUMN_DRAG_DATA_TYPE = 'application/x-dashboard-column-id'
+const ROW_INDICATOR_COLUMN_ID = '__rowIndicator'
 
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
   return classNames.filter(Boolean).join(' ')
+}
+
+function rowChangeState(row: unknown): 'New' | 'Updated' | null {
+  const timestampedRow = row as { createdAt?: string; updatedAt?: string }
+  if (!timestampedRow.createdAt || !timestampedRow.updatedAt) return null
+  if (timestampedRow.createdAt === timestampedRow.updatedAt) return 'New'
+  return timestampedRow.updatedAt > timestampedRow.createdAt ? 'Updated' : null
+}
+
+function RowIndicator({ row }: { row: unknown }) {
+  const state = rowChangeState(row)
+  if (!state) return <span className="block h-2 w-2" aria-hidden="true" />
+  return (
+    <span
+      className={['inline-flex h-2.5 w-2.5 rounded-full', state === 'New' ? 'bg-green-500' : 'bg-amber-500'].join(' ')}
+      title={state}
+      aria-label={state}
+    />
+  )
 }
 
 function uniqueColumnOptions<T>(rows: T[], sourceColumn?: DashboardColumn<T>): string[] {
@@ -735,14 +755,14 @@ export function DataDashboard<T extends { id: string }>({
   const [sorting, setSorting] = useState<SortingState>([])
   const [grouping, setGrouping] = useState<GroupingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => columns.map((column) => column.id))
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => [ROW_INDICATOR_COLUMN_ID, ...columns.map((column) => column.id)])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
-    Object.fromEntries(columns.map((column) => [column.id, true])),
+    Object.fromEntries([ROW_INDICATOR_COLUMN_ID, ...columns.map((column) => column.id)].map((columnId) => [columnId, true])),
   )
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null)
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
-  const sourceColumnIds = useMemo(() => columns.map((column) => column.id), [columns])
+  const sourceColumnIds = useMemo(() => [ROW_INDICATOR_COLUMN_ID, ...columns.map((column) => column.id)], [columns])
   const [persistedDashboardViews, setPersistedDashboardViews] = useState(() => loadDashboardViews())
   const [selectedViewId, setSelectedViewId] = useState(FULL_DASHBOARD_VIEW_ID)
   const [pendingViewId, setPendingViewId] = useState<string | null>(null)
@@ -767,8 +787,17 @@ export function DataDashboard<T extends { id: string }>({
   }, [sourceColumnIds])
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
-    () =>
-      columns.map((column) => ({
+    () => [
+      {
+        id: ROW_INDICATOR_COLUMN_ID,
+        header: '',
+        accessorFn: (row) => rowChangeState(row) ?? '',
+        enableSorting: true,
+        enableGrouping: false,
+        enableColumnFilter: true,
+        cell: ({ row }) => <RowIndicator row={row.original} />,
+      },
+      ...columns.map((column): ColumnDef<T> => ({
         id: column.id,
         header: column.label,
         accessorFn: (row) => String(column.getValue(row) ?? ''),
@@ -817,6 +846,7 @@ export function DataDashboard<T extends { id: string }>({
           return (column.render?.(row.original) ?? raw) || '—'
         },
       })),
+    ],
     [columns, enableInlineEditing, onEdit],
   )
 

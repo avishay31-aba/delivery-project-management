@@ -31,12 +31,19 @@ import {
 } from '@/config/opportunity-metadata'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
+import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { type AllocationActionResult, useAppStore } from '@/store/useAppStore'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
+  orderedProjectMilestones,
+  orderedProjectTasks,
+  projectMilestoneStatus,
+  projectMilestoneTaskProgress,
   resolveProjectMilestoneTemplate,
-} from '@/config/project-milestone-templates'
+  updateMilestoneOrderInPlan,
+  updateTaskInPlan,
+} from '@/domain/milestone-plan'
 
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
@@ -184,31 +191,17 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
   const isDone = status === 'DONE'
   const isInProgress = status === 'IN_PROGRESS'
   const Icon = isDone ? CheckCircle2 : CirclePlay
+  const color = isDone ? 'text-green-600' : isInProgress ? 'text-amber-500' : 'text-slate-500'
   if (large) {
-    return <Icon className={[isDone ? 'text-blue-500' : isInProgress ? 'text-amber-500' : 'text-green-500', 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    return <Icon className={[color, 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sf-text">
-      <Icon className={[isDone ? 'text-blue-500' : isInProgress ? 'text-amber-500' : 'text-green-500', 'h-4 w-4'].join(' ')} aria-hidden="true" />
+      <Icon className={[color, 'h-4 w-4'].join(' ')} aria-hidden="true" />
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
-}
-
-function milestoneStatus(project: Project, milestoneId: string): Project['progressStatus'] {
-  const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
-  if (tasks.length === 0) return 'OPEN'
-  const doneCount = tasks.filter((task) => task.status === 'DONE').length
-  if (doneCount === 0) return 'OPEN'
-  if (doneCount === tasks.length) return 'DONE'
-  return 'IN_PROGRESS'
-}
-
-function milestoneProgress(project: Project, milestoneId: string): number {
-  const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
-  if (tasks.length === 0) return 0
-  return Math.round((tasks.filter((task) => task.status === 'DONE').length / tasks.length) * 100)
 }
 
 function projectTypeForOpportunity(opportunity: Opportunity): { mainType: ProjectMainType; subType: ProjectSubType } {
@@ -651,6 +644,7 @@ export function ProjectFormPage() {
       milestoneTemplateId: projectDraft.milestoneTemplateId,
       milestones: projectDraft.milestones,
       tasks: projectDraft.tasks,
+      documents: projectDraft.documents ?? [],
     })
     setSaveMessages(['Project saved.'])
     if (!stayOnPage) navigate('/projects')
@@ -802,54 +796,21 @@ export function ProjectFormPage() {
   }
 
   function updateMilestoneOrder(milestoneId: string, order: number) {
-    setDraft((current) => {
-      if (!current) return current
-      return {
-        ...current,
-        milestones: (current.milestones ?? []).map((milestone) =>
-          milestone.id === milestoneId ? { ...milestone, order } : milestone,
-        ),
-      }
-    })
+    setDraft((current) => (current ? updateMilestoneOrderInPlan(current, milestoneId, order) : current))
     setSaveMessages([])
   }
 
   function updateTask(taskId: string, patch: Partial<NonNullable<Project['tasks']>[number]>) {
-    setDraft((current) => {
-      if (!current) return current
-      const tasks = (current.tasks ?? []).map((task) =>
-        task.id === taskId ? { ...task, ...patch } : task,
-      )
-      const statusForMilestone = (milestoneId: string): Project['progressStatus'] => {
-        const milestoneTasks = tasks.filter((task) => task.milestoneId === milestoneId)
-        if (milestoneTasks.length === 0) return 'OPEN'
-        const doneCount = milestoneTasks.filter((task) => task.status === 'DONE').length
-        if (doneCount === 0) return 'OPEN'
-        if (doneCount === milestoneTasks.length) return 'DONE'
-        return 'IN_PROGRESS'
-      }
-      return {
-        ...current,
-        tasks,
-        milestones: (current.milestones ?? []).map((milestone) => ({
-          ...milestone,
-          status: statusForMilestone(milestone.id),
-        })),
-      }
-    })
+    setDraft((current) => (current ? updateTaskInPlan(current, taskId, patch) : current))
     setSaveMessages([])
   }
 
   function orderedMilestones(project: Project) {
-    return [...(project.milestones ?? [])].sort((first, second) => first.order - second.order || first.name.localeCompare(second.name))
+    return orderedProjectMilestones(project)
   }
 
   function orderedTasks(project: Project) {
-    const milestoneOrder = new Map(orderedMilestones(project).map((milestone, index) => [milestone.id, index]))
-    return [...(project.tasks ?? [])].sort((first, second) => {
-      const milestoneCompare = (milestoneOrder.get(first.milestoneId) ?? 0) - (milestoneOrder.get(second.milestoneId) ?? 0)
-      return milestoneCompare || first.order - second.order
-    })
+    return orderedProjectTasks(project)
   }
 
   function renderMilestonesTab() {
@@ -888,8 +849,8 @@ export function ProjectFormPage() {
               </thead>
               <tbody>
                 {milestones.map((milestone) => {
-                  const status = milestoneStatus(projectDraft, milestone.id)
-                  const progress = milestoneProgress(projectDraft, milestone.id)
+                  const status = projectMilestoneStatus(projectDraft, milestone.id)
+                  const progress = projectMilestoneTaskProgress(projectDraft, milestone.id)
                   const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestone.id).length ?? 0
                   return (
                     <tr key={milestone.id} className="hover:bg-sf-surface-alt">
@@ -958,11 +919,16 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-sf-surface-alt">
-                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={task.status} /></td>
+                    <td className="w-56 border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
+                    <td className="min-w-64 border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
+                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
+                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <select className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}>
+                        <option value="OPEN">Open</option>
+                        <option value="DONE">Done</option>
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1064,6 +1030,28 @@ export function ProjectFormPage() {
         <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
           {projectTabLabel(tab)} workspace is not editable in this MVP scope.
         </div>
+      </CollapsibleSection>
+    )
+  }
+
+  function renderDocumentsTab() {
+    const sectionId = tabSectionId('documents')
+    return (
+      <CollapsibleSection
+        title="Documents"
+        subtitle="Shared document workspace for this Project."
+        collapsed={collapsedSections[sectionId]}
+        onToggle={() => toggleSection(sectionId)}
+        className="space-y-3 p-3"
+      >
+        <DocumentsPanel
+          documents={projectDraft.documents ?? []}
+          emptyText="No documents uploaded for this project."
+          onChange={(documents) => {
+            setDraft((current) => (current ? { ...current, documents } : current))
+            setSaveMessages([])
+          }}
+        />
       </CollapsibleSection>
     )
   }
@@ -1349,7 +1337,9 @@ export function ProjectFormPage() {
                 ? renderMilestonesTab()
                 : activeTab === 'tasks'
                   ? renderTasksTab()
-                  : renderPlaceholderTab(activeTab)}
+                  : activeTab === 'documents'
+                    ? renderDocumentsTab()
+                    : renderPlaceholderTab(activeTab)}
         </div>
       </div>
       {renderMilestoneDialog()}

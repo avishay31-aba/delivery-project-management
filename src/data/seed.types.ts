@@ -94,6 +94,7 @@ export interface Project {
   milestoneTemplateId?: string
   milestones?: ProjectMilestone[]
   tasks?: ProjectTask[]
+  documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -253,6 +254,7 @@ export interface System {
   timeGroup: string
   timeGroupAlert?: string
   operationalStatus: string
+  documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -281,7 +283,7 @@ export interface Tenant {
   remarks?: TenantRemark[]
   configurationHistory?: TenantConfigurationHistoryRecord[]
   warranties?: TenantWarranty[]
-  documents?: TenantDocument[]
+  documents?: DocumentRecord[]
   productType: string
   hostingType?: string
   cloudPlatform?: string
@@ -415,14 +417,17 @@ export interface TenantWarranty {
   remark: string
 }
 
-export interface TenantDocument {
+export interface DocumentRecord {
   id: string
   fileName: string
   fileType: string
   fileSize: number
   uploadedAt: string
+  replacedAt?: string
   objectUrl?: string
 }
+
+export type TenantDocument = DocumentRecord
 
 export interface TenantHostedSystemHistory {
   systemId: string
@@ -457,6 +462,7 @@ export interface ProductionSystemInventoryItem {
   linkedProjects?: string[]
   operationalStatus: string
   tenantCount: number
+  documents?: DocumentRecord[]
   licenses?: number | null
   users?: number | null
   concurrentSearches?: number | null
@@ -538,6 +544,7 @@ export interface ReusedInternalSystem {
   additionalFeatures?: string[]
   alerts: string[]
   operationalStatus: string
+  documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
 }

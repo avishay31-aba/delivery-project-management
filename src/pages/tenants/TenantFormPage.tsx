@@ -1,9 +1,10 @@
-import { type ChangeEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, FileText, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
+import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
@@ -26,7 +27,6 @@ import type {
   Tenant,
   TenantConfiguration,
   TenantConfigurationHistoryRecord,
-  TenantDocument,
   TenantFormType,
   TenantHostingSnapshot,
   TenantRemark,
@@ -803,26 +803,6 @@ export function TenantFormPage() {
     setDraft((current) => (current ? { ...current, warranties: (current.warranties ?? []).filter((warranty) => warranty.id !== id) } : current))
   }
 
-  function addDocuments(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? [])
-    if (files.length === 0) return
-    const uploadedAt = new Date().toISOString()
-    const documents: TenantDocument[] = files.map((file) => ({
-      id: `tenant-document-${crypto.randomUUID()}`,
-      fileName: file.name,
-      fileType: file.type,
-      fileSize: file.size,
-      uploadedAt,
-      objectUrl: URL.createObjectURL(file),
-    }))
-    setDraft((current) => (current ? { ...current, documents: [...(current.documents ?? []), ...documents] } : current))
-    event.target.value = ''
-  }
-
-  function deleteDocument(id: string) {
-    setDraft((current) => (current ? { ...current, documents: (current.documents ?? []).filter((document) => document.id !== id) } : current))
-  }
-
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap gap-2">
@@ -1176,29 +1156,15 @@ export function TenantFormPage() {
   }
 
   function renderDocumentsTab() {
-    const documents = tenantDraft.documents ?? []
     return (
-      <div className="space-y-3">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt">
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Upload
-          <input className="sr-only" type="file" multiple onChange={addDocuments} />
-        </label>
-        <ReadonlyTable
-          headers={['File', 'Type', 'Size', 'Uploaded At', 'Action']}
-          rows={documents.map((document) => [
-            <span className="inline-flex items-center gap-1"><FileText className="h-4 w-4" aria-hidden="true" />{document.fileName}</span>,
-            document.fileType,
-            `${Math.round(document.fileSize / 1024)} KB`,
-            document.uploadedAt,
-            <span className="inline-flex gap-2">
-              {document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : null}
-              <button type="button" className="text-red-700 hover:underline" onClick={() => deleteDocument(document.id)}>Delete</button>
-            </span>,
-          ])}
-          emptyText="No documents uploaded for this tenant."
-        />
-      </div>
+      <DocumentsPanel
+        documents={tenantDraft.documents ?? []}
+        emptyText="No documents uploaded for this tenant."
+        onChange={(documents) => {
+          setDraft((current) => (current ? { ...current, documents } : current))
+          setMessages([])
+        }}
+      />
     )
   }
 

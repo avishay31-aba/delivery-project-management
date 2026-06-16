@@ -1,5 +1,20 @@
+import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { Project } from '@/data/seed.types'
+import { deriveProjectProgress } from '@/domain/milestone-plan'
+
+function ProgressBar({ value }: { value: number }) {
+  return createElement(
+    'div',
+    { className: 'min-w-32' },
+    createElement(
+      'div',
+      { className: 'h-2 overflow-hidden rounded-full bg-sf-surface-alt' },
+      createElement('div', { className: 'h-full bg-sf-brand', style: { width: `${value}%` } }),
+    ),
+    createElement('span', { className: 'mt-1 block text-xs text-sf-text-muted' }, `${value}%`),
+  )
+}
 
 export const projectListColumns: DashboardColumn<Project>[] = [
   { id: 'pid', label: 'PID#', getValue: (r) => r.pid },
@@ -22,12 +37,12 @@ export const projectListColumns: DashboardColumn<Project>[] = [
   { id: 'licenses', label: 'Licenses', getValue: () => '' },
   { id: 'users', label: 'Users', getValue: () => '' },
   { id: 'projectAlerts', label: 'Project Alerts', getValue: () => '' },
-  { id: 'percent', label: '%', getValue: () => '' },
-  { id: 'milestonesCompletion', label: 'Milestones Completion', getValue: () => '' },
-  { id: 'lastMilestone', label: 'Last Milestone', getValue: () => '' },
+  { id: 'lastMilestone', label: 'Last Milestone', getValue: (r) => deriveProjectProgress(r).lastMilestone },
+  { id: 'currentMilestone', label: 'Current Milestone', getValue: (r) => deriveProjectProgress(r).currentMilestone },
+  { id: 'percent', label: '%', getValue: (r) => deriveProjectProgress(r).percent, render: (r) => createElement(ProgressBar, { value: deriveProjectProgress(r).percent }) },
+  { id: 'milestonesCompletion', label: 'Milestones Completion', getValue: (r) => `${deriveProjectProgress(r).percent}%` },
   { id: 'financialProfile', label: 'Financial Profile', getValue: () => '' },
   { id: 'directChannel', label: 'Direct/Channel', getValue: () => '' },
-  { id: 'currentMilestone', label: 'Current Milestone', getValue: () => '' },
   { id: 'owner', label: 'Owner', getValue: (r) => r.dealOwner, editable: true, editKey: 'dealOwner' },
   { id: 'sales', label: 'Sales', getValue: () => '' },
   { id: 'finance', label: 'Finance', getValue: () => '' },

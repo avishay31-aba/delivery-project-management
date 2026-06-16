@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
+import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import {
   HOSTING_OPTIONS,
@@ -1090,6 +1091,19 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderDocumentsTab() {
+    return (
+      <DocumentsPanel
+        documents={activeDraft.documents ?? []}
+        emptyText="No documents uploaded for this system."
+        onChange={(documents) => {
+          setDraft((current) => (current ? ({ ...current, documents } as T) : current))
+          setMessages([])
+        }}
+      />
+    )
+  }
+
   function renderAddTenantDialog() {
     if (!addTenantOpen) return null
     const linkedProjects = linkedProjectsForSystem()
@@ -1226,7 +1240,9 @@ function InventoryForm<T extends InventoryRecord>({
               ? renderInfrastructureTab()
               : activeTab === 'tenant'
                 ? renderTenantTab()
-                : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+                : activeTab === 'documents'
+                  ? renderDocumentsTab()
+                  : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>

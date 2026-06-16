@@ -491,6 +491,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       dealOwner: '',
       opportunityName: '',
       canceledAt: null,
+      documents: [],
       createdAt: now,
       updatedAt: now,
     }
@@ -538,6 +539,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       operationalStatus: 'On',
       tenantCount: 0,
       alerts: [],
+      documents: [],
       createdAt: now,
       updatedAt: now,
     }
@@ -589,6 +591,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenantCount: 0,
       alerts: [],
       operationalStatus: 'On',
+      documents: [],
       createdAt: now,
       updatedAt: now,
     }
@@ -653,6 +656,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         pid: nextProjectId.id,
         ...buildProjectPatch(projectSource),
         progressStatus: 'OPEN',
+        documents: [],
         createdAt: now,
         updatedAt: now,
       }
@@ -730,6 +734,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       state: '',
       timeGroup: '',
       operationalStatus: '',
+      documents: [],
       createdAt: now,
       updatedAt: now,
     }
@@ -903,6 +908,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       timeGroup: reusedSystem.timeGroup,
       timeGroupAlert: reusedSystem.timeGroupAlert,
       operationalStatus: reusedSystem.operationalStatus,
+      documents: reusedSystem.documents ?? [],
       createdAt: now,
       updatedAt: now,
     }
