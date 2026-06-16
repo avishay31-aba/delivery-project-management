@@ -1,4 +1,5 @@
 import type { NewTenantRequirement, Tenant, TenantConfiguration } from '@/data/seed.types'
+import { defaultHostingIntent } from '@/domain/hosting-context'
 import { numericOrNull } from './service'
 
 export function applicationConfigurationFromRequirement(
@@ -68,10 +69,11 @@ export function applicationConfigurationFromTenant(tenant: Tenant, productOverri
 
 export function applicationConfigurationPatchFromTenant(tenant?: Tenant): Partial<NewTenantRequirement> {
   if (!tenant) return {}
+  const defaultIntent = defaultHostingIntent()
 
   return {
-    hostingType: tenant.hostingType ?? 'Cloud',
-    cloudPlatform: tenant.cloudPlatform ?? 'AWS',
+    hostingType: tenant.hostingType ?? defaultIntent.hostingType,
+    cloudPlatform: tenant.cloudPlatform ?? defaultIntent.cloudPlatform,
     productType: tenant.productType,
     mapCenter: tenant.mapCenter ?? tenant.country,
     licenses: numericOrNull(tenant.licenses),

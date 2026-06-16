@@ -6,6 +6,7 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
+import { defaultHostingIntent } from '@/domain/hosting-context'
 
 export function createBaseRequirement(requirementId: string): Omit<
   NewTenantRequirement,
@@ -14,8 +15,7 @@ export function createBaseRequirement(requirementId: string): Omit<
   return {
     id: `req-${crypto.randomUUID()}`,
     requirementId,
-    hostingType: 'Cloud',
-    cloudPlatform: 'AWS',
+    ...defaultHostingIntent(),
     productType: 'Tangles',
     mapCenter: '',
     licenses: null,

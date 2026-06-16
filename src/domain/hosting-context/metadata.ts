@@ -91,9 +91,13 @@ export const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
 
 export const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
 
-export const DEFAULT_HOSTING_CONTEXT = {
+export const DEFAULT_HOSTING_INTENT = {
   hostingType: 'Cloud',
   cloudPlatform: 'AWS',
+}
+
+export const DEFAULT_HOSTING_CONTEXT = {
+  ...DEFAULT_HOSTING_INTENT,
   csp: 'Automate IT',
   cloudRegion: 'us-east-1 (N. Virginia)',
   performanceTier: 'STANDARD' as const,
