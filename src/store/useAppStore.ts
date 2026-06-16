@@ -18,6 +18,10 @@ import {
 } from '@/store/persistence'
 import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 import {
+  activeProjectSystemLinks,
+  type AllocationActionResult,
+} from '@/domain/allocation-context'
+import {
   defaultHostingContext,
   defaultSystemHostingContext,
   hostingContextFromSource,
@@ -75,22 +79,12 @@ export interface OpportunityProjectSyncResult {
   projectChanges: ProjectLifecycleChange[]
 }
 
-export interface AllocationActionResult {
-  ok: boolean
-  message: string
-  allocationId?: string
-}
-
 function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)))
 }
 
 function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType {
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
-}
-
-function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
-  return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
 }
 
 function findLinkedPocProjects(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project[] {

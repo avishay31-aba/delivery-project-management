@@ -52,6 +52,7 @@ import { timeGroupForCountry } from '@/config/time-groups'
 import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
@@ -760,8 +761,8 @@ function InventoryForm<T extends InventoryRecord>({
 
   function linkedProjectsForSystem(): Project[] {
     const projectIds = new Set(
-      projectSystems
-        .filter((link) => link.systemId === activeRecord.id && link.allocationStatus !== 'DEALLOCATED')
+      activeProjectSystemLinks(projectSystems)
+        .filter((link) => link.systemId === activeRecord.id)
         .map((link) => link.projectId),
     )
     if ('linkedProjectIds' in activeRecord) {

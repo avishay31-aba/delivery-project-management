@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 
 export function SystemListPage() {
   const navigate = useNavigate()
@@ -11,7 +12,7 @@ export function SystemListPage() {
   const tenants = useAppStore((s) => s.tenants)
   const projectSystems = useAppStore((s) => s.projectSystems)
   const updateSystem = useAppStore((s) => s.updateSystem)
-  const allocatedSystemIds = new Set(projectSystems.map((link) => link.systemId))
+  const allocatedSystemIds = new Set(activeProjectSystemLinks(projectSystems).map((link) => link.systemId))
   const allocatedSystems = systems.filter((system) => Boolean(system.sid) && allocatedSystemIds.has(system.id))
   const systemListColumns = createAllocatedSystemColumns(projects, tenants)
 

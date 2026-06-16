@@ -32,7 +32,17 @@ import {
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { type AllocationActionResult, useAppStore } from '@/store/useAppStore'
+import { useAppStore } from '@/store/useAppStore'
+import {
+  activeProjectSystemLinks,
+  allocationModeLabel,
+  allowedAllocationModes,
+  availableExistingSystemCandidates,
+  availableProductionCandidates,
+  availableReusedInternalCandidates,
+  type AllocationActionResult,
+  type AllocationMode,
+} from '@/domain/allocation-context'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -47,7 +57,6 @@ import {
 
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
-type AllocationMode = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -144,24 +153,6 @@ function completeRequirementSections(
 
 function tenantDisplayName(tenant: Tenant): string {
   return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
-}
-
-function allocationModeLabel(mode: AllocationMode): string {
-  if (mode === 'PRODUCTION') return 'Allocate Production System'
-  if (mode === 'REUSED_INTERNAL') return 'Allocate Reused Internal System'
-  return 'Link Existing System'
-}
-
-function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
-  return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
-}
-
-function isPocProject(project: Project): boolean {
-  return project.mainType === 'POC'
-}
-
-function allowedAllocationModes(project: Project): AllocationMode[] {
-  return isPocProject(project) ? ['REUSED_INTERNAL'] : ['PRODUCTION', 'EXISTING_SYSTEM']
 }
 
 function candidatePrimaryId(candidate: AllocationCandidate): string {
@@ -480,16 +471,10 @@ export function ProjectFormPage() {
   const activeSystemLinkBySystemId = new Map(activeSystemLinks.map((link) => [link.systemId, link]))
   const availableAllocationCandidates: AllocationCandidate[] =
     selectedMode === 'PRODUCTION'
-      ? productionSystemInventory
+      ? availableProductionCandidates(productionSystemInventory)
       : selectedMode === 'REUSED_INTERNAL'
-        ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
-        : systems.filter(
-            (system) =>
-              Boolean(system.sid) &&
-              !activeProjectSystemLinks(projectSystems).some(
-                (link) => link.projectId === projectDraft.id && link.systemId === system.id,
-              ),
-          )
+        ? availableReusedInternalCandidates(reusedInternalSystems)
+        : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
@@ -499,16 +484,10 @@ export function ProjectFormPage() {
     const initialMode = permittedAllocationModes[0]
     const initialCandidates =
       initialMode === 'PRODUCTION'
-        ? productionSystemInventory
+        ? availableProductionCandidates(productionSystemInventory)
         : initialMode === 'REUSED_INTERNAL'
-          ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
-          : systems.filter(
-              (system) =>
-                Boolean(system.sid) &&
-                !activeProjectSystemLinks(projectSystems).some(
-                  (link) => link.projectId === projectDraft.id && link.systemId === system.id,
-                ),
-            )
+          ? availableReusedInternalCandidates(reusedInternalSystems)
+          : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
     setAllocationMode(initialMode)
     setSelectedAllocationId(initialCandidates[0]?.id ?? '')
     setAllocationResult(null)
@@ -518,16 +497,10 @@ export function ProjectFormPage() {
   function changeAllocationMode(mode: AllocationMode) {
     const nextCandidates =
       mode === 'PRODUCTION'
-        ? productionSystemInventory
+        ? availableProductionCandidates(productionSystemInventory)
         : mode === 'REUSED_INTERNAL'
-          ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
-          : systems.filter(
-              (system) =>
-                Boolean(system.sid) &&
-                !activeProjectSystemLinks(projectSystems).some(
-                  (link) => link.projectId === projectDraft.id && link.systemId === system.id,
-                ),
-            )
+          ? availableReusedInternalCandidates(reusedInternalSystems)
+          : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
     setAllocationMode(mode)
     setSelectedAllocationId(nextCandidates[0]?.id ?? '')
     setAllocationResult(null)
