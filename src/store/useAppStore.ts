@@ -5,7 +5,6 @@ import type {
   OpportunitySubType,
   OpportunityType,
   Project,
-  ProjectSystemLink,
   ProjectSubType,
   Tenant,
 } from '@/data/seed.types'
@@ -18,6 +17,9 @@ import {
 } from '@/store/persistence'
 import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 import {
+  createProjectSystemLink,
+  systemFromProductionInventoryAllocation,
+  systemFromReusedInternalAllocation,
   validateExistingSystemLink,
   validateProductionAllocation,
   validateProjectSystemDeallocation,
@@ -27,7 +29,6 @@ import {
 import {
   defaultHostingContext,
   defaultSystemHostingContext,
-  hostingContextFromSource,
   tenantHostingPatchFromSystem,
 } from '@/domain/hosting-context'
 
@@ -765,29 +766,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const tenantIds: string[] = []
 
-    const allocatedSystem = {
-      ...productionSystem,
-      accountId: null,
-      salesManagerId: null,
-      machineId: null,
-      systemClass: 'CUSTOMER' as const,
-      availability: 'OCCUPIED' as const,
-      linkedProjectIds: [projectId],
-      tenantIds,
-      createdAt: productionSystem.createdAt,
-      updatedAt: now,
-    }
-    const allocation: ProjectSystemLink = {
-      id: `alloc-${crypto.randomUUID()}`,
+    const allocatedSystem = systemFromProductionInventoryAllocation(productionSystem, projectId, tenantIds, now)
+    const allocation = createProjectSystemLink(
       projectId,
-      systemId: allocatedSystem.id,
-      tenantIds,
-      allocationStatus: 'ALLOCATED',
-      allocationType: 'PRODUCTION',
-      sourceMachineId: null,
-      allocatedAt: now,
-      deallocatedAt: null,
-    }
+      allocatedSystem.id,
+      'PRODUCTION',
+      now,
+      { tenantIds },
+    )
 
     set((current) => ({
       productionSystemInventory: current.productionSystemInventory.filter((candidate) => candidate.id !== productionSystemId),
@@ -812,46 +798,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const tenantIds: string[] = []
     const allocatedSystemId = `sys-${crypto.randomUUID()}`
 
-    const allocatedSystem = {
-      id: allocatedSystemId,
-      accountId: null,
-      salesManagerId: null,
-      sid: nextSystemId.id,
-      deliveryPid: project.pid,
-      machineId: reusedSystem.machineId,
-      source: 'Reused Internal Systems' as const,
-      linkedProjectIds: [projectId],
-      tenantIds,
-      systemClass: 'POC_DEMO_TRAINING' as const,
-      purpose: reusedSystem.purpose,
-      availability: 'OCCUPIED' as const,
-      logo: reusedSystem.logo,
-      url: reusedSystem.url,
-      cognitoRegion: reusedSystem.cognitoRegion,
-      productType: reusedSystem.productType,
-      ...hostingContextFromSource(reusedSystem),
-      mapCenter: reusedSystem.mapCenter,
-      region: reusedSystem.usedInRegion,
-      country: '',
-      state: '',
-      timeGroup: reusedSystem.timeGroup,
-      timeGroupAlert: reusedSystem.timeGroupAlert,
-      operationalStatus: reusedSystem.operationalStatus,
-      documents: reusedSystem.documents ?? [],
-      createdAt: now,
-      updatedAt: now,
-    }
-    const allocation: ProjectSystemLink = {
-      id: `alloc-${crypto.randomUUID()}`,
+    const allocatedSystem = systemFromReusedInternalAllocation(
+      reusedSystem,
       projectId,
-      systemId: allocatedSystem.id,
+      allocatedSystemId,
+      nextSystemId.id,
+      project.pid,
       tenantIds,
-      allocationStatus: 'ALLOCATED',
-      allocationType: 'REUSED_INTERNAL',
-      sourceMachineId: reusedSystem.machineId,
-      allocatedAt: now,
-      deallocatedAt: null,
-    }
+      now,
+    )
+    const allocation = createProjectSystemLink(
+      projectId,
+      allocatedSystem.id,
+      'REUSED_INTERNAL',
+      now,
+      { tenantIds, sourceMachineId: reusedSystem.machineId },
+    )
 
     set((current) => ({
       idCounters,
@@ -882,17 +844,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const tenantIds: string[] = []
 
-    const allocation: ProjectSystemLink = {
-      id: `alloc-${crypto.randomUUID()}`,
+    const allocation = createProjectSystemLink(
       projectId,
       systemId,
-      tenantIds,
-      allocationStatus: 'ALLOCATED',
-      allocationType: 'EXISTING_SYSTEM',
-      sourceMachineId: null,
-      allocatedAt: now,
-      deallocatedAt: null,
-    }
+      'EXISTING_SYSTEM',
+      now,
+      { tenantIds },
+    )
 
     set((current) => ({
       systems: current.systems.map((candidate) =>
