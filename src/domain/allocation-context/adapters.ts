@@ -128,3 +128,29 @@ export function systemFromReusedInternalAllocation(
     updatedAt: createdAt,
   }
 }
+
+export function deallocateProjectSystemLink(link: ProjectSystemLink, deallocatedAt: string): ProjectSystemLink {
+  return { ...link, allocationStatus: 'DEALLOCATED', deallocatedAt }
+}
+
+export function deallocateProjectTenantLink(link: ProjectTenantLink, deallocatedAt: string): ProjectTenantLink {
+  return { ...link, allocationStatus: 'DEALLOCATED', deallocatedAt }
+}
+
+export function unlinkProjectFromSystem(system: System, projectId: string, updatedAt: string): System {
+  return {
+    ...system,
+    linkedProjectIds: (system.linkedProjectIds ?? []).filter((candidateProjectId) => candidateProjectId !== projectId),
+    updatedAt,
+  }
+}
+
+export function releaseReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+  return {
+    ...system,
+    status: 'Available',
+    currentProjectIds: system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId),
+    occupationEndDate: updatedAt,
+    updatedAt,
+  }
+}

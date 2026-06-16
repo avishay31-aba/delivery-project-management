@@ -18,8 +18,12 @@ import {
 import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 import {
   createProjectSystemLink,
+  deallocateProjectSystemLink,
+  deallocateProjectTenantLink,
+  releaseReusedInternalSystem,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
+  unlinkProjectFromSystem,
   validateExistingSystemLink,
   validateProductionAllocation,
   validateProjectSystemDeallocation,
@@ -880,32 +884,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((current) => ({
       projectSystems: current.projectSystems.map((candidate) =>
         candidate.id === allocationId
-          ? { ...candidate, allocationStatus: 'DEALLOCATED', deallocatedAt: now }
+          ? deallocateProjectSystemLink(candidate, now)
           : candidate,
       ),
       projectTenants: current.projectTenants.map((candidate) =>
         candidate.projectId === allocation.projectId && candidate.systemId === allocation.systemId && candidate.allocationStatus !== 'DEALLOCATED'
-          ? { ...candidate, allocationStatus: 'DEALLOCATED', deallocatedAt: now }
+          ? deallocateProjectTenantLink(candidate, now)
           : candidate,
       ),
       systems: current.systems.map((system) =>
         system.id === allocation.systemId
-          ? {
-              ...system,
-              linkedProjectIds: (system.linkedProjectIds ?? []).filter((projectId) => projectId !== allocation.projectId),
-              updatedAt: now,
-            }
+          ? unlinkProjectFromSystem(system, allocation.projectId, now)
           : system,
       ),
       reusedInternalSystems: current.reusedInternalSystems.map((system) =>
         allocation.allocationType === 'REUSED_INTERNAL' && system.machineId === allocation.sourceMachineId
-          ? {
-              ...system,
-              status: 'Available',
-              currentProjectIds: system.currentProjectIds.filter((projectId) => projectId !== allocation.projectId),
-              occupationEndDate: now,
-              updatedAt: now,
-            }
+          ? releaseReusedInternalSystem(system, allocation.projectId, now)
           : system,
       ),
     }))
