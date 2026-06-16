@@ -318,12 +318,28 @@ function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Arr
   return projects.find((project) => project.pid === tenant.deliveryPid || system?.linkedProjectIds?.includes(project.id))
 }
 
+function normalizeReference(value: string | undefined | null): string {
+  return value?.trim().toLocaleLowerCase() ?? ''
+}
+
+function projectOpportunityReference(project: Project | undefined): string {
+  if (!project) return ''
+  if (project.opportunityId) return project.opportunityId
+  return normalizeReference(project.opportunityName).startsWith('sf-opp-') ? project.opportunityName : ''
+}
+
 function resolveOpportunity(project: Project | undefined, opportunities: Opportunity[]): Opportunity | undefined {
   if (!project) return undefined
+  const opportunityReference = normalizeReference(projectOpportunityReference(project))
+  const projectName = normalizeReference(project.opportunityName)
+
   return opportunities.find(
     (opportunity) =>
       opportunity.opportunityId === project.opportunityId ||
       opportunity.id === project.opportunityId ||
+      normalizeReference(opportunity.opportunityId) === opportunityReference ||
+      normalizeReference(opportunity.id) === opportunityReference ||
+      normalizeReference(opportunity.opportunityName) === projectName ||
       opportunity.pocProjectIds.includes(project.id) ||
       opportunity.finalProjectId === project.id,
   )
@@ -450,6 +466,25 @@ export function TenantFormPage() {
     setDraft(savedTenant ? cloneTenant(savedTenant) : null)
   }, [savedTenant])
 
+  useEffect(() => {
+    if (!activeMultiSelect) return
+    const activePickerId = activeMultiSelect.id
+
+    function closeMultiSelectOnOutsideClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null
+      if (
+        target?.closest(`[data-multiselect-picker="${activePickerId}"]`) ||
+        target?.closest(`[data-multiselect-trigger="${activePickerId}"]`)
+      ) {
+        return
+      }
+      setActiveMultiSelect(null)
+    }
+
+    document.addEventListener('mousedown', closeMultiSelectOnOutsideClick)
+    return () => document.removeEventListener('mousedown', closeMultiSelectOnOutsideClick)
+  }, [activeMultiSelect])
+
   if (!savedTenant || !draft) {
     return (
       <PlaceholderCard
@@ -464,7 +499,8 @@ export function TenantFormPage() {
   const activeSystem = systems.find((candidate) => candidate.id === (tenantDraft.hostedSystemId ?? tenantDraft.systemId)) ?? system
   const project = resolveProject(tenantDraft, projects, projectTenants, systems)
   const opportunity = resolveOpportunity(project, opportunities)
-  const canManageWarranties = Boolean(project && opportunity)
+  const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
+  const canManageWarranties = Boolean(project && linkedOpportunityId)
   const inheritedEngagementCircle = tenantDraft.engagementCircle?.length
     ? tenantDraft.engagementCircle
     : opportunity?.engagementCircles ?? []
@@ -494,6 +530,7 @@ export function TenantFormPage() {
   function computedWarranties(source: TenantWarranty[]): TenantWarranty[] {
     return source.map((warranty, index) => {
       const selectedProject = projects.find((candidate) => candidate.id === warranty.relatedProjectId)
+      const selectedOpportunity = resolveOpportunity(selectedProject, opportunities)
       const successor = source
         .find((candidate) => candidate.predecessor.split(';').map((item) => item.trim()).includes(`${warranty.warrantyId}${tenantDraft.tid}`))
         ?.warrantyId ?? warranty.successor ?? ''
@@ -503,7 +540,7 @@ export function TenantFormPage() {
         firstWarranty: index === 0,
         accountId: tenantDraft.accountId,
         warrantyType: warrantyTypeForProject(selectedProject),
-        opportunityId: selectedProject?.opportunityId ?? '',
+        opportunityId: selectedOpportunity?.opportunityId ?? projectOpportunityReference(selectedProject),
         successor,
         durationDays: daysBetween(warranty.startDate, warranty.endDate),
         daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
@@ -517,7 +554,7 @@ export function TenantFormPage() {
     const now = new Date().toISOString()
     return opportunity ?? {
       id: `tenant-config-opportunity-${tenantDraft.id}`,
-      opportunityId: project?.opportunityId ?? '',
+      opportunityId: linkedOpportunityId,
       opportunityName: project?.opportunityName ?? tenantDraft.tenantName ?? tenantDraft.tid,
       stage: 'OPEN',
       accountId: tenantDraft.accountId,
@@ -725,7 +762,7 @@ export function TenantFormPage() {
         accountId: current.accountId,
         relatedProjectId: project?.id ?? '',
         warrantyType: project?.mainType ?? '',
-        opportunityId: opportunity?.opportunityId ?? '',
+        opportunityId: linkedOpportunityId,
         startDate: null,
         endDate: null,
         durationDays: null,
@@ -984,6 +1021,7 @@ export function TenantFormPage() {
       <>
         <button
           type="button"
+          data-multiselect-trigger={pickerId}
           className="h-7 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm"
           style={{ width: triggerWidth }}
           title={selected.join('; ')}
@@ -1008,6 +1046,7 @@ export function TenantFormPage() {
         {isOpen
           ? createPortal(
               <div
+                data-multiselect-picker={pickerId}
                 className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
                 style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
               >
