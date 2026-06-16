@@ -890,7 +890,7 @@ export function ProjectFormPage() {
             className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm font-semibold text-sf-text-muted"
             disabled
           >
-            System Allocation
+            System Allocation - Planned for F4
           </button>
         </div>
 

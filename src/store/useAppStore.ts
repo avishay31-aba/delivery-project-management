@@ -82,141 +82,6 @@ function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType 
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
 }
 
-function buildDefaultHostedTenant(
-  tid: string,
-  systemId: string,
-  now: string,
-  account?: AppDataState['accounts'][number],
-  tenantType: Tenant['tenantType'] = 'CUSTOMER',
-  deliveryPid = '',
-): AppDataState['tenants'][number] {
-  return {
-    id: `ten-${crypto.randomUUID()}`,
-    tid,
-    tenantName: `${tid} Default Tenant`,
-    accountId: account?.id ?? '',
-    systemId,
-    deliveryPid,
-    tenantType,
-    tenantFormType: tenantType === 'POC' ? 'POC' : 'CUSTOMER',
-    hostedSystemId: systemId,
-    accountName: account?.accountName ?? '',
-    country: account?.country ?? '',
-    timeGroup: account?.timeGroup ?? '',
-    operationalStatus: 'Active',
-    contractStatus: 'UNDER_CONTRACT',
-    hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
-    productType: 'Tangles',
-    hostingType: 'Cloud',
-    cloudPlatform: 'AWS',
-    csp: 'Automate IT',
-    cloudRegion: 'us-east-1 (N. Virginia)',
-    mapCenter: account?.country ?? '',
-    licenses: 1,
-    users: 1,
-    concurrentSearches: 1,
-    dailySearches: null,
-    monthlySearches: null,
-    concurrentAnalyses: 1,
-    topicAnalyses: null,
-    dailyAnalyses: null,
-    monthlyAnalyses: null,
-    tangles: null,
-    tanglesGo: null,
-    webloc: null,
-    webeye: null,
-    ingest: null,
-    blockchain: '',
-    crossSystemFeatures: [],
-    apiEnabled: '',
-    apiDailyQty: null,
-    apiMonthlyQty: null,
-    aiFeatures: [],
-    additionalFeatures: [],
-    standardMonitors: 1,
-    fullMonitors: null,
-    topicMonitors: null,
-    warrantyStatus: 'NOT_SET',
-    warrantyStartDate: null,
-    warrantyEndDate: null,
-    pocStartDate: null,
-    pocEndDate: null,
-    createdAt: now,
-    updatedAt: now,
-  }
-}
-
-function copyRequirementToTenant(
-  requirement: NonNullable<Opportunity['newTenantRequirements']>[number],
-  project: Project,
-  systemId: string,
-  tid: string,
-  now: string,
-): Tenant {
-  return {
-    id: `ten-${crypto.randomUUID()}`,
-    tid,
-    tenantName: `${tid} ${project.accountName}`.trim(),
-    accountId: '',
-    systemId,
-    deliveryPid: project.pid,
-    tenantType: project.mainType === 'POC' ? 'POC' : 'CUSTOMER',
-    tenantFormType: project.mainType === 'POC' ? 'POC' : 'CUSTOMER',
-    hostedSystemId: systemId,
-    sourceRequirementId: requirement.requirementId,
-    accountName: project.accountName,
-    country: '',
-    timeGroup: '',
-    operationalStatus: 'Active',
-    contractStatus: 'UNDER_CONTRACT',
-    hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
-    productType: requirement.productType,
-    hostingType: requirement.hostingType,
-    cloudPlatform: requirement.cloudPlatform,
-    csp: requirement.csp,
-    cloudRegion: requirement.cloudRegion,
-    statisticsId: requirement.statisticsId,
-    authId: requirement.authId,
-    rdmId: requirement.rdmId,
-    performanceTier: requirement.performanceTier,
-    vpnEnabled: requirement.vpnEnabled,
-    vpnType: requirement.vpnType,
-    ipRestrictionEnabled: requirement.ipRestrictionEnabled,
-    mapCenter: requirement.mapCenter,
-    licenses: requirement.licenses,
-    users: requirement.users,
-    concurrentSearches: requirement.concurrentSearches,
-    dailySearches: requirement.dailySearches,
-    monthlySearches: requirement.monthlySearches,
-    concurrentAnalyses: requirement.concurrentAnalyses,
-    topicAnalyses: requirement.topicAnalyses,
-    dailyAnalyses: requirement.dailyAnalyses,
-    monthlyAnalyses: requirement.monthlyAnalyses,
-    tangles: requirement.tangles,
-    tanglesGo: requirement.tanglesGo,
-    webloc: requirement.webloc,
-    webeye: requirement.webeye,
-    ingest: requirement.ingest,
-    blockchain: requirement.blockchain,
-    crossSystemFeatures: [...requirement.crossSystemFeatures],
-    apiEnabled: requirement.apiEnabled,
-    apiDailyQty: requirement.apiDailyQty,
-    apiMonthlyQty: requirement.apiMonthlyQty,
-    aiFeatures: [...requirement.aiFeatures],
-    additionalFeatures: [...requirement.additionalFeatures],
-    standardMonitors: requirement.standardMonitors,
-    fullMonitors: requirement.fullMonitors,
-    topicMonitors: requirement.topicMonitors,
-    warrantyStatus: 'NOT_SET',
-    warrantyStartDate: null,
-    warrantyEndDate: null,
-    pocStartDate: null,
-    pocEndDate: null,
-    createdAt: now,
-    updatedAt: now,
-  }
-}
-
 function tenantConfigurationFromRequirement(
   requirement: NonNullable<Opportunity['newTenantRequirements']>[number],
   product: string,
@@ -638,8 +503,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   createProductionSystemInventoryItem: () => {
     const state = get()
     const nextSystemId = incrementCounter(state.idCounters, 'sid')
-    const nextTenantId = incrementCounter(nextSystemId.counters, 'tid')
-    const idCounters = nextTenantId.counters
+    const idCounters = nextSystemId.counters
     const nextSid = nextSystemId.id
     const now = new Date().toISOString()
     const system: AppDataState['productionSystemInventory'][number] = {
@@ -672,17 +536,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
       timeGroupAlert: '',
       linkedProjects: [],
       operationalStatus: 'On',
-      tenantCount: 1,
+      tenantCount: 0,
       alerts: [],
       createdAt: now,
       updatedAt: now,
     }
-    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
 
     set((currentState) => ({
       idCounters,
       productionSystemInventory: [system, ...currentState.productionSystemInventory],
-      tenants: [tenant, ...currentState.tenants],
     }))
     get().saveToStorage()
     return system
@@ -691,8 +553,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   createReusedInternalSystem: () => {
     const state = get()
     const nextMachineId = incrementCounter(state.idCounters, 'mid')
-    const nextTenantId = incrementCounter(nextMachineId.counters, 'tid')
-    const idCounters = nextTenantId.counters
+    const idCounters = nextMachineId.counters
     const nextMid = nextMachineId.id
     const now = new Date().toISOString()
     const system: AppDataState['reusedInternalSystems'][number] = {
@@ -725,18 +586,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       occupationStartDate: null,
       occupationEndDate: null,
       currentProjectIds: [],
-      tenantCount: 1,
+      tenantCount: 0,
       alerts: [],
       operationalStatus: 'On',
       createdAt: now,
       updatedAt: now,
     }
-    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now, undefined, 'POC')
 
     set((currentState) => ({
       idCounters,
       reusedInternalSystems: [system, ...currentState.reusedInternalSystems],
-      tenants: [tenant, ...currentState.tenants],
     }))
     get().saveToStorage()
     return system
@@ -846,8 +705,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   createSystem: () => {
     const state = get()
     const nextSystemId = incrementCounter(state.idCounters, 'sid')
-    const nextTenantId = incrementCounter(nextSystemId.counters, 'tid')
-    const idCounters = nextTenantId.counters
+    const idCounters = nextSystemId.counters
     const nextSid = nextSystemId.id
     const now = new Date().toISOString()
 
@@ -875,10 +733,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     }
-    const tenant = buildDefaultHostedTenant(nextTenantId.id, system.id, now)
-    system.tenantIds = [tenant.id]
 
-    set((s) => ({ idCounters, systems: [system, ...s.systems], tenants: [tenant, ...s.tenants] }))
+    set((s) => ({ idCounters, systems: [system, ...s.systems] }))
     get().saveToStorage()
     return system
   },
@@ -947,7 +803,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return tenant
   },
 
-  allocateProductionSystemToProject: (projectId, productionSystemId, requirementIds = []) => {
+  allocateProductionSystemToProject: (projectId, productionSystemId) => {
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const productionSystem = state.productionSystemInventory.find((candidate) => candidate.id === productionSystemId)
@@ -962,18 +818,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     const now = new Date().toISOString()
-    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
-    let idCounters = state.idCounters
     const tenantIds: string[] = []
-    const tenants = [...state.tenants]
-    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
-    requirements.forEach((requirement) => {
-      const nextTenantId = incrementCounter(idCounters, 'tid')
-      idCounters = nextTenantId.counters
-      const tenant = copyRequirementToTenant(requirement, project, productionSystem.id, nextTenantId.id, now)
-      tenantIds.push(tenant.id)
-      tenants.unshift(tenant)
-    })
 
     const allocatedSystem = {
       ...productionSystem,
@@ -1000,30 +845,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     set((current) => ({
-      idCounters,
       productionSystemInventory: current.productionSystemInventory.filter((candidate) => candidate.id !== productionSystemId),
       systems: [allocatedSystem, ...current.systems],
-      tenants,
       projectSystems: [allocation, ...current.projectSystems],
-      projectTenants: [
-        ...tenantIds.map((tenantId) => ({
-          id: `proj-ten-${crypto.randomUUID()}`,
-          projectId,
-          tenantId,
-          systemId: allocatedSystem.id,
-          allocationStatus: 'ALLOCATED' as const,
-          allocationType: 'PRODUCTION' as const,
-          allocatedAt: now,
-          deallocatedAt: null,
-        })),
-        ...current.projectTenants,
-      ],
     }))
     get().saveToStorage()
     return { ok: true, message: 'Production system allocated.', allocationId: allocation.id }
   },
 
-  allocateReusedInternalSystemToProject: (projectId, reusedSystemId, requirementIds = []) => {
+  allocateReusedInternalSystemToProject: (projectId, reusedSystemId) => {
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const reusedSystem = state.reusedInternalSystems.find((candidate) => candidate.id === reusedSystemId)
@@ -1037,19 +867,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const now = new Date().toISOString()
     const nextSystemId = incrementCounter(state.idCounters, 'sid')
-    let idCounters = nextSystemId.counters
-    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+    const idCounters = nextSystemId.counters
     const tenantIds: string[] = []
-    const tenants = [...state.tenants]
     const allocatedSystemId = `sys-${crypto.randomUUID()}`
-    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
-    requirements.forEach((requirement) => {
-      const nextTenantId = incrementCounter(idCounters, 'tid')
-      idCounters = nextTenantId.counters
-      const tenant = copyRequirementToTenant(requirement, project, allocatedSystemId, nextTenantId.id, now)
-      tenantIds.push(tenant.id)
-      tenants.unshift(tenant)
-    })
 
     const allocatedSystem = {
       id: allocatedSystemId,
@@ -1113,27 +933,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : candidate,
       ),
       systems: [allocatedSystem, ...current.systems],
-      tenants,
       projectSystems: [allocation, ...current.projectSystems],
-      projectTenants: [
-        ...tenantIds.map((tenantId) => ({
-          id: `proj-ten-${crypto.randomUUID()}`,
-          projectId,
-          tenantId,
-          systemId: allocatedSystem.id,
-          allocationStatus: 'ALLOCATED' as const,
-          allocationType: 'REUSED_INTERNAL' as const,
-          allocatedAt: now,
-          deallocatedAt: null,
-        })),
-        ...current.projectTenants,
-      ],
     }))
     get().saveToStorage()
     return { ok: true, message: 'Reused internal system allocated.', allocationId: allocation.id }
   },
 
-  linkExistingSystemToProject: (projectId, systemId, requirementIds = []) => {
+  linkExistingSystemToProject: (projectId, systemId) => {
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const system = state.systems.find((candidate) => candidate.id === systemId)
@@ -1145,18 +951,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     const now = new Date().toISOString()
-    const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
-    let idCounters = state.idCounters
     const tenantIds: string[] = []
-    const tenants = [...state.tenants]
-    const requirements = opportunity?.newTenantRequirements.filter((requirement) => requirementIds.includes(requirement.id)) ?? []
-    requirements.forEach((requirement) => {
-      const nextTenantId = incrementCounter(idCounters, 'tid')
-      idCounters = nextTenantId.counters
-      const tenant = copyRequirementToTenant(requirement, project, systemId, nextTenantId.id, now)
-      tenantIds.push(tenant.id)
-      tenants.unshift(tenant)
-    })
 
     const allocation: ProjectSystemLink = {
       id: `alloc-${crypto.randomUUID()}`,
@@ -1171,7 +966,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     set((current) => ({
-      idCounters,
       systems: current.systems.map((candidate) =>
         candidate.id === systemId
           ? {
@@ -1182,21 +976,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }
           : candidate,
       ),
-      tenants,
       projectSystems: [allocation, ...current.projectSystems],
-      projectTenants: [
-        ...tenantIds.map((tenantId) => ({
-          id: `proj-ten-${crypto.randomUUID()}`,
-          projectId,
-          tenantId,
-          systemId,
-          allocationStatus: 'ALLOCATED' as const,
-          allocationType: 'EXISTING_SYSTEM' as const,
-          allocatedAt: now,
-          deallocatedAt: null,
-        })),
-        ...current.projectTenants,
-      ],
     }))
     get().saveToStorage()
     return { ok: true, message: 'Existing system linked.', allocationId: allocation.id }
