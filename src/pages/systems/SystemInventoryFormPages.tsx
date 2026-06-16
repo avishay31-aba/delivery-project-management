@@ -30,7 +30,6 @@ import {
   cloudPlatformOptionsForHosting,
   cloudRegionOptionsForCloudPlatform,
   cspOptionsForCloudPlatform,
-  requiresCloudRegion,
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
@@ -53,6 +52,11 @@ import { timeGroupForCountry } from '@/config/time-groups'
 import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
+import {
+  hostingContextPatchForFieldChange,
+  sanitizeHostingContext,
+  validateHostingContext,
+} from '@/domain/hosting-context'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
@@ -398,16 +402,7 @@ function InventoryForm<T extends InventoryRecord>({
     setDraft((current) => {
       if (!current) return current
       const next = { ...current, [key]: value }
-      if (key === 'hostingType') {
-        return { ...next, cloudPlatform: '', csp: '', cloudRegion: '' } as T
-      }
-      if (key === 'cloudPlatform') {
-        return { ...next, csp: '', cloudRegion: '' } as T
-      }
-      if (key === 'vpnEnabled' && value !== 'YES') {
-        return { ...next, vpnType: '' } as T
-      }
-      return next as T
+      return { ...next, ...hostingContextPatchForFieldChange(key, value) } as T
     })
     setMessages([])
   }
@@ -465,7 +460,6 @@ function InventoryForm<T extends InventoryRecord>({
 
   function validate(): string[] {
     const nextMessages: string[] = []
-    const url = textValue(readRecordValue(activeDraft, 'url'))
     const mid = textValue(readRecordValue(activeDraft, 'machineId')).trim()
 
     if (metadata.source === 'Reused Internal Systems') {
@@ -479,41 +473,16 @@ function InventoryForm<T extends InventoryRecord>({
       }
     }
 
-    if (url && (!/^https?:\/\/\S+$/.test(url) || url.includes(' '))) {
-      invalidFields.add('url')
-      nextMessages.push('URL must start with http:// or https:// and contain no spaces.')
-    }
-
-    if (requiresCloudRegion(textValue(readRecordValue(activeDraft, 'cloudPlatform'))) && !textValue(readRecordValue(activeDraft, 'cloudRegion'))) {
-      invalidFields.add('cloudRegion')
-      nextMessages.push('Cloud Region is required when Cloud Platform is AWS, AWS Gov, Azure, or Azure Gov.')
-    }
+    validateHostingContext(activeDraft).forEach((message) => {
+      if (message.field) invalidFields.add(message.field)
+      nextMessages.push(message.message)
+    })
 
     return nextMessages
   }
 
   function sanitizedDraftForSave(): T {
-    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
-    const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
-    const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
-    const next = { ...activeDraft } as T & Record<string, unknown>
-
-    if (hostingType === 'On premise') {
-      next.cloudPlatform = ''
-      next.csp = ''
-      next.cloudRegion = ''
-    } else if (!cloudPlatform) {
-      next.csp = ''
-      next.cloudRegion = ''
-    } else if (cloudPlatform === "Customer's datacenter") {
-      next.cloudRegion = ''
-    }
-
-    if (vpnEnabled !== 'YES') {
-      next.vpnType = ''
-    }
-
-    return next as T
+    return sanitizeHostingContext(activeDraft)
   }
 
   validate()
