@@ -6,8 +6,7 @@ export const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse
 export const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation']
 
 export const REGION_OPTIONS = ['NA', 'EU', 'APAC']
-export const PERFORMANCE_TIER_OPTIONS = ['STANDARD', 'POWERED']
-export const VPN_TYPE_OPTIONS = ['OpenVPN', 'FortiGate', 'CheckPoint', 'Cisco', 'Palo Alto', 'Jump server', 'Apache Guacamole', 'Add new...']
+export { PERFORMANCE_TIER_OPTIONS, VPN_TYPE_OPTIONS } from '@/domain/hosting-context'
 
 export const REUSED_PURPOSE_OPTIONS = ['POC', 'Demo', 'Training', 'Support']
 export const REUSED_STATUS_OPTIONS = ['Available', 'Occupied', 'Obsolete']
