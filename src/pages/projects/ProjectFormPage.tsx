@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -13,17 +13,25 @@ import type {
   ChangeRequestRequirement,
   NewTenantRequirement,
   Opportunity,
+  ProductionSystemInventoryItem,
   Project,
   ProjectMainType,
   ProjectSubType,
+  ProjectSystemLink,
+  ReusedInternalSystem,
   StandardRenewalRequirement,
   System,
   Tenant,
 } from '@/data/seed.types'
-import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
+import {
+  requirementAColumns,
+  requirementBColumns,
+  requirementCColumns,
+  type RequirementColumnMetadata,
+} from '@/config/opportunity-metadata'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
-import { useAppStore } from '@/store/useAppStore'
+import { type AllocationActionResult, useAppStore } from '@/store/useAppStore'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -32,6 +40,8 @@ import {
 
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
+type AllocationMode = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
+type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   projectHeader: false,
@@ -75,8 +85,93 @@ function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
 
+function opportunityRowsForSection(opportunity: Opportunity | undefined, kind: ProjectRequirementSectionKind): RequirementRow[] {
+  if (!opportunity) return []
+  if (kind === 'A') return opportunity.newTenantRequirements
+  if (kind === 'B') return opportunity.changeRequestRequirements
+  return opportunity.standardRenewalRequirements
+}
+
+function projectRequirementTitle(section: ProjectRequirementSectionMetadata): string {
+  if (section.kind === 'A') return 'Grid A: New Tenant Requirements'
+  if (section.kind === 'B') return 'Grid B: Change Request Requirements'
+  return 'Tenants to Renew'
+}
+
+function completeRequirementSections(
+  sections: ProjectRequirementSectionMetadata[],
+  opportunity: Opportunity | undefined,
+): ProjectRequirementSectionMetadata[] {
+  const sectionsByKind = new Map(sections.map((section) => [section.kind, section]))
+  const fallbackSections: ProjectRequirementSectionMetadata[] = [
+    {
+      kind: 'A',
+      title: 'New Tenant Requirements',
+      description: 'Live-linked from the Opportunity new tenant requirements.',
+      columns: requirementAColumns,
+    },
+    {
+      kind: 'B',
+      title: 'Change Request on Existing Tenant - Final Configuration',
+      description: 'Live-linked from the Opportunity selected tenant change requirements.',
+      columns: requirementBColumns,
+    },
+    {
+      kind: 'C',
+      title: 'Standard Renewal',
+      description: 'Live-linked from the Opportunity tenants to renew.',
+      columns: requirementCColumns,
+    },
+  ]
+
+  fallbackSections.forEach((section) => {
+    if (!sectionsByKind.has(section.kind) && opportunityRowsForSection(opportunity, section.kind).length > 0) {
+      sectionsByKind.set(section.kind, section)
+    }
+  })
+
+  return fallbackSections
+    .map((section) => sectionsByKind.get(section.kind))
+    .filter((section): section is ProjectRequirementSectionMetadata => Boolean(section))
+}
+
 function tenantDisplayName(tenant: Tenant): string {
   return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
+}
+
+function allocationModeLabel(mode: AllocationMode): string {
+  if (mode === 'PRODUCTION') return 'Allocate Production System'
+  if (mode === 'REUSED_INTERNAL') return 'Allocate Reused Internal System'
+  return 'Link Existing System'
+}
+
+function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
+  return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
+}
+
+function isPocProject(project: Project): boolean {
+  return project.mainType === 'POC'
+}
+
+function allowedAllocationModes(project: Project): AllocationMode[] {
+  return isPocProject(project) ? ['REUSED_INTERNAL'] : ['PRODUCTION', 'EXISTING_SYSTEM']
+}
+
+function candidatePrimaryId(candidate: AllocationCandidate): string {
+  if ('sid' in candidate && candidate.sid) return candidate.sid
+  if ('machineId' in candidate && candidate.machineId) return candidate.machineId
+  return candidate.id
+}
+
+function candidateSummary(candidate: AllocationCandidate): string {
+  return [candidate.productType, candidate.hostingType, candidate.cloudPlatform, candidate.cloudRegion].filter(Boolean).join(' | ')
+}
+
+function allocationStatusClassName(result: AllocationActionResult | null): string {
+  if (!result) return ''
+  return result.ok
+    ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
+    : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
 }
 
 function projectStatusLabel(status: string): string {
@@ -211,17 +306,12 @@ function RequirementSection({
   tenants: Tenant[]
   systems: System[]
 }) {
-  const rows =
-    section.kind === 'A'
-      ? opportunity?.newTenantRequirements ?? []
-      : section.kind === 'B'
-        ? opportunity?.changeRequestRequirements ?? []
-        : opportunity?.standardRenewalRequirements ?? []
+  const rows = opportunityRowsForSection(opportunity, section.kind)
 
   return (
     <div className="space-y-2">
       <div>
-        <h3 className="text-lg font-semibold text-sf-text">{section.title}</h3>
+        <h3 className="text-lg font-semibold text-sf-text">{projectRequirementTitle(section)}</h3>
         {section.description ? <p className="text-sm text-sf-text-muted">{section.description}</p> : null}
       </div>
       {rows.length > 0 ? (
@@ -231,17 +321,26 @@ function RequirementSection({
               <tr>
                 {section.columns.map((column) => (
                   <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                    <span>{column.label}</span>
+                    <span>
+                      {column.label}
+                      {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
+                      {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
+                    </span>
                     {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span> : null}
+                    {column.requiredWhen && column.key !== 'existingSystemId' ? (
+                      <span className="block max-w-40 whitespace-normal text-xs font-normal leading-tight text-red-700">
+                        {column.requiredWhen}
+                      </span>
+                    ) : null}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white">
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-sf-surface-alt">
                   {section.columns.map((column) => (
-                    <td key={column.key} className="border border-sf-border px-1.5 py-1 align-top text-sm text-sf-text">
+                    <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
                       {readonlyCellValue(row, column, section.kind, tenants, systems)}
                     </td>
                   ))}
@@ -280,15 +379,25 @@ export function ProjectFormPage() {
   const salesManagers = useAppStore((state) => state.salesManagers)
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
+  const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
+  const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const updateProject = useAppStore((state) => state.updateProject)
+  const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
+  const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
+  const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
+  const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProject(savedProject) : null)
   const [activeTab, setActiveTab] = useState<ProjectFormTab>('systemsTenants')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
+  const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
+  const [selectedAllocationId, setSelectedAllocationId] = useState('')
+  const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
@@ -309,14 +418,22 @@ export function ProjectFormPage() {
   }, [currentDraft, opportunities])
   const account = linkedOpportunity ? accounts.find((candidate) => candidate.id === linkedOpportunity.accountId) : undefined
   const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
+  const activeSystemLinks = useMemo(() => {
+    if (!currentDraft) return []
+    return activeProjectSystemLinks(projectSystems).filter((link) => link.projectId === currentDraft.id)
+  }, [currentDraft, projectSystems])
   const linkedSystems = useMemo(() => {
     if (!currentDraft) return []
-    const linkedSystemIds = new Set(projectSystems.filter((link) => link.projectId === currentDraft.id).map((link) => link.systemId))
+    const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
     return systems.filter((system) => linkedSystemIds.has(system.id))
-  }, [currentDraft, projectSystems, systems])
+  }, [activeSystemLinks, currentDraft, systems])
   const linkedTenants = useMemo(() => {
     if (!currentDraft) return []
-    const linkedTenantIds = new Set(projectTenants.filter((link) => link.projectId === currentDraft.id).map((link) => link.tenantId))
+    const linkedTenantIds = new Set(
+      projectTenants
+        .filter((link) => link.projectId === currentDraft.id && link.allocationStatus !== 'DEALLOCATED')
+        .map((link) => link.tenantId),
+    )
     linkedSystems.forEach((system) => {
       tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
     })
@@ -365,9 +482,87 @@ export function ProjectFormPage() {
   const persistedProject = savedProject
   const formMetadata = metadata
   const visibleTabs = formMetadata.tabs.filter((tab) => tab !== 'tenantRequirements')
+  const permittedAllocationModes = allowedAllocationModes(projectDraft)
+  const selectedMode = permittedAllocationModes.includes(allocationMode) ? allocationMode : permittedAllocationModes[0]
+  const activeSystemLinkBySystemId = new Map(activeSystemLinks.map((link) => [link.systemId, link]))
+  const availableAllocationCandidates: AllocationCandidate[] =
+    selectedMode === 'PRODUCTION'
+      ? productionSystemInventory
+      : selectedMode === 'REUSED_INTERNAL'
+        ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
+        : systems.filter(
+            (system) =>
+              Boolean(system.sid) &&
+              !activeProjectSystemLinks(projectSystems).some(
+                (link) => link.projectId === projectDraft.id && link.systemId === system.id,
+              ),
+          )
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
+  }
+
+  function openAllocationDialog() {
+    const initialMode = permittedAllocationModes[0]
+    const initialCandidates =
+      initialMode === 'PRODUCTION'
+        ? productionSystemInventory
+        : initialMode === 'REUSED_INTERNAL'
+          ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
+          : systems.filter(
+              (system) =>
+                Boolean(system.sid) &&
+                !activeProjectSystemLinks(projectSystems).some(
+                  (link) => link.projectId === projectDraft.id && link.systemId === system.id,
+                ),
+            )
+    setAllocationMode(initialMode)
+    setSelectedAllocationId(initialCandidates[0]?.id ?? '')
+    setAllocationResult(null)
+    setIsAllocationDialogOpen(true)
+  }
+
+  function changeAllocationMode(mode: AllocationMode) {
+    const nextCandidates =
+      mode === 'PRODUCTION'
+        ? productionSystemInventory
+        : mode === 'REUSED_INTERNAL'
+          ? reusedInternalSystems.filter((system) => system.status !== 'Occupied')
+          : systems.filter(
+              (system) =>
+                Boolean(system.sid) &&
+                !activeProjectSystemLinks(projectSystems).some(
+                  (link) => link.projectId === projectDraft.id && link.systemId === system.id,
+                ),
+            )
+    setAllocationMode(mode)
+    setSelectedAllocationId(nextCandidates[0]?.id ?? '')
+    setAllocationResult(null)
+  }
+
+  function confirmAllocation() {
+    if (!selectedAllocationId) {
+      setAllocationResult({ ok: false, message: 'Select a system before allocating.' })
+      return
+    }
+
+    const result =
+      selectedMode === 'PRODUCTION'
+        ? allocateProductionSystemToProject(projectDraft.id, selectedAllocationId)
+        : selectedMode === 'REUSED_INTERNAL'
+          ? allocateReusedInternalSystemToProject(projectDraft.id, selectedAllocationId)
+          : linkExistingSystemToProject(projectDraft.id, selectedAllocationId)
+
+    setAllocationResult(result)
+    if (result.ok) {
+      setIsAllocationDialogOpen(false)
+      setSelectedAllocationId('')
+    }
+  }
+
+  function deallocateSystem(link: ProjectSystemLink) {
+    const result = deallocateProjectSystem(link.id)
+    setAllocationResult(result)
   }
 
   function fieldChanged(key: ProjectHeaderFieldMetadata['key']): boolean {
@@ -582,6 +777,7 @@ export function ProjectFormPage() {
   }
 
   function renderTenantRequirementsTab() {
+    const requirementSections = completeRequirementSections(formMetadata.requirementSections, linkedOpportunity)
     return (
       <CollapsibleSection
         title="Tenant Requirements"
@@ -592,7 +788,7 @@ export function ProjectFormPage() {
       >
         {linkedOpportunity ? (
           <div className="space-y-4">
-            {formMetadata.requirementSections.map((section) => (
+            {requirementSections.map((section) => (
               <RequirementSection key={section.kind} section={section} opportunity={linkedOpportunity} tenants={tenants} systems={systems} />
             ))}
           </div>
@@ -872,27 +1068,124 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderAllocationDialog() {
+    if (!isAllocationDialogOpen) return null
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="project-allocation-title">
+          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
+            <div>
+              <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>
+              <p className="text-sm text-sf-text-muted">Create a Project to System link for {projectDraft.pid}. Tenants are created later from the System Form.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close allocation dialog" onClick={() => setIsAllocationDialogOpen(false)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="space-y-4 overflow-auto p-4">
+            <div className="flex flex-wrap gap-2">
+              {permittedAllocationModes.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={[
+                    'inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-semibold',
+                    selectedMode === mode
+                      ? 'border-sf-brand bg-sf-brand text-white'
+                      : 'border-sf-border bg-white text-sf-text hover:bg-sf-surface-alt',
+                  ].join(' ')}
+                  onClick={() => changeAllocationMode(mode)}
+                >
+                  {mode === 'EXISTING_SYSTEM' ? <Link2 className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                  {allocationModeLabel(mode)}
+                </button>
+              ))}
+            </div>
+
+            {allocationResult ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
+
+            {availableAllocationCandidates.length > 0 ? (
+              <div className="overflow-x-auto rounded border border-sf-border bg-white">
+                <table className="min-w-full border-collapse text-sm leading-tight">
+                  <thead className="bg-sf-surface-alt text-left">
+                    <tr>
+                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product / Hosting'].map((label) => (
+                        <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {availableAllocationCandidates.map((candidate) => (
+                      <tr key={candidate.id} className="hover:bg-sf-surface-alt">
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <input
+                            type="radio"
+                            name="project-system-allocation-candidate"
+                            checked={selectedAllocationId === candidate.id}
+                            onChange={() => setSelectedAllocationId(candidate.id)}
+                          />
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'machineId' in candidate ? candidate.machineId ?? '' : ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'source' in candidate ? candidate.source ?? '' : ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'status' in candidate ? candidate.status : candidate.operationalStatus}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSummary(candidate) || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+                No available systems for this allocation mode.
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t border-sf-border p-4">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsAllocationDialogOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedAllocationId}
+              onClick={confirmAllocation}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderSystemsTenantsTab() {
     return (
       <CollapsibleSection
         title="Systems and Tenants"
-        subtitle="Read-only foundation for linked systems and hosted tenants. Allocation workflow is planned for a later phase."
+        subtitle="Allocate or link systems for this Project. Tenant creation happens from the linked System Form."
         collapsed={collapsedSections.systemsTenants}
         onToggle={() => toggleSection('systemsTenants')}
         className="space-y-3 p-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-sf-text-muted">
-            Systems and tenants linked to this Project are shown for execution context only.
+            Allocation creates Project to System links only. It does not create tenants.
           </p>
           <button
             type="button"
-            className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm font-semibold text-sf-text-muted"
-            disabled
+            className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+            onClick={openAllocationDialog}
           >
-            System Allocation - Planned for F4
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Allocate System
           </button>
         </div>
+
+        {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
 
         <div className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Linked Systems</h3>
@@ -901,7 +1194,7 @@ export function ProjectFormPage() {
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
-                    {['SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode'].map((label) => (
+                    {['SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode', 'Allocation', 'Action'].map((label) => (
                       <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                         {label}
                       </th>
@@ -909,17 +1202,33 @@ export function ProjectFormPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {linkedSystems.map((system) => (
-                    <tr key={system.id} className="hover:bg-sf-surface-alt">
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.sid ?? ''}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.machineId ?? ''}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.source ?? (system.machineId ? 'Reused Internal Systems' : 'Production')}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
-                    </tr>
-                  ))}
+                  {linkedSystems.map((system) => {
+                    const link = activeSystemLinkBySystemId.get(system.id)
+                    return (
+                      <tr key={system.id} className="hover:bg-sf-surface-alt">
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.sid ?? ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.machineId ?? ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.source ?? (system.machineId ? 'Reused Internal Systems' : 'Production')}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{link ? allocationModeLabel(link.allocationType ?? 'EXISTING_SYSTEM') : '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {link ? (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                              onClick={() => deallocateSystem(link)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Deallocate
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1044,6 +1353,7 @@ export function ProjectFormPage() {
         </div>
       </div>
       {renderMilestoneDialog()}
+      {renderAllocationDialog()}
     </div>
   )
 }

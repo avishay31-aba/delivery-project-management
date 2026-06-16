@@ -1996,7 +1996,11 @@ export function OpportunityFormPage() {
                           className={project.progressStatus === 'DONE' ? 'bg-blue-50 hover:bg-blue-100' : 'bg-green-50 hover:bg-green-100'}
                         >
                           <td className="border border-sf-border px-2 py-1 text-sm">{renderProjectChangeBadge(projectChangeStatus(project.id))}</td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{project.pid}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">
+                            <Link className="font-medium text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                              {project.pid}
+                            </Link>
+                          </td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.mainType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.subType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.progressStatus}</td>
