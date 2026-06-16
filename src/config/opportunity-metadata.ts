@@ -1,9 +1,10 @@
 import type { OpportunitySubType, OpportunityType, RequirementType } from '@/data/seed.types'
+import type { SharedFieldMetadata } from '@/domain/application-configuration'
 import {
-  NEW_TENANT_REQUIREMENT_FIELDS,
-  TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
-  type SharedFieldMetadata,
-} from '@/config/application-configuration-fields'
+  requirementAColumns,
+  requirementBColumns,
+  requirementCColumns,
+} from '@/domain/tenant-requirement'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
@@ -103,27 +104,7 @@ const RENEWAL_CHANGE_HEADER_FIELDS: OpportunityHeaderField[] = [
   ...COMMON_HEADER_FIELDS.slice(3),
 ]
 
-export const requirementAColumns: RequirementColumnMetadata[] = NEW_TENANT_REQUIREMENT_FIELDS
-
-export const requirementBColumns: RequirementColumnMetadata[] = [
-  { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
-  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
-  { key: 'tenantName', label: 'Tenant Name', group: 'Tenant requirements', editable: false },
-  { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
-  { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
-  ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
-]
-
-export const requirementCColumns: RequirementColumnMetadata[] = [
-  { key: 'requirementId', label: 'Req ID', group: 'Tenant requirements', editable: true },
-  { key: 'tenantId', label: 'TID', group: 'Tenant requirements', editable: true, required: true },
-  { key: 'tenantName', label: 'Tenant Name', group: 'Tenant requirements', editable: false },
-  { key: 'systemId', label: 'SID', group: 'Tenant requirements', editable: false },
-  { key: 'deliveryPid', label: 'Delivery PID', group: 'Tenant requirements', editable: false },
-  { key: 'warrantyStatus', label: 'Warranty status', group: 'Renewal context', editable: false },
-  { key: 'warrantyEndDate', label: 'Warranty end date', group: 'Renewal context', editable: false },
-  ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((column) => ({ ...column, editable: false, required: false, requiredWhen: undefined })),
-]
+export { requirementAColumns, requirementBColumns, requirementCColumns }
 
 function keyForOpportunity(type: OpportunityType, subType: OpportunitySubType): string {
   return `${type}:${subType}`
