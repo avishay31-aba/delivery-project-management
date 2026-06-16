@@ -6,11 +6,11 @@ import type {
   ProjectSystemLink,
   ProjectTenantLink,
   Tenant,
-  TenantHostingSnapshot,
 } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 import { applicationConfigurationFromTenant } from '@/domain/application-configuration'
+import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
@@ -75,29 +75,6 @@ function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Op
     pocProjectIds,
     finalProjectId,
     wonAt: opportunity.wonAt ?? (opportunity.stage === 'WON' ? opportunity.updatedAt : null),
-  }
-}
-
-function hostingSnapshotFromTenant(tenant: Tenant, systems: AppDataState['systems']): TenantHostingSnapshot {
-  const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
-  const platform = system?.cloudPlatform ?? tenant.cloudPlatform ?? ''
-  const cloudRegion = system?.cloudRegion ?? tenant.cloudRegion ?? ''
-  return {
-    currentSystem: Boolean(tenant.systemId || tenant.hostedSystemId),
-    sid: system?.sid ?? tenant.hostingSid ?? '',
-    operationalStatus: system?.operationalStatus ?? tenant.operationalStatus ?? '',
-    machineNumber: system?.machineId ?? '',
-    versionNumber: system?.cognitoRegion ?? '',
-    hostingType: system?.hostingType ?? tenant.hostingType ?? '',
-    url: system?.url ?? '',
-    performanceTier: system?.performanceTier ?? tenant.performanceTier ?? '',
-    vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled ?? '',
-    vpnType: system?.vpnType ?? tenant.vpnType ?? '',
-    ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled ?? '',
-    platform,
-    csp: system?.csp ?? tenant.csp ?? '',
-    awsRegion: platform.includes('AWS') ? cloudRegion : '',
-    azureRegion: platform.includes('Azure') ? cloudRegion : '',
   }
 }
 

@@ -41,6 +41,7 @@ import {
   applicationConfigurationFromTenant,
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
+import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -143,28 +144,6 @@ function tenantFormTypeForSystem(system: System): TenantFormType {
 
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
   return applicationConfigurationFromTenant(tenant, system?.productType)
-}
-
-function hostingFromSystem(tenant: Tenant, system?: System): TenantHostingSnapshot {
-  const platform = system?.cloudPlatform ?? tenant.cloudPlatform ?? ''
-  const cloudRegion = system?.cloudRegion ?? tenant.cloudRegion ?? ''
-  return {
-    currentSystem: Boolean(system),
-    sid: system?.sid ?? tenant.hostingSid ?? '',
-    operationalStatus: system?.operationalStatus ?? tenant.operationalStatus ?? '',
-    machineNumber: system?.machineId ?? '',
-    versionNumber: system?.cognitoRegion ?? '',
-    hostingType: system?.hostingType ?? tenant.hostingType ?? '',
-    url: system?.url ?? '',
-    performanceTier: system?.performanceTier ?? tenant.performanceTier ?? '',
-    vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled ?? '',
-    vpnType: system?.vpnType ?? tenant.vpnType ?? '',
-    ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled ?? '',
-    platform,
-    csp: system?.csp ?? tenant.csp ?? '',
-    awsRegion: platform.includes('AWS') ? cloudRegion : '',
-    azureRegion: platform.includes('Azure') ? cloudRegion : '',
-  }
 }
 
 function daysBetween(startDate: string | null, endDate: string | null): number | null {
@@ -340,7 +319,7 @@ function tenantPatchFromDraft(draft: Tenant, saved: Tenant, system?: System): Pa
     hostedSystemId: system?.id ?? draft.systemId,
     hostingSid: system?.sid ?? draft.hostingSid ?? '',
     configuration,
-    hostingSnapshot: hostingFromSystem(draft, system),
+    hostingSnapshot: hostingSnapshotFromSystem(draft, system),
     engagementCircle: draft.engagementCircle ?? [],
     remarks: draft.remarks ?? [],
     configurationHistory,
@@ -481,7 +460,7 @@ export function TenantFormPage() {
     : opportunity?.engagementCircles ?? []
   const formType = tenantFormType(tenantDraft)
   const configuration = configurationFromTenant(tenantDraft, activeSystem)
-  const hosting = hostingFromSystem(tenantDraft, activeSystem)
+  const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
   const countryOptions = Array.from(
     new Set(
       [
