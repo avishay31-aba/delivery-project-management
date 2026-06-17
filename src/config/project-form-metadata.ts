@@ -1,4 +1,5 @@
 import type { ProjectMainType, ProjectSubType } from '@/data/seed.types'
+import { ENGAGEMENT_CIRCLE_TAB_LABEL } from '@/domain/engagement-circle'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import {
   requirementAColumns,
@@ -212,7 +213,7 @@ export function projectTabLabel(tab: ProjectFormTab): string {
     milestones: 'Milestones',
     tasks: 'Tasks',
     systemsTenants: 'Systems and Tenants',
-    engagementCircles: 'Engagement circles',
+    engagementCircles: ENGAGEMENT_CIRCLE_TAB_LABEL,
     documents: 'Documents',
   }
   return labels[tab]

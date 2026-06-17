@@ -9,6 +9,8 @@ export const DEFAULT_ENGAGEMENT_CIRCLE_ROLES = [
 ]
 
 export const ENGAGEMENT_CIRCLE_EMPTY_TEXT = 'No engagement circle records inherited from the linked Opportunity.'
+export const ENGAGEMENT_CIRCLE_TAB_LABEL = 'Engagement circles'
+export const ENGAGEMENT_CIRCLE_TABLE_HEADERS = ['Circle subject / purpose', 'Role', 'User name', 'Email', 'Phone']
 export const SUPPORT_MANAGER_ROLE = 'Support Manager'
 export const SUPPORT_MANAGER_SUBJECT = 'Support and version update notifications'
 export const DEFAULT_ENGAGEMENT_SUBJECT = 'Tenant engagement'

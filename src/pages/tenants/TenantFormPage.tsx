@@ -39,7 +39,12 @@ import {
   applicationConfigurationFromTenant,
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
-import { inheritedEngagementCircleForTenant } from '@/domain/engagement-circle'
+import {
+  ENGAGEMENT_CIRCLE_EMPTY_TEXT,
+  ENGAGEMENT_CIRCLE_TABLE_HEADERS,
+  inheritedEngagementCircleForTenant,
+  normalizeEngagementCircleSnapshot,
+} from '@/domain/engagement-circle'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
 import {
   canManageWarrantyCollection,
@@ -271,7 +276,7 @@ function tenantPatchFromDraft(draft: Tenant, saved: Tenant, system?: System): Pa
     hostingSid: system?.sid ?? draft.hostingSid ?? '',
     configuration,
     hostingSnapshot: hostingSnapshotFromSystem(draft, system),
-    engagementCircle: draft.engagementCircle ?? [],
+    engagementCircle: normalizeEngagementCircleSnapshot(draft.engagementCircle),
     remarks: draft.remarks ?? [],
     configurationHistory,
     warranties: (draft.warranties ?? []).map((warranty) => ({
@@ -1008,7 +1013,7 @@ export function TenantFormPage() {
   function renderEngagementTab() {
     return (
       <ReadonlyTable
-        headers={['Circle subject / purpose', 'Role', 'User name', 'Email', 'Phone']}
+        headers={ENGAGEMENT_CIRCLE_TABLE_HEADERS}
         rows={inheritedEngagementCircle.map((circle) => [
           circle.subject,
           circle.role,
@@ -1016,7 +1021,7 @@ export function TenantFormPage() {
           circle.email,
           circle.phone ?? '',
         ])}
-        emptyText="No engagement circle records inherited from the linked Opportunity."
+        emptyText={ENGAGEMENT_CIRCLE_EMPTY_TEXT}
       />
     )
   }
