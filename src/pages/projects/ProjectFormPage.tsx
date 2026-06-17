@@ -48,6 +48,11 @@ import {
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
 import {
+  isProjectHeaderFieldChanged,
+  projectHeaderFieldValue,
+  projectPatchFromOpportunitySelection,
+} from '@/domain/project-lifecycle'
+import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
   orderedProjectMilestones,
@@ -515,44 +520,11 @@ export function ProjectFormPage() {
   }
 
   function fieldChanged(key: ProjectHeaderFieldMetadata['key']): boolean {
-    if (key === 'pocStartDate' || key === 'pocEndDate' || key === 'warrantyServiceMonths' || key === 'currentMilestone' || key === 'projectAlerts') {
-      return false
-    }
-    return !valuesEqual(headerFieldValue(persistedProject, key), headerFieldValue(projectDraft, key))
+    return isProjectHeaderFieldChanged(persistedProject, projectDraft, key, { linkedOpportunity, account, salesManager })
   }
 
   function headerFieldValue(project: Project, key: ProjectHeaderFieldMetadata['key']): string {
-    switch (key) {
-      case 'accountName':
-        return account?.accountName ?? project.accountName
-      case 'region':
-        return linkedOpportunity?.region ?? account?.region ?? ''
-      case 'country':
-        return linkedOpportunity?.country ?? account?.country ?? ''
-      case 'state':
-        return linkedOpportunity?.state ?? account?.state ?? ''
-      case 'timeZone':
-        return linkedOpportunity?.timeZone ?? account?.timeZone ?? ''
-      case 'timeGroup':
-        return linkedOpportunity?.timeGroup ?? account?.timeGroup ?? ''
-      case 'pocStartDate':
-        return linkedOpportunity?.pocStartDate ?? ''
-      case 'pocEndDate':
-        return linkedOpportunity?.pocEndDate ?? ''
-      case 'warrantyServiceMonths':
-        return textValue(linkedOpportunity?.warrantyServiceMonths)
-      case 'currentMilestone':
-        return linkedOpportunity?.currentMilestone ?? ''
-      case 'projectAlerts':
-        return linkedOpportunity?.projectAlerts?.join(', ') ?? ''
-      case 'reportToDirect':
-      case 'reportToLevel2':
-        return ''
-      case 'dealOwner':
-        return salesManager?.name ?? project.dealOwner
-      default:
-        return textValue(project[key as keyof Project])
-    }
+    return projectHeaderFieldValue(project, key, { linkedOpportunity, account, salesManager })
   }
 
   function updateDraftField(key: keyof Project, value: string | null) {
@@ -564,14 +536,7 @@ export function ProjectFormPage() {
         )
         if (!selectedOpportunity) return { ...current, [key]: value || undefined }
         const projectType = projectTypeForOpportunity(selectedOpportunity)
-        return {
-          ...current,
-          opportunityId: selectedOpportunity.opportunityId,
-          opportunityName: selectedOpportunity.opportunityName,
-          mainType: projectType.mainType,
-          subType: projectType.subType,
-          deliveryDate: selectedOpportunity.deliveryDate,
-        }
+        return projectPatchFromOpportunitySelection(current, selectedOpportunity, projectType)
       }
       return { ...current, [key]: value }
     })
