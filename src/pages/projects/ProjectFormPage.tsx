@@ -49,6 +49,7 @@ import {
   projectHeaderFieldValue,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
+  projectStatusLabel,
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import {
@@ -110,12 +111,6 @@ function allocationStatusClassName(result: AllocationActionResult | null): strin
   return result.ok
     ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
     : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
-}
-
-function projectStatusLabel(status: string): string {
-  if (status === 'DONE') return 'Done'
-  if (status === 'IN_PROGRESS') return 'In progress'
-  return 'Open'
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {

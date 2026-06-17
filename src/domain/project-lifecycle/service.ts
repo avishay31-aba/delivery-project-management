@@ -1,6 +1,6 @@
 import { deriveProjectProgress } from '@/domain/milestone-plan'
 import { opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
-import { activeProjectSystemLinks } from '@/domain/allocation-context'
+import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -72,6 +72,18 @@ export function projectDashboardMilestonesCompletion(project: Project): string {
 
 export function projectDashboardEmptyValue(): string {
   return ''
+}
+
+export function projectStatusLabel(status: string): string {
+  if (status === 'DONE') return 'Done'
+  if (status === 'IN_PROGRESS') return 'In progress'
+  return 'Open'
+}
+
+export function projectListRowClassName(project: Project): string {
+  return project.progressStatus === 'DONE'
+    ? 'bg-blue-50 hover:bg-blue-100'
+    : 'bg-green-50 hover:bg-green-100'
 }
 
 function textValue(value: unknown): string {
@@ -252,8 +264,8 @@ export function linkedTenantsForProject(
 ): Tenant[] {
   if (!project) return []
   const linkedTenantIds = new Set(
-    projectTenants
-      .filter((link) => link.projectId === project.id && link.allocationStatus !== 'DEALLOCATED')
+    activeProjectTenantLinks(projectTenants)
+      .filter((link) => link.projectId === project.id)
       .map((link) => link.tenantId),
   )
   linkedSystems.forEach((system) => {

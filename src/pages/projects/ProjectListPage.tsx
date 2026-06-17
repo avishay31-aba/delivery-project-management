@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { projectListColumns } from '@/config/project-columns'
+import { projectListRowClassName } from '@/domain/project-lifecycle'
 
 export function ProjectListPage() {
 const navigate = useNavigate()
@@ -32,11 +33,7 @@ return (
         + New Project
       </button>
     }
-    getRowClassName={(row) =>
-      row.progressStatus === 'DONE'
-        ? 'bg-blue-50 hover:bg-blue-100'
-        : 'bg-green-50 hover:bg-green-100'
-    }
+    getRowClassName={projectListRowClassName}
     onEdit={(row, columnId, value) => {
       const column = projectListColumns.find((candidate) => candidate.id === columnId)
       if (!column?.editKey) return
