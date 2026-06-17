@@ -13,6 +13,7 @@ import {
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
+import { normalizeTenantWarranties } from '@/domain/warranty-collection'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
@@ -100,13 +101,7 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
     engagementCircle: Array.isArray(tenant.engagementCircle) ? tenant.engagementCircle : [],
     remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
     configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
-    warranties: Array.isArray(tenant.warranties)
-      ? tenant.warranties.map((warranty) => ({
-          ...warranty,
-          noWarranty: warranty.noWarranty ?? 'NO',
-          outOfContract: warranty.outOfContract ?? 'NO',
-        }))
-      : [],
+    warranties: normalizeTenantWarranties(tenant.warranties),
     documents: Array.isArray(tenant.documents) ? tenant.documents : [],
   }
 }
