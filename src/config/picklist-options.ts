@@ -8,10 +8,12 @@ export const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhan
 export const REGION_OPTIONS = ['NA', 'EU', 'APAC']
 export { PERFORMANCE_TIER_OPTIONS, VPN_TYPE_OPTIONS } from '@/domain/hosting-context'
 
-export const REUSED_PURPOSE_OPTIONS = ['POC', 'Demo', 'Training', 'Support']
-export const REUSED_STATUS_OPTIONS = ['Available', 'Occupied', 'Obsolete']
-export const REUSED_OPERATIONAL_STATUS_OPTIONS = ['On', 'Off', 'Access blocked', 'Service blocked', 'Deleted']
-export const PRODUCTION_OPERATIONAL_STATUS_OPTIONS = [...REUSED_OPERATIONAL_STATUS_OPTIONS, 'Canceled']
+export {
+  PRODUCTION_OPERATIONAL_STATUS_OPTIONS,
+  REUSED_OPERATIONAL_STATUS_OPTIONS,
+  REUSED_PURPOSE_OPTIONS,
+  REUSED_STATUS_OPTIONS,
+} from '@/domain/system-inventory'
 
 export const TENANT_FORM_TYPE_OPTIONS = [
   { value: 'POC', label: 'POC' },

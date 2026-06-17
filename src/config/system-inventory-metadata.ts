@@ -6,43 +6,25 @@ import {
   REUSED_PURPOSE_OPTIONS,
   REUSED_STATUS_OPTIONS,
 } from '@/config/picklist-options'
+import {
+  SYSTEM_INVENTORY_TABS,
+  SYSTEM_SOURCE_PRODUCTION,
+  SYSTEM_SOURCE_REUSED_INTERNAL,
+  type SystemInventoryHeaderField,
+  type SystemInventoryMetadata,
+  type SystemInventorySource,
+  type SystemInventoryTab,
+} from '@/domain/system-inventory'
 
-export type SystemInventorySource = 'Production' | 'Reused Internal Systems'
-
-export interface SystemInventoryHeaderField {
-  key: string
-  label: string
-  editable: boolean
-  source: string
-  line: number
-  inputType?: 'text' | 'date' | 'integer' | 'picklist' | 'readonly'
-  options?: string[]
+export type {
+  SystemInventoryHeaderField,
+  SystemInventoryMetadata,
+  SystemInventorySource,
+  SystemInventoryTab,
 }
-
-export interface SystemInventoryTab {
-  id: string
-  label: string
-}
-
-export interface SystemInventoryMetadata {
-  source: SystemInventorySource
-  sourceSheet: string
-  titleLabel: string
-  headerFields: SystemInventoryHeaderField[]
-  tabs: SystemInventoryTab[]
-}
-
-const SYSTEM_TABS: SystemInventoryTab[] = [
-  { id: 'tenant', label: 'Tenant' },
-  { id: 'infrastructure', label: 'Platform' },
-  { id: 'versionUpdate', label: 'Version update' },
-  { id: 'usage', label: 'Usage' },
-  { id: 'configurationHistory', label: 'Configuration history' },
-  { id: 'documents', label: 'Documents' },
-]
 
 export const productionSystemMetadata: SystemInventoryMetadata = {
-  source: 'Production',
+  source: SYSTEM_SOURCE_PRODUCTION,
   sourceSheet: 'System form-Customer',
   titleLabel: 'SID',
   headerFields: [
@@ -65,11 +47,11 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
     { key: 'linkedProjects', label: 'Linked Projects', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
   ],
-  tabs: SYSTEM_TABS,
+  tabs: SYSTEM_INVENTORY_TABS,
 }
 
 export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
-  source: 'Reused Internal Systems',
+  source: SYSTEM_SOURCE_REUSED_INTERNAL,
   sourceSheet: 'System form-POC-Demo-Training',
   titleLabel: 'MID',
   headerFields: [
@@ -96,5 +78,5 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
     { key: 'occupationStartDate', label: 'Occupation Start Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
     { key: 'occupationEndDate', label: 'Occupation End Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
   ],
-  tabs: SYSTEM_TABS,
+  tabs: SYSTEM_INVENTORY_TABS,
 }

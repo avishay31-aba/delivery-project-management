@@ -39,3 +39,37 @@ export const PRODUCTION_OPERATIONAL_STATUS_OPTIONS = [
   ...REUSED_OPERATIONAL_STATUS_OPTIONS,
   SYSTEM_OPERATIONAL_STATUS_CANCELED,
 ]
+
+export type SystemInventorySource = typeof SYSTEM_SOURCE_PRODUCTION | typeof SYSTEM_SOURCE_REUSED_INTERNAL
+
+export interface SystemInventoryHeaderField {
+  key: string
+  label: string
+  editable: boolean
+  source: string
+  line: number
+  inputType?: 'text' | 'date' | 'integer' | 'picklist' | 'readonly'
+  options?: string[]
+}
+
+export interface SystemInventoryTab {
+  id: string
+  label: string
+}
+
+export interface SystemInventoryMetadata {
+  source: SystemInventorySource
+  sourceSheet: string
+  titleLabel: string
+  headerFields: SystemInventoryHeaderField[]
+  tabs: SystemInventoryTab[]
+}
+
+export const SYSTEM_INVENTORY_TABS: SystemInventoryTab[] = [
+  { id: 'tenant', label: 'Tenant' },
+  { id: 'infrastructure', label: 'Platform' },
+  { id: 'versionUpdate', label: 'Version update' },
+  { id: 'usage', label: 'Usage' },
+  { id: 'configurationHistory', label: 'Configuration history' },
+  { id: 'documents', label: 'Documents' },
+]
