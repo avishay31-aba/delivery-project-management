@@ -65,6 +65,7 @@ import {
   systemTimeGroup,
   systemTimeGroupAlert,
   tenantCountForSystem,
+  validateReusedInternalMachineId,
 } from '@/domain/system-inventory'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
@@ -451,17 +452,12 @@ function InventoryForm<T extends InventoryRecord>({
 
   function validate(): string[] {
     const nextMessages: string[] = []
-    const mid = textValue(readRecordValue(activeDraft, 'machineId')).trim()
 
     if (metadata.source === 'Reused Internal Systems') {
-      const duplicateMid = records.some((candidate) => candidate.id !== activeRecord.id && textValue(readRecordValue(candidate, 'machineId')).trim() === mid)
-      if (!mid) {
-        invalidFields.add('machineId')
-        nextMessages.push('MID is required.')
-      } else if (duplicateMid) {
-        invalidFields.add('machineId')
-        nextMessages.push('MID must be unique.')
-      }
+      validateReusedInternalMachineId(activeDraft, records).forEach((message) => {
+        if (message.field) invalidFields.add(message.field)
+        nextMessages.push(message.message)
+      })
     }
 
     validateHostingContext(activeDraft).forEach((message) => {
