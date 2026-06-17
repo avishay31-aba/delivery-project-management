@@ -48,6 +48,8 @@ import {
   daysBeforeExpiration,
   daysBetween,
   displayWarrantyStatus,
+  predecessorReference,
+  splitWarrantyPredecessors,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
 
@@ -646,14 +648,14 @@ export function TenantFormPage() {
     if (!selection?.tenantId || !selection.warrantyId) return
     const selectedTenant = tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
-    const predecessorValue = `${selection.warrantyId}${selectedTenant.tid}`
+    const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
     setDraft((current) => {
       if (!current) return current
       return {
         ...current,
         warranties: (current.warranties ?? []).map((warranty) => {
           if (warranty.id !== warrantyId) return warranty
-          const currentValues = splitMultiValue(warranty.predecessor)
+          const currentValues = splitWarrantyPredecessors(warranty.predecessor)
           return {
             ...warranty,
             predecessor: currentValues.includes(predecessorValue)

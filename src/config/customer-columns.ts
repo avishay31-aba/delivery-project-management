@@ -1,19 +1,9 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { Account, SalesManager, System, Tenant, WarrantyRecord } from '@/data/seed.types'
+import { warrantySummaryForAccount } from '@/domain/warranty-collection'
 
 function joinSemicolon(values: Array<string | null | undefined>): string {
   return values.filter((value): value is string => Boolean(value)).join(';')
-}
-
-function warrantySummary(accountId: string, tenants: Tenant[], warrantyRecords: WarrantyRecord[]): string {
-  const accountTenantIds = new Set(tenants.filter((tenant) => tenant.accountId === accountId).map((tenant) => tenant.id))
-  const statuses = warrantyRecords
-    .filter((record) => accountTenantIds.has(record.tenantId))
-    .map((record) => record.status)
-
-  if (statuses.length === 0) return ''
-
-  return Array.from(new Set(statuses)).join(';')
 }
 
 export function createCustomerColumns(
@@ -68,7 +58,7 @@ export function createCustomerColumns(
     {
       id: 'warrantySummary',
       label: 'Warranty Summary',
-      getValue: (row) => warrantySummary(row.id, tenants, warrantyRecords),
+      getValue: (row) => warrantySummaryForAccount(row.id, tenants, warrantyRecords),
     },
     { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt },
   ]
