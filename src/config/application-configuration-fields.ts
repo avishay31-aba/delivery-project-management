@@ -21,6 +21,7 @@ export {
   TENANT_REQUIREMENT_CONTEXT_FIELDS,
   TENANT_REQUIREMENT_ENVIRONMENT_FIELDS,
 } from '@/domain/tenant-requirement'
+export { SYSTEM_OBJECT_DEFINITION, TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 
 export type _ApplicationConfigurationCompatibilityKey = ApplicationConfigurationKey
 export type _ApplicationConfigurationCompatibilityField = ApplicationConfigurationFieldMetadata

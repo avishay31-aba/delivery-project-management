@@ -15,6 +15,7 @@ import {
   type SystemInventorySource,
   type SystemInventoryTab,
 } from '@/domain/system-inventory'
+export { SYSTEM_OBJECT_DEFINITION } from '@/domain/object-registry'
 
 export type {
   SystemInventoryHeaderField,

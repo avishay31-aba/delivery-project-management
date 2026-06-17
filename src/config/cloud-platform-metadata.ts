@@ -14,3 +14,4 @@ export {
   cspOptionsForCloudPlatform,
   requiresCloudRegion,
 } from '@/domain/hosting-context'
+export { SYSTEM_OBJECT_DEFINITION, TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
