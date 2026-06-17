@@ -4,13 +4,8 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
 import type { OpportunitySubType, OpportunityType } from '@/data/seed.types'
+import { opportunitySubTypeOptions } from '@/domain/opportunity-lifecycle'
 import { useAppStore } from '@/store/useAppStore'
-
-const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
-  POC: ['FREE', 'PAID'],
-  DELIVERY: ['NEW', 'UPSELL'],
-  RENEWAL: ['STANDARD', 'UPSELL', 'DOWN_SELL'],
-}
 
 export function OpportunityListPage() {
   const navigate = useNavigate()
@@ -48,7 +43,7 @@ export function OpportunityListPage() {
                 onChange={(event) => {
                   const nextType = event.target.value as OpportunityType
                   setNewOpportunityType(nextType)
-                  setNewOpportunitySubType(SUB_TYPE_OPTIONS[nextType][0])
+                  setNewOpportunitySubType(opportunitySubTypeOptions(nextType)[0])
                 }}
               >
                 <option value="POC">POC</option>
@@ -63,7 +58,7 @@ export function OpportunityListPage() {
                 value={newOpportunitySubType}
                 onChange={(event) => setNewOpportunitySubType(event.target.value as OpportunitySubType)}
               >
-                {SUB_TYPE_OPTIONS[newOpportunityType].map((subType) => (
+                {opportunitySubTypeOptions(newOpportunityType).map((subType) => (
                   <option key={subType} value={subType}>
                     {subType}
                   </option>

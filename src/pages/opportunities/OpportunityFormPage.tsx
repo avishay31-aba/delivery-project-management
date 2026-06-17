@@ -53,6 +53,7 @@ import {
 } from '@/domain/tenant-requirement'
 import {
   activePocProjectForOpportunity,
+  cloneOpportunityDraft,
   createdProjectsForOpportunity,
   isSameOpportunityTypeChange,
   opportunitySubTypeOptions,
@@ -94,17 +95,6 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   gridB: false,
   gridC: false,
   createdProject: false,
-}
-
-function cloneOpportunity(opportunity: Opportunity): Opportunity {
-  const clone = JSON.parse(JSON.stringify(opportunity)) as Opportunity
-  return {
-    ...clone,
-    warrantyRecordId: clone.warrantyRecordId ?? clone.standardRenewalRequirements[0]?.warrantyRecordId ?? '',
-    pocProjectIds: clone.pocProjectIds ?? [],
-    finalProjectId: clone.finalProjectId ?? null,
-    wonAt: clone.wonAt ?? null,
-  }
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -798,8 +788,8 @@ export function OpportunityFormPage() {
     reset: resetDraft,
     undo,
     canUndo,
-  } = useUndoHistory<Opportunity | null>(savedOpportunity ? cloneOpportunity(savedOpportunity) : null, {
-    clone: (value) => (value ? cloneOpportunity(value) : value),
+  } = useUndoHistory<Opportunity | null>(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null, {
+    clone: (value) => (value ? cloneOpportunityDraft(value) : value),
     isEqual: valuesEqual,
   })
   const [saveMessages, setSaveMessages] = useState<string[]>([])
@@ -812,7 +802,7 @@ export function OpportunityFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
-    resetDraft(savedOpportunity ? cloneOpportunity(savedOpportunity) : null)
+    resetDraft(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null)
     setSaveMessages([])
   }, [resetDraft, savedOpportunity])
 
@@ -1112,12 +1102,12 @@ export function OpportunityFormPage() {
   }
 
   function discardChanges() {
-    resetDraft(cloneOpportunity(currentSavedOpportunity))
+    resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
   }
 
   function cancelChanges() {
-    resetDraft(cloneOpportunity(currentSavedOpportunity))
+    resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
     navigate('/opportunities')
   }
@@ -1136,7 +1126,7 @@ export function OpportunityFormPage() {
 
   function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
-    resetDraft(cloneOpportunity(result.opportunity))
+    resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
     setPendingPocSave(null)
