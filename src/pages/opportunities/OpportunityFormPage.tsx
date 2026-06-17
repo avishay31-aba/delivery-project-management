@@ -51,6 +51,12 @@ import {
   createNewTenantRequirement,
   createStandardRenewalRequirement,
 } from '@/domain/tenant-requirement'
+import {
+  warrantyRecordById,
+  warrantyRecordForTenant,
+  warrantyRecordPatch,
+  warrantyRecordsForTenant,
+} from '@/domain/warranty-collection'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -573,7 +579,7 @@ function RequirementGrid({
 
     if (column.key === 'warrantyRecordId' && kind === 'C') {
       const requirement = row as StandardRenewalRequirement
-      const tenantWarrantyRecords = warrantyRecords.filter((record) => record.tenantId === requirement.tenantId)
+      const tenantWarrantyRecords = warrantyRecordsForTenant(requirement.tenantId, warrantyRecords)
       return (
         <select
           className={fieldClassName(isChanged, isMissing, 'h-7 w-44 text-sm')}
@@ -1026,7 +1032,7 @@ export function OpportunityFormPage() {
   function addRequirement(kind: RequirementGridKind) {
     const firstTenant = kind === 'B' || kind === 'C' ? firstAvailableTenant(kind) : accountTenants[0]
     const firstWarranty = firstTenant
-      ? warrantyRecords.find((record) => record.tenantId === firstTenant.id)
+      ? warrantyRecordForTenant(firstTenant.id, warrantyRecords)
       : undefined
 
     if (kind === 'A') {
@@ -1112,7 +1118,7 @@ export function OpportunityFormPage() {
     const selectedTenant = typeof value === 'string' ? accountTenants.find((tenant) => tenant.id === value) : undefined
     const selectedWarranty =
       key === 'warrantyRecordId' && typeof value === 'string'
-        ? warrantyRecords.find((record) => record.warrantyRecordId === value)
+        ? warrantyRecordById(value, warrantyRecords)
         : undefined
     const nextRows = currentDraft.standardRenewalRequirements.map((row) =>
       row.id === rowId
@@ -1124,17 +1130,12 @@ export function OpportunityFormPage() {
                   ...applicationConfigurationPatchFromTenant(selectedTenant),
                   systemId: selectedTenant.systemId,
                   warrantyRecordId:
-                    warrantyRecords.find((record) => record.tenantId === selectedTenant.id)?.warrantyRecordId ?? '',
+                    warrantyRecordForTenant(selectedTenant.id, warrantyRecords)?.warrantyRecordId ?? '',
                   warrantyStatus: selectedTenant.warrantyStatus,
                   warrantyEndDate: selectedTenant.warrantyEndDate,
                 }
               : {}),
-            ...(selectedWarranty
-              ? {
-                  warrantyStatus: selectedWarranty.status,
-                  warrantyEndDate: selectedWarranty.endDate,
-                }
-              : {}),
+            ...warrantyRecordPatch(selectedWarranty),
           } as StandardRenewalRequirement)
         : row,
     )
@@ -1201,11 +1202,11 @@ export function OpportunityFormPage() {
       standardRenewalRequirements: [
         ...currentDraft.standardRenewalRequirements,
         ...tenantsToAdd.map((tenant, index) =>
-          createStandardRenewalRequirement(
-            currentDraft.standardRenewalRequirements.length + index,
-            tenant,
-            warrantyRecords.find((record) => record.tenantId === tenant.id),
-          ),
+            createStandardRenewalRequirement(
+              currentDraft.standardRenewalRequirements.length + index,
+              tenant,
+              warrantyRecordForTenant(tenant.id, warrantyRecords),
+            ),
         ),
       ],
     })

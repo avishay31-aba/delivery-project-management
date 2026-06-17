@@ -7,6 +7,7 @@ import type {
 } from '@/data/seed.types'
 import { applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
 import { defaultHostingIntent } from '@/domain/hosting-context'
+import { warrantyRecordPatch } from '@/domain/warranty-collection'
 
 export function createBaseRequirement(requirementId: string): Omit<
   NewTenantRequirement,
@@ -72,7 +73,7 @@ export function createStandardRenewalRequirement(index: number, tenant?: Tenant,
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
     warrantyRecordId: warrantyRecord?.warrantyRecordId ?? '',
-    warrantyStatus: warrantyRecord?.status ?? tenant?.warrantyStatus ?? 'NOT_SET',
-    warrantyEndDate: warrantyRecord?.endDate ?? tenant?.warrantyEndDate ?? null,
+    warrantyStatus: warrantyRecordPatch(warrantyRecord).warrantyStatus ?? tenant?.warrantyStatus ?? 'NOT_SET',
+    warrantyEndDate: warrantyRecordPatch(warrantyRecord).warrantyEndDate ?? tenant?.warrantyEndDate ?? null,
   }
 }

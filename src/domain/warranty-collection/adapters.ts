@@ -87,6 +87,10 @@ export function warrantyRecordForTenant(tenantId: string, warrantyRecords: Warra
   return warrantyRecords.find((record) => record.tenantId === tenantId)
 }
 
+export function warrantyRecordsForTenant(tenantId: string, warrantyRecords: WarrantyRecord[]): WarrantyRecord[] {
+  return warrantyRecords.filter((record) => record.tenantId === tenantId)
+}
+
 export function warrantyRecordById(warrantyRecordId: string, warrantyRecords: WarrantyRecord[]): WarrantyRecord | undefined {
   return warrantyRecords.find((record) => record.warrantyRecordId === warrantyRecordId)
 }
