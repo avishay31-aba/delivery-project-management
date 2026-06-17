@@ -6,6 +6,7 @@ import {
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
   REUSED_INTERNAL_STATUS_AVAILABLE,
+  REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_AVAILABILITY_AVAILABLE,
   SYSTEM_AVAILABILITY_OCCUPIED,
   SYSTEM_CLASS_CUSTOMER,
@@ -56,6 +57,27 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     documents: [],
     createdAt: now,
     updatedAt: now,
+  }
+}
+
+export function occupyReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+  return {
+    ...system,
+    status: REUSED_INTERNAL_STATUS_OCCUPIED,
+    currentProjectIds: Array.from(new Set([...system.currentProjectIds, projectId])),
+    occupationStartDate: system.occupationStartDate ?? updatedAt,
+    occupationEndDate: null,
+    updatedAt,
+  }
+}
+
+export function releaseReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+  return {
+    ...system,
+    status: REUSED_INTERNAL_STATUS_AVAILABLE,
+    currentProjectIds: system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId),
+    occupationEndDate: updatedAt,
+    updatedAt,
   }
 }
 

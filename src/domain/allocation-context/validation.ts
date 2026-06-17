@@ -1,4 +1,5 @@
 import type { ProjectSystemLink } from '@/data/seed.types'
+import { isReusedInternalOccupied } from '@/domain/system-inventory'
 import { activeProjectSystemLinks } from './service'
 import type { AllocationActionResult, AllocationValidationContext, AllocationValidationInput } from './types'
 
@@ -33,7 +34,7 @@ export function validateReusedInternalAllocation(
   if (!project) return failed('Project not found.')
   if (project.mainType !== 'POC') return failed('Delivery and Renewal projects cannot allocate Reused Internal Systems.')
   if (!reusedSystem) return failed('Reused internal system not found.')
-  if (reusedSystem.status === 'Occupied') return failed('Reused internal system is already occupied.')
+  if (isReusedInternalOccupied(reusedSystem.status)) return failed('Reused internal system is already occupied.')
   if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && link.sourceMachineId === reusedSystem.machineId)) {
     return failed('This MID is already allocated to the project.')
   }

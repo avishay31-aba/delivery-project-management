@@ -2,10 +2,10 @@ import type {
   AllocationType,
   ProjectSystemLink,
   ProjectTenantLink,
-  ReusedInternalSystem,
   System,
 } from '@/data/seed.types'
 export {
+  releaseReusedInternalSystem,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
 } from '@/domain/system-inventory'
@@ -83,16 +83,6 @@ export function unlinkProjectFromSystem(system: System, projectId: string, updat
   return {
     ...system,
     linkedProjectIds: (system.linkedProjectIds ?? []).filter((candidateProjectId) => candidateProjectId !== projectId),
-    updatedAt,
-  }
-}
-
-export function releaseReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
-  return {
-    ...system,
-    status: 'Available',
-    currentProjectIds: system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId),
-    occupationEndDate: updatedAt,
     updatedAt,
   }
 }

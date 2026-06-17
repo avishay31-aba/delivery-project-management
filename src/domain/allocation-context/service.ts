@@ -7,6 +7,7 @@ import type {
   System,
 } from '@/data/seed.types'
 import type { AllocationMode } from './types'
+import { isReusedInternalOccupied } from '@/domain/system-inventory'
 
 export function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
   return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
@@ -37,7 +38,7 @@ export function availableProductionCandidates(
 export function availableReusedInternalCandidates(
   reusedSystems: ReusedInternalSystem[],
 ): ReusedInternalSystem[] {
-  return reusedSystems.filter((system) => system.status !== 'Occupied')
+  return reusedSystems.filter((system) => !isReusedInternalOccupied(system.status))
 }
 
 export function availableExistingSystemCandidates(

@@ -37,6 +37,7 @@ import {
   createProductionInventorySystem,
   createReusedInternalInventorySystem,
   createStandaloneSystem,
+  occupyReusedInternalSystem,
 } from '@/domain/system-inventory'
 
 interface AppStore extends AppDataState {
@@ -747,14 +748,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       idCounters,
       reusedInternalSystems: current.reusedInternalSystems.map((candidate) =>
         candidate.id === reusedSystemId
-          ? {
-              ...candidate,
-              status: 'Occupied',
-              currentProjectIds: Array.from(new Set([...candidate.currentProjectIds, projectId])),
-              occupationStartDate: candidate.occupationStartDate ?? now,
-              occupationEndDate: null,
-              updatedAt: now,
-            }
+          ? occupyReusedInternalSystem(candidate, projectId, now)
           : candidate,
       ),
       systems: [allocatedSystem, ...current.systems],
