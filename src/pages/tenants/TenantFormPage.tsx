@@ -42,11 +42,13 @@ import {
 } from '@/domain/application-configuration'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
 import {
-  calculateWarrantyStatus,
+  canManageWarrantyCollection,
+  computeTenantWarranties,
+  createTenantWarranty,
   daysBeforeExpiration,
   daysBetween,
   displayWarrantyStatus,
-  warrantyTypeForProject,
+  warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
@@ -401,7 +403,7 @@ export function TenantFormPage() {
   const project = resolveProject(tenantDraft, projects, projectTenants, systems)
   const opportunity = resolveOpportunity(project, opportunities)
   const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
-  const canManageWarranties = Boolean(project && linkedOpportunityId)
+  const canManageWarranties = canManageWarrantyCollection(project, linkedOpportunityId)
   const inheritedEngagementCircle = tenantDraft.engagementCircle?.length
     ? tenantDraft.engagementCircle
     : opportunity?.engagementCircles ?? []
@@ -428,28 +430,8 @@ export function TenantFormPage() {
     (tenant.warranties ?? []).map((warranty) => ({ tenant, warranty })),
   )
 
-  function computedWarranties(source: TenantWarranty[]): TenantWarranty[] {
-    return source.map((warranty, index) => {
-      const selectedProject = projects.find((candidate) => candidate.id === warranty.relatedProjectId)
-      const selectedOpportunity = resolveOpportunity(selectedProject, opportunities)
-      const successor = source
-        .find((candidate) => candidate.predecessor.split(';').map((item) => item.trim()).includes(`${warranty.warrantyId}${tenantDraft.tid}`))
-        ?.warrantyId ?? warranty.successor ?? ''
-      const status = calculateWarrantyStatus(warranty, Boolean(successor))
-      return {
-        ...warranty,
-        firstWarranty: index === 0,
-        accountId: tenantDraft.accountId,
-        warrantyType: warrantyTypeForProject(selectedProject),
-        opportunityId: selectedOpportunity?.opportunityId ?? projectOpportunityReference(selectedProject),
-        successor,
-        durationDays: daysBetween(warranty.startDate, warranty.endDate),
-        daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
-        warrantyStatus: status,
-        alerts: status === 'PENDING' ? 'Expiring soon' : '',
-      }
-    })
-  }
+  const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] =>
+    computeTenantWarranties(source, tenantDraft, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
 
   function validationOpportunity(): Opportunity {
     const now = new Date().toISOString()
@@ -647,33 +629,14 @@ export function TenantFormPage() {
 
   function addWarranty() {
     if (!canManageWarranties) {
-      setMessages(['Warranty can be managed only after the tenant is linked to a Project/Opportunity.'])
+      setMessages([warrantyManageabilityMessage()])
       return
     }
 
     setDraft((current) => {
       if (!current) return current
       const warranties = current.warranties ?? []
-      const warranty: TenantWarranty = {
-        id: `tenant-warranty-${crypto.randomUUID()}`,
-        warrantyId: `W-${String(warranties.length + 1).padStart(3, '0')}`,
-        firstWarranty: warranties.length === 0,
-        predecessor: '',
-        successor: '',
-        accountId: current.accountId,
-        relatedProjectId: project?.id ?? '',
-        warrantyType: project?.mainType ?? '',
-        opportunityId: linkedOpportunityId,
-        startDate: null,
-        endDate: null,
-        durationDays: null,
-        daysBeforeExpiration: null,
-        warrantyStatus: 'NOT_SET',
-        noWarranty: 'NO',
-        outOfContract: 'NO',
-        alerts: '',
-        remark: '',
-      }
+      const warranty = createTenantWarranty(current, warranties, project, linkedOpportunityId)
       return { ...current, warranties: [...warranties, warranty] }
     })
   }
