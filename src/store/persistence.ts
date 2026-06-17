@@ -11,7 +11,10 @@ import {
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
-import { defaultEngagementCircles } from '@/domain/engagement-circle'
+import {
+  normalizeOpportunityEngagementCircles,
+  normalizeTenantEngagementCircle,
+} from '@/domain/engagement-circle'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 import { normalizeTenantWarranties } from '@/domain/warranty-collection'
 
@@ -46,10 +49,7 @@ function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Op
   return {
     ...opportunity,
     stage: opportunity.stage === 'WON' ? 'WON' : 'OPEN',
-    engagementCircles:
-      Array.isArray(opportunity.engagementCircles) && opportunity.engagementCircles.length > 0
-        ? opportunity.engagementCircles
-        : defaultEngagementCircles(opportunity),
+    engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
     pocProjectIds,
     finalProjectId,
     wonAt: opportunity.wonAt ?? (opportunity.stage === 'WON' ? opportunity.updatedAt : null),
@@ -73,7 +73,7 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
     hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
     configuration: applicationConfigurationFromTenant(tenant),
     hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
-    engagementCircle: Array.isArray(tenant.engagementCircle) ? tenant.engagementCircle : [],
+    engagementCircle: normalizeTenantEngagementCircle(tenant),
     remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
     configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
     warranties: normalizeTenantWarranties(tenant.warranties),
