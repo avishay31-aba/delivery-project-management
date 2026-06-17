@@ -38,6 +38,7 @@ import {
 import {
   activeSystemLinkMapBySystemId,
   activeSystemLinksForProject,
+  cloneProjectDraft,
   completeProjectRequirementSections,
   isProjectHeaderFieldChanged,
   linkedSystemsForProject,
@@ -47,6 +48,8 @@ import {
   projectRequirementTitle,
   projectHeaderFieldValue,
   projectPatchFromOpportunitySelection,
+  projectSavePatch,
+  validateProjectSave,
 } from '@/domain/project-lifecycle'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
@@ -71,10 +74,6 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   systemsTenants: false,
   engagementCircles: false,
   documents: false,
-}
-
-function cloneProject(project: Project): Project {
-  return JSON.parse(JSON.stringify(project)) as Project
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -261,7 +260,7 @@ export function ProjectFormPage() {
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
-  const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProject(savedProject) : null)
+  const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProjectDraft(savedProject) : null)
   const [activeTab, setActiveTab] = useState<ProjectFormTab>('systemsTenants')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
@@ -273,7 +272,7 @@ export function ProjectFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
-    setDraft(savedProject ? cloneProject(savedProject) : null)
+    setDraft(savedProject ? cloneProjectDraft(savedProject) : null)
   }, [savedProject])
 
   const currentDraft = draft ?? savedProject
@@ -426,41 +425,25 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
-  function validateProject(): string[] {
-    const messages: string[] = []
-    if (!projectDraft.opportunityName.trim()) messages.push('Project name is required.')
-    return messages
-  }
-
   function saveProject(stayOnPage: boolean) {
-    const messages = validateProject()
+    const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
       return
     }
 
-    updateProject(projectDraft.id, {
-      opportunityId: projectDraft.opportunityId,
-      opportunityName: projectDraft.opportunityName.trim(),
-      mainType: projectDraft.mainType,
-      subType: projectDraft.subType,
-      deliveryDate: projectDraft.deliveryDate,
-      milestoneTemplateId: projectDraft.milestoneTemplateId,
-      milestones: projectDraft.milestones,
-      tasks: projectDraft.tasks,
-      documents: projectDraft.documents ?? [],
-    })
+    updateProject(projectDraft.id, projectSavePatch(projectDraft))
     setSaveMessages(['Project saved.'])
     if (!stayOnPage) navigate('/projects')
   }
 
   function revertProject() {
-    setDraft(cloneProject(persistedProject))
+    setDraft(cloneProjectDraft(persistedProject))
     setSaveMessages([])
   }
 
   function cancelProject() {
-    setDraft(cloneProject(persistedProject))
+    setDraft(cloneProjectDraft(persistedProject))
     navigate('/projects')
   }
 
