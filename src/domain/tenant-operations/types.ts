@@ -37,6 +37,7 @@ export interface TenantCreationInput {
 
 export interface TenantCreationSource {
   account?: Account
+  idCounters: AppDataState['idCounters']
   opportunity: Opportunity
   project: Project
   projectSystemLink?: ProjectSystemLink
@@ -60,4 +61,3 @@ export interface TenantConfigurationSaveDraft {
   configuration: TenantConfiguration
   patch: Partial<Tenant>
 }
-

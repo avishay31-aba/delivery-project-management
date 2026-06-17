@@ -47,6 +47,7 @@ export function resolveTenantCreationSource(
   return {
     source: {
       account: context.accounts.find((candidate) => candidate.id === opportunity.accountId),
+      idCounters: context.idCounters,
       opportunity,
       project,
       projectSystemLink: activeProjectSystemLinks(context.projectSystems).find(
