@@ -31,10 +31,13 @@ import {
   type AllocationActionResult,
 } from '@/domain/allocation-context'
 import {
-  defaultHostingContext,
-  defaultSystemHostingContext,
   tenantHostingPatchFromSystem,
 } from '@/domain/hosting-context'
+import {
+  createProductionInventorySystem,
+  createReusedInternalInventorySystem,
+  createStandaloneSystem,
+} from '@/domain/system-inventory'
 
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
@@ -475,35 +478,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const idCounters = nextSystemId.counters
     const nextSid = nextSystemId.id
     const now = new Date().toISOString()
-    const system: AppDataState['productionSystemInventory'][number] = {
-      id: `prod-sys-${crypto.randomUUID()}`,
-      sid: nextSid,
-      source: 'Production',
-      purpose: 'Delivery',
-      logo: 'T',
-      url: '',
-      cognitoRegion: 'NA',
-      productType: 'Tangles',
-      ...defaultHostingContext(),
-      mapCenter: '',
-      licenses: 1,
-      users: 1,
-      concurrentSearches: 1,
-      concurrentAnalyses: 1,
-      standardMonitors: 10,
-      region: '',
-      country: '',
-      state: '',
-      timeGroup: '',
-      timeGroupAlert: '',
-      linkedProjects: [],
-      operationalStatus: 'On',
-      tenantCount: 0,
-      alerts: [],
-      documents: [],
-      createdAt: now,
-      updatedAt: now,
-    }
+    const system = createProductionInventorySystem(nextSid, now)
 
     set((currentState) => ({
       idCounters,
@@ -519,36 +494,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const idCounters = nextMachineId.counters
     const nextMid = nextMachineId.id
     const now = new Date().toISOString()
-    const system: AppDataState['reusedInternalSystems'][number] = {
-      id: `reused-sys-${crypto.randomUUID()}`,
-      machineId: nextMid,
-      source: 'Reused Internal Systems',
-      purpose: 'POC',
-      status: 'Available',
-      logo: 'T',
-      url: '',
-      cognitoRegion: 'NA',
-      productType: 'Tangles',
-      ...defaultHostingContext(),
-      mapCenter: '',
-      licenses: 1,
-      users: 1,
-      concurrentSearches: 1,
-      concurrentAnalyses: 1,
-      standardMonitors: 10,
-      usedInRegion: '',
-      timeGroup: '',
-      timeGroupAlert: '',
-      occupationStartDate: null,
-      occupationEndDate: null,
-      currentProjectIds: [],
-      tenantCount: 0,
-      alerts: [],
-      operationalStatus: 'On',
-      documents: [],
-      createdAt: now,
-      updatedAt: now,
-    }
+    const system = createReusedInternalInventorySystem(nextMid, now)
 
     set((currentState) => ({
       idCounters,
@@ -666,29 +612,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const idCounters = nextSystemId.counters
     const nextSid = nextSystemId.id
     const now = new Date().toISOString()
-
-    const system: AppDataState['systems'][number] = {
-      id: `sys-${crypto.randomUUID()}`,
-      accountId: null,
-      salesManagerId: null,
-      sid: nextSid,
-      deliveryPid: '',
-      machineId: null,
-      systemClass: 'CUSTOMER',
-      purpose: 'CUSTOMER',
-      availability: 'AVAILABLE',
-      tenantIds: [],
-      productType: 'Tangles',
-      ...defaultSystemHostingContext(),
-      region: '',
-      country: '',
-      state: '',
-      timeGroup: '',
-      operationalStatus: '',
-      documents: [],
-      createdAt: now,
-      updatedAt: now,
-    }
+    const system = createStandaloneSystem(nextSid, now)
 
     set((s) => ({ idCounters, systems: [system, ...s.systems] }))
     get().saveToStorage()
