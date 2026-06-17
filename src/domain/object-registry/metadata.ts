@@ -478,8 +478,141 @@ export const SYSTEM_OBJECT_DEFINITION: ObjectDefinition = {
   ],
 }
 
+const tenantConfigurationSource: ObjectMetadataSourceRef = {
+  domain: 'ApplicationConfiguration',
+  exportName: 'TENANT_CONFIGURATION_FIELDS',
+}
+
+const tenantFields: ObjectFieldDefinition[] = [
+  {
+    key: 'tid',
+    label: 'TID',
+    type: 'readonly',
+    section: 'identity',
+    editable: false,
+    source: { domain: 'TenantRequirement', exportName: 'createTenantRequirementId', fieldKey: 'tid' },
+  },
+  {
+    key: 'tenantName',
+    label: 'Tenant Name',
+    type: 'text',
+    section: 'identity',
+    editable: true,
+    source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel', fieldKey: 'tenantName' },
+  },
+  {
+    key: 'tenantType',
+    label: 'Tenant Type',
+    type: 'readonly',
+    section: 'identity',
+    editable: false,
+    source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel', fieldKey: 'tenantType' },
+  },
+  {
+    key: 'systemId',
+    label: 'System ID/reference',
+    type: 'reference',
+    section: 'hosting',
+    editable: false,
+    source: { domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant', fieldKey: 'systemId' },
+  },
+  {
+    key: 'hostingSnapshot',
+    label: 'Hosting Snapshot',
+    type: 'collection',
+    section: 'hosting',
+    editable: false,
+    source: { domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' },
+    readModelSource: { domain: 'HostingContext', exportName: 'tenantHostingPatchFromSystem' },
+  },
+  {
+    key: 'configuration',
+    label: 'Application Configuration',
+    type: 'collection',
+    tab: 'configuration',
+    editable: true,
+    source: tenantConfigurationSource,
+    validationSource: { domain: 'ApplicationConfiguration', exportName: 'validateApplicationConfiguration' },
+  },
+  {
+    key: 'productType',
+    label: 'Product',
+    type: 'picklist',
+    section: 'configuration',
+    editable: true,
+    source: { ...tenantConfigurationSource, fieldKey: 'productType' },
+    picklistSource: { domain: 'ApplicationConfiguration', exportName: 'TENANT_CONFIGURATION_FIELDS', fieldKey: 'productType' },
+  },
+  {
+    key: 'warranties',
+    label: 'Warranty records',
+    type: 'collection',
+    tab: 'warranty',
+    editable: true,
+    source: { domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' },
+    validationSource: { domain: 'WarrantyCollection', exportName: 'canManageWarrantyCollection' },
+  },
+  {
+    key: 'warrantyStatus',
+    label: 'Warranty Status',
+    type: 'readonly',
+    section: 'warranty',
+    editable: false,
+    source: { domain: 'WarrantyCollection', exportName: 'warrantyStatusForRecord', fieldKey: 'warrantyStatus' },
+  },
+  {
+    key: 'engagementCircle',
+    label: 'Engagement Circle',
+    type: 'collection',
+    tab: 'engagementCircles',
+    editable: true,
+    source: { domain: 'EngagementCircle', exportName: 'normalizeTenantEngagementCircle' },
+    readModelSource: { domain: 'EngagementCircle', exportName: 'tenantEngagementCircleView' },
+  },
+  {
+    key: 'documents',
+    label: 'Documents',
+    type: 'collection',
+    tab: 'documents',
+    editable: true,
+    source: { domain: 'DocumentCollection' },
+  },
+]
+
+export const TENANT_OBJECT_DEFINITION: ObjectDefinition = {
+  key: 'tenant',
+  label: 'Tenant',
+  pluralLabel: 'Tenants',
+  identityField: 'tid',
+  source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel' },
+  fields: tenantFields,
+  sections: [
+    { id: 'identity', label: 'Identity', source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel' } },
+    { id: 'hosting', label: 'Hosting', source: { domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' } },
+    { id: 'configuration', label: 'Configuration', source: tenantConfigurationSource },
+    { id: 'warranty', label: 'Warranty', source: { domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' } },
+  ],
+  tabs: [
+    { id: 'configuration', label: 'Configuration', source: tenantConfigurationSource },
+    { id: 'hosting', label: 'Hosting', source: { domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' } },
+    { id: 'warranty', label: 'Warranty', source: { domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' } },
+    { id: 'engagementCircles', label: 'Engagement Circle', source: { domain: 'EngagementCircle', exportName: 'tenantEngagementCircleView' } },
+    { id: 'documents', label: 'Documents', source: { domain: 'DocumentCollection' } },
+  ],
+  relationships: [
+    { relationship: 'references', domain: 'ProjectLifecycle', exportName: 'linkedTenantsForProject' },
+    { relationship: 'references', domain: 'SystemInventory', exportName: 'systemReadModel' },
+    { relationship: 'composes', domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' },
+    { relationship: 'composes', domain: 'ApplicationConfiguration', exportName: 'TENANT_CONFIGURATION_FIELDS' },
+    { relationship: 'composes', domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' },
+    { relationship: 'composes', domain: 'EngagementCircle', exportName: 'tenantEngagementCircleView' },
+    { relationship: 'composes', domain: 'DocumentCollection' },
+  ],
+}
+
 export const OBJECT_REGISTRY_ENTRIES: ObjectRegistryEntry[] = [
   OPPORTUNITY_OBJECT_DEFINITION,
   PROJECT_OBJECT_DEFINITION,
   SYSTEM_OBJECT_DEFINITION,
+  TENANT_OBJECT_DEFINITION,
 ]
