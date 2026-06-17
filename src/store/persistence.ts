@@ -1,6 +1,5 @@
 import type {
   AppDataState,
-  EngagementCircleContact,
   Opportunity,
   Project,
   Tenant,
@@ -12,6 +11,7 @@ import {
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
+import { defaultEngagementCircles } from '@/domain/engagement-circle'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 import { normalizeTenantWarranties } from '@/domain/warranty-collection'
 
@@ -26,31 +26,6 @@ function normalizeProject(project: Project): Project {
     ...project,
     projectSource: projectSourceFor(project),
   }
-}
-
-const DEFAULT_ENGAGEMENT_CIRCLE_ROLES = [
-  'Region Manager',
-  'Sales / Deal Manager',
-  'Customer Success Manager',
-  'Customer Success Engineer',
-  'VP Project',
-  'Delivery Specialist',
-  'Support Manager',
-]
-
-function defaultEngagementCircles(opportunity: Opportunity): EngagementCircleContact[] {
-  const region = opportunity.region || 'Global'
-  return DEFAULT_ENGAGEMENT_CIRCLE_ROLES.map((role) => {
-    const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-    return {
-      id: `circle-${opportunity.id}-${slug}`,
-      subject: role === 'Support Manager' ? 'Support and version update notifications' : 'Tenant engagement',
-      role,
-      userName: `${region} ${role}`,
-      email: `${slug}.${region.toLowerCase()}@example.com`,
-      phone: '',
-    }
-  })
 }
 
 function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
