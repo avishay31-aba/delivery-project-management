@@ -4,7 +4,6 @@ import type {
   Opportunity,
   OpportunitySubType,
   OpportunityType,
-  Tenant,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
@@ -13,7 +12,6 @@ import {
   persistState,
   clearPersistedState,
 } from '@/store/persistence'
-import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
 import {
   createProjectSystemLink,
   deallocateProjectSystemLink,
@@ -26,18 +24,13 @@ import {
   type AllocationActionResult,
 } from '@/domain/allocation-context'
 import {
-  tenantHostingPatchFromSystem,
-} from '@/domain/hosting-context'
-import {
   createProductionInventorySystem,
   createReusedInternalInventorySystem,
   createStandaloneSystem,
   occupyReusedInternalSystem,
   releaseReusedInternalSystem,
-  SYSTEM_SOURCE_REUSED_INTERNAL,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
-  systemSource,
 } from '@/domain/system-inventory'
 import {
   syncOpportunityProjectsFromOpportunity,
@@ -46,6 +39,12 @@ import {
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
 import { createStandaloneProject } from '@/domain/project-lifecycle'
+import {
+  deletedTenantHostedSystemHistory,
+  movedTenantHostedSystemHistory,
+  resolveTenantCreationSource,
+  tenantCreationDraftFromSource,
+} from '@/domain/tenant-operations'
 
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
@@ -158,18 +157,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
-        const history = tenant.hostedSystemHistory ?? [
-          { systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const },
-        ]
         return {
           ...tenant,
           systemId: '',
           operationalStatus: 'Deleted',
-          hostedSystemHistory: history.map((entry, index) =>
-            index === history.length - 1 && entry.endedAt == null
-              ? { ...entry, endedAt: now, reason: 'Deleted' as const }
-              : entry,
-          ),
+          hostedSystemHistory: deletedTenantHostedSystemHistory(tenant, now),
           updatedAt: now,
         }
       }),
@@ -182,22 +174,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
-        const history = tenant.hostedSystemHistory ?? [
-          { systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const },
-        ]
-        const closedHistory = history.map((entry, index) =>
-          index === history.length - 1 && entry.endedAt == null
-            ? { ...entry, endedAt: now, reason: 'Moved' as const }
-            : entry,
-        )
         return {
           ...tenant,
           systemId: destinationSystemId,
           contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
-          hostedSystemHistory: [
-            ...closedHistory,
-            { systemId: destinationSystemId, startedAt: now, endedAt: null, reason: 'Moved' as const },
-          ],
+          hostedSystemHistory: movedTenantHostedSystemHistory(tenant, destinationSystemId, now),
           updatedAt: now,
         }
       }),
@@ -207,105 +188,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createTenantFromSystemRequirement: (projectId, systemId, requirementId) => {
     const state = get()
-    const project = state.projects.find((candidate) => candidate.id === projectId)
-    const system = state.systems.find((candidate) => candidate.id === systemId)
-    if (!project) return { ok: false, message: 'Project not found.' }
-    if (!system) return { ok: false, message: 'System not found.' }
-
-    const opportunity = state.opportunities.find(
-      (candidate) =>
-        candidate.opportunityId === project.opportunityId ||
-        candidate.id === project.opportunityId ||
-        candidate.pocProjectIds.includes(project.id) ||
-        candidate.finalProjectId === project.id,
-    )
-    const requirement = opportunity?.newTenantRequirements.find((candidate) => candidate.id === requirementId)
-    if (!requirement) return { ok: false, message: 'New tenant requirement not found for this project.' }
-
-    const alreadyLinked = state.tenants.some((tenant) => {
-      const linkedToProject = state.projectTenants.some(
-        (link) => link.projectId === projectId && link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED',
-      )
-      return linkedToProject && tenant.systemId === systemId && tenant.sourceRequirementId === requirement.requirementId
-    })
-    if (alreadyLinked) return { ok: false, message: 'A tenant already exists for this requirement on this system.' }
-
-    const account = opportunity ? state.accounts.find((candidate) => candidate.id === opportunity.accountId) : undefined
-    const nextTenantId = incrementCounter(state.idCounters, 'tid')
-    const idCounters = nextTenantId.counters
     const now = new Date().toISOString()
-    const projectSystemLink = state.projectSystems.find(
-      (link) => link.projectId === projectId && link.systemId === systemId && link.allocationStatus !== 'DEALLOCATED',
-    )
-    const tenantType = project.mainType === 'POC' || system.systemClass === 'POC_DEMO_TRAINING' ? 'POC' : 'CUSTOMER'
-    const configuration = applicationConfigurationFromRequirement(requirement, system.productType)
-    const tenant: Tenant = {
-      id: `ten-${crypto.randomUUID()}`,
-      tid: nextTenantId.id,
-      tenantName: `${nextTenantId.id} ${project.accountName || (account?.accountName ?? '')}`.trim(),
-      accountId: account?.id ?? system.accountId ?? '',
-      systemId,
-      deliveryPid: project.pid,
-      tenantType,
-      tenantFormType: tenantType === 'POC' ? 'POC' : 'CUSTOMER',
-      hostedSystemId: systemId,
-      hostingSid: system.sid ?? '',
-      sourceRequirementId: requirement.requirementId,
-      configuration,
-      accountName: project.accountName || (account?.accountName ?? ''),
-      country: opportunity?.country ?? account?.country ?? system.country ?? '',
-      timeGroup: opportunity?.timeGroup ?? account?.timeGroup ?? system.timeGroup,
-      operationalStatus: 'Active',
-      contractStatus: 'UNDER_CONTRACT',
-      hostedSystemHistory: [{ systemId, startedAt: now, endedAt: null, reason: 'Created' }],
-      productType: configuration.product,
-      ...tenantHostingPatchFromSystem(system),
-      statisticsId: requirement.statisticsId,
-      authId: requirement.authId,
-      rdmId: requirement.rdmId,
-      mapCenter: configuration.mapCenter,
-      licenses: configuration.licenses,
-      users: configuration.users,
-      concurrentSearches: configuration.concurrentSearches,
-      dailySearches: configuration.dailySearches,
-      monthlySearches: configuration.monthlySearches,
-      concurrentAnalyses: configuration.concurrentAnalyses,
-      topicAnalyses: configuration.topicAnalyses,
-      dailyAnalyses: configuration.dailyAnalyses,
-      monthlyAnalyses: configuration.monthlyAnalyses,
-      standardMonitors: configuration.standardMonitors,
-      fullMonitors: configuration.fullMonitors,
-      topicMonitors: configuration.topicMonitors,
-      tangles: configuration.tangles,
-      tanglesGo: configuration.tanglesGo,
-      webloc: configuration.webloc,
-      webeye: configuration.webeye,
-      ingest: configuration.ingest,
-      blockchain: configuration.blockchain,
-      crossSystemFeatures: [...configuration.crossSystemFeatures],
-      apiEnabled: configuration.apiEnabled,
-      apiDailyQty: configuration.apiDailyQty,
-      apiMonthlyQty: configuration.apiMonthlyQty,
-      aiFeatures: [...configuration.aiFeatures],
-      additionalFeatures: [...configuration.additionalFeatures],
-      warrantyStatus: 'NOT_SET',
-      warrantyStartDate: null,
-      warrantyEndDate: null,
-      pocStartDate: opportunity?.pocStartDate ?? null,
-      pocEndDate: opportunity?.pocEndDate ?? null,
-      createdAt: now,
-      updatedAt: now,
-    }
-    const projectTenant = {
-      id: `proj-ten-${crypto.randomUUID()}`,
-      projectId,
-      tenantId: tenant.id,
-      systemId,
-      allocationStatus: 'ALLOCATED' as const,
-      allocationType: projectSystemLink?.allocationType ?? (systemSource(system) === SYSTEM_SOURCE_REUSED_INTERNAL ? 'REUSED_INTERNAL' as const : 'EXISTING_SYSTEM' as const),
-      allocatedAt: now,
-      deallocatedAt: null,
-    }
+    const resolved = resolveTenantCreationSource({ projectId, systemId, requirementId }, state)
+    if (resolved.error) return resolved.error
+    const { tenant, projectTenant, idCounters } = tenantCreationDraftFromSource(resolved.source, now)
 
     set((current) => ({
       idCounters,
