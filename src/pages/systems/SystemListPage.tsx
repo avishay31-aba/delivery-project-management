@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
-import { activeProjectSystemLinks } from '@/domain/allocation-context'
+import { allocatedSystemsForActiveLinks, systemRoutePath } from '@/domain/system-inventory'
 
 export function SystemListPage() {
   const navigate = useNavigate()
@@ -12,8 +12,7 @@ export function SystemListPage() {
   const tenants = useAppStore((s) => s.tenants)
   const projectSystems = useAppStore((s) => s.projectSystems)
   const updateSystem = useAppStore((s) => s.updateSystem)
-  const allocatedSystemIds = new Set(activeProjectSystemLinks(projectSystems).map((link) => link.systemId))
-  const allocatedSystems = systems.filter((system) => Boolean(system.sid) && allocatedSystemIds.has(system.id))
+  const allocatedSystems = allocatedSystemsForActiveLinks(systems, projectSystems)
   const systemListColumns = createAllocatedSystemColumns(projects, tenants)
 
   return (
@@ -30,13 +29,7 @@ export function SystemListPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => {
-          if (row.source === 'Reused Internal Systems' && row.machineId) {
-            navigate(`/systems/reused-internal/${row.machineId}`)
-            return
-          }
-          navigate(`/systems/production-inventory/${row.sid}`)
-        }}
+        onRowClick={(row) => navigate(systemRoutePath(row))}
       />
     </div>
   )

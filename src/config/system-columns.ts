@@ -1,9 +1,6 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
-
-function joinSemicolon(values: Array<string | null | undefined>): string {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).join(';')
-}
+import { joinUniqueValues, systemIdentity, tenantCountForSystem } from '@/domain/system-inventory'
 
 export function createSystemColumns(
   accounts: Account[],
@@ -11,7 +8,7 @@ export function createSystemColumns(
   tenants: Tenant[],
 ): DashboardColumn<System>[] {
   return [
-    { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? row.machineId ?? '' },
+    { id: 'sid', label: 'SID', getValue: (row) => systemIdentity(row) },
     {
       id: 'accountName',
       label: 'Customer / End User / Account',
@@ -32,12 +29,12 @@ export function createSystemColumns(
     {
       id: 'tenantCount',
       label: 'Tenants Count',
-      getValue: (row) => tenants.filter((tenant) => tenant.systemId === row.id).length,
+      getValue: (row) => tenantCountForSystem(row, tenants),
     },
     {
       id: 'deliveryPid',
       label: 'Related Delivery PID',
-      getValue: (row) => joinSemicolon(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.deliveryPid)),
+      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.deliveryPid), ';'),
     },
     { id: 'systemStatus', label: 'System Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
     { id: 'systemClass', label: 'System Class', getValue: (row) => row.systemClass },

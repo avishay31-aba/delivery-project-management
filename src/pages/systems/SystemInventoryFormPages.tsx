@@ -48,16 +48,24 @@ import {
   type SystemInventoryHeaderField,
   type SystemInventoryMetadata,
 } from '@/config/system-inventory-metadata'
-import { timeGroupForCountry } from '@/config/time-groups'
 import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
-import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
   validateHostingContext,
 } from '@/domain/hosting-context'
+import {
+  hostedTenantsForSystem,
+  linkedProjectDisplay,
+  linkedProjectIdsForSystem,
+  systemDisplayName as systemDisplayNameForRecord,
+  systemIdentity,
+  systemTimeGroup,
+  systemTimeGroupAlert,
+  tenantCountForSystem,
+} from '@/domain/system-inventory'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
@@ -208,31 +216,15 @@ function CollapsibleSection({
 }
 
 function deriveLinkedProjects(record: InventoryRecord, projects: Project[]): string {
-  const projectIds =
-    'linkedProjects' in record
-      ? record.linkedProjects ?? []
-      : 'currentProjectIds' in record
-        ? record.currentProjectIds
-        : []
-  return projectIds
-    .map((projectId) => projects.find((project) => project.id === projectId)?.pid ?? projectId)
-    .join(', ')
+  return linkedProjectDisplay(record, projects)
 }
 
 function deriveTenantCount(record: InventoryRecord, tenants: Tenant[]): number {
-  if ('sid' in record) {
-    const hostedTenantCount = tenants.filter((tenant) => tenant.systemId === record.id).length
-    const storedTenantCount = 'tenantCount' in record ? record.tenantCount : 0
-    return hostedTenantCount || storedTenantCount || 0
-  }
-  return record.tenantCount || 0
+  return tenantCountForSystem(record, tenants)
 }
 
 function deriveTimeGroup(record: InventoryRecord, tenants: Tenant[]): string {
-  const oldestTenant = tenants
-    .filter((tenant) => tenant.systemId === record.id)
-    .sort((first, second) => first.createdAt.localeCompare(second.createdAt))[0]
-  return timeGroupForCountry(oldestTenant?.country) || textValue(readRecordValue(record, 'timeGroup'))
+  return systemTimeGroup(record, tenants)
 }
 
 function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[]): string {
@@ -240,9 +232,7 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
   if (key === 'timeGroupAlert') {
-    const systemTimeGroup = deriveTimeGroup(record, tenants)
-    const tenant = tenants.find((candidate) => candidate.systemId === record.id && timeGroupForCountry(candidate.country) && timeGroupForCountry(candidate.country) !== systemTimeGroup)
-    return tenant ? `Tenant ${tenant.tid} does not belong to system time group` : textValue(readRecordValue(record, key))
+    return systemTimeGroupAlert(record, tenants, readRecordValue(record, key))
   }
   return textValue(readRecordValue(record, key))
 }
@@ -696,7 +686,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function hostedTenantsForDraft(): Tenant[] {
-    return tenants.filter((tenant) => tenant.systemId === activeRecord.id || tenant.hostedSystemId === activeRecord.id)
+    return hostedTenantsForSystem(activeRecord.id, tenants)
   }
 
   function applicationSummaryProduct(): string {
@@ -741,8 +731,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function systemDisplayName(system: InventoryRecord): string {
-    const id = 'sid' in system ? system.sid : 'machineId' in system ? system.machineId : ''
-    return `${id || system.id} - ${system.productType || 'System'}`
+    return systemDisplayNameForRecord(system)
   }
 
   function tenantFieldValue(tenant: Tenant, field: SharedFieldMetadata): string {
@@ -761,13 +750,8 @@ function InventoryForm<T extends InventoryRecord>({
 
   function linkedProjectsForSystem(): Project[] {
     const projectIds = new Set(
-      activeProjectSystemLinks(projectSystems)
-        .filter((link) => link.systemId === activeRecord.id)
-        .map((link) => link.projectId),
+      linkedProjectIdsForSystem(activeRecord, projectSystems),
     )
-    if ('linkedProjectIds' in activeRecord) {
-      activeRecord.linkedProjectIds?.forEach((projectId) => projectIds.add(projectId))
-    }
     return projects.filter((project) => projectIds.has(project.id))
   }
 
@@ -1151,7 +1135,7 @@ function InventoryForm<T extends InventoryRecord>({
         title={
           <span className="inline-flex items-center gap-2">
             <LargeStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
-            <span>{`${metadata.titleLabel} ${derivedValue(activeDraft, metadata.source === 'Production' ? 'sid' : 'machineId', projects, tenants)}`}</span>
+            <span>{`${metadata.titleLabel} ${systemIdentity(activeDraft)}`}</span>
           </span>
         }
         subtitle={metadata.sourceSheet}

@@ -1,10 +1,11 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
-
-function join(values: Array<string | null | undefined>): string {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).join('; ')
-}
+import {
+  joinUniqueValues,
+  systemSourceLabel,
+  tenantCountForSystem,
+} from '@/domain/system-inventory'
 
 export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemInventoryItem>[] = [
   { id: 'sid', label: 'SID', getValue: (row) => row.sid },
@@ -43,27 +44,28 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
   return [
     { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? '' },
     { id: 'machineId', label: 'MID', getValue: (row) => row.machineId ?? '' },
-    { id: 'source', label: 'Source', getValue: (row) => row.source ?? (row.machineId ? 'Reused Internal Systems' : 'Production') },
+    { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
     {
       id: 'projects',
       label: 'Linked Projects',
       getValue: (row) =>
-        join(
+        joinUniqueValues(
           (row.linkedProjectIds ?? [])
             .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
             .filter(Boolean),
+          '; ',
         ),
     },
     {
       id: 'tenantCount',
       label: '# Tenants',
-      getValue: (row) => tenants.filter((tenant) => tenant.systemId === row.id).length,
+      getValue: (row) => tenantCountForSystem(row, tenants),
     },
     {
       id: 'tenants',
       label: 'Hosted Tenants',
-      getValue: (row) => join(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.tid)),
+      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.tid)),
     },
     { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
