@@ -1,0 +1,23 @@
+import type { SystemInventoryRecord, SystemInventoryValidationMessage } from './types'
+
+function textValue(value: unknown): string {
+  return value == null ? '' : String(value)
+}
+
+export function validateReusedInternalMachineId(
+  record: SystemInventoryRecord,
+  records: SystemInventoryRecord[],
+): SystemInventoryValidationMessage[] {
+  if (!('machineId' in record)) return []
+  const machineId = textValue(record.machineId).trim()
+  const duplicateMid = records.some(
+    (candidate) =>
+      candidate.id !== record.id &&
+      'machineId' in candidate &&
+      textValue(candidate.machineId).trim() === machineId,
+  )
+
+  if (!machineId) return [{ field: 'machineId', message: 'MID is required.' }]
+  if (duplicateMid) return [{ field: 'machineId', message: 'MID must be unique.' }]
+  return []
+}
