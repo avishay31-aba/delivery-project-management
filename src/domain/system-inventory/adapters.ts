@@ -1,12 +1,15 @@
 import {
   defaultHostingContext,
   defaultSystemHostingContext,
+  hostingContextFromSource,
 } from '@/domain/hosting-context'
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
   REUSED_INTERNAL_STATUS_AVAILABLE,
   SYSTEM_AVAILABILITY_AVAILABLE,
+  SYSTEM_AVAILABILITY_OCCUPIED,
   SYSTEM_CLASS_CUSTOMER,
+  SYSTEM_CLASS_POC_DEMO_TRAINING,
   SYSTEM_OPERATIONAL_STATUS_ON,
   SYSTEM_PURPOSE_CUSTOMER,
   SYSTEM_PURPOSE_DELIVERY,
@@ -111,5 +114,65 @@ export function createStandaloneSystem(sid: string, now: string): System {
     documents: [],
     createdAt: now,
     updatedAt: now,
+  }
+}
+
+export function systemFromProductionInventoryAllocation(
+  productionSystem: ProductionSystemInventoryItem,
+  projectId: string,
+  tenantIds: string[],
+  updatedAt: string,
+): System {
+  return {
+    ...productionSystem,
+    accountId: null,
+    salesManagerId: null,
+    machineId: null,
+    systemClass: SYSTEM_CLASS_CUSTOMER,
+    availability: SYSTEM_AVAILABILITY_OCCUPIED,
+    linkedProjectIds: [projectId],
+    tenantIds,
+    createdAt: productionSystem.createdAt,
+    updatedAt,
+  }
+}
+
+export function systemFromReusedInternalAllocation(
+  reusedSystem: ReusedInternalSystem,
+  projectId: string,
+  systemId: string,
+  sid: string,
+  deliveryPid: string,
+  tenantIds: string[],
+  createdAt: string,
+): System {
+  return {
+    id: systemId,
+    accountId: null,
+    salesManagerId: null,
+    sid,
+    deliveryPid,
+    machineId: reusedSystem.machineId,
+    source: SYSTEM_SOURCE_REUSED_INTERNAL,
+    linkedProjectIds: [projectId],
+    tenantIds,
+    systemClass: SYSTEM_CLASS_POC_DEMO_TRAINING,
+    purpose: reusedSystem.purpose,
+    availability: SYSTEM_AVAILABILITY_OCCUPIED,
+    logo: reusedSystem.logo,
+    url: reusedSystem.url,
+    cognitoRegion: reusedSystem.cognitoRegion,
+    productType: reusedSystem.productType,
+    ...hostingContextFromSource(reusedSystem),
+    mapCenter: reusedSystem.mapCenter,
+    region: reusedSystem.usedInRegion,
+    country: '',
+    state: '',
+    timeGroup: reusedSystem.timeGroup,
+    timeGroupAlert: reusedSystem.timeGroupAlert,
+    operationalStatus: reusedSystem.operationalStatus,
+    documents: reusedSystem.documents ?? [],
+    createdAt,
+    updatedAt: createdAt,
   }
 }

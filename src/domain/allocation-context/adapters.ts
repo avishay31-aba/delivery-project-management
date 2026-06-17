@@ -1,12 +1,14 @@
 import type {
   AllocationType,
-  ProductionSystemInventoryItem,
   ProjectSystemLink,
   ProjectTenantLink,
   ReusedInternalSystem,
   System,
 } from '@/data/seed.types'
-import { hostingContextFromSource } from '@/domain/hosting-context'
+export {
+  systemFromProductionInventoryAllocation,
+  systemFromReusedInternalAllocation,
+} from '@/domain/system-inventory'
 
 export function normalizeProjectSystemLink(link: ProjectSystemLink): ProjectSystemLink {
   return {
@@ -66,66 +68,6 @@ export function createProjectTenantLink(
     allocationType,
     allocatedAt,
     deallocatedAt: null,
-  }
-}
-
-export function systemFromProductionInventoryAllocation(
-  productionSystem: ProductionSystemInventoryItem,
-  projectId: string,
-  tenantIds: string[],
-  updatedAt: string,
-): System {
-  return {
-    ...productionSystem,
-    accountId: null,
-    salesManagerId: null,
-    machineId: null,
-    systemClass: 'CUSTOMER',
-    availability: 'OCCUPIED',
-    linkedProjectIds: [projectId],
-    tenantIds,
-    createdAt: productionSystem.createdAt,
-    updatedAt,
-  }
-}
-
-export function systemFromReusedInternalAllocation(
-  reusedSystem: ReusedInternalSystem,
-  projectId: string,
-  systemId: string,
-  sid: string,
-  deliveryPid: string,
-  tenantIds: string[],
-  createdAt: string,
-): System {
-  return {
-    id: systemId,
-    accountId: null,
-    salesManagerId: null,
-    sid,
-    deliveryPid,
-    machineId: reusedSystem.machineId,
-    source: 'Reused Internal Systems',
-    linkedProjectIds: [projectId],
-    tenantIds,
-    systemClass: 'POC_DEMO_TRAINING',
-    purpose: reusedSystem.purpose,
-    availability: 'OCCUPIED',
-    logo: reusedSystem.logo,
-    url: reusedSystem.url,
-    cognitoRegion: reusedSystem.cognitoRegion,
-    productType: reusedSystem.productType,
-    ...hostingContextFromSource(reusedSystem),
-    mapCenter: reusedSystem.mapCenter,
-    region: reusedSystem.usedInRegion,
-    country: '',
-    state: '',
-    timeGroup: reusedSystem.timeGroup,
-    timeGroupAlert: reusedSystem.timeGroupAlert,
-    operationalStatus: reusedSystem.operationalStatus,
-    documents: reusedSystem.documents ?? [],
-    createdAt,
-    updatedAt: createdAt,
   }
 }
 
