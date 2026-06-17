@@ -1,5 +1,6 @@
 import { deriveProjectProgress } from '@/domain/milestone-plan'
 import { opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -14,6 +15,8 @@ import type {
   Project,
   ProjectLifecycleContext,
   ProjectRequirementRow,
+  ProjectSystemLink,
+  ProjectTenantLink,
   StandardRenewalRequirement,
   System,
   Tenant,
@@ -225,4 +228,40 @@ export function projectRequirementReadonlyCellValue(
   }
 
   return textValue(rowValue(row, column.key))
+}
+
+export function activeSystemLinksForProject(projectId: string, projectSystems: ProjectSystemLink[]): ProjectSystemLink[] {
+  return activeProjectSystemLinks(projectSystems).filter((link) => link.projectId === projectId)
+}
+
+export function linkedSystemsForProject(
+  project: Project | undefined,
+  systems: System[],
+  activeSystemLinks: ProjectSystemLink[],
+): System[] {
+  if (!project) return []
+  const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
+  return systems.filter((system) => linkedSystemIds.has(system.id))
+}
+
+export function linkedTenantsForProject(
+  project: Project | undefined,
+  linkedSystems: System[],
+  projectTenants: ProjectTenantLink[],
+  tenants: Tenant[],
+): Tenant[] {
+  if (!project) return []
+  const linkedTenantIds = new Set(
+    projectTenants
+      .filter((link) => link.projectId === project.id && link.allocationStatus !== 'DEALLOCATED')
+      .map((link) => link.tenantId),
+  )
+  linkedSystems.forEach((system) => {
+    tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
+  })
+  return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
+}
+
+export function activeSystemLinkMapBySystemId(activeSystemLinks: ProjectSystemLink[]): Map<string, ProjectSystemLink> {
+  return new Map(activeSystemLinks.map((link) => [link.systemId, link]))
 }

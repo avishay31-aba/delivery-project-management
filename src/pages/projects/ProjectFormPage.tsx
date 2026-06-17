@@ -22,7 +22,6 @@ import { FormField, PlaceholderCard } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
-  activeProjectSystemLinks,
   allocationModeLabel,
   allowedAllocationModes,
   availableExistingSystemCandidates,
@@ -37,8 +36,12 @@ import {
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
 import {
+  activeSystemLinkMapBySystemId,
+  activeSystemLinksForProject,
   completeProjectRequirementSections,
   isProjectHeaderFieldChanged,
+  linkedSystemsForProject,
+  linkedTenantsForProject,
   projectRequirementReadonlyCellValue,
   projectRequirementRows,
   projectRequirementTitle,
@@ -283,24 +286,13 @@ export function ProjectFormPage() {
   const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
   const activeSystemLinks = useMemo(() => {
     if (!currentDraft) return []
-    return activeProjectSystemLinks(projectSystems).filter((link) => link.projectId === currentDraft.id)
+    return activeSystemLinksForProject(currentDraft.id, projectSystems)
   }, [currentDraft, projectSystems])
   const linkedSystems = useMemo(() => {
-    if (!currentDraft) return []
-    const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
-    return systems.filter((system) => linkedSystemIds.has(system.id))
+    return linkedSystemsForProject(currentDraft, systems, activeSystemLinks)
   }, [activeSystemLinks, currentDraft, systems])
   const linkedTenants = useMemo(() => {
-    if (!currentDraft) return []
-    const linkedTenantIds = new Set(
-      projectTenants
-        .filter((link) => link.projectId === currentDraft.id && link.allocationStatus !== 'DEALLOCATED')
-        .map((link) => link.tenantId),
-    )
-    linkedSystems.forEach((system) => {
-      tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
-    })
-    return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
+    return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants)
   }, [currentDraft, linkedSystems, projectTenants, tenants])
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
@@ -347,7 +339,7 @@ export function ProjectFormPage() {
   const visibleTabs = formMetadata.tabs.filter((tab) => tab !== 'tenantRequirements')
   const permittedAllocationModes = allowedAllocationModes(projectDraft)
   const selectedMode = permittedAllocationModes.includes(allocationMode) ? allocationMode : permittedAllocationModes[0]
-  const activeSystemLinkBySystemId = new Map(activeSystemLinks.map((link) => [link.systemId, link]))
+  const activeSystemLinkBySystemId = activeSystemLinkMapBySystemId(activeSystemLinks)
   const availableAllocationCandidates: AllocationCandidate[] =
     selectedMode === 'PRODUCTION'
       ? availableProductionCandidates(productionSystemInventory)
