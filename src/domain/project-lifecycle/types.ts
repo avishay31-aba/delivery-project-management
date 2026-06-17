@@ -1,6 +1,7 @@
 import type {
   Account,
   ChangeRequestRequirement,
+  NewTenantRequirement,
   Opportunity,
   Project,
   ProjectMainType,
@@ -19,7 +20,7 @@ export type ProjectLifecycleMainType = ProjectMainType
 export type ProjectLifecycleSubType = ProjectSubType
 export type ProjectLifecycleSource = ProjectSource
 
-export type ProjectRequirementRow = ChangeRequestRequirement | StandardRenewalRequirement
+export type ProjectRequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 
 export interface ProjectLifecycleContext {
   linkedOpportunity?: Opportunity
@@ -38,6 +39,7 @@ export interface ProjectSystemsTenantsContext {
 export type {
   Account,
   ChangeRequestRequirement,
+  NewTenantRequirement,
   Opportunity,
   Project,
   ProjectMainType,

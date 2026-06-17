@@ -1,6 +1,23 @@
 import { deriveProjectProgress } from '@/domain/milestone-plan'
+import { opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
+import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
-import type { Opportunity, Project, ProjectLifecycleContext } from './types'
+import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
+import {
+  CHANGE_REQUEST_PROJECT_SECTION,
+  NEW_TENANT_PROJECT_SECTION,
+  STANDARD_RENEWAL_PROJECT_SECTION,
+} from './metadata'
+import type {
+  ChangeRequestRequirement,
+  Opportunity,
+  Project,
+  ProjectLifecycleContext,
+  ProjectRequirementRow,
+  StandardRenewalRequirement,
+  System,
+  Tenant,
+} from './types'
 
 export function projectLifecycleIdentity(project: Project): Project {
   return project
@@ -123,4 +140,89 @@ export function projectPatchFromOpportunitySelection(
     subType: projectType.subType,
     deliveryDate: selectedOpportunity.deliveryDate,
   }
+}
+
+export function projectRequirementTitle(section: ProjectRequirementSectionMetadata): string {
+  if (section.kind === 'A') return 'Grid A: New Tenant Requirements'
+  if (section.kind === 'B') return 'Grid B: Change Request Requirements'
+  return 'Tenants to Renew'
+}
+
+export function completeProjectRequirementSections(
+  sections: ProjectRequirementSectionMetadata[],
+  opportunity: Opportunity | undefined,
+): ProjectRequirementSectionMetadata[] {
+  const sectionsByKind = new Map(sections.map((section) => [section.kind, section]))
+  const fallbackSections: ProjectRequirementSectionMetadata[] = [
+    NEW_TENANT_PROJECT_SECTION,
+    CHANGE_REQUEST_PROJECT_SECTION,
+    STANDARD_RENEWAL_PROJECT_SECTION,
+  ]
+
+  fallbackSections.forEach((section) => {
+    if (!sectionsByKind.has(section.kind) && opportunityRowsForRequirementSection(opportunity, section.kind).length > 0) {
+      sectionsByKind.set(section.kind, section)
+    }
+  })
+
+  return fallbackSections
+    .map((section) => sectionsByKind.get(section.kind))
+    .filter((section): section is ProjectRequirementSectionMetadata => Boolean(section))
+}
+
+export function projectRequirementRows(opportunity: Opportunity | undefined, kind: ProjectRequirementSectionKind): ProjectRequirementRow[] {
+  return opportunityRowsForRequirementSection(opportunity, kind)
+}
+
+function rowValue(row: ProjectRequirementRow, key: string): unknown {
+  return (row as unknown as Record<string, unknown>)[key]
+}
+
+export function projectTenantDisplayName(tenant: Tenant): string {
+  return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
+}
+
+export function resolveProjectSystemSid(systemId: string | null | undefined, systems: System[]): string {
+  if (!systemId) return ''
+  return systems.find((system) => system.id === systemId)?.sid ?? ''
+}
+
+export function resolveProjectTenant(tenantId: string, tenants: Tenant[]): Tenant | undefined {
+  return tenants.find((tenant) => tenant.id === tenantId)
+}
+
+export function projectRequirementReadonlyCellValue(
+  row: ProjectRequirementRow,
+  column: RequirementColumnMetadata,
+  kind: ProjectRequirementSectionKind,
+  tenants: Tenant[],
+  systems: System[],
+): string {
+  if (column.key === 'existingSystemId' && kind === 'A') {
+    const requirement = row as ProjectRequirementRow & { deployTarget?: string; existingSystemId?: string | null }
+    if (requirement.deployTarget !== 'EXISTING_SID') return 'New System'
+    return resolveProjectSystemSid(requirement.existingSystemId, systems)
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'tenantId') {
+    const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant ? projectTenantDisplayName(tenant) : ''
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'tenantName') {
+    const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant?.tenantName ?? ''
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'systemId') {
+    const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return resolveProjectSystemSid(tenant?.systemId ?? rowValue(row, column.key) as string, systems)
+  }
+
+  if ((kind === 'B' || kind === 'C') && column.key === 'deliveryPid') {
+    const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
+    return tenant?.deliveryPid ?? ''
+  }
+
+  return textValue(rowValue(row, column.key))
 }

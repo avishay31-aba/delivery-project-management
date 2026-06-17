@@ -6,27 +6,17 @@ import {
   projectTabLabel,
   type ProjectFormTab,
   type ProjectHeaderFieldMetadata,
-  type ProjectRequirementSectionKind,
   type ProjectRequirementSectionMetadata,
 } from '@/config/project-form-metadata'
 import type {
-  ChangeRequestRequirement,
-  NewTenantRequirement,
   Opportunity,
   ProductionSystemInventoryItem,
   Project,
   ProjectSystemLink,
   ReusedInternalSystem,
-  StandardRenewalRequirement,
   System,
   Tenant,
 } from '@/data/seed.types'
-import {
-  requirementAColumns,
-  requirementBColumns,
-  requirementCColumns,
-  type RequirementColumnMetadata,
-} from '@/config/opportunity-metadata'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -44,11 +34,14 @@ import {
 import { systemSourceLabel } from '@/domain/system-inventory'
 import {
   linkedOpportunityForProject,
-  opportunityRowsForRequirementSection,
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
 import {
+  completeProjectRequirementSections,
   isProjectHeaderFieldChanged,
+  projectRequirementReadonlyCellValue,
+  projectRequirementRows,
+  projectRequirementTitle,
   projectHeaderFieldValue,
   projectPatchFromOpportunitySelection,
 } from '@/domain/project-lifecycle'
@@ -64,7 +57,6 @@ import {
   updateTaskInPlan,
 } from '@/domain/milestone-plan'
 
-type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 
@@ -86,11 +78,6 @@ function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
-function textValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  return value == null ? '' : String(value)
-}
-
 function inputClassName(isChanged: boolean, extra = ''): string {
   return [
     'rounded border border-sf-border px-2 py-1 leading-tight',
@@ -104,57 +91,6 @@ function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): str
     inputClassName(isChanged, extra),
     isMissing ? 'border-red-500 ring-1 ring-red-500' : '',
   ].join(' ')
-}
-
-function rowValue(row: RequirementRow, key: string): unknown {
-  return (row as unknown as Record<string, unknown>)[key]
-}
-
-function projectRequirementTitle(section: ProjectRequirementSectionMetadata): string {
-  if (section.kind === 'A') return 'Grid A: New Tenant Requirements'
-  if (section.kind === 'B') return 'Grid B: Change Request Requirements'
-  return 'Tenants to Renew'
-}
-
-function completeRequirementSections(
-  sections: ProjectRequirementSectionMetadata[],
-  opportunity: Opportunity | undefined,
-): ProjectRequirementSectionMetadata[] {
-  const sectionsByKind = new Map(sections.map((section) => [section.kind, section]))
-  const fallbackSections: ProjectRequirementSectionMetadata[] = [
-    {
-      kind: 'A',
-      title: 'New Tenant Requirements',
-      description: 'Live-linked from the Opportunity new tenant requirements.',
-      columns: requirementAColumns,
-    },
-    {
-      kind: 'B',
-      title: 'Change Request on Existing Tenant - Final Configuration',
-      description: 'Live-linked from the Opportunity selected tenant change requirements.',
-      columns: requirementBColumns,
-    },
-    {
-      kind: 'C',
-      title: 'Standard Renewal',
-      description: 'Live-linked from the Opportunity tenants to renew.',
-      columns: requirementCColumns,
-    },
-  ]
-
-  fallbackSections.forEach((section) => {
-    if (!sectionsByKind.has(section.kind) && opportunityRowsForRequirementSection(opportunity, section.kind).length > 0) {
-      sectionsByKind.set(section.kind, section)
-    }
-  })
-
-  return fallbackSections
-    .map((section) => sectionsByKind.get(section.kind))
-    .filter((section): section is ProjectRequirementSectionMetadata => Boolean(section))
-}
-
-function tenantDisplayName(tenant: Tenant): string {
-  return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
 }
 
 function candidatePrimaryId(candidate: AllocationCandidate): string {
@@ -197,15 +133,6 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
   )
 }
 
-function resolveSystemSid(systemId: string | null | undefined, systems: System[]): string {
-  if (!systemId) return ''
-  return systems.find((system) => system.id === systemId)?.sid ?? ''
-}
-
-function resolveTenant(tenantId: string, tenants: Tenant[]): Tenant | undefined {
-  return tenants.find((tenant) => tenant.id === tenantId)
-}
-
 function CollapsibleSection({
   title,
   subtitle,
@@ -237,42 +164,6 @@ function CollapsibleSection({
   )
 }
 
-function readonlyCellValue(
-  row: RequirementRow,
-  column: RequirementColumnMetadata,
-  kind: ProjectRequirementSectionKind,
-  tenants: Tenant[],
-  systems: System[],
-): string {
-  if (column.key === 'existingSystemId' && kind === 'A') {
-    const requirement = row as NewTenantRequirement
-    if (requirement.deployTarget !== 'EXISTING_SID') return 'New System'
-    return resolveSystemSid(requirement.existingSystemId, systems)
-  }
-
-  if ((kind === 'B' || kind === 'C') && column.key === 'tenantId') {
-    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return tenant ? tenantDisplayName(tenant) : ''
-  }
-
-  if ((kind === 'B' || kind === 'C') && column.key === 'tenantName') {
-    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return tenant?.tenantName ?? ''
-  }
-
-  if ((kind === 'B' || kind === 'C') && column.key === 'systemId') {
-    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return resolveSystemSid(tenant?.systemId ?? rowValue(row, column.key) as string, systems)
-  }
-
-  if ((kind === 'B' || kind === 'C') && column.key === 'deliveryPid') {
-    const tenant = resolveTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return tenant?.deliveryPid ?? ''
-  }
-
-  return textValue(rowValue(row, column.key))
-}
-
 function RequirementSection({
   section,
   opportunity,
@@ -284,7 +175,7 @@ function RequirementSection({
   tenants: Tenant[]
   systems: System[]
 }) {
-  const rows = opportunityRowsForRequirementSection(opportunity, section.kind)
+  const rows = projectRequirementRows(opportunity, section.kind)
 
   return (
     <div className="space-y-2">
@@ -319,7 +210,7 @@ function RequirementSection({
                 <tr key={row.id} className="hover:bg-sf-surface-alt">
                   {section.columns.map((column) => (
                     <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
-                      {readonlyCellValue(row, column, section.kind, tenants, systems)}
+                      {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
                     </td>
                   ))}
                 </tr>
@@ -692,7 +583,7 @@ export function ProjectFormPage() {
   }
 
   function renderTenantRequirementsTab() {
-    const requirementSections = completeRequirementSections(formMetadata.requirementSections, linkedOpportunity)
+    const requirementSections = completeProjectRequirementSections(formMetadata.requirementSections, linkedOpportunity)
     return (
       <CollapsibleSection
         title="Tenant Requirements"
