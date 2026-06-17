@@ -54,7 +54,11 @@ import {
 import {
   activePocProjectForOpportunity,
   createdProjectsForOpportunity,
+  isSameOpportunityTypeChange,
   opportunitySubTypeOptions,
+  opportunitySubTypeForTypeChange,
+  opportunityTypeChangePatch,
+  shouldConfirmOpportunityTypeChange,
 } from '@/domain/opportunity-lifecycle'
 import {
   warrantyRecordById,
@@ -972,32 +976,14 @@ export function OpportunityFormPage() {
     })
   }
 
-  function hasRequirementRows(): boolean {
-    return (
-      currentDraft.newTenantRequirements.length > 0 ||
-      currentDraft.changeRequestRequirements.length > 0 ||
-      currentDraft.standardRenewalRequirements.length > 0
-    )
-  }
-
   function applyOpportunityTypeChange(nextChange: PendingOpportunityTypeChange, deleteIrrelevantRequirements: boolean) {
-    patchDraft({
-      type: nextChange.type,
-      subType: nextChange.subType,
-      ...(deleteIrrelevantRequirements
-        ? {
-            newTenantRequirements: [],
-            changeRequestRequirements: [],
-            standardRenewalRequirements: [],
-          }
-        : {}),
-    })
+    patchDraft(opportunityTypeChangePatch(nextChange, deleteIrrelevantRequirements))
     setPendingOpportunityTypeChange(null)
   }
 
   function requestOpportunityTypeChange(nextChange: PendingOpportunityTypeChange) {
-    if (nextChange.type === currentDraft.type && nextChange.subType === currentDraft.subType) return
-    if (!hasRequirementRows()) {
+    if (isSameOpportunityTypeChange(currentDraft, nextChange)) return
+    if (!shouldConfirmOpportunityTypeChange(currentDraft, nextChange)) {
       applyOpportunityTypeChange(nextChange, false)
       return
     }
@@ -1005,8 +991,7 @@ export function OpportunityFormPage() {
   }
 
   function updateType(type: OpportunityType) {
-    const nextSubTypes = opportunitySubTypeOptions(type)
-    const nextSubType = nextSubTypes.includes(currentDraft.subType) ? currentDraft.subType : nextSubTypes[0]
+    const nextSubType = opportunitySubTypeForTypeChange(currentDraft.subType, type)
     requestOpportunityTypeChange({ type, subType: nextSubType })
   }
 

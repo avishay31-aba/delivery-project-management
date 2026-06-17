@@ -20,6 +20,50 @@ export function opportunitySubTypeOptions(type: OpportunityType): OpportunitySub
   return OPPORTUNITY_SUB_TYPE_OPTIONS[type]
 }
 
+export function hasOpportunityRequirementRows(opportunity: Opportunity): boolean {
+  return (
+    opportunity.newTenantRequirements.length > 0 ||
+    opportunity.changeRequestRequirements.length > 0 ||
+    opportunity.standardRenewalRequirements.length > 0
+  )
+}
+
+export function opportunitySubTypeForTypeChange(
+  currentSubType: OpportunitySubType,
+  type: OpportunityType,
+): OpportunitySubType {
+  const nextSubTypes = opportunitySubTypeOptions(type)
+  return nextSubTypes.includes(currentSubType) ? currentSubType : nextSubTypes[0]
+}
+
+export function isSameOpportunityTypeChange(
+  opportunity: Opportunity,
+  nextChange: Pick<Opportunity, 'type' | 'subType'>,
+): boolean {
+  return nextChange.type === opportunity.type && nextChange.subType === opportunity.subType
+}
+
+export function shouldConfirmOpportunityTypeChange(opportunity: Opportunity, nextChange: Pick<Opportunity, 'type' | 'subType'>): boolean {
+  return !isSameOpportunityTypeChange(opportunity, nextChange) && hasOpportunityRequirementRows(opportunity)
+}
+
+export function opportunityTypeChangePatch(
+  nextChange: Pick<Opportunity, 'type' | 'subType'>,
+  deleteIrrelevantRequirements: boolean,
+): Partial<Opportunity> {
+  return {
+    type: nextChange.type,
+    subType: nextChange.subType,
+    ...(deleteIrrelevantRequirements
+      ? {
+          newTenantRequirements: [],
+          changeRequestRequirements: [],
+          standardRenewalRequirements: [],
+        }
+      : {}),
+  }
+}
+
 export function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType {
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
 }
