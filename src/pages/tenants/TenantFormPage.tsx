@@ -19,7 +19,6 @@ import {
 } from '@/config/application-configuration-fields'
 import { HOSTING_OPTIONS, cloudPlatformOptionsForHosting } from '@/config/cloud-platform-metadata'
 import type {
-  EngagementCircleContact,
   NewTenantRequirement,
   Opportunity,
   Project,
@@ -40,6 +39,7 @@ import {
   applicationConfigurationFromTenant,
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
+import { inheritedEngagementCircleForTenant } from '@/domain/engagement-circle'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
 import {
   canManageWarrantyCollection,
@@ -406,9 +406,7 @@ export function TenantFormPage() {
   const opportunity = resolveOpportunity(project, opportunities)
   const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
   const canManageWarranties = canManageWarrantyCollection(project, linkedOpportunityId)
-  const inheritedEngagementCircle = tenantDraft.engagementCircle?.length
-    ? tenantDraft.engagementCircle
-    : opportunity?.engagementCircles ?? []
+  const inheritedEngagementCircle = inheritedEngagementCircleForTenant(tenantDraft, opportunity)
   const formType = tenantFormType(tenantDraft)
   const configuration = configurationFromTenant(tenantDraft, activeSystem)
   const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
@@ -1011,7 +1009,7 @@ export function TenantFormPage() {
     return (
       <ReadonlyTable
         headers={['Circle subject / purpose', 'Role', 'User name', 'Email', 'Phone']}
-        rows={inheritedEngagementCircle.map((circle: EngagementCircleContact) => [
+        rows={inheritedEngagementCircle.map((circle) => [
           circle.subject,
           circle.role,
           circle.userName,
