@@ -60,6 +60,7 @@ import {
   hostedTenantsForSystem,
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
+  SYSTEM_SOURCE_REUSED_INTERNAL,
   systemDisplayName as systemDisplayNameForRecord,
   systemIdentity,
   systemTimeGroup,
@@ -453,7 +454,7 @@ function InventoryForm<T extends InventoryRecord>({
   function validate(): string[] {
     const nextMessages: string[] = []
 
-    if (metadata.source === 'Reused Internal Systems') {
+    if (metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
       validateReusedInternalMachineId(activeDraft, records).forEach((message) => {
         if (message.field) invalidFields.add(message.field)
         nextMessages.push(message.message)
@@ -1247,7 +1248,7 @@ export function ProductionSystemInventoryFormPage() {
   const systems = useAppStore((state) => state.systems)
   const updateInventoryRecord = useAppStore((state) => state.updateProductionSystemInventoryItem)
   const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
-  const allocatedRecords = useMemo(() => systems.filter((system) => system.source !== 'Reused Internal Systems'), [systems])
+  const allocatedRecords = useMemo(() => systems.filter((system) => system.source !== SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
   const record = useMemo(() => records.find((system) => system.sid === sid), [records, sid])
 
@@ -1275,7 +1276,7 @@ export function ReusedInternalSystemFormPage() {
   const systems = useAppStore((state) => state.systems)
   const updateInventoryRecord = useAppStore((state) => state.updateReusedInternalSystem)
   const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
-  const allocatedRecords = useMemo(() => systems.filter((system) => system.source === 'Reused Internal Systems'), [systems])
+  const allocatedRecords = useMemo(() => systems.filter((system) => system.source === SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
   const record = useMemo(() => records.find((system) => system.machineId === mid), [records, mid])
 

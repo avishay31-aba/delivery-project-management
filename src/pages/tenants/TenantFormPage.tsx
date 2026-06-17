@@ -47,6 +47,7 @@ import {
   normalizeEngagementCircleSnapshot,
 } from '@/domain/engagement-circle'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
+import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 import {
   canManageWarrantyCollection,
   computeTenantWarranties,
@@ -154,7 +155,7 @@ function tenantFormType(tenant: Tenant): TenantFormType {
 }
 
 function tenantFormTypeForSystem(system: System): TenantFormType {
-  if (system.systemClass === 'POC_DEMO_TRAINING' || system.source === 'Reused Internal Systems') return 'POC'
+  if (system.systemClass === SYSTEM_CLASS_POC_DEMO_TRAINING || isReusedInternalSystem(system)) return 'POC'
   return 'CUSTOMER'
 }
 

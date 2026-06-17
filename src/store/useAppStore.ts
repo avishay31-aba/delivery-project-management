@@ -20,9 +20,6 @@ import {
   createProjectSystemLink,
   deallocateProjectSystemLink,
   deallocateProjectTenantLink,
-  releaseReusedInternalSystem,
-  systemFromProductionInventoryAllocation,
-  systemFromReusedInternalAllocation,
   unlinkProjectFromSystem,
   validateExistingSystemLink,
   validateProductionAllocation,
@@ -38,6 +35,11 @@ import {
   createReusedInternalInventorySystem,
   createStandaloneSystem,
   occupyReusedInternalSystem,
+  releaseReusedInternalSystem,
+  SYSTEM_SOURCE_REUSED_INTERNAL,
+  systemFromProductionInventoryAllocation,
+  systemFromReusedInternalAllocation,
+  systemSource,
 } from '@/domain/system-inventory'
 
 interface AppStore extends AppDataState {
@@ -339,7 +341,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenantId: tenant.id,
       systemId,
       allocationStatus: 'ALLOCATED' as const,
-      allocationType: projectSystemLink?.allocationType ?? (system.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' as const : 'EXISTING_SYSTEM' as const),
+      allocationType: projectSystemLink?.allocationType ?? (systemSource(system) === SYSTEM_SOURCE_REUSED_INTERNAL ? 'REUSED_INTERNAL' as const : 'EXISTING_SYSTEM' as const),
       allocatedAt: now,
       deallocatedAt: null,
     }

@@ -43,6 +43,7 @@ import {
   type AllocationActionResult,
   type AllocationMode,
 } from '@/domain/allocation-context'
+import { systemSourceLabel } from '@/domain/system-inventory'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -1169,7 +1170,7 @@ export function ProjectFormPage() {
                       <tr key={system.id} className="hover:bg-sf-surface-alt">
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.sid ?? ''}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.machineId ?? ''}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.source ?? (system.machineId ? 'Reused Internal Systems' : 'Production')}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
