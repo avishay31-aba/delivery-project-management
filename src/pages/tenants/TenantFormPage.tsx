@@ -27,7 +27,6 @@ import type {
   TenantConfiguration,
   TenantConfigurationHistoryRecord,
   TenantFormType,
-  TenantHostingSnapshot,
   TenantRemark,
   TenantWarranty,
   YesNo,
@@ -59,6 +58,7 @@ import {
   splitWarrantyPredecessors,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
+import { TENANT_HOSTING_FIELDS, TENANT_REMARK_TYPES } from '@/domain/tenant-operations'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -84,27 +84,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'documents', label: 'Documents' },
 ]
 
-const REMARK_TYPES = ['Note', 'Warranty', 'Temporary change', 'Permanent change', 'Task']
-
 const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
-
-const HOSTING_FIELDS: Array<{ key: keyof TenantHostingSnapshot; label: string }> = [
-  { key: 'currentSystem', label: 'Current system' },
-  { key: 'sid', label: 'SID' },
-  { key: 'operationalStatus', label: 'Operational Status' },
-  { key: 'machineNumber', label: 'Machine Number' },
-  { key: 'versionNumber', label: 'Version Number' },
-  { key: 'hostingType', label: 'Hosting type' },
-  { key: 'url', label: 'URL' },
-  { key: 'performanceTier', label: 'Performance tier' },
-  { key: 'vpnEnabled', label: 'VPN' },
-  { key: 'vpnType', label: 'VPN type' },
-  { key: 'ipRestrictionEnabled', label: 'IP restriction' },
-  { key: 'platform', label: 'Platform' },
-  { key: 'csp', label: 'CSP' },
-  { key: 'awsRegion', label: 'AWS Region' },
-  { key: 'azureRegion', label: 'Azure Region' },
-]
 
 function cloneTenant(tenant: Tenant): Tenant {
   return JSON.parse(JSON.stringify(tenant)) as Tenant
@@ -1005,8 +985,8 @@ export function TenantFormPage() {
   function renderHostingTab() {
     return (
       <ReadonlyTable
-        headers={HOSTING_FIELDS.map((field) => field.label)}
-        rows={[HOSTING_FIELDS.map((field) => textValue(hosting[field.key]))]}
+        headers={TENANT_HOSTING_FIELDS.map((field) => field.label)}
+        rows={[TENANT_HOSTING_FIELDS.map((field) => textValue(hosting[field.key]))]}
         emptyText="No hosting system is linked to this tenant."
       />
     )
@@ -1083,7 +1063,7 @@ export function TenantFormPage() {
                       <td className="border border-sf-border px-1.5 py-1">
                         {isEditing ? (
                           <select className="h-8 rounded border border-sf-border px-2 py-1" value={remark.type} onChange={(event) => updateRemark(remark.id, 'type', event.target.value)}>
-                            {REMARK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                            {TENANT_REMARK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
                           </select>
                         ) : remark.type}
                       </td>
