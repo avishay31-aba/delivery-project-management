@@ -42,6 +42,7 @@ import {
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
+  ENGAGEMENT_CIRCLE_TAB_LABEL,
   inheritedEngagementCircleForTenant,
   normalizeEngagementCircleSnapshot,
 } from '@/domain/engagement-circle'
@@ -77,7 +78,7 @@ type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left:
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'hosting', label: 'Hosting' },
-  { id: 'engagement', label: 'Engagement circles' },
+  { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
 ]
