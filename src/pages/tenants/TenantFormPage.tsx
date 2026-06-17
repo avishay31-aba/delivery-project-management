@@ -31,7 +31,6 @@ import type {
   TenantHostingSnapshot,
   TenantRemark,
   TenantWarranty,
-  WarrantyStatus,
   YesNo,
 } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
@@ -42,6 +41,13 @@ import {
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
+import {
+  calculateWarrantyStatus,
+  daysBeforeExpiration,
+  daysBetween,
+  displayWarrantyStatus,
+  warrantyTypeForProject,
+} from '@/domain/warranty-collection'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -146,69 +152,10 @@ function configurationFromTenant(tenant: Tenant, system?: System): TenantConfigu
   return applicationConfigurationFromTenant(tenant, system?.productType)
 }
 
-function daysBetween(startDate: string | null, endDate: string | null): number | null {
-  if (!startDate || !endDate) return null
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) return null
-  return Math.ceil((end.valueOf() - start.valueOf()) / 86_400_000)
-}
-
-function daysBeforeExpiration(endDate: string | null): number | null {
-  if (!endDate) return null
-  const end = new Date(endDate)
-  if (Number.isNaN(end.valueOf())) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return Math.ceil((end.valueOf() - today.valueOf()) / 86_400_000)
-}
-
-function warrantyTypeForProject(project?: Project): string {
-  if (!project) return ''
-  if (project.mainType === 'DELIVERY' && project.subType === 'UPSELL') return 'Upsell'
-  if (project.mainType === 'RENEWAL') return project.subType === 'UPSELL' ? 'Upsell' : 'Renewal'
-  return 'Delivery'
-}
-
-function displayWarrantyStatus(status: WarrantyStatus): string {
-  const labels: Record<WarrantyStatus, string> = {
-    NOT_SET: 'Not set yet',
-    PLANNED: 'Planned',
-    VALID: 'Valid',
-    PENDING: 'Pending',
-    RENEWED: 'Renewed',
-    EXPIRED: 'Expired',
-    NO_WARRANTY: 'No warranty',
-    OUT_OF_CONTRACT: 'Out of contract',
-    OBSOLETE: 'Obsolete',
-  }
-  return labels[status]
-}
-
 function licenseNumber(sid: string, pid: string): string {
   if (sid && pid) return `${pid}${sid}`
   if (sid) return sid
   return ''
-}
-
-function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
-  if (warranty.noWarranty === 'YES') return 'NO_WARRANTY'
-  if (warranty.outOfContract === 'YES') return 'OUT_OF_CONTRACT'
-  if (hasSuccessor) return 'RENEWED'
-  if (!warranty.startDate && !warranty.endDate) return 'NOT_SET'
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const start = warranty.startDate ? new Date(warranty.startDate) : null
-  const end = warranty.endDate ? new Date(warranty.endDate) : null
-  if (start && today < start) return 'PLANNED'
-  if (end) {
-    const daysLeft = daysBeforeExpiration(warranty.endDate)
-    if (daysLeft != null && daysLeft < 0) return 'EXPIRED'
-    if (daysLeft != null && daysLeft < 90) return 'PENDING'
-    if (!start || today >= start) return 'VALID'
-  }
-  return 'NOT_SET'
 }
 
 function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
