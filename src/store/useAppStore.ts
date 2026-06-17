@@ -45,6 +45,7 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
+import { createStandaloneProject } from '@/domain/project-lifecycle'
 
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
@@ -411,24 +412,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const { counters: idCounters, id: nextPid } = incrementCounter(state.idCounters, 'pid')
     const now = new Date().toISOString()
-
-    const project: AppDataState['projects'][number] = {
-      id: `proj-${crypto.randomUUID()}`,
-      pid: nextPid,
-      opportunityId: undefined,
-      projectSource: 'FINAL',
-      accountName: '',
-      mainType: 'DELIVERY',
-      subType: 'NONE',
-      deliveryDate: null,
-      progressStatus: 'OPEN',
-      dealOwner: '',
-      opportunityName: '',
-      canceledAt: null,
-      documents: [],
-      createdAt: now,
-      updatedAt: now,
-    }
+    const project = createStandaloneProject(nextPid, now)
 
     set((s) => ({ idCounters, projects: [project, ...s.projects] }))
     get().saveToStorage()

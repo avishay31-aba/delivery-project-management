@@ -17,3 +17,34 @@ export function projectSavePatch(project: Project): Partial<Project> {
     documents: project.documents ?? [],
   }
 }
+
+export function projectSourceFor(project: Project): Project['projectSource'] {
+  return project.projectSource ?? (project.mainType === 'POC' ? 'POC' : 'FINAL')
+}
+
+export function normalizeProjectLifecycleProject(project: Project): Project {
+  return {
+    ...project,
+    projectSource: projectSourceFor(project),
+  }
+}
+
+export function createStandaloneProject(nextPid: string, now: string): Project {
+  return {
+    id: `proj-${crypto.randomUUID()}`,
+    pid: nextPid,
+    opportunityId: undefined,
+    projectSource: 'FINAL',
+    accountName: '',
+    mainType: 'DELIVERY',
+    subType: 'NONE',
+    deliveryDate: null,
+    progressStatus: 'OPEN',
+    dealOwner: '',
+    opportunityName: '',
+    canceledAt: null,
+    documents: [],
+    createdAt: now,
+    updatedAt: now,
+  }
+}

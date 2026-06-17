@@ -16,20 +16,10 @@ import {
   normalizeTenantEngagementCircle,
 } from '@/domain/engagement-circle'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
+import { normalizeProjectLifecycleProject, projectSourceFor } from '@/domain/project-lifecycle'
 import { normalizeTenantWarranties } from '@/domain/warranty-collection'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
-
-function projectSourceFor(project: Project): Project['projectSource'] {
-  return project.projectSource ?? (project.mainType === 'POC' ? 'POC' : 'FINAL')
-}
-
-function normalizeProject(project: Project): Project {
-  return {
-    ...project,
-    projectSource: projectSourceFor(project),
-  }
-}
 
 function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
   const linkedProjects = projects.filter((project) => project.opportunityId === opportunity.opportunityId)
@@ -83,7 +73,7 @@ function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tena
 
 function normalizeState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
-  const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProject) : seedState.projects.map(normalizeProject)
+  const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProjectLifecycleProject) : seedState.projects.map(normalizeProjectLifecycleProject)
   const opportunities = Array.isArray(state.opportunities)
     ? state.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
     : seedState.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
