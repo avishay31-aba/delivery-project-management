@@ -59,6 +59,9 @@ import {
   opportunitySubTypeForTypeChange,
   opportunityTypeChangePatch,
   shouldConfirmOpportunityTypeChange,
+  shouldConfirmPocProjectSync,
+  shouldConfirmWonTransition,
+  validateOpportunityTransition,
 } from '@/domain/opportunity-lifecycle'
 import {
   warrantyRecordById,
@@ -1184,25 +1187,19 @@ export function OpportunityFormPage() {
       .filter((message) => message.level === 'error')
       .map((message) => message.message)
 
-    if (currentSavedOpportunity.stage === 'WON' && currentDraft.stage !== 'WON') {
-      messages.push('WON is irreversible. A WON Opportunity cannot be changed back to Open.')
-    }
-
-    if (currentDraft.stage === 'WON' && currentDraft.type === 'POC') {
-      messages.push('WON Opportunities must be Delivery or Renewal to create a final Project.')
-    }
+    validateOpportunityTransition(currentDraft, currentSavedOpportunity).forEach((message) => messages.push(message))
 
     if (messages.length > 0) {
       setSaveMessages(messages)
       return
     }
 
-    if (currentSavedOpportunity.stage !== 'WON' && currentDraft.stage === 'WON') {
+    if (shouldConfirmWonTransition(currentDraft, currentSavedOpportunity)) {
       setPendingWonSave(options)
       return
     }
 
-    if (currentDraft.stage !== 'WON' && currentDraft.type === 'POC' && activePocProject(currentDraft, currentSavedOpportunity)) {
+    if (shouldConfirmPocProjectSync(currentDraft, currentSavedOpportunity, projects)) {
       setPendingPocSave(options)
       return
     }
