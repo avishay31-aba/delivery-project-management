@@ -52,6 +52,11 @@ import {
   createStandardRenewalRequirement,
 } from '@/domain/tenant-requirement'
 import {
+  activePocProjectForOpportunity,
+  createdProjectsForOpportunity,
+  opportunitySubTypeOptions,
+} from '@/domain/opportunity-lifecycle'
+import {
   warrantyRecordById,
   warrantyRecordForTenant,
   warrantyRecordPatch,
@@ -73,12 +78,6 @@ type ExistingActionValue =
   | 'Standard renewal'
   | 'Renewal + upsell'
   | 'Renewal + downsell'
-
-const SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
-  POC: ['FREE', 'PAID'],
-  DELIVERY: ['NEW', 'UPSELL'],
-  RENEWAL: ['STANDARD', 'UPSELL', 'DOWN_SELL'],
-}
 
 const EMPTY_PROJECT_CHANGES: ProjectLifecycleChange[] = []
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -838,14 +837,7 @@ export function OpportunityFormPage() {
   const createdProjects = useMemo(
     () =>
       draft
-        ? projects.filter((project) => {
-        const linkedIds = new Set([...(draft.pocProjectIds ?? []), draft.finalProjectId].filter(Boolean))
-        const isExplicitlyLinked = linkedIds.has(project.id)
-        const isLegacyLinked =
-          project.opportunityId === draft.opportunityId ||
-          Boolean(savedOpportunity?.opportunityId && project.opportunityId === savedOpportunity.opportunityId)
-        return isExplicitlyLinked || isLegacyLinked
-      })
+        ? createdProjectsForOpportunity(draft, savedOpportunity, projects)
         : [],
     [draft, projects, savedOpportunity?.opportunityId],
   )
@@ -880,19 +872,8 @@ export function OpportunityFormPage() {
     return !valuesEqual(currentDraft[field], currentSavedOpportunity[field])
   }
 
-  function linkedPocProjects(opportunity: Opportunity, saved: Opportunity): Project[] {
-    const linkedIds = new Set([...(opportunity.pocProjectIds ?? []), ...(saved.pocProjectIds ?? [])])
-    const opportunityIds = new Set([opportunity.opportunityId, saved.opportunityId])
-
-    return projects.filter(
-      (project) =>
-        linkedIds.has(project.id) ||
-        (project.projectSource === 'POC' && Boolean(project.opportunityId && opportunityIds.has(project.opportunityId))),
-    )
-  }
-
   function activePocProject(opportunity: Opportunity, saved: Opportunity): Project | undefined {
-    return linkedPocProjects(opportunity, saved).find((project) => project.progressStatus !== 'DONE')
+    return activePocProjectForOpportunity(opportunity, saved, projects)
   }
 
   function tenantAction(tenantId: string): ExistingActionValue {
@@ -1024,7 +1005,7 @@ export function OpportunityFormPage() {
   }
 
   function updateType(type: OpportunityType) {
-    const nextSubTypes = SUB_TYPE_OPTIONS[type]
+    const nextSubTypes = opportunitySubTypeOptions(type)
     const nextSubType = nextSubTypes.includes(currentDraft.subType) ? currentDraft.subType : nextSubTypes[0]
     requestOpportunityTypeChange({ type, subType: nextSubType })
   }
@@ -1274,7 +1255,7 @@ export function OpportunityFormPage() {
               })
             }
           >
-            {SUB_TYPE_OPTIONS[currentDraft.type].map((subType) => (
+            {opportunitySubTypeOptions(currentDraft.type).map((subType) => (
               <option key={subType} value={subType}>
                 {subType}
               </option>

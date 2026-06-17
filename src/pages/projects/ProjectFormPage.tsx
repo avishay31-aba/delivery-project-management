@@ -15,8 +15,6 @@ import type {
   Opportunity,
   ProductionSystemInventoryItem,
   Project,
-  ProjectMainType,
-  ProjectSubType,
   ProjectSystemLink,
   ReusedInternalSystem,
   StandardRenewalRequirement,
@@ -44,6 +42,11 @@ import {
   type AllocationMode,
 } from '@/domain/allocation-context'
 import { systemSourceLabel } from '@/domain/system-inventory'
+import {
+  linkedOpportunityForProject,
+  opportunityRowsForRequirementSection,
+  projectTypeForOpportunity,
+} from '@/domain/opportunity-lifecycle'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -102,13 +105,6 @@ function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
 
-function opportunityRowsForSection(opportunity: Opportunity | undefined, kind: ProjectRequirementSectionKind): RequirementRow[] {
-  if (!opportunity) return []
-  if (kind === 'A') return opportunity.newTenantRequirements
-  if (kind === 'B') return opportunity.changeRequestRequirements
-  return opportunity.standardRenewalRequirements
-}
-
 function projectRequirementTitle(section: ProjectRequirementSectionMetadata): string {
   if (section.kind === 'A') return 'Grid A: New Tenant Requirements'
   if (section.kind === 'B') return 'Grid B: Change Request Requirements'
@@ -142,7 +138,7 @@ function completeRequirementSections(
   ]
 
   fallbackSections.forEach((section) => {
-    if (!sectionsByKind.has(section.kind) && opportunityRowsForSection(opportunity, section.kind).length > 0) {
+    if (!sectionsByKind.has(section.kind) && opportunityRowsForRequirementSection(opportunity, section.kind).length > 0) {
       sectionsByKind.set(section.kind, section)
     }
   })
@@ -194,14 +190,6 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
-}
-
-function projectTypeForOpportunity(opportunity: Opportunity): { mainType: ProjectMainType; subType: ProjectSubType } {
-  if (opportunity.type === 'POC') return { mainType: 'POC', subType: 'NONE' }
-  if (opportunity.type === 'DELIVERY') return { mainType: 'DELIVERY', subType: opportunity.subType === 'UPSELL' ? 'UPSELL' : 'NEW' }
-  if (opportunity.subType === 'UPSELL') return { mainType: 'RENEWAL', subType: 'UPSELL' }
-  if (opportunity.subType === 'DOWN_SELL') return { mainType: 'RENEWAL', subType: 'DOWN_SELL' }
-  return { mainType: 'RENEWAL', subType: 'STANDARD' }
 }
 
 function resolveSystemSid(systemId: string | null | undefined, systems: System[]): string {
@@ -291,7 +279,7 @@ function RequirementSection({
   tenants: Tenant[]
   systems: System[]
 }) {
-  const rows = opportunityRowsForSection(opportunity, section.kind)
+  const rows = opportunityRowsForRequirementSection(opportunity, section.kind)
 
   return (
     <div className="space-y-2">
@@ -393,13 +381,7 @@ export function ProjectFormPage() {
   const metadata = currentDraft ? getProjectFormMetadata(currentDraft.mainType, currentDraft.subType) : null
   const linkedOpportunity = useMemo(() => {
     if (!currentDraft) return undefined
-    return opportunities.find(
-      (opportunity) =>
-        opportunity.opportunityId === currentDraft.opportunityId ||
-        opportunity.id === currentDraft.opportunityId ||
-        opportunity.pocProjectIds.includes(currentDraft.id) ||
-        opportunity.finalProjectId === currentDraft.id,
-    )
+    return linkedOpportunityForProject(currentDraft, opportunities)
   }, [currentDraft, opportunities])
   const account = linkedOpportunity ? accounts.find((candidate) => candidate.id === linkedOpportunity.accountId) : undefined
   const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
