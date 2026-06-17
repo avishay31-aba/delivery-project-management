@@ -1,4 +1,18 @@
-import type { Opportunity } from './types'
+import { incrementCounter } from '@/data/id-generator'
+import {
+  activePocProjectForOpportunity,
+  finalProjectForOpportunity,
+  projectSubTypeForOpportunity,
+  uniqueOpportunityValues,
+} from './service'
+import type {
+  Opportunity,
+  OpportunityProjectSyncContext,
+  OpportunityProjectSyncOptions,
+  OpportunityProjectSyncResult,
+  Project,
+  ProjectLifecycleChange,
+} from './types'
 
 export function cloneOpportunityDraft(opportunity: Opportunity): Opportunity {
   const clone = JSON.parse(JSON.stringify(opportunity)) as Opportunity
@@ -9,4 +23,94 @@ export function cloneOpportunityDraft(opportunity: Opportunity): Opportunity {
     finalProjectId: clone.finalProjectId ?? null,
     wonAt: clone.wonAt ?? null,
   }
+}
+
+export function syncOpportunityProjectsFromOpportunity(
+  opportunity: Opportunity,
+  savedOpportunity: Opportunity,
+  context: OpportunityProjectSyncContext,
+  options?: OpportunityProjectSyncOptions,
+): OpportunityProjectSyncResult & Pick<OpportunityProjectSyncContext, 'idCounters' | 'projects'> {
+  let idCounters = context.idCounters
+  let projects = context.projects
+  const projectChanges: ProjectLifecycleChange[] = []
+  const nextOpportunity: Opportunity = {
+    ...opportunity,
+    pocProjectIds: [...(opportunity.pocProjectIds ?? [])],
+    finalProjectId: opportunity.finalProjectId ?? null,
+    wonAt:
+      opportunity.stage === 'WON'
+        ? savedOpportunity.stage === 'WON'
+          ? savedOpportunity.wonAt ?? opportunity.wonAt ?? context.now
+          : context.now
+        : null,
+    updatedAt: context.now,
+  }
+
+  const buildProjectPatch = (projectSource: Project['projectSource']) => ({
+    opportunityId: nextOpportunity.opportunityId,
+    projectSource,
+    accountName: context.account?.accountName ?? '',
+    mainType: projectSource === 'POC' ? 'POC' : nextOpportunity.type,
+    subType: projectSource === 'POC' ? 'NONE' : projectSubTypeForOpportunity(nextOpportunity),
+    deliveryDate: nextOpportunity.deliveryDate,
+    dealOwner: context.salesManager?.name ?? '',
+    opportunityName: nextOpportunity.opportunityName,
+    canceledAt: null,
+    updatedAt: context.now,
+  })
+
+  const updateProjectFromOpportunity = (existingProject: Project, projectSource: Project['projectSource']): Project => {
+    const project = {
+      ...existingProject,
+      ...buildProjectPatch(projectSource),
+    }
+    projects = projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate))
+    projectChanges.push({ projectId: project.id, changeStatus: 'Updated' })
+    return project
+  }
+
+  const createProjectFromOpportunity = (projectSource: Project['projectSource']): Project => {
+    const nextProjectId = incrementCounter(idCounters, 'pid')
+    idCounters = nextProjectId.counters
+    const project: Project = {
+      id: `proj-${crypto.randomUUID()}`,
+      pid: nextProjectId.id,
+      ...buildProjectPatch(projectSource),
+      progressStatus: 'OPEN',
+      documents: [],
+      createdAt: context.now,
+      updatedAt: context.now,
+    }
+    projects = [project, ...projects]
+    projectChanges.push({ projectId: project.id, changeStatus: 'New' })
+    return project
+  }
+
+  if (nextOpportunity.stage !== 'WON' && nextOpportunity.type === 'POC') {
+    const activePocProject = activePocProjectForOpportunity(nextOpportunity, savedOpportunity, projects)
+
+    if (activePocProject && options?.pocAction === 'UPDATE_EXISTING_POC') {
+      updateProjectFromOpportunity(activePocProject, 'POC')
+    } else if (!activePocProject || options?.pocAction === 'CREATE_NEW_POC') {
+      const project = createProjectFromOpportunity('POC')
+      nextOpportunity.pocProjectIds = uniqueOpportunityValues([...nextOpportunity.pocProjectIds, project.id])
+    }
+  }
+
+  if (nextOpportunity.stage === 'WON' && nextOpportunity.type !== 'POC') {
+    const finalProject = finalProjectForOpportunity(nextOpportunity, savedOpportunity, projects)
+
+    if (!finalProject) {
+      const project = createProjectFromOpportunity('FINAL')
+      nextOpportunity.finalProjectId = project.id
+    } else {
+      nextOpportunity.finalProjectId = finalProject.id
+      if (finalProject.progressStatus !== 'DONE' || options?.allowDoneFinalUpdate) {
+        updateProjectFromOpportunity(finalProject, 'FINAL')
+      }
+    }
+  }
+
+  return { idCounters, projects, opportunity: nextOpportunity, projectChanges }
 }
