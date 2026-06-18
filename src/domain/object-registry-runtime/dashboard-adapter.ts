@@ -4,24 +4,32 @@ import { resolveObjectRegistryOptions } from './source-resolver'
 import type { RuntimeSourceResolverOptions } from './types'
 import { isRuntimeDashboardSupportedField } from './validation'
 
-export function objectFieldToRuntimeDashboardField<T extends Record<string, unknown>>(
+export interface RuntimeDashboardColumnOptions<T> extends RuntimeSourceResolverOptions {
+  editable?: boolean
+  editKey?: keyof T
+  id?: string
+  label?: string
+  options?: string[]
+}
+
+export function objectFieldToRuntimeDashboardField<T extends object>(
   field: ObjectFieldDefinition,
-  options: RuntimeSourceResolverOptions = {},
+  options: RuntimeDashboardColumnOptions<T> = {},
 ): DashboardColumn<T> | null {
   if (!isRuntimeDashboardSupportedField(field)) return null
   const optionResolution = resolveObjectRegistryOptions(field.picklistSource, options)
-  const editable = field.editable === true
+  const editable = options.editable ?? field.editable === true
   return {
-    id: field.key,
-    label: field.label,
-    getValue: (row) => runtimeDashboardValue(row[field.key]),
-    editKey: editable ? field.key as keyof T : undefined,
+    id: options.id ?? field.key,
+    label: options.label ?? field.label,
+    getValue: (row) => runtimeDashboardValue((row as Record<string, unknown>)[field.key]),
+    editKey: editable ? options.editKey ?? field.key as keyof T : undefined,
     editable,
-    options: optionResolution.resolved ? optionResolution.value : undefined,
+    options: options.options ?? (optionResolution.resolved ? optionResolution.value : undefined),
   }
 }
 
-export function objectFieldsToRuntimeDashboardColumns<T extends Record<string, unknown>>(
+export function objectFieldsToRuntimeDashboardColumns<T extends object>(
   fields: ObjectFieldDefinition[],
   options: RuntimeSourceResolverOptions = {},
 ): DashboardColumn<T>[] {

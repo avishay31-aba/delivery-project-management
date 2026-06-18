@@ -1,5 +1,7 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { System, Tenant } from '@/data/seed.types'
+import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
+import { objectFieldToRuntimeDashboardField } from '@/domain/object-registry-runtime'
 
 function sidForTenant(tenant: Tenant, systems: System[]): string {
   return systems.find((system) => system.id === tenant.systemId)?.sid ?? ''
@@ -9,16 +11,26 @@ function joinValues(values?: string[]): string {
   return values?.join(';') ?? ''
 }
 
+function tenantRuntimeColumn(
+  key: string,
+  options: { id?: string; label?: string; editable?: boolean; editKey?: keyof Tenant } = {},
+): DashboardColumn<Tenant> {
+  const field = TENANT_OBJECT_DEFINITION.fields.find((candidate) => candidate.key === key)
+  const column = field ? objectFieldToRuntimeDashboardField<Tenant>(field, options) : null
+  if (!column) throw new Error(`Tenant dashboard field is not runtime-compatible: ${key}`)
+  return column
+}
+
 export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[] {
   return [
-    { id: 'tid', label: 'TID', getValue: (row) => row.tid },
+    tenantRuntimeColumn('tid'),
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
     { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
     { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
     { id: 'sid', label: 'SID', getValue: (row) => sidForTenant(row, systems) },
     { id: 'systemId', label: 'System ID/reference', getValue: (row) => row.systemId },
     { id: 'deliveryPid', label: 'Delivery PID', getValue: (row) => row.deliveryPid ?? '' },
-    { id: 'product', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
+    tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
     { id: 'mapCenter', label: 'Map Center', getValue: (row) => row.mapCenter ?? row.country },
@@ -42,7 +54,7 @@ export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[
     { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
     { id: 'tenantStatus', label: 'Tenant Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
-    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => row.warrantyStatus, editable: true, editKey: 'warrantyStatus' },
+    tenantRuntimeColumn('warrantyStatus', { editable: true, editKey: 'warrantyStatus' }),
     { id: 'warrantyStartDate', label: 'Warranty Start Date', getValue: (row) => row.warrantyStartDate ?? '' },
     { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.warrantyEndDate ?? '', editable: true, editKey: 'warrantyEndDate' },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editable: true, editKey: 'pocStartDate' },
