@@ -1,13 +1,14 @@
 import type { AppDataState } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import {
-  localStoragePersistenceAdapter,
+  APP_STATE_STORAGE_KEY,
+  clearAppDataStateFromStorage,
+  loadAppDataStateFromStorage,
   normalizeAppDataState,
-  parseJson,
-  stringifyJson,
+  persistAppDataStateToStorage,
 } from '@/platform/persistence'
 
-export const STORAGE_KEY = 'dpm-mvp-v1'
+export const STORAGE_KEY = APP_STATE_STORAGE_KEY
 
 /** Default state loaded from seed file */
 export function createInitialState(): AppDataState {
@@ -18,28 +19,13 @@ export function createInitialState(): AppDataState {
 }
 
 export function loadPersistedState(): AppDataState | null {
-  try {
-    const raw = localStoragePersistenceAdapter.getItem(STORAGE_KEY)
-    if (!raw) return null
-
-    const parsed = parseJson(raw) as AppDataState
-    if (typeof parsed.version !== 'number' || !Array.isArray(parsed.projects)) {
-      return null
-    }
-    return normalizeAppDataState(parsed)
-  } catch {
-    return null
-  }
+  return loadAppDataStateFromStorage()
 }
 
 export function persistState(state: AppDataState): void {
-  const payload: AppDataState = normalizeAppDataState({
-    ...state,
-    lastPersistedAt: new Date().toISOString(),
-  })
-  localStoragePersistenceAdapter.setItem(STORAGE_KEY, stringifyJson(payload))
+  persistAppDataStateToStorage(state)
 }
 
 export function clearPersistedState(): void {
-  localStoragePersistenceAdapter.removeItem(STORAGE_KEY)
+  clearAppDataStateFromStorage()
 }

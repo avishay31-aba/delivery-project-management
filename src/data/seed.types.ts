@@ -583,7 +583,7 @@ export interface ProjectTenantLink {
   deallocatedAt?: string | null
 }
 
-/** Root shape persisted to localStorage */
+/** Root shape persisted by the application storage adapter */
 export interface AppDataState {
   version: number
   salesManagers: SalesManager[]
