@@ -4,5 +4,6 @@
  */
 
 export { projectsApi } from '@/api/projects'
+export { opportunitiesApi } from '@/api/opportunities'
 export { systemsApi } from '@/api/systems'
 export { tenantsApi } from '@/api/tenants'

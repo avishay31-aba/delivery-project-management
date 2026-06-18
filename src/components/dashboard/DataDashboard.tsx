@@ -47,6 +47,7 @@ export interface DashboardColumn<T> {
   filterable?: boolean
   groupable?: boolean
   editable?: boolean
+  replaceable?: boolean
   options?: string[]
 }
 
@@ -61,6 +62,7 @@ interface DataDashboardProps<T extends { id: string }> {
   onEdit?: (row: T, columnId: string, value: string) => void
   getRowClassName?: (row: T) => string
   toolbar?: ReactNode
+  enableInlineEditing?: boolean
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -440,6 +442,11 @@ function HeaderMenu<T extends { id: string }>({
   const hiddenColumnCount = hiddenColumns.length
   const [showRestoreColumns, setShowRestoreColumns] = useState(false)
   const [selectedColumnIds, setSelectedColumnIds] = useState<string[]>([])
+  const selectedFilterValues = Array.isArray(column.getFilterValue())
+    ? (column.getFilterValue() as string[])
+    : column.getFilterValue()
+      ? [String(column.getFilterValue())]
+      : []
 
   const updateMenuPosition = useCallback(() => {
     const triggerElement = menuButtonRef.current
@@ -537,6 +544,21 @@ function HeaderMenu<T extends { id: string }>({
     onClose()
   }
 
+  function toggleFilterValue(value: string) {
+    const nextValues = selectedFilterValues.includes(value)
+      ? selectedFilterValues.filter((selectedValue) => selectedValue !== value)
+      : [...selectedFilterValues, value]
+    column.setFilterValue(nextValues.length > 0 ? nextValues : undefined)
+  }
+
+  function selectAllFilterValues() {
+    column.setFilterValue(filterOptions.length > 0 ? filterOptions : undefined)
+  }
+
+  function clearFilterValues() {
+    column.setFilterValue(undefined)
+  }
+
   return (
     <div ref={menuWrapperRef} className="relative inline-block" onClick={(event) => event.stopPropagation()}>
       <button
@@ -557,19 +579,48 @@ function HeaderMenu<T extends { id: string }>({
         >
           <label className="block space-y-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
             <span>Filter</span>
-            <select
-              className="w-full rounded border border-sf-border px-2 py-1 text-sm font-normal normal-case text-sf-text"
-              disabled={!column.getCanFilter()}
-              value={(column.getFilterValue() as string) ?? ''}
-              onChange={(event) => column.setFilterValue(event.target.value || undefined)}
-            >
-              <option value="">All</option>
-              {filterOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            <div className="rounded border border-sf-border bg-white p-2 text-sm font-normal normal-case text-sf-text">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-sf-text-muted">
+                  {selectedFilterValues.length > 0 ? `${selectedFilterValues.length} selected` : 'All values'}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="rounded border border-sf-border px-1.5 py-0.5 text-xs hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+                    disabled={!column.getCanFilter() || filterOptions.length === 0}
+                    onClick={selectAllFilterValues}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-sf-border px-1.5 py-0.5 text-xs hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+                    disabled={!column.getCanFilter() || selectedFilterValues.length === 0}
+                    onClick={clearFilterValues}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+                {filterOptions.length > 0 ? (
+                  filterOptions.map((option) => (
+                    <label key={option} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-sf-surface-alt">
+                      <input
+                        type="checkbox"
+                        disabled={!column.getCanFilter()}
+                        checked={selectedFilterValues.includes(option)}
+                        onChange={() => toggleFilterValue(option)}
+                      />
+                      <span className="truncate" title={option}>{option}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="px-1.5 py-1 text-xs text-sf-text-muted">No filter values</p>
+                )}
+              </div>
+            </div>
           </label>
 
           <div className="space-y-1 border-t border-sf-border pt-2">
@@ -678,6 +729,7 @@ export function DataDashboard<T extends { id: string }>({
   onEdit,
   getRowClassName,
   toolbar,
+  enableInlineEditing = true,
 }: DataDashboardProps<T>) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
@@ -696,6 +748,10 @@ export function DataDashboard<T extends { id: string }>({
   const [pendingViewId, setPendingViewId] = useState<string | null>(null)
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
   const [saveSuccessContinuation, setSaveSuccessContinuation] = useState<(() => void) | null>(null)
+  const [replaceColumnId, setReplaceColumnId] = useState(columns.find((column) => column.editable)?.id ?? columns[0]?.id ?? '')
+  const [replaceFindValue, setReplaceFindValue] = useState('')
+  const [replaceValue, setReplaceValue] = useState('')
+  const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
@@ -721,12 +777,16 @@ export function DataDashboard<T extends { id: string }>({
         enableColumnFilter: column.filterable !== false,
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true
-          return String(row.getValue(columnId) ?? '') === String(filterValue)
+          const rowValue = String(row.getValue(columnId) ?? '')
+          if (Array.isArray(filterValue)) {
+            return filterValue.length === 0 || filterValue.map(String).includes(rowValue)
+          }
+          return rowValue === String(filterValue)
         },
         cell: ({ row }) => {
           const raw = String(column.getValue(row.original) ?? '')
 
-          if (column.editable && onEdit) {
+          if (enableInlineEditing && column.editable && onEdit) {
             if (column.options?.length) {
               return (
                 <select
@@ -757,7 +817,7 @@ export function DataDashboard<T extends { id: string }>({
           return (column.render?.(row.original) ?? raw) || '—'
         },
       })),
-    [columns, onEdit],
+    [columns, enableInlineEditing, onEdit],
   )
 
   const table = useReactTable({
@@ -793,6 +853,14 @@ export function DataDashboard<T extends { id: string }>({
   const isSelectedViewModified = selectedDashboardView
     ? !areDashboardViewStatesEqual(currentDashboardViewState, selectedDashboardView.state, sourceColumnIds)
     : false
+  const replaceColumns = useMemo(
+    () => columns.filter((column) => (column.replaceable ?? Boolean(column.editKey)) && onEdit),
+    [columns, onEdit],
+  )
+  const replaceColumn = replaceColumns.find((column) => column.id === replaceColumnId) ?? replaceColumns[0]
+  const replaceMatchCount = replaceColumn
+    ? rows.filter((row) => String(replaceColumn.getValue(row) ?? '') === replaceFindValue).length
+    : 0
 
   const applyDashboardView = useCallback(
     (view: RuntimeDashboardView) => {
@@ -1117,15 +1185,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   String(column.columnDef.header),
 )
 
-function clearAllColumnFilters() {
-  setColumnFilters([])
-}
-
-function clearGlobalSearch() {
-  setGlobalFilter('')
-}
-
-function clearAllFiltersAndSearch() {
+  function clearAllFiltersAndSearch() {
   setColumnFilters([])
   setGlobalFilter('')
 }
@@ -1150,6 +1210,21 @@ function clearAllFiltersAndSearch() {
     URL.revokeObjectURL(url)
   }
 
+  function applyReplaceAll() {
+    if (!onEdit || !replaceColumn || !replaceFindValue) return
+    if (replaceMatchCount === 0) return
+
+    const confirmed = window.confirm(
+      `Replace ${replaceMatchCount} exact match${replaceMatchCount === 1 ? '' : 'es'} in "${replaceColumn.label}"?`,
+    )
+    if (!confirmed) return
+
+    rows
+      .filter((row) => String(replaceColumn.getValue(row) ?? '') === replaceFindValue)
+      .forEach((row) => onEdit(row, replaceColumn.id, replaceValue))
+    setIsReplaceDialogOpen(false)
+  }
+
   return (
     <div className="space-y-4">
       {pendingViewId ? (
@@ -1169,6 +1244,60 @@ function clearAllFiltersAndSearch() {
           onUpdateExisting={saveExistingView}
           onSetDefault={setSelectedViewAsDefault}
         />
+      ) : null}
+      {isReplaceDialogOpen && replaceColumns.length > 0 ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-sf-text">Search & Replace</h2>
+            <p className="mt-1 text-sm text-sf-text-muted">Replace exact matches in one selected dashboard field.</p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm font-medium text-sf-text">
+                Field / Column
+                <select
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceColumn?.id ?? ''}
+                  onChange={(event) => setReplaceColumnId(event.target.value)}
+                >
+                  {replaceColumns.map((column) => (
+                    <option key={column.id} value={column.id}>{column.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-sf-text">
+                Exact value to find
+                <input
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceFindValue}
+                  onChange={(event) => setReplaceFindValue(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-medium text-sf-text">
+                New value
+                <input
+                  className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  value={replaceValue}
+                  onChange={(event) => setReplaceValue(event.target.value)}
+                />
+              </label>
+              <div className="rounded border border-sf-border bg-sf-surface-alt px-3 py-2 text-sm text-sf-text-muted">
+                {replaceMatchCount} exact match{replaceMatchCount === 1 ? '' : 'es'} found.
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!replaceColumn || !replaceFindValue || replaceMatchCount === 0}
+                onClick={applyReplaceAll}
+              >
+                Apply Replacement
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sf-text-muted">
@@ -1208,13 +1337,6 @@ function clearAllFiltersAndSearch() {
 
 
           {selectedDashboardView ? (
-            <span className="text-sm text-sf-text-muted">
-              {selectedDashboardView.name}
-              {isSelectedViewModified ? ' (modified)' : ''}
-            </span>
-          ) : null}
-
-          {selectedDashboardView ? (
             <button
               type="button"
               className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
@@ -1233,67 +1355,60 @@ function clearAllFiltersAndSearch() {
           ) : null}
 
 <div className="flex flex-wrap items-center gap-2">
-            <input
-              placeholder="Search"
-              className="rounded border border-sf-border px-2 py-1"
-              value={globalFilter}
-              onChange={(event) => setGlobalFilter(event.target.value)}
-            />
-            <span
-              className={joinClassNames(
-                'rounded-full border px-2 py-0.5 text-xs font-semibold',
-                activeFilterAndSearchCount > 0
-                  ? 'border-sf-brand bg-sf-brand/10 text-sf-brand'
-                  : 'border-sf-border text-sf-text-muted',
-              )}
-              title={`${activeColumnFilterCount} column filter${activeColumnFilterCount === 1 ? '' : 's'} and ${
-                hasGlobalSearch ? 1 : 0
-              } global search active`}
-            >
-              Filters ({activeFilterAndSearchCount})
-            </span>
-            <button
-              type="button"
-              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
-              disabled={activeColumnFilterCount === 0}
-              onClick={clearAllColumnFilters}
-            >
-              Clear All Column Filters
-            </button>
-            <button
-              type="button"
-              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
-              disabled={!hasGlobalSearch}
-              onClick={clearGlobalSearch}
-            >
-              Clear Global Search
-            </button>
-            <button
-              type="button"
-              className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
-              disabled={activeFilterAndSearchCount === 0}
-              onClick={clearAllFiltersAndSearch}
-            >
-              Clear All Filters/Search
-            </button>
+            <div className="relative">
+              <input
+                placeholder="Search"
+                className="rounded border border-sf-border px-2 py-1 pr-7"
+                value={globalFilter}
+                onChange={(event) => setGlobalFilter(event.target.value)}
+              />
+              {hasGlobalSearch ? (
+                <button
+                  type="button"
+                  className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-sf-text-muted hover:bg-sf-surface-alt hover:text-sf-text"
+                  aria-label="Clear search"
+                  onClick={() => setGlobalFilter('')}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+            {activeFilterAndSearchCount > 0 ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-sf-brand bg-sf-brand/10 px-2 py-0.5 text-xs font-semibold text-sf-brand"
+                title={`${activeColumnFilterCount} column filter${activeColumnFilterCount === 1 ? '' : 's'} and ${
+                  hasGlobalSearch ? 1 : 0
+                } global search active`}
+              >
+                Filters ({activeFilterAndSearchCount})
+                <button
+                  type="button"
+                  className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-sf-brand/15"
+                  aria-label="Clear all filters and search"
+                  onClick={clearAllFiltersAndSearch}
+                >
+                  ×
+                </button>
+              </span>
+            ) : null}
           </div>
 
           <button type="button" onClick={exportCsv} className="rounded border border-sf-border px-3 py-1">
             Export CSV
           </button>
-        </div>
 
-        <details>
-          <summary className="cursor-pointer text-sm text-sf-text-muted">Show / hide columns</summary>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {table.getAllLeafColumns().map((column) => (
-              <label key={column.id} className="inline-flex items-center gap-1 text-sm">
-                <input type="checkbox" checked={column.getIsVisible()} onChange={column.getToggleVisibilityHandler()} />
-                {String(column.columnDef.header)}
-              </label>
-            ))}
-          </div>
-        </details>
+          {replaceColumns.length > 0 ? (
+            <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(true)}>
+              Search & Replace
+            </button>
+          ) : null}
+          {selectedDashboardView ? (
+            <span className="ml-auto text-sm text-sf-text-muted">
+              {selectedDashboardView.name}
+              {isSelectedViewModified ? ' (modified)' : ''}
+            </span>
+          ) : null}
+        </div>
 
         {hiddenFilteredColumns.length > 0 ? (
           <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
@@ -1416,3 +1531,4 @@ function clearAllFiltersAndSearch() {
     </div>
   )
 }
+

@@ -1,47 +1,48 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import type { System } from '@/data/seed.types'
+import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
 
-export const systemListColumns: DashboardColumn<System>[] = [
-{ id: 'sid', label: 'SID#', getValue: (r) => r.sid ?? r.machineId ?? '' },
-{ id: 'pocDeliveryPid', label: 'POC/Delivery PID#', getValue: () => '' },
-{ id: 'projectType', label: 'Project Type', getValue: () => '' },
-{ id: 'renewalPid', label: 'Renewal PID#', getValue: () => '' },
-{ id: 'aboutService', label: 'About Service', getValue: () => '' },
-{ id: 'systemStatusRaw', label: 'System Status', getValue: (r) => r.operationalStatus, editable: true, editKey: 'operationalStatus' },
-{ id: 'performanceTier', label: 'Performance Tier', getValue: () => '' },
-{ id: 'owner', label: 'Owner', getValue: () => '' },
-{ id: 'systemStatusVisual', label: 'System Status (visual)', getValue: (r) => r.operationalStatus },
-{ id: 'region', label: 'Region', getValue: (r) => r.timeGroup },
-{ id: 'projectName', label: 'Project Name', getValue: () => '' },
-{ id: 'country', label: 'Country', getValue: () => '' },
-{ id: 'state', label: 'State', getValue: () => '' },
-{ id: 'endUser', label: 'End User', getValue: () => '' },
-{ id: 'system', label: 'System', getValue: (r) => r.productType },
-{ id: 'systemUrl', label: 'System URL (text)', getValue: () => '' },
-{ id: 'modulesRaw', label: 'Modules', getValue: () => '' },
-{ id: 'cloudRegion', label: 'Cloud Region', getValue: () => '' },
-{ id: 'hosting', label: 'Hosting', getValue: (r) => r.hostingType, editable: true, editKey: 'hostingType' },
-{ id: 'cloudEnvironment', label: 'Cloud Environment', getValue: () => '' },
-{ id: 'csp', label: 'CSP', getValue: () => '' },
-{ id: 'saasRegion', label: 'SaaS Region', getValue: () => '' },
-{ id: 'product', label: 'Product', getValue: (r) => r.productType, editable: true, editKey: 'productType' },
-{ id: 'modulesProduct', label: 'Modules (product)', getValue: () => '' },
-{ id: 'aiFeatures', label: 'AI Features', getValue: () => '' },
-{ id: 'additionalFeatures', label: 'Additional Features', getValue: () => '' },
-{ id: 'brand', label: 'Brand', getValue: () => '' },
-{ id: 'servers', label: 'No. of Servers', getValue: () => '' },
-{ id: 'licenses', label: 'No. of Licenses (Concurrent Login)', getValue: () => '' },
-{ id: 'users', label: 'No. of Users (Named)', getValue: () => '' },
-{ id: 'searches', label: 'Searches - Concurrent', getValue: () => '' },
-{ id: 'analyses', label: 'Analyses - Concurrent', getValue: () => '' },
-{ id: 'standardMonitors', label: 'No. of standard Monitors', getValue: () => '' },
-{ id: 'fullMonitors', label: 'No. of full Monitors', getValue: () => '' },
-{ id: 'topicMonitors', label: 'No. of Topic Monitors', getValue: () => '' },
-{ id: 'mediaProxy', label: 'Media Proxy', getValue: () => '' },
-{ id: 'currentVersion', label: 'Current Version', getValue: () => '' },
-{ id: 'lastVersionUpdate', label: 'Last Version Update', getValue: () => '' },
-{ id: 'systemAlerts', label: 'System Alerts', getValue: () => '' },
-{ id: 'systemDeliveryDate', label: 'System Delivery Date', getValue: () => '' },
-{ id: 'projectStatus', label: 'Project Status', getValue: () => '' },
-{ id: 'customer', label: 'Custmoer', getValue: () => '' },
-]
+function joinSemicolon(values: Array<string | null | undefined>): string {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).join(';')
+}
+
+export function createSystemColumns(
+  accounts: Account[],
+  salesManagers: SalesManager[],
+  tenants: Tenant[],
+): DashboardColumn<System>[] {
+  return [
+    { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? row.machineId ?? '' },
+    {
+      id: 'accountName',
+      label: 'Customer / End User / Account',
+      getValue: (row) => accounts.find((account) => account.id === row.accountId)?.accountName ?? '',
+    },
+    { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId ?? '' },
+    {
+      id: 'salesManager',
+      label: 'Sales Manager / Deal Owner',
+      getValue: (row) => salesManagers.find((manager) => manager.id === row.salesManagerId)?.name ?? '',
+    },
+    { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
+    { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
+    { id: 'product', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
+    { id: 'region', label: 'Region', getValue: (row) => row.region ?? row.timeGroup },
+    { id: 'country', label: 'Country', getValue: (row) => row.country ?? '' },
+    { id: 'state', label: 'State', getValue: (row) => row.state ?? '' },
+    {
+      id: 'tenantCount',
+      label: 'Tenants Count',
+      getValue: (row) => tenants.filter((tenant) => tenant.systemId === row.id).length,
+    },
+    {
+      id: 'deliveryPid',
+      label: 'Related Delivery PID',
+      getValue: (row) => joinSemicolon(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.deliveryPid)),
+    },
+    { id: 'systemStatus', label: 'System Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
+    { id: 'systemClass', label: 'System Class', getValue: (row) => row.systemClass },
+    { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
+    { id: 'availability', label: 'Availability', getValue: (row) => row.availability },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt },
+  ]
+}
