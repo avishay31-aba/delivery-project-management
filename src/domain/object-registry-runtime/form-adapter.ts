@@ -15,6 +15,7 @@ export function objectFieldToRuntimeFormField(
     type: field.type,
     editable: field.editable === true,
     required: field.required === true,
+    visible: field.visible !== false,
     section: field.section,
     tab: field.tab,
     options: optionResolution.resolved ? optionResolution.value : undefined,
