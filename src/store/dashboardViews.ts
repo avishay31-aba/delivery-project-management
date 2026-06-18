@@ -1,10 +1,3 @@
-import type {
-  ColumnFiltersState,
-  ColumnOrderState,
-  GroupingState,
-  SortingState,
-  VisibilityState,
-} from '@tanstack/react-table'
 import {
   FULL_DASHBOARD_VIEW_ID,
   FULL_DASHBOARD_VIEW_NAME,
@@ -24,6 +17,11 @@ import {
   setDefaultView,
   updateView,
   type DashboardViewScope,
+  type DashboardViewState,
+  type DashboardViewsForScope,
+  type PersistedDashboardViews,
+  type RuntimeDashboardView,
+  type SavedDashboardView,
 } from '@/domain/dashboard-view'
 
 export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
@@ -41,38 +39,13 @@ export {
   resolveDefaultDashboardViewId,
 }
 export type { DashboardViewScope }
-
-export interface SavedDashboardViewState {
-  columnOrder: ColumnOrderState
-  columnVisibility: VisibilityState
-  columnFilters: ColumnFiltersState
-  sorting: SortingState
-  grouping: GroupingState
-  globalFilter: string
+export type {
+  DashboardViewsForScope,
+  PersistedDashboardViews,
+  RuntimeDashboardView,
+  SavedDashboardView,
 }
-
-export interface SavedDashboardView {
-  id: string
-  name: string
-  state: SavedDashboardViewState
-  createdAt: string
-  updatedAt: string
-}
-
-export interface DashboardViewsForScope {
-  defaultViewId: string
-  views: SavedDashboardView[]
-}
-
-export interface PersistedDashboardViews {
-  version: 1
-  dashboards: Record<DashboardViewScope, DashboardViewsForScope>
-}
-
-export interface RuntimeDashboardView extends SavedDashboardView {
-  isFullDashboard: boolean
-  isDefault: boolean
-}
+export type SavedDashboardViewState = DashboardViewState
 
 export function loadDashboardViews(): PersistedDashboardViews {
   try {
