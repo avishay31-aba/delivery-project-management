@@ -1,5 +1,5 @@
 import type { ObjectFieldDefinition } from '@/domain/object-registry'
-import { runtimeSimpleFields, runtimeSupportedFields } from './validation'
+import { isRuntimeSupportedField, runtimeSimpleFields, runtimeSupportedFields } from './validation'
 
 export function supportedRuntimeFields(fields: ObjectFieldDefinition[]): ObjectFieldDefinition[] {
   return runtimeSupportedFields(fields)
@@ -12,4 +12,8 @@ export function simpleRuntimeFields(fields: ObjectFieldDefinition[]): ObjectFiel
 export function runtimeFieldsByKeys(fields: ObjectFieldDefinition[], keys: string[]): ObjectFieldDefinition[] {
   const keySet = new Set(keys)
   return fields.filter((field) => keySet.has(field.key))
+}
+
+export function unsupportedRuntimeFields(fields: ObjectFieldDefinition[]): ObjectFieldDefinition[] {
+  return fields.filter((field) => !isRuntimeSupportedField(field))
 }
