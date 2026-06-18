@@ -473,7 +473,7 @@ export const SYSTEM_OBJECT_DEFINITION: ObjectDefinition = {
     { relationship: 'composes', domain: 'HostingContext', exportName: 'DEFAULT_HOSTING_CONTEXT' },
     { relationship: 'composes', domain: 'ApplicationConfiguration', exportName: 'APPLICATION_CONFIGURATION_FIELDS' },
     { relationship: 'references', domain: 'AllocationContext', exportName: 'activeProjectSystemLinks' },
-    { relationship: 'hosts', domain: 'TenantRequirement', description: 'Tenant creation remains System Add Tenant flow using tenant requirement id.' },
+    { relationship: 'hosts', domain: 'TenantOperations', exportName: 'tenantCreationDraftFromSource', description: 'Tenant creation remains System Add Tenant flow using tenant requirement id.' },
     { relationship: 'composes', domain: 'DocumentCollection' },
   ],
 }
@@ -481,6 +481,11 @@ export const SYSTEM_OBJECT_DEFINITION: ObjectDefinition = {
 const tenantConfigurationSource: ObjectMetadataSourceRef = {
   domain: 'ApplicationConfiguration',
   exportName: 'TENANT_CONFIGURATION_FIELDS',
+}
+
+const tenantOperationsSource: ObjectMetadataSourceRef = {
+  domain: 'TenantOperations',
+  exportName: 'tenantCreationDraftFromSource/tenantConfigurationSaveDraft',
 }
 
 const tenantFields: ObjectFieldDefinition[] = [
@@ -506,7 +511,7 @@ const tenantFields: ObjectFieldDefinition[] = [
     type: 'readonly',
     section: 'identity',
     editable: false,
-    source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel', fieldKey: 'tenantType' },
+    source: { domain: 'TenantOperations', exportName: 'tenantFormType', fieldKey: 'tenantType' },
   },
   {
     key: 'systemId',
@@ -584,10 +589,10 @@ export const TENANT_OBJECT_DEFINITION: ObjectDefinition = {
   label: 'Tenant',
   pluralLabel: 'Tenants',
   identityField: 'tid',
-  source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel' },
+  source: tenantOperationsSource,
   fields: tenantFields,
   sections: [
-    { id: 'identity', label: 'Identity', source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel' } },
+    { id: 'identity', label: 'Identity', source: tenantOperationsSource },
     { id: 'hosting', label: 'Hosting', source: { domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' } },
     { id: 'configuration', label: 'Configuration', source: tenantConfigurationSource },
     { id: 'warranty', label: 'Warranty', source: { domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' } },
@@ -602,6 +607,7 @@ export const TENANT_OBJECT_DEFINITION: ObjectDefinition = {
   relationships: [
     { relationship: 'references', domain: 'ProjectLifecycle', exportName: 'linkedTenantsForProject' },
     { relationship: 'references', domain: 'SystemInventory', exportName: 'systemReadModel' },
+    { relationship: 'composes', domain: 'TenantOperations', exportName: 'tenantCreationDraftFromSource/tenantConfigurationSaveDraft' },
     { relationship: 'composes', domain: 'HostingContext', exportName: 'hostingSnapshotFromTenant' },
     { relationship: 'composes', domain: 'ApplicationConfiguration', exportName: 'TENANT_CONFIGURATION_FIELDS' },
     { relationship: 'composes', domain: 'WarrantyCollection', exportName: 'computeTenantWarranties' },

@@ -56,8 +56,8 @@ import {
   cloneTenant,
   tenantConfigurationFromTenant,
   tenantConfigurationSaveDraft,
+  tenantDraftWithAttachedSystem,
   tenantFormType,
-  tenantFormTypeForSystem,
   TENANT_HOSTING_FIELDS,
   TENANT_REMARK_TYPES,
   validateTenantConfigurationSave,
@@ -376,25 +376,9 @@ export function TenantFormPage() {
     const nextProject = nextSystem?.linkedProjectIds?.[0]
       ? projects.find((candidate) => candidate.id === nextSystem.linkedProjectIds?.[0])
       : undefined
-    const nextType = nextSystem ? tenantFormTypeForSystem(nextSystem) : tenantFormType(tenantDraft)
     setDraft((current) =>
       current
-        ? {
-            ...current,
-            systemId: nextSystemId,
-            hostedSystemId: nextSystemId,
-            hostingSid: nextSystem?.sid ?? '',
-            deliveryPid: nextProject?.pid ?? '',
-            tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
-            tenantFormType: nextType,
-            productType: nextSystem?.productType ?? current.productType,
-            hostedSystemHistory: nextSystemId
-              ? [
-                  ...(current.hostedSystemHistory ?? []),
-                  { systemId: nextSystemId, startedAt: new Date().toISOString(), endedAt: null, reason: 'Moved' as const },
-                ]
-              : current.hostedSystemHistory ?? [],
-          }
+        ? tenantDraftWithAttachedSystem(current, nextSystemId, nextSystem, nextProject, new Date().toISOString())
         : current,
     )
     setMessages([])

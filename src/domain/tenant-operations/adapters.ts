@@ -1,5 +1,5 @@
 import { incrementCounter } from '@/data/id-generator'
-import type { AllocationType, NewTenantRequirement, System, Tenant, TenantConfiguration } from '@/data/seed.types'
+import type { AllocationType, NewTenantRequirement, Project, System, Tenant, TenantConfiguration } from '@/data/seed.types'
 import {
   applicationConfigurationFromRequirement,
   applicationConfigurationFromTenant,
@@ -14,7 +14,7 @@ import {
 import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
 import { daysBeforeExpiration, daysBetween } from '@/domain/warranty-collection'
-import { tenantFormType } from './service'
+import { tenantFormType, tenantFormTypeForSystem } from './service'
 import type { TenantConfigurationSaveDraft, TenantCreationDraft, TenantCreationSource } from './types'
 
 export function cloneTenant(tenant: Tenant): Tenant {
@@ -209,6 +209,32 @@ export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, syste
       aiFeatures: configuration.aiFeatures,
       additionalFeatures: configuration.additionalFeatures,
     },
+  }
+}
+
+export function tenantDraftWithAttachedSystem(
+  tenant: Tenant,
+  nextSystemId: string,
+  nextSystem: System | undefined,
+  nextProject: Project | undefined,
+  attachedAt: string,
+): Tenant {
+  const nextType = nextSystem ? tenantFormTypeForSystem(nextSystem) : tenantFormType(tenant)
+  return {
+    ...tenant,
+    systemId: nextSystemId,
+    hostedSystemId: nextSystemId,
+    hostingSid: nextSystem?.sid ?? '',
+    deliveryPid: nextProject?.pid ?? '',
+    tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
+    tenantFormType: nextType,
+    productType: nextSystem?.productType ?? tenant.productType,
+    hostedSystemHistory: nextSystemId
+      ? [
+          ...(tenant.hostedSystemHistory ?? []),
+          { systemId: nextSystemId, startedAt: attachedAt, endedAt: null, reason: 'Moved' as const },
+        ]
+      : tenant.hostedSystemHistory ?? [],
   }
 }
 

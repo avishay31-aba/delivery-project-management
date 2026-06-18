@@ -14,6 +14,7 @@ export type ObjectFieldType =
 export type ObjectRegistryDomainSource =
   | 'ApplicationConfiguration'
   | 'TenantRequirement'
+  | 'TenantOperations'
   | 'HostingContext'
   | 'AllocationContext'
   | 'WarrantyCollection'
