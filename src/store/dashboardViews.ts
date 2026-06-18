@@ -23,8 +23,13 @@ import {
   type RuntimeDashboardView,
   type SavedDashboardView,
 } from '@/domain/dashboard-view'
+import {
+  DASHBOARD_VIEWS_STORAGE_KEY,
+  loadDashboardViewsFromStorage,
+  persistDashboardViewsToStorage,
+} from '@/platform/persistence'
 
-export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
+export { DASHBOARD_VIEWS_STORAGE_KEY }
 export {
   FULL_DASHBOARD_VIEW_ID,
   FULL_DASHBOARD_VIEW_NAME,
@@ -48,22 +53,11 @@ export type {
 export type SavedDashboardViewState = DashboardViewState
 
 export function loadDashboardViews(): PersistedDashboardViews {
-  try {
-    const raw = localStorage.getItem(DASHBOARD_VIEWS_STORAGE_KEY)
-    if (!raw) return createEmptyDashboardViews()
-
-    return normalizePersistedDashboardViews(JSON.parse(raw) as unknown)
-  } catch {
-    return createEmptyDashboardViews()
-  }
+  return loadDashboardViewsFromStorage()
 }
 
 export function persistDashboardViews(dashboardViews: PersistedDashboardViews): void {
-  try {
-    localStorage.setItem(DASHBOARD_VIEWS_STORAGE_KEY, JSON.stringify(normalizePersistedDashboardViews(dashboardViews)))
-  } catch {
-    // Ignore storage failures so dashboard rendering is not blocked by browser storage restrictions.
-  }
+  persistDashboardViewsToStorage(dashboardViews)
 }
 
 function createViewId(): string {
