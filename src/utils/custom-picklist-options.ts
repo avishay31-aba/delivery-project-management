@@ -1,25 +1,17 @@
-const CUSTOM_PICKLIST_STORAGE_KEY = 'dpm.customPicklistOptions.v1'
+import {
+  loadCustomPicklistOptionsFromStorage,
+  saveCustomPicklistOptionsToStorage,
+  type PersistedCustomPicklistOptions,
+} from '@/platform/persistence'
 
-export type CustomPicklistOptions = Record<string, string[]>
+export type CustomPicklistOptions = PersistedCustomPicklistOptions
 
 export function loadCustomPicklistOptions(): CustomPicklistOptions {
-  try {
-    const rawValue = window.localStorage.getItem(CUSTOM_PICKLIST_STORAGE_KEY)
-    if (!rawValue) return {}
-    const parsed = JSON.parse(rawValue) as CustomPicklistOptions
-    return Object.fromEntries(
-      Object.entries(parsed).map(([key, values]) => [
-        key,
-        Array.isArray(values) ? values.filter((value) => typeof value === 'string' && value.trim()) : [],
-      ]),
-    )
-  } catch {
-    return {}
-  }
+  return loadCustomPicklistOptionsFromStorage()
 }
 
 export function saveCustomPicklistOptions(options: CustomPicklistOptions): void {
-  window.localStorage.setItem(CUSTOM_PICKLIST_STORAGE_KEY, JSON.stringify(options))
+  saveCustomPicklistOptionsToStorage(options)
 }
 
 export function addCustomPicklistOption(options: CustomPicklistOptions, key: string, value: string): CustomPicklistOptions {
