@@ -18,6 +18,7 @@ import {
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 import { normalizeProjectLifecycleProject, projectSourceFor } from '@/domain/project-lifecycle'
 import { normalizeTenantWarranties } from '@/domain/warranty-collection'
+import { localStoragePersistenceAdapter, parseJson, stringifyJson } from '@/platform/persistence'
 
 export const STORAGE_KEY = 'dpm-mvp-v1'
 
@@ -118,10 +119,10 @@ export function createInitialState(): AppDataState {
 
 export function loadPersistedState(): AppDataState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStoragePersistenceAdapter.getItem(STORAGE_KEY)
     if (!raw) return null
 
-    const parsed = JSON.parse(raw) as AppDataState
+    const parsed = parseJson(raw) as AppDataState
     if (typeof parsed.version !== 'number' || !Array.isArray(parsed.projects)) {
       return null
     }
@@ -136,9 +137,9 @@ export function persistState(state: AppDataState): void {
     ...state,
     lastPersistedAt: new Date().toISOString(),
   })
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  localStoragePersistenceAdapter.setItem(STORAGE_KEY, stringifyJson(payload))
 }
 
 export function clearPersistedState(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  localStoragePersistenceAdapter.removeItem(STORAGE_KEY)
 }
