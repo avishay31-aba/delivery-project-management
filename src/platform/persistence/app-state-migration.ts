@@ -1,44 +1,13 @@
-import type {
-  AppDataState,
-  Tenant,
-} from '@/data/seed.types'
+import type { AppDataState } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
-import { applicationConfigurationFromTenant } from '@/domain/application-configuration'
 import {
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
-import { normalizeTenantEngagementCircle } from '@/domain/engagement-circle'
-import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
 import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
 import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
-import { normalizeTenantWarranties } from '@/domain/warranty-collection'
-
-function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tenant {
-  const history =
-    tenant.hostedSystemHistory && tenant.hostedSystemHistory.length > 0
-      ? tenant.hostedSystemHistory
-      : tenant.systemId
-        ? [{ systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
-        : []
-
-  return {
-    ...tenant,
-    contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
-    hostedSystemHistory: history,
-    tenantFormType: tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
-    hostedSystemId: tenant.hostedSystemId ?? tenant.systemId,
-    hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
-    configuration: applicationConfigurationFromTenant(tenant),
-    hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
-    engagementCircle: normalizeTenantEngagementCircle(tenant),
-    remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
-    configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
-    warranties: normalizeTenantWarranties(tenant.warranties),
-    documents: Array.isArray(tenant.documents) ? tenant.documents : [],
-  }
-}
+import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
@@ -60,8 +29,8 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       : seedState.reusedInternalSystems,
     systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
     tenants: Array.isArray(state.tenants)
-      ? state.tenants.map((tenant) => normalizeTenant(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
-      : seedState.tenants.map((tenant) => normalizeTenant(tenant, seedState.systems)),
+      ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
+      : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     projectSystems: Array.isArray(state.projectSystems)
       ? state.projectSystems.map(normalizeProjectSystemLink)

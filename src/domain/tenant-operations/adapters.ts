@@ -8,17 +8,43 @@ import { createProjectTenantLink } from '@/domain/allocation-context'
 import {
   cloudPlatformOptionsForHosting,
   HOSTING_OPTIONS,
+  hostingSnapshotFromTenant,
   hostingSnapshotFromSystem,
   tenantHostingPatchFromSystem,
 } from '@/domain/hosting-context'
 import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
-import { daysBeforeExpiration, daysBetween } from '@/domain/warranty-collection'
+import { daysBeforeExpiration, daysBetween, normalizeTenantWarranties } from '@/domain/warranty-collection'
 import { tenantFormType, tenantFormTypeForSystem } from './service'
 import type { TenantConfigurationSaveDraft, TenantCreationDraft, TenantCreationSource } from './types'
 
 export function cloneTenant(tenant: Tenant): Tenant {
   return JSON.parse(JSON.stringify(tenant)) as Tenant
+}
+
+export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]): Tenant {
+  const history =
+    tenant.hostedSystemHistory && tenant.hostedSystemHistory.length > 0
+      ? tenant.hostedSystemHistory
+      : tenant.systemId
+        ? [{ systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
+        : []
+
+  return {
+    ...tenant,
+    contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
+    hostedSystemHistory: history,
+    tenantFormType: tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
+    hostedSystemId: tenant.hostedSystemId ?? tenant.systemId,
+    hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
+    configuration: applicationConfigurationFromTenant(tenant),
+    hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
+    engagementCircle: normalizeEngagementCircleSnapshot(tenant.engagementCircle),
+    remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
+    configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
+    warranties: normalizeTenantWarranties(tenant.warranties),
+    documents: Array.isArray(tenant.documents) ? tenant.documents : [],
+  }
 }
 
 export function tenantCreationDraftFromSource(source: TenantCreationSource, now: string): TenantCreationDraft {
