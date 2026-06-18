@@ -6,21 +6,39 @@ import type {
   VisibilityState,
 } from '@tanstack/react-table'
 import {
-  DASHBOARD_VIEW_SCOPES,
   FULL_DASHBOARD_VIEW_ID,
   FULL_DASHBOARD_VIEW_NAME,
-  assertCanDeleteDashboardView,
-  assertCanDuplicateDashboardView,
-  assertCanOverwriteDashboardView,
-  assertCanRenameDashboardView,
+  areDashboardViewStatesEqual,
+  createEmptyDashboardViews,
+  createEmptyScopeViews,
+  createFullDashboardView,
+  createFullDashboardViewState,
+  createView,
+  deleteView,
+  duplicateView,
+  getRuntimeDashboardViews,
   hasDashboardViewNameConflict,
-  validateDashboardViewName,
+  normalizeDashboardViewState,
+  renameView,
+  resolveDefaultDashboardViewId,
+  setDefaultView,
+  updateView,
   type DashboardViewScope,
 } from '@/domain/dashboard-view'
 
 export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
-export { FULL_DASHBOARD_VIEW_ID, FULL_DASHBOARD_VIEW_NAME }
-export { hasDashboardViewNameConflict }
+export {
+  FULL_DASHBOARD_VIEW_ID,
+  FULL_DASHBOARD_VIEW_NAME,
+  areDashboardViewStatesEqual,
+  createEmptyDashboardViews,
+  createFullDashboardView,
+  createFullDashboardViewState,
+  getRuntimeDashboardViews,
+  hasDashboardViewNameConflict,
+  normalizeDashboardViewState,
+  resolveDefaultDashboardViewId,
+}
 export type { DashboardViewScope }
 
 export interface SavedDashboardViewState {
@@ -53,30 +71,6 @@ export interface PersistedDashboardViews {
 export interface RuntimeDashboardView extends SavedDashboardView {
   isFullDashboard: boolean
   isDefault: boolean
-}
-
-const DASHBOARD_SCOPES: DashboardViewScope[] = DASHBOARD_VIEW_SCOPES
-
-function createEmptyScopeViews(): DashboardViewsForScope {
-  return {
-    defaultViewId: FULL_DASHBOARD_VIEW_ID,
-    views: [],
-  }
-}
-
-export function createEmptyDashboardViews(): PersistedDashboardViews {
-  return {
-    version: 1,
-    dashboards: {
-      opportunities: createEmptyScopeViews(),
-      projects: createEmptyScopeViews(),
-      systems: createEmptyScopeViews(),
-      productionSystemInventory: createEmptyScopeViews(),
-      reusedInternalSystems: createEmptyScopeViews(),
-      tenants: createEmptyScopeViews(),
-      customers: createEmptyScopeViews(),
-    },
-  }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -204,96 +198,6 @@ export function persistDashboardViews(dashboardViews: PersistedDashboardViews): 
   }
 }
 
-export function createFullDashboardViewState(columnIds: string[]): SavedDashboardViewState {
-  return {
-    columnOrder: columnIds,
-    columnVisibility: Object.fromEntries(columnIds.map((columnId) => [columnId, true])),
-    columnFilters: [],
-    sorting: [],
-    grouping: [],
-    globalFilter: '',
-  }
-}
-
-export function normalizeDashboardViewState(
-  state: SavedDashboardViewState,
-  columnIds: string[],
-): SavedDashboardViewState {
-  const columnIdSet = new Set(columnIds)
-  const preservedColumnOrder = state.columnOrder.filter((columnId) => columnIdSet.has(columnId))
-  const newColumnIds = columnIds.filter((columnId) => !preservedColumnOrder.includes(columnId))
-  const columnVisibility = Object.fromEntries(
-    columnIds.map((columnId) => [columnId, state.columnVisibility[columnId] ?? true]),
-  )
-
-  return {
-    columnOrder: [...preservedColumnOrder, ...newColumnIds],
-    columnVisibility,
-    columnFilters: state.columnFilters.filter((filter) => columnIdSet.has(filter.id)),
-    sorting: state.sorting.filter((sort) => columnIdSet.has(sort.id)),
-    grouping: state.grouping.filter((columnId) => columnIdSet.has(columnId)),
-    globalFilter: state.globalFilter ?? '',
-  }
-}
-
-export function createFullDashboardView(
-  columnIds: string[],
-  defaultViewId: string = FULL_DASHBOARD_VIEW_ID,
-): RuntimeDashboardView {
-  const now = new Date(0).toISOString()
-
-  return {
-    id: FULL_DASHBOARD_VIEW_ID,
-    name: FULL_DASHBOARD_VIEW_NAME,
-    state: createFullDashboardViewState(columnIds),
-    createdAt: now,
-    updatedAt: now,
-    isFullDashboard: true,
-    isDefault: defaultViewId === FULL_DASHBOARD_VIEW_ID,
-  }
-}
-
-export function getRuntimeDashboardViews(
-  persistedViews: PersistedDashboardViews,
-  scope: DashboardViewScope,
-  columnIds: string[],
-): RuntimeDashboardView[] {
-  const scopedViews = persistedViews.dashboards[scope]
-  const fullDashboardView = createFullDashboardView(columnIds, scopedViews.defaultViewId)
-  const savedViews = scopedViews.views.map((view) => ({
-    ...view,
-    state: normalizeDashboardViewState(view.state, columnIds),
-    isFullDashboard: false,
-    isDefault: scopedViews.defaultViewId === view.id,
-  }))
-
-  return [fullDashboardView, ...savedViews]
-}
-
-export function resolveDefaultDashboardViewId(persistedViews: PersistedDashboardViews, scope: DashboardViewScope): string {
-  const scopedViews = persistedViews.dashboards[scope]
-  return scopedViews.defaultViewId === FULL_DASHBOARD_VIEW_ID ||
-    scopedViews.views.some((view) => view.id === scopedViews.defaultViewId)
-    ? scopedViews.defaultViewId
-    : FULL_DASHBOARD_VIEW_ID
-}
-
-function updateScope(
-  persistedViews: PersistedDashboardViews,
-  scope: DashboardViewScope,
-  updater: (scopeViews: DashboardViewsForScope) => DashboardViewsForScope,
-): PersistedDashboardViews {
-  return {
-    version: 1,
-    dashboards: Object.fromEntries(
-      DASHBOARD_SCOPES.map((dashboardScope) => [
-        dashboardScope,
-        dashboardScope === scope ? updater(persistedViews.dashboards[dashboardScope]) : persistedViews.dashboards[dashboardScope],
-      ]),
-    ) as Record<DashboardViewScope, DashboardViewsForScope>,
-  }
-}
-
 function createViewId(): string {
   return `view-${crypto.randomUUID()}`
 }
@@ -306,20 +210,13 @@ export function addDashboardView(
   setAsDefault = false,
 ): { dashboardViews: PersistedDashboardViews; view: SavedDashboardView } {
   const now = new Date().toISOString()
-  const view: SavedDashboardView = {
+  return createView(persistedViews, scope, {
     id: createViewId(),
-    name: validateDashboardViewName(persistedViews, scope, name),
+    name,
     state,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  const dashboardViews = updateScope(persistedViews, scope, (scopeViews) => ({
-    defaultViewId: setAsDefault ? view.id : scopeViews.defaultViewId,
-    views: [...scopeViews.views, view],
-  }))
-
-  return { dashboardViews, view }
+    nowIso: now,
+    setAsDefault,
+  })
 }
 
 export function updateDashboardView(
@@ -329,14 +226,7 @@ export function updateDashboardView(
   state: SavedDashboardViewState,
   setAsDefault = false,
 ): PersistedDashboardViews {
-  assertCanOverwriteDashboardView(viewId)
-
-  return updateScope(persistedViews, scope, (scopeViews) => ({
-    defaultViewId: setAsDefault ? viewId : scopeViews.defaultViewId,
-    views: scopeViews.views.map((view) =>
-      view.id === viewId ? { ...view, state, updatedAt: new Date().toISOString() } : view,
-    ),
-  }))
+  return updateView(persistedViews, scope, viewId, state, { nowIso: new Date().toISOString(), setAsDefault })
 }
 
 export function setDefaultDashboardView(
@@ -344,17 +234,7 @@ export function setDefaultDashboardView(
   scope: DashboardViewScope,
   viewId: string,
 ): PersistedDashboardViews {
-  return updateScope(persistedViews, scope, (scopeViews) => {
-    const nextDefaultViewId =
-      viewId === FULL_DASHBOARD_VIEW_ID || scopeViews.views.some((view) => view.id === viewId)
-        ? viewId
-        : FULL_DASHBOARD_VIEW_ID
-
-    return {
-      ...scopeViews,
-      defaultViewId: nextDefaultViewId,
-    }
-  })
+  return setDefaultView(persistedViews, scope, viewId)
 }
 
 export function renameDashboardView(
@@ -363,16 +243,7 @@ export function renameDashboardView(
   viewId: string,
   name: string,
 ): PersistedDashboardViews {
-  assertCanRenameDashboardView(viewId)
-
-  const nextName = validateDashboardViewName(persistedViews, scope, name, viewId)
-
-  return updateScope(persistedViews, scope, (scopeViews) => ({
-    ...scopeViews,
-    views: scopeViews.views.map((view) =>
-      view.id === viewId ? { ...view, name: nextName, updatedAt: new Date().toISOString() } : view,
-    ),
-  }))
+  return renameView(persistedViews, scope, viewId, name, { nowIso: new Date().toISOString() })
 }
 
 export function duplicateDashboardView(
@@ -381,14 +252,7 @@ export function duplicateDashboardView(
   viewId: string,
   name: string,
 ): { dashboardViews: PersistedDashboardViews; view: SavedDashboardView } {
-  assertCanDuplicateDashboardView(viewId)
-
-  const sourceView = persistedViews.dashboards[scope].views.find((view) => view.id === viewId)
-  if (!sourceView) {
-    throw new Error('Saved dashboard view not found.')
-  }
-
-  return addDashboardView(persistedViews, scope, name, sourceView.state)
+  return duplicateView(persistedViews, scope, viewId, { id: createViewId(), name, nowIso: new Date().toISOString() })
 }
 
 export function deleteDashboardView(
@@ -396,21 +260,5 @@ export function deleteDashboardView(
   scope: DashboardViewScope,
   viewId: string,
 ): PersistedDashboardViews {
-  assertCanDeleteDashboardView(viewId)
-
-  return updateScope(persistedViews, scope, (scopeViews) => ({
-    defaultViewId: scopeViews.defaultViewId === viewId ? FULL_DASHBOARD_VIEW_ID : scopeViews.defaultViewId,
-    views: scopeViews.views.filter((view) => view.id !== viewId),
-  }))
-}
-
-export function areDashboardViewStatesEqual(
-  firstState: SavedDashboardViewState,
-  secondState: SavedDashboardViewState,
-  columnIds: string[],
-): boolean {
-  const normalizedFirstState = normalizeDashboardViewState(firstState, columnIds)
-  const normalizedSecondState = normalizeDashboardViewState(secondState, columnIds)
-
-  return JSON.stringify(normalizedFirstState) === JSON.stringify(normalizedSecondState)
+  return deleteView(persistedViews, scope, viewId)
 }
