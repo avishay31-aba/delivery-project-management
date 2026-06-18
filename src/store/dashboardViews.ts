@@ -10,7 +10,6 @@ import {
   FULL_DASHBOARD_VIEW_NAME,
   areDashboardViewStatesEqual,
   createEmptyDashboardViews,
-  createEmptyScopeViews,
   createFullDashboardView,
   createFullDashboardViewState,
   createView,
@@ -18,6 +17,7 @@ import {
   duplicateView,
   getRuntimeDashboardViews,
   hasDashboardViewNameConflict,
+  normalizePersistedDashboardViews,
   normalizeDashboardViewState,
   renameView,
   resolveDefaultDashboardViewId,
@@ -36,6 +36,7 @@ export {
   createFullDashboardViewState,
   getRuntimeDashboardViews,
   hasDashboardViewNameConflict,
+  normalizePersistedDashboardViews,
   normalizeDashboardViewState,
   resolveDefaultDashboardViewId,
 }
@@ -71,112 +72,6 @@ export interface PersistedDashboardViews {
 export interface RuntimeDashboardView extends SavedDashboardView {
   isFullDashboard: boolean
   isDefault: boolean
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function safeString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value : null
-}
-
-function sanitizeViewState(value: unknown): SavedDashboardViewState | null {
-  if (!isObject(value)) return null
-
-  const columnOrder = Array.isArray(value.columnOrder)
-    ? value.columnOrder.filter((columnId): columnId is string => typeof columnId === 'string')
-    : []
-  const columnVisibility = isObject(value.columnVisibility)
-    ? Object.fromEntries(
-        Object.entries(value.columnVisibility).filter(
-          (entry): entry is [string, boolean] => typeof entry[1] === 'boolean',
-        ),
-      )
-    : {}
-  const columnFilters = Array.isArray(value.columnFilters)
-    ? value.columnFilters.filter(
-        (filter): filter is ColumnFiltersState[number] =>
-          isObject(filter) && typeof filter.id === 'string' && 'value' in filter,
-      )
-    : []
-  const sorting = Array.isArray(value.sorting)
-    ? value.sorting.filter(
-        (sort): sort is SortingState[number] =>
-          isObject(sort) && typeof sort.id === 'string' && typeof sort.desc === 'boolean',
-      )
-    : []
-  const grouping = Array.isArray(value.grouping)
-    ? value.grouping.filter((columnId): columnId is string => typeof columnId === 'string')
-    : []
-  const globalFilter = typeof value.globalFilter === 'string' ? value.globalFilter : ''
-
-  return {
-    columnOrder,
-    columnVisibility,
-    columnFilters,
-    sorting,
-    grouping,
-    globalFilter,
-  }
-}
-
-function sanitizeSavedView(value: unknown): SavedDashboardView | null {
-  if (!isObject(value)) return null
-
-  const id = safeString(value.id)
-  const name = safeString(value.name)
-  const state = sanitizeViewState(value.state)
-
-  if (!id || id === FULL_DASHBOARD_VIEW_ID || !name || !state) return null
-
-  return {
-    id,
-    name,
-    state,
-    createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
-    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
-  }
-}
-
-function sanitizeScopeViews(value: unknown): DashboardViewsForScope {
-  if (!isObject(value)) return createEmptyScopeViews()
-
-  const views = Array.isArray(value.views)
-    ? value.views.map(sanitizeSavedView).filter((view): view is SavedDashboardView => view !== null)
-    : []
-  const uniqueViews = views.filter(
-    (view, index, allViews) => allViews.findIndex((candidate) => candidate.id === view.id) === index,
-  )
-  const defaultViewId =
-    typeof value.defaultViewId === 'string' &&
-    (value.defaultViewId === FULL_DASHBOARD_VIEW_ID || uniqueViews.some((view) => view.id === value.defaultViewId))
-      ? value.defaultViewId
-      : FULL_DASHBOARD_VIEW_ID
-
-  return {
-    defaultViewId,
-    views: uniqueViews,
-  }
-}
-
-export function normalizePersistedDashboardViews(value: unknown): PersistedDashboardViews {
-  if (!isObject(value) || value.version !== 1 || !isObject(value.dashboards)) {
-    return createEmptyDashboardViews()
-  }
-
-  return {
-    version: 1,
-    dashboards: {
-      opportunities: sanitizeScopeViews(value.dashboards.opportunities),
-      projects: sanitizeScopeViews(value.dashboards.projects),
-      productionSystemInventory: sanitizeScopeViews(value.dashboards.productionSystemInventory),
-      reusedInternalSystems: sanitizeScopeViews(value.dashboards.reusedInternalSystems),
-      systems: sanitizeScopeViews(value.dashboards.systems),
-      tenants: sanitizeScopeViews(value.dashboards.tenants),
-      customers: sanitizeScopeViews(value.dashboards.customers),
-    },
-  }
 }
 
 export function loadDashboardViews(): PersistedDashboardViews {
