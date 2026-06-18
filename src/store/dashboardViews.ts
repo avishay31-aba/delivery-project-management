@@ -9,11 +9,18 @@ import {
   DASHBOARD_VIEW_SCOPES,
   FULL_DASHBOARD_VIEW_ID,
   FULL_DASHBOARD_VIEW_NAME,
+  assertCanDeleteDashboardView,
+  assertCanDuplicateDashboardView,
+  assertCanOverwriteDashboardView,
+  assertCanRenameDashboardView,
+  hasDashboardViewNameConflict,
+  validateDashboardViewName,
   type DashboardViewScope,
 } from '@/domain/dashboard-view'
 
 export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
 export { FULL_DASHBOARD_VIEW_ID, FULL_DASHBOARD_VIEW_NAME }
+export { hasDashboardViewNameConflict }
 export type { DashboardViewScope }
 
 export interface SavedDashboardViewState {
@@ -291,49 +298,6 @@ function createViewId(): string {
   return `view-${crypto.randomUUID()}`
 }
 
-function normalizeDashboardViewName(name: string): string {
-  return name.trim().toLocaleLowerCase()
-}
-
-export function hasDashboardViewNameConflict(
-  persistedViews: PersistedDashboardViews,
-  scope: DashboardViewScope,
-  name: string,
-  excludeViewId?: string,
-): boolean {
-  const normalizedName = normalizeDashboardViewName(name)
-
-  if (!normalizedName) return false
-  if (normalizedName === normalizeDashboardViewName(FULL_DASHBOARD_VIEW_NAME)) return true
-
-  return persistedViews.dashboards[scope].views.some(
-    (view) => view.id !== excludeViewId && normalizeDashboardViewName(view.name) === normalizedName,
-  )
-}
-
-function validateDashboardViewName(
-  persistedViews: PersistedDashboardViews,
-  scope: DashboardViewScope,
-  name: string,
-  excludeViewId?: string,
-): string {
-  const nextName = name.trim()
-
-  if (!nextName) {
-    throw new Error('Saved dashboard view name is required.')
-  }
-
-  if (normalizeDashboardViewName(nextName) === normalizeDashboardViewName(FULL_DASHBOARD_VIEW_NAME)) {
-    throw new Error('Full Dashboard is a reserved dashboard view name.')
-  }
-
-  if (hasDashboardViewNameConflict(persistedViews, scope, nextName, excludeViewId)) {
-    throw new Error('A saved dashboard view with this name already exists.')
-  }
-
-  return nextName
-}
-
 export function addDashboardView(
   persistedViews: PersistedDashboardViews,
   scope: DashboardViewScope,
@@ -365,9 +329,7 @@ export function updateDashboardView(
   state: SavedDashboardViewState,
   setAsDefault = false,
 ): PersistedDashboardViews {
-  if (viewId === FULL_DASHBOARD_VIEW_ID) {
-    throw new Error('Full Dashboard cannot be overwritten.')
-  }
+  assertCanOverwriteDashboardView(viewId)
 
   return updateScope(persistedViews, scope, (scopeViews) => ({
     defaultViewId: setAsDefault ? viewId : scopeViews.defaultViewId,
@@ -401,9 +363,7 @@ export function renameDashboardView(
   viewId: string,
   name: string,
 ): PersistedDashboardViews {
-  if (viewId === FULL_DASHBOARD_VIEW_ID) {
-    throw new Error('Full Dashboard cannot be renamed.')
-  }
+  assertCanRenameDashboardView(viewId)
 
   const nextName = validateDashboardViewName(persistedViews, scope, name, viewId)
 
@@ -421,9 +381,7 @@ export function duplicateDashboardView(
   viewId: string,
   name: string,
 ): { dashboardViews: PersistedDashboardViews; view: SavedDashboardView } {
-  if (viewId === FULL_DASHBOARD_VIEW_ID) {
-    throw new Error('Full Dashboard cannot be duplicated.')
-  }
+  assertCanDuplicateDashboardView(viewId)
 
   const sourceView = persistedViews.dashboards[scope].views.find((view) => view.id === viewId)
   if (!sourceView) {
@@ -438,9 +396,7 @@ export function deleteDashboardView(
   scope: DashboardViewScope,
   viewId: string,
 ): PersistedDashboardViews {
-  if (viewId === FULL_DASHBOARD_VIEW_ID) {
-    throw new Error('Full Dashboard cannot be deleted.')
-  }
+  assertCanDeleteDashboardView(viewId)
 
   return updateScope(persistedViews, scope, (scopeViews) => ({
     defaultViewId: scopeViews.defaultViewId === viewId ? FULL_DASHBOARD_VIEW_ID : scopeViews.defaultViewId,
