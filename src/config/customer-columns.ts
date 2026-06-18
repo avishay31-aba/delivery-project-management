@@ -1,10 +1,16 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { Account, SalesManager, System, Tenant, WarrantyRecord } from '@/data/seed.types'
-import { warrantySummaryForAccount } from '@/domain/warranty-collection'
-
-function joinSemicolon(values: Array<string | null | undefined>): string {
-  return values.filter((value): value is string => Boolean(value)).join(';')
-}
+import {
+  CUSTOMER_ACCOUNT_FIELD_LABELS,
+  accountManagerDisplayName,
+  customerSidList,
+  customerSystemCount,
+  customerTenantCount,
+  customerTenantNameList,
+  customerTidList,
+  customerTypeLabel,
+  customerWarrantySummary,
+} from '@/domain/customer-account'
 
 export function createCustomerColumns(
   salesManagers: SalesManager[],
@@ -13,53 +19,48 @@ export function createCustomerColumns(
   warrantyRecords: WarrantyRecord[],
 ): DashboardColumn<Account>[] {
   return [
-    { id: 'accountCode', label: 'Customer / Account ID', getValue: (row) => row.accountCode, editKey: 'accountCode' },
-    { id: 'accountName', label: 'Customer / Account Name', getValue: (row) => row.accountName, editKey: 'accountName' },
-    { id: 'customerType', label: 'Customer Type', getValue: (row) => row.customerType === 'VETERAN_CUSTOMER' ? 'Veteran' : 'New' },
+    { id: 'accountCode', label: CUSTOMER_ACCOUNT_FIELD_LABELS.accountCode, getValue: (row) => row.accountCode, editKey: 'accountCode' },
+    { id: 'accountName', label: CUSTOMER_ACCOUNT_FIELD_LABELS.accountName, getValue: (row) => row.accountName, editKey: 'accountName' },
+    { id: 'customerType', label: CUSTOMER_ACCOUNT_FIELD_LABELS.customerType, getValue: customerTypeLabel },
     {
       id: 'salesManager',
-      label: 'Sales Manager / Deal Owner',
-      getValue: (row) => salesManagers.find((manager) => manager.id === row.salesManagerId)?.name ?? '',
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.salesManager,
+      getValue: (row) => accountManagerDisplayName(row.salesManagerId, salesManagers),
     },
-    { id: 'region', label: 'Region', getValue: (row) => row.region, editKey: 'region' },
-    { id: 'country', label: 'Country', getValue: (row) => row.country, editKey: 'country' },
-    { id: 'state', label: 'State', getValue: (row) => row.state, editKey: 'state' },
-    { id: 'timeZone', label: 'Time Zone', getValue: (row) => row.timeZone, editKey: 'timeZone' },
+    { id: 'region', label: CUSTOMER_ACCOUNT_FIELD_LABELS.region, getValue: (row) => row.region, editKey: 'region' },
+    { id: 'country', label: CUSTOMER_ACCOUNT_FIELD_LABELS.country, getValue: (row) => row.country, editKey: 'country' },
+    { id: 'state', label: CUSTOMER_ACCOUNT_FIELD_LABELS.state, getValue: (row) => row.state, editKey: 'state' },
+    { id: 'timeZone', label: CUSTOMER_ACCOUNT_FIELD_LABELS.timeZone, getValue: (row) => row.timeZone, editKey: 'timeZone' },
     {
       id: 'systemCount',
-      label: 'Number of Systems',
-      getValue: (row) => systems.filter((system) => system.accountId === row.id).length,
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.systemCount,
+      getValue: (row) => customerSystemCount(row.id, systems),
     },
     {
       id: 'tenantCount',
-      label: 'Number of Tenants',
-      getValue: (row) => tenants.filter((tenant) => tenant.accountId === row.id).length,
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.tenantCount,
+      getValue: (row) => customerTenantCount(row.id, tenants),
     },
     {
       id: 'sids',
-      label: 'SIDs',
-      getValue: (row) => joinSemicolon(systems.filter((system) => system.accountId === row.id).map((system) => system.sid)),
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.sids,
+      getValue: (row) => customerSidList(row.id, systems),
     },
     {
       id: 'tids',
-      label: 'TIDs',
-      getValue: (row) => joinSemicolon(tenants.filter((tenant) => tenant.accountId === row.id).map((tenant) => tenant.tid)),
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.tids,
+      getValue: (row) => customerTidList(row.id, tenants),
     },
     {
       id: 'tenantNames',
-      label: 'Tenant Names',
-      getValue: (row) =>
-        joinSemicolon(
-          tenants
-            .filter((tenant) => tenant.accountId === row.id)
-            .map((tenant) => tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim()),
-        ),
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.tenantNames,
+      getValue: (row) => customerTenantNameList(row.id, tenants),
     },
     {
       id: 'warrantySummary',
-      label: 'Warranty Summary',
-      getValue: (row) => warrantySummaryForAccount(row.id, tenants, warrantyRecords),
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.warrantySummary,
+      getValue: (row) => customerWarrantySummary(row.id, tenants, warrantyRecords),
     },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt },
+    { id: 'updatedAt', label: CUSTOMER_ACCOUNT_FIELD_LABELS.updatedAt, getValue: (row) => row.updatedAt },
   ]
 }
