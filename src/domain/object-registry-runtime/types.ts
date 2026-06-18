@@ -13,6 +13,12 @@ export interface RuntimeSourceResolverOptions {
   strict?: boolean
 }
 
+export interface RuntimeAdapterValidationMessage {
+  fieldKey?: string
+  level: 'warning' | 'error'
+  message: string
+}
+
 export interface RuntimeFormField {
   key: string
   label: string
@@ -34,4 +40,3 @@ export interface RuntimeDashboardField<T> {
   editable?: boolean
   options?: string[]
 }
-
