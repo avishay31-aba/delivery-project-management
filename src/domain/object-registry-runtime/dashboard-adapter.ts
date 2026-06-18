@@ -1,16 +1,34 @@
+import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ObjectFieldDefinition } from '@/domain/object-registry'
-import type { RuntimeDashboardField } from './types'
+import { resolveObjectRegistryOptions } from './source-resolver'
+import type { RuntimeSourceResolverOptions } from './types'
+import { isRuntimeDashboardSupportedField } from './validation'
 
 export function objectFieldToRuntimeDashboardField<T extends Record<string, unknown>>(
   field: ObjectFieldDefinition,
-): RuntimeDashboardField<T> {
+  options: RuntimeSourceResolverOptions = {},
+): DashboardColumn<T> | null {
+  if (!isRuntimeDashboardSupportedField(field)) return null
+  const optionResolution = resolveObjectRegistryOptions(field.picklistSource, options)
+  const editable = field.editable === true
   return {
     id: field.key,
     label: field.label,
     getValue: (row) => runtimeDashboardValue(row[field.key]),
-    editKey: field.editable === true ? field.key as keyof T : undefined,
-    editable: field.editable === true,
+    editKey: editable ? field.key as keyof T : undefined,
+    editable,
+    options: optionResolution.resolved ? optionResolution.value : undefined,
   }
+}
+
+export function objectFieldsToRuntimeDashboardColumns<T extends Record<string, unknown>>(
+  fields: ObjectFieldDefinition[],
+  options: RuntimeSourceResolverOptions = {},
+): DashboardColumn<T>[] {
+  return fields.flatMap((field) => {
+    const column = objectFieldToRuntimeDashboardField<T>(field, options)
+    return column ? [column] : []
+  })
 }
 
 function runtimeDashboardValue(value: unknown): string | number | null {
@@ -19,4 +37,3 @@ function runtimeDashboardValue(value: unknown): string | number | null {
   if (value == null) return ''
   return String(value)
 }
-
