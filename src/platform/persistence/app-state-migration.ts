@@ -1,7 +1,5 @@
 import type {
   AppDataState,
-  Opportunity,
-  Project,
   Tenant,
 } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
@@ -11,38 +9,11 @@ import {
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
-import {
-  normalizeOpportunityEngagementCircles,
-  normalizeTenantEngagementCircle,
-} from '@/domain/engagement-circle'
+import { normalizeTenantEngagementCircle } from '@/domain/engagement-circle'
 import { hostingSnapshotFromTenant } from '@/domain/hosting-context'
-import { normalizeProjectLifecycleProject, projectSourceFor } from '@/domain/project-lifecycle'
+import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
+import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
 import { normalizeTenantWarranties } from '@/domain/warranty-collection'
-
-function normalizeOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
-  const linkedProjects = projects.filter((project) => project.opportunityId === opportunity.opportunityId)
-  const pocProjectIds = Array.from(
-    new Set([
-      ...(Array.isArray(opportunity.pocProjectIds) ? opportunity.pocProjectIds : []),
-      ...linkedProjects
-        .filter((project) => projectSourceFor(project) === 'POC')
-        .map((project) => project.id),
-    ]),
-  )
-  const finalProjectId =
-    opportunity.finalProjectId ??
-    linkedProjects.find((project) => projectSourceFor(project) === 'FINAL')?.id ??
-    null
-
-  return {
-    ...opportunity,
-    stage: opportunity.stage === 'WON' ? 'WON' : 'OPEN',
-    engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
-    pocProjectIds,
-    finalProjectId,
-    wonAt: opportunity.wonAt ?? (opportunity.stage === 'WON' ? opportunity.updatedAt : null),
-  }
-}
 
 function normalizeTenant(tenant: Tenant, systems: AppDataState['systems']): Tenant {
   const history =
@@ -73,8 +44,8 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = seedJson as AppDataState
   const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProjectLifecycleProject) : seedState.projects.map(normalizeProjectLifecycleProject)
   const opportunities = Array.isArray(state.opportunities)
-    ? state.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
-    : seedState.opportunities.map((opportunity) => normalizeOpportunity(opportunity, projects))
+    ? state.opportunities.map((opportunity) => normalizeOpportunityLifecycleOpportunity(opportunity, projects))
+    : seedState.opportunities.map((opportunity) => normalizeOpportunityLifecycleOpportunity(opportunity, projects))
   const normalizedState = {
     ...state,
     salesManagers: Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers,
@@ -105,4 +76,3 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     idCounters: normalizeIdCounters(state.idCounters, normalizedState),
   }
 }
-

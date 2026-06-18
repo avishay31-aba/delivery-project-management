@@ -1,4 +1,5 @@
 import { incrementCounter } from '@/data/id-generator'
+import { normalizeOpportunityEngagementCircles } from '@/domain/engagement-circle'
 import {
   activePocProjectForOpportunity,
   finalProjectForOpportunity,
@@ -113,4 +114,33 @@ export function syncOpportunityProjectsFromOpportunity(
   }
 
   return { idCounters, projects, opportunity: nextOpportunity, projectChanges }
+}
+
+function linkedOpportunityProjectSource(project: Project): 'POC' | 'FINAL' {
+  return project.projectSource === 'POC' ? 'POC' : 'FINAL'
+}
+
+export function normalizeOpportunityLifecycleOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
+  const linkedProjects = projects.filter((project) => project.opportunityId === opportunity.opportunityId)
+  const pocProjectIds = Array.from(
+    new Set([
+      ...(Array.isArray(opportunity.pocProjectIds) ? opportunity.pocProjectIds : []),
+      ...linkedProjects
+        .filter((project) => linkedOpportunityProjectSource(project) === 'POC')
+        .map((project) => project.id),
+    ]),
+  )
+  const finalProjectId =
+    opportunity.finalProjectId ??
+    linkedProjects.find((project) => linkedOpportunityProjectSource(project) === 'FINAL')?.id ??
+    null
+
+  return {
+    ...opportunity,
+    stage: opportunity.stage === 'WON' ? 'WON' : 'OPEN',
+    engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
+    pocProjectIds,
+    finalProjectId,
+    wonAt: opportunity.wonAt ?? (opportunity.stage === 'WON' ? opportunity.updatedAt : null),
+  }
 }
