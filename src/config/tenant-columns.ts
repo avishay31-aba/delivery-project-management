@@ -1,7 +1,12 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
-import { objectFieldToRuntimeDashboardField } from '@/domain/object-registry-runtime'
+import {
+  objectDefinitionToRuntimeFormModel,
+  objectFieldToRuntimeDashboardField,
+} from '@/domain/object-registry-runtime'
+
+export const TENANT_RUNTIME_FORM_MODEL = objectDefinitionToRuntimeFormModel(TENANT_OBJECT_DEFINITION)
 
 function sidForTenant(tenant: Tenant, systems: System[]): string {
   return systems.find((system) => system.id === tenant.systemId)?.sid ?? ''
