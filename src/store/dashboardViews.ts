@@ -5,19 +5,16 @@ import type {
   SortingState,
   VisibilityState,
 } from '@tanstack/react-table'
+import {
+  DASHBOARD_VIEW_SCOPES,
+  FULL_DASHBOARD_VIEW_ID,
+  FULL_DASHBOARD_VIEW_NAME,
+  type DashboardViewScope,
+} from '@/domain/dashboard-view'
 
 export const DASHBOARD_VIEWS_STORAGE_KEY = 'dpm-dashboard-views-v1'
-export const FULL_DASHBOARD_VIEW_ID = 'full-dashboard'
-export const FULL_DASHBOARD_VIEW_NAME = 'Full Dashboard'
-
-export type DashboardViewScope =
-  | 'opportunities'
-  | 'projects'
-  | 'systems'
-  | 'productionSystemInventory'
-  | 'reusedInternalSystems'
-  | 'tenants'
-  | 'customers'
+export { FULL_DASHBOARD_VIEW_ID, FULL_DASHBOARD_VIEW_NAME }
+export type { DashboardViewScope }
 
 export interface SavedDashboardViewState {
   columnOrder: ColumnOrderState
@@ -51,15 +48,7 @@ export interface RuntimeDashboardView extends SavedDashboardView {
   isDefault: boolean
 }
 
-const DASHBOARD_SCOPES: DashboardViewScope[] = [
-  'opportunities',
-  'projects',
-  'systems',
-  'productionSystemInventory',
-  'reusedInternalSystems',
-  'tenants',
-  'customers',
-]
+const DASHBOARD_SCOPES: DashboardViewScope[] = DASHBOARD_VIEW_SCOPES
 
 function createEmptyScopeViews(): DashboardViewsForScope {
   return {
