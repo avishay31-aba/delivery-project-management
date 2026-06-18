@@ -17,9 +17,7 @@ import {
   TENANT_CONFIGURATION_FIELDS,
   type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
-import { HOSTING_OPTIONS, cloudPlatformOptionsForHosting } from '@/config/cloud-platform-metadata'
 import type {
-  NewTenantRequirement,
   Opportunity,
   Project,
   System,
@@ -32,10 +30,8 @@ import type {
   YesNo,
 } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
-import { validateRequirementA } from '@/utils/opportunity-validation'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
-  applicationConfigurationFromTenant,
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
 import {
@@ -43,10 +39,8 @@ import {
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
   ENGAGEMENT_CIRCLE_TAB_LABEL,
   inheritedEngagementCircleForTenant,
-  normalizeEngagementCircleSnapshot,
 } from '@/domain/engagement-circle'
 import { hostingSnapshotFromSystem } from '@/domain/hosting-context'
-import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 import {
   canManageWarrantyCollection,
   computeTenantWarranties,
@@ -58,7 +52,16 @@ import {
   splitWarrantyPredecessors,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
-import { TENANT_HOSTING_FIELDS, TENANT_REMARK_TYPES } from '@/domain/tenant-operations'
+import {
+  cloneTenant,
+  tenantConfigurationFromTenant,
+  tenantConfigurationSaveDraft,
+  tenantFormType,
+  tenantFormTypeForSystem,
+  TENANT_HOSTING_FIELDS,
+  TENANT_REMARK_TYPES,
+  validateTenantConfigurationSave,
+} from '@/domain/tenant-operations'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -85,10 +88,6 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
 ]
 
 const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
-
-function cloneTenant(tenant: Tenant): Tenant {
-  return JSON.parse(JSON.stringify(tenant)) as Tenant
-}
 
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
@@ -130,17 +129,8 @@ function formatLocalTimestamp(value = new Date()): string {
   return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-function tenantFormType(tenant: Tenant): TenantFormType {
-  return tenant.tenantFormType ?? (tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER')
-}
-
-function tenantFormTypeForSystem(system: System): TenantFormType {
-  if (system.systemClass === SYSTEM_CLASS_POC_DEMO_TRAINING || isReusedInternalSystem(system)) return 'POC'
-  return 'CUSTOMER'
-}
-
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
-  return applicationConfigurationFromTenant(tenant, system?.productType)
+  return tenantConfigurationFromTenant(tenant, system)
 }
 
 function licenseNumber(sid: string, pid: string): string {
@@ -151,56 +141,6 @@ function licenseNumber(sid: string, pid: string): string {
 
 function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
   return applicationConfigurationValue(configuration, column)
-}
-
-function buildRequirementAFromConfiguration(
-  tenant: Tenant,
-  configuration: TenantConfiguration,
-  system?: System,
-): NewTenantRequirement {
-  return {
-    id: `tenant-config-${tenant.id}`,
-    requirementId: tenant.sourceRequirementId ?? 'TENANT-CONFIG',
-    deployTarget: 'NEW_SYSTEM',
-    existingSystemId: null,
-    hostingType: system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0],
-    cloudPlatform: system?.cloudPlatform ?? tenant.cloudPlatform ?? cloudPlatformOptionsForHosting(system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0])[0] ?? '',
-    csp: system?.csp ?? tenant.csp,
-    cloudRegion: system?.cloudRegion ?? tenant.cloudRegion,
-    statisticsId: tenant.statisticsId,
-    authId: tenant.authId,
-    rdmId: tenant.rdmId,
-    performanceTier: system?.performanceTier ?? tenant.performanceTier,
-    vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled,
-    vpnType: system?.vpnType ?? tenant.vpnType,
-    ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled,
-    productType: configuration.product,
-    mapCenter: configuration.mapCenter,
-    licenses: configuration.licenses,
-    users: configuration.users,
-    concurrentSearches: configuration.concurrentSearches,
-    dailySearches: configuration.dailySearches,
-    monthlySearches: configuration.monthlySearches,
-    concurrentAnalyses: configuration.concurrentAnalyses,
-    topicAnalyses: configuration.topicAnalyses,
-    dailyAnalyses: configuration.dailyAnalyses,
-    monthlyAnalyses: configuration.monthlyAnalyses,
-    tangles: configuration.tangles,
-    tanglesGo: configuration.tanglesGo,
-    webloc: configuration.webloc,
-    webeye: configuration.webeye,
-    ingest: configuration.ingest,
-    blockchain: configuration.blockchain,
-    crossSystemFeatures: configuration.crossSystemFeatures,
-    apiEnabled: configuration.apiEnabled,
-    apiDailyQty: configuration.apiDailyQty,
-    apiMonthlyQty: configuration.apiMonthlyQty,
-    aiFeatures: configuration.aiFeatures,
-    additionalFeatures: configuration.additionalFeatures,
-    standardMonitors: configuration.standardMonitors,
-    fullMonitors: configuration.fullMonitors,
-    topicMonitors: configuration.topicMonitors,
-  }
 }
 
 function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string }>, systems: System[]): Project | undefined {
@@ -235,65 +175,6 @@ function resolveOpportunity(project: Project | undefined, opportunities: Opportu
       opportunity.pocProjectIds.includes(project.id) ||
       opportunity.finalProjectId === project.id,
   )
-}
-
-function tenantPatchFromDraft(draft: Tenant, saved: Tenant, system?: System): Partial<Tenant> {
-  const configuration = configurationFromTenant(draft, system)
-  const now = new Date().toISOString()
-  const configurationHistory = [...(draft.configurationHistory ?? [])]
-
-  if (!valuesEqual(configurationFromTenant(saved, system), configuration)) {
-    configurationHistory.unshift({
-      id: `tenant-config-history-${crypto.randomUUID()}`,
-      recordId: `CH-${String(configurationHistory.length + 1).padStart(3, '0')}`,
-      timestamp: now,
-      recordedBy: 'Current user',
-      configuration,
-    })
-  }
-
-  return {
-    tenantFormType: tenantFormType(draft),
-    hostedSystemId: system?.id ?? draft.systemId,
-    hostingSid: system?.sid ?? draft.hostingSid ?? '',
-    configuration,
-    hostingSnapshot: hostingSnapshotFromSystem(draft, system),
-    engagementCircle: normalizeEngagementCircleSnapshot(draft.engagementCircle),
-    remarks: draft.remarks ?? [],
-    configurationHistory,
-    warranties: (draft.warranties ?? []).map((warranty) => ({
-      ...warranty,
-      durationDays: daysBetween(warranty.startDate, warranty.endDate),
-      daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
-    })),
-    documents: draft.documents ?? [],
-    productType: configuration.product,
-    licenses: configuration.licenses,
-    users: configuration.users,
-    concurrentSearches: configuration.concurrentSearches,
-    dailySearches: configuration.dailySearches,
-    monthlySearches: configuration.monthlySearches,
-    concurrentAnalyses: configuration.concurrentAnalyses,
-    dailyAnalyses: configuration.dailyAnalyses,
-    monthlyAnalyses: configuration.monthlyAnalyses,
-    topicAnalyses: configuration.topicAnalyses,
-    standardMonitors: configuration.standardMonitors,
-    fullMonitors: configuration.fullMonitors,
-    topicMonitors: configuration.topicMonitors,
-    mapCenter: configuration.mapCenter,
-    tangles: configuration.tangles,
-    tanglesGo: configuration.tanglesGo,
-    webloc: configuration.webloc,
-    webeye: configuration.webeye,
-    ingest: configuration.ingest,
-    blockchain: configuration.blockchain,
-    crossSystemFeatures: configuration.crossSystemFeatures,
-    apiEnabled: configuration.apiEnabled,
-    apiDailyQty: configuration.apiDailyQty,
-    apiMonthlyQty: configuration.apiMonthlyQty,
-    aiFeatures: configuration.aiFeatures,
-    additionalFeatures: configuration.additionalFeatures,
-  }
 }
 
 function ReadonlyTable({ headers, rows, emptyText }: { headers: string[]; rows: ReactNode[][]; emptyText: string }) {
@@ -455,13 +336,12 @@ export function TenantFormPage() {
   }
 
   function validateTenantConfiguration(): string[] {
-    return validateRequirementA(
-      buildRequirementAFromConfiguration(tenantDraft, configuration, activeSystem),
+    return validateTenantConfigurationSave(
+      tenantDraft,
+      configuration,
       validationOpportunity(),
-      { accounts, systems, tenants },
+      { accounts, systems, tenants, activeSystem },
     )
-      .filter((message) => message.level === 'error')
-      .map((message) => message.message.replace(/^Grid A row 1: /, 'Configuration: '))
   }
 
   function updateConfiguration(key: ConfigKey, value: string | string[] | number | null) {
@@ -531,7 +411,7 @@ export function TenantFormPage() {
       ...tenantDraft,
       warranties: computedWarranties(tenantDraft.warranties ?? []),
     }
-    updateTenant(persistedTenant.id, tenantPatchFromDraft(normalizedDraft, persistedTenant, activeSystem))
+    updateTenant(persistedTenant.id, tenantConfigurationSaveDraft(normalizedDraft, persistedTenant, activeSystem).patch)
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()

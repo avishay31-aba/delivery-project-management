@@ -1,4 +1,7 @@
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { validateRequirementA } from '@/domain/tenant-requirement'
+import type { Account, Opportunity, System, Tenant, TenantConfiguration } from '@/data/seed.types'
+import { tenantRequirementFromConfiguration } from './adapters'
 import type {
   TenantCreationContext,
   TenantCreationInput,
@@ -57,4 +60,19 @@ export function resolveTenantCreationSource(
       system,
     },
   }
+}
+
+export function validateTenantConfigurationSave(
+  tenant: Tenant,
+  configuration: TenantConfiguration,
+  opportunity: Opportunity,
+  context: { accounts: Account[]; systems: System[]; tenants: Tenant[]; activeSystem?: System },
+): string[] {
+  return validateRequirementA(
+    tenantRequirementFromConfiguration(tenant, configuration, context.activeSystem),
+    opportunity,
+    { accounts: context.accounts, systems: context.systems, tenants: context.tenants },
+  )
+    .filter((message) => message.level === 'error')
+    .map((message) => message.message.replace(/^Grid A row 1: /, 'Configuration: '))
 }

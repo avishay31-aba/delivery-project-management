@@ -1,10 +1,21 @@
 import { incrementCounter } from '@/data/id-generator'
-import type { AllocationType, Tenant } from '@/data/seed.types'
-import { applicationConfigurationFromRequirement } from '@/domain/application-configuration'
+import type { AllocationType, NewTenantRequirement, System, Tenant, TenantConfiguration } from '@/data/seed.types'
+import {
+  applicationConfigurationFromRequirement,
+  applicationConfigurationFromTenant,
+} from '@/domain/application-configuration'
 import { createProjectTenantLink } from '@/domain/allocation-context'
-import { tenantHostingPatchFromSystem } from '@/domain/hosting-context'
+import {
+  cloudPlatformOptionsForHosting,
+  HOSTING_OPTIONS,
+  hostingSnapshotFromSystem,
+  tenantHostingPatchFromSystem,
+} from '@/domain/hosting-context'
+import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
-import type { TenantCreationDraft, TenantCreationSource } from './types'
+import { daysBeforeExpiration, daysBetween } from '@/domain/warranty-collection'
+import { tenantFormType } from './service'
+import type { TenantConfigurationSaveDraft, TenantCreationDraft, TenantCreationSource } from './types'
 
 export function cloneTenant(tenant: Tenant): Tenant {
   return JSON.parse(JSON.stringify(tenant)) as Tenant
@@ -83,4 +94,124 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
 
 function tenantAllocationTypeForSystem(system: TenantCreationSource['system']): AllocationType {
   return systemSource(system) === SYSTEM_SOURCE_REUSED_INTERNAL ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM'
+}
+
+export function tenantConfigurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
+  return applicationConfigurationFromTenant(tenant, system?.productType)
+}
+
+export function tenantRequirementFromConfiguration(
+  tenant: Tenant,
+  configuration: TenantConfiguration,
+  system?: System,
+): NewTenantRequirement {
+  const hostingType = system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0]
+  return {
+    id: `tenant-config-${tenant.id}`,
+    requirementId: tenant.sourceRequirementId ?? 'TENANT-CONFIG',
+    deployTarget: 'NEW_SYSTEM',
+    existingSystemId: null,
+    hostingType,
+    cloudPlatform: system?.cloudPlatform ?? tenant.cloudPlatform ?? cloudPlatformOptionsForHosting(hostingType)[0] ?? '',
+    csp: system?.csp ?? tenant.csp,
+    cloudRegion: system?.cloudRegion ?? tenant.cloudRegion,
+    statisticsId: tenant.statisticsId,
+    authId: tenant.authId,
+    rdmId: tenant.rdmId,
+    performanceTier: system?.performanceTier ?? tenant.performanceTier,
+    vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled,
+    vpnType: system?.vpnType ?? tenant.vpnType,
+    ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled,
+    productType: configuration.product,
+    mapCenter: configuration.mapCenter,
+    licenses: configuration.licenses,
+    users: configuration.users,
+    concurrentSearches: configuration.concurrentSearches,
+    dailySearches: configuration.dailySearches,
+    monthlySearches: configuration.monthlySearches,
+    concurrentAnalyses: configuration.concurrentAnalyses,
+    topicAnalyses: configuration.topicAnalyses,
+    dailyAnalyses: configuration.dailyAnalyses,
+    monthlyAnalyses: configuration.monthlyAnalyses,
+    tangles: configuration.tangles,
+    tanglesGo: configuration.tanglesGo,
+    webloc: configuration.webloc,
+    webeye: configuration.webeye,
+    ingest: configuration.ingest,
+    blockchain: configuration.blockchain,
+    crossSystemFeatures: configuration.crossSystemFeatures,
+    apiEnabled: configuration.apiEnabled,
+    apiDailyQty: configuration.apiDailyQty,
+    apiMonthlyQty: configuration.apiMonthlyQty,
+    aiFeatures: configuration.aiFeatures,
+    additionalFeatures: configuration.additionalFeatures,
+    standardMonitors: configuration.standardMonitors,
+    fullMonitors: configuration.fullMonitors,
+    topicMonitors: configuration.topicMonitors,
+  }
+}
+
+export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, system?: System, now = new Date().toISOString()): TenantConfigurationSaveDraft {
+  const configuration = tenantConfigurationFromTenant(draft, system)
+  const configurationHistory = [...(draft.configurationHistory ?? [])]
+
+  if (!valuesEqual(tenantConfigurationFromTenant(saved, system), configuration)) {
+    configurationHistory.unshift({
+      id: `tenant-config-history-${crypto.randomUUID()}`,
+      recordId: `CH-${String(configurationHistory.length + 1).padStart(3, '0')}`,
+      timestamp: now,
+      recordedBy: 'Current user',
+      configuration,
+    })
+  }
+
+  return {
+    configuration,
+    patch: {
+      tenantFormType: tenantFormType(draft),
+      hostedSystemId: system?.id ?? draft.systemId,
+      hostingSid: system?.sid ?? draft.hostingSid ?? '',
+      configuration,
+      hostingSnapshot: hostingSnapshotFromSystem(draft, system),
+      engagementCircle: normalizeEngagementCircleSnapshot(draft.engagementCircle),
+      remarks: draft.remarks ?? [],
+      configurationHistory,
+      warranties: (draft.warranties ?? []).map((warranty) => ({
+        ...warranty,
+        durationDays: daysBetween(warranty.startDate, warranty.endDate),
+        daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
+      })),
+      documents: draft.documents ?? [],
+      productType: configuration.product,
+      licenses: configuration.licenses,
+      users: configuration.users,
+      concurrentSearches: configuration.concurrentSearches,
+      dailySearches: configuration.dailySearches,
+      monthlySearches: configuration.monthlySearches,
+      concurrentAnalyses: configuration.concurrentAnalyses,
+      dailyAnalyses: configuration.dailyAnalyses,
+      monthlyAnalyses: configuration.monthlyAnalyses,
+      topicAnalyses: configuration.topicAnalyses,
+      standardMonitors: configuration.standardMonitors,
+      fullMonitors: configuration.fullMonitors,
+      topicMonitors: configuration.topicMonitors,
+      mapCenter: configuration.mapCenter,
+      tangles: configuration.tangles,
+      tanglesGo: configuration.tanglesGo,
+      webloc: configuration.webloc,
+      webeye: configuration.webeye,
+      ingest: configuration.ingest,
+      blockchain: configuration.blockchain,
+      crossSystemFeatures: configuration.crossSystemFeatures,
+      apiEnabled: configuration.apiEnabled,
+      apiDailyQty: configuration.apiDailyQty,
+      apiMonthlyQty: configuration.apiMonthlyQty,
+      aiFeatures: configuration.aiFeatures,
+      additionalFeatures: configuration.additionalFeatures,
+    },
+  }
+}
+
+function valuesEqual(first: unknown, second: unknown): boolean {
+  return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
