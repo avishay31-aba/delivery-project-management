@@ -17,13 +17,15 @@ import {
 } from '@/domain/project-lifecycle'
 
 function ProgressBar({ value }: { value: number }) {
+  const fillClassName = value >= 100 ? 'h-full bg-blue-900' : 'h-full bg-amber-500'
+
   return createElement(
     'div',
     { className: 'min-w-32' },
     createElement(
       'div',
-      { className: 'h-2 overflow-hidden rounded-full bg-sf-surface-alt' },
-      createElement('div', { className: 'h-full bg-sf-brand', style: { width: `${value}%` } }),
+      { className: 'h-3.5 overflow-hidden rounded-full bg-sf-surface-alt' },
+      createElement('div', { className: fillClassName, style: { width: `${value}%` } }),
     ),
     createElement('span', { className: 'mt-1 block text-xs text-sf-text-muted' }, `${value}%`),
   )

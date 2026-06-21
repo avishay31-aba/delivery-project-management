@@ -902,8 +902,8 @@ export function ProjectFormPage() {
                       </td>
                       <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
                       <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">
-                        <div className="h-2 overflow-hidden rounded-full bg-sf-surface-alt">
-                          <div className="h-full bg-sf-brand" style={{ width: `${progress}%` }} />
+                        <div className="h-3.5 overflow-hidden rounded-full bg-sf-surface-alt">
+                          <div className={progress >= 100 ? 'h-full bg-blue-900' : 'h-full bg-amber-500'} style={{ width: `${progress}%` }} />
                         </div>
                         <span className="mt-1 block text-xs text-sf-text-muted">{progress}%</span>
                       </td>
