@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay, Clock3, Link2, Plus, Trash2, X } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -235,10 +235,10 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
 
 function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
   if (status === 'DONE') {
-    return <CheckCircle2 className="h-8 w-8 stroke-[3.25] text-blue-900" aria-label="Task status: Done" />
+    return <Check className="h-8 w-8 stroke-[3.5] text-blue-800" aria-label="Task status: Done" />
   }
 
-  return <Clock3 className="h-8 w-8 stroke-[3] text-emerald-700" aria-label="Task status: Open" />
+  return <Square className="h-8 w-8 fill-emerald-100 stroke-[3] text-emerald-600" aria-label="Task status: Open" />
 }
 
 function CollapsibleSection({
