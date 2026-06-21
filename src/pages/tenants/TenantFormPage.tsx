@@ -50,6 +50,8 @@ import {
   displayWarrantyStatus,
   predecessorReference,
   splitWarrantyPredecessors,
+  tenantWarrantyHeaderStatusDisplay,
+  warrantyCanEditNoWarranty,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
 import {
@@ -294,12 +296,23 @@ export function TenantFormPage() {
       candidate.pid === tenantDraft.deliveryPid ||
       Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
   )
-  const allTenantWarrantyOptions = tenants.flatMap((tenant) =>
-    (tenant.warranties ?? []).map((warranty) => ({ tenant, warranty })),
-  )
-
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenantDraft, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
+  const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
+  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusDisplay(draftComputedWarranties, tenantDraft.warrantyStatus)
+
+  function warrantyOptionsForTenant(selectedTenantId: string, currentWarrantyId: string): Array<{ tenant: Tenant; warranty: TenantWarranty }> {
+    if (selectedTenantId === tenantDraft.id) {
+      return draftComputedWarranties
+        .filter((warranty) => warranty.id !== currentWarrantyId)
+        .map((warranty) => ({ tenant: tenantDraft, warranty }))
+    }
+
+    const selectedTenant = tenants.find((candidate) => candidate.id === selectedTenantId)
+    return selectedTenant
+      ? (selectedTenant.warranties ?? []).map((warranty) => ({ tenant: selectedTenant, warranty }))
+      : []
+  }
 
   function validationOpportunity(): Opportunity {
     const now = new Date().toISOString()
@@ -495,7 +508,8 @@ export function TenantFormPage() {
   function applyPredecessor(warrantyId: string) {
     const selection = predecessorSelections[warrantyId]
     if (!selection?.tenantId || !selection.warrantyId) return
-    const selectedTenant = tenants.find((candidate) => candidate.id === selection.tenantId)
+    if (selection.tenantId === tenantDraft.id && selection.warrantyId === warrantyId) return
+    const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
     const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
     setDraft((current) => {
@@ -609,7 +623,7 @@ export function TenantFormPage() {
       renderTenantTypeField(),
       renderHeaderField('Operational mode', tenantDraft.operationalStatus),
       formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(hosting.sid, tenantDraft.deliveryPid ?? ''), 'w-56') : null,
-      formType === 'CUSTOMER' ? renderHeaderField('Warranty status', tenantDraft.warrantyStatus) : null,
+      formType === 'CUSTOMER' ? renderHeaderField('Warranty status', tenantWarrantyHeaderStatus) : null,
       renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : ''),
     ].filter(Boolean)
 
@@ -996,7 +1010,7 @@ export function TenantFormPage() {
   }
 
   function renderWarranties() {
-    const warranties = computedWarranties(tenantDraft.warranties ?? [])
+    const warranties = draftComputedWarranties
     if (!canManageWarranties) {
       return (
         <section className="sf-card space-y-3 p-3">
@@ -1048,7 +1062,11 @@ export function TenantFormPage() {
               </tr>
             </thead>
             <tbody>
-              {warranties.map((warranty) => (
+              {warranties.map((warranty) => {
+                const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
+                const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
+                const canEditNoWarranty = warrantyCanEditNoWarranty(warranty, warranties, tenantDraft.tid)
+                return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
@@ -1083,8 +1101,7 @@ export function TenantFormPage() {
                         }
                       >
                         <option value="">Warranty ID</option>
-                        {allTenantWarrantyOptions
-                          .filter(({ tenant }) => tenant.id === (predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id))
+                        {predecessorOptions
                           .map(({ tenant, warranty: option }) => (
                             <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
                               {option.warrantyId}
@@ -1115,7 +1132,13 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={warranty.noWarranty === 'YES' ? 'YES' : 'NO'} onChange={(event) => updateWarranty(warranty.id, 'noWarranty', event.target.value as YesNo)}>
+                    <select
+                      className="h-8 rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                      value={warranty.noWarranty === 'YES' ? 'YES' : 'NO'}
+                      disabled={!canEditNoWarranty}
+                      title={canEditNoWarranty ? undefined : 'No Warranty is locked because this warranty has a successor.'}
+                      onChange={(event) => updateWarranty(warranty.id, 'noWarranty', event.target.value as YesNo)}
+                    >
                       {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
                   </td>
@@ -1129,7 +1152,8 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-48 rounded border border-sf-border px-2 py-1" value={warranty.remark} onChange={(event) => updateWarranty(warranty.id, 'remark', event.target.value)} /></td>
                   <td className="border border-sf-border px-1.5 py-1"><button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button></td>
                 </tr>
-              ))}
+                )
+              })}
               {warranties.length === 0 ? (
                 <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={18}>No warranty records yet.</td></tr>
               ) : null}

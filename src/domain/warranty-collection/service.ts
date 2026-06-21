@@ -33,6 +33,35 @@ export function displayWarrantyStatus(status: WarrantyStatus): string {
   return WARRANTY_STATUS_LABELS[status]
 }
 
+export function tenantWarrantyHeaderStatusDisplay(
+  warranties: TenantWarranty[],
+  fallbackStatus: WarrantyStatus | string = 'NOT_SET',
+): string {
+  if (warranties.some((warranty) => ['PLANNED', 'VALID', 'EXPIRED'].includes(warranty.warrantyStatus))) {
+    return 'Under Contract'
+  }
+
+  if (warranties.length === 1 && warranties[0].firstWarranty && warranties[0].warrantyStatus === 'NOT_SET') {
+    return WARRANTY_STATUS_LABELS.NOT_SET
+  }
+
+  const latestWarranties = warranties.filter((warranty) => !warranty.successor)
+  const renewedWarranties = warranties.filter((warranty) => warranty.successor)
+  if (
+    latestWarranties.length > 0 &&
+    renewedWarranties.length > 0 &&
+    renewedWarranties.every((warranty) => warranty.warrantyStatus === 'RENEWED') &&
+    latestWarranties.every((warranty) => warranty.warrantyStatus === 'NO_WARRANTY')
+  ) {
+    return 'Out Of Contract'
+  }
+
+  if (fallbackStatus in WARRANTY_STATUS_LABELS) {
+    return WARRANTY_STATUS_LABELS[fallbackStatus as WarrantyStatus]
+  }
+  return String(fallbackStatus || WARRANTY_STATUS_LABELS.NOT_SET)
+}
+
 export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
   if (hasSuccessor) return 'RENEWED'
   if (warranty.noWarranty === 'YES') return 'NO_WARRANTY'
