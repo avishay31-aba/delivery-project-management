@@ -4,6 +4,7 @@ import {
   daysBeforeExpiration,
   daysBetween,
   nextWarrantyId,
+  normalizeNoWarrantyForSuccessor,
   successorForWarranty,
   warrantyAlertForStatus,
   warrantyTypeForProject,
@@ -58,9 +59,10 @@ export function computeTenantWarranties(
     const selectedProject = projects.find((candidate) => candidate.id === warranty.relatedProjectId)
     const selectedOpportunity = resolveOpportunity(selectedProject)
     const successor = successorForWarranty(warranty, source, tenant.tid)
-    const status = calculateWarrantyStatus(warranty, Boolean(successor))
+    const normalizedWarranty = normalizeNoWarrantyForSuccessor(warranty, Boolean(successor))
+    const status = calculateWarrantyStatus(normalizedWarranty, Boolean(successor))
     return {
-      ...warranty,
+      ...normalizedWarranty,
       firstWarranty: index === 0,
       accountId: tenant.accountId,
       warrantyType: warrantyTypeForProject(selectedProject),

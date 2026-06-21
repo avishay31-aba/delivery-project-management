@@ -34,9 +34,9 @@ export function displayWarrantyStatus(status: WarrantyStatus): string {
 }
 
 export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
+  if (hasSuccessor) return 'RENEWED'
   if (warranty.noWarranty === 'YES') return 'NO_WARRANTY'
   if (warranty.outOfContract === 'YES') return 'OUT_OF_CONTRACT'
-  if (hasSuccessor) return 'RENEWED'
   if (!warranty.startDate && !warranty.endDate) return 'NOT_SET'
 
   const today = new Date()
@@ -72,6 +72,18 @@ export function successorForWarranty(warranty: TenantWarranty, warranties: Tenan
   return warranties
     .find((candidate) => splitWarrantyPredecessors(candidate.predecessor).includes(predecessorReference(warranty.warrantyId, tenantTid)))
     ?.warrantyId ?? warranty.successor ?? ''
+}
+
+export function warrantyHasSuccessor(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): boolean {
+  return Boolean(successorForWarranty(warranty, warranties, tenantTid))
+}
+
+export function normalizeNoWarrantyForSuccessor(warranty: TenantWarranty, hasSuccessor: boolean): TenantWarranty {
+  return hasSuccessor ? { ...warranty, noWarranty: 'NO' } : warranty
+}
+
+export function warrantyCanEditNoWarranty(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): boolean {
+  return !warrantyHasSuccessor(warranty, warranties, tenantTid)
 }
 
 export function warrantyAlertForStatus(status: WarrantyStatus): string {
