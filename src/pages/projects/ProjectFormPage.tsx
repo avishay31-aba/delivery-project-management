@@ -75,6 +75,7 @@ import {
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
+type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status'>
 
 const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey; label: string }> = [
   { key: 'id', label: 'ID' },
@@ -370,6 +371,10 @@ export function ProjectFormPage() {
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
+  const [isAddMilestoneDialogOpen, setIsAddMilestoneDialogOpen] = useState(false)
+  const [newMilestoneName, setNewMilestoneName] = useState('')
+  const [newMilestoneOrder, setNewMilestoneOrder] = useState(1)
+  const [newMilestoneTasks, setNewMilestoneTasks] = useState<NewMilestoneTaskDraft[]>([])
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationId, setSelectedAllocationId] = useState('')
@@ -722,6 +727,97 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function openAddMilestoneDialog() {
+    const nextOrder = ((projectDraft.milestones ?? []).reduce((maxOrder, milestone) => Math.max(maxOrder, milestone.order), 0) || 0) + 1
+    setNewMilestoneName('')
+    setNewMilestoneOrder(nextOrder)
+    setNewMilestoneTasks([{ name: '', department: '', resource: '', status: 'OPEN' }])
+    setIsAddMilestoneDialogOpen(true)
+  }
+
+  function addMilestoneTaskDraft() {
+    setNewMilestoneTasks((current) => [...current, { name: '', department: '', resource: '', status: 'OPEN' }])
+  }
+
+  function updateMilestoneTaskDraft(index: number, patch: Partial<NewMilestoneTaskDraft>) {
+    setNewMilestoneTasks((current) => current.map((task, taskIndex) => (taskIndex === index ? { ...task, ...patch } : task)))
+  }
+
+  function deleteMilestoneTaskDraft(index: number) {
+    setNewMilestoneTasks((current) => current.filter((_, taskIndex) => taskIndex !== index))
+  }
+
+  function createMilestoneTask(milestoneId: string, task: NewMilestoneTaskDraft, order: number): NonNullable<Project['tasks']>[number] {
+    return {
+      id: `project-task-${crypto.randomUUID()}`,
+      milestoneId,
+      name: task.name.trim() || `Task ${order}`,
+      department: task.department.trim(),
+      resource: task.resource.trim(),
+      status: task.status,
+      order,
+    }
+  }
+
+  function confirmAddMilestone() {
+    const milestoneName = newMilestoneName.trim()
+    if (!milestoneName) {
+      setSaveMessages(['Milestone name is required.'])
+      return
+    }
+
+    const milestoneId = `project-milestone-${crypto.randomUUID()}`
+    const initialTasks = newMilestoneTasks
+      .filter((task) => task.name.trim() || task.department.trim() || task.resource.trim())
+      .map((task, index) => createMilestoneTask(milestoneId, task, index + 1))
+
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            milestones: [
+              ...(current.milestones ?? []),
+              {
+                id: milestoneId,
+                name: milestoneName,
+                order: newMilestoneOrder,
+                status: 'OPEN',
+              },
+            ],
+            tasks: [...(current.tasks ?? []), ...initialTasks],
+          }
+        : current,
+    )
+    setSaveMessages([])
+    setIsAddMilestoneDialogOpen(false)
+  }
+
+  function addTaskToMilestone(milestoneId: string) {
+    const existingTasks = (projectDraft.tasks ?? []).filter((task) => task.milestoneId === milestoneId)
+    const order = existingTasks.reduce((maxOrder, task) => Math.max(maxOrder, task.order), 0) + 1
+    const task = createMilestoneTask(milestoneId, { name: '', department: '', resource: '', status: 'OPEN' }, order)
+    setDraft((current) => (current ? { ...current, tasks: [...(current.tasks ?? []), task] } : current))
+    setSaveMessages([])
+  }
+
+  function deleteTaskFromMilestone(taskId: string) {
+    setDraft((current) => {
+      if (!current) return current
+      const nextProject = {
+        ...current,
+        tasks: (current.tasks ?? []).filter((task) => task.id !== taskId),
+      }
+      return {
+        ...nextProject,
+        milestones: (nextProject.milestones ?? []).map((milestone) => ({
+          ...milestone,
+          status: projectMilestoneStatus(nextProject, milestone.id),
+        })),
+      }
+    })
+    setSaveMessages([])
+  }
+
   function renderTaskStatusSelect(task: NonNullable<Project['tasks']>[number]) {
     return (
       <div className="flex items-center gap-2">
@@ -761,6 +857,9 @@ export function ProjectFormPage() {
         className="space-y-3 p-3"
       >
         <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={openAddMilestoneDialog}>
+            + Add Milestone
+          </button>
           <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
             Save as replacement template
           </button>
@@ -871,6 +970,90 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderAddMilestoneDialog() {
+    if (!isAddMilestoneDialogOpen) return null
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-milestone-title">
+          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
+            <div>
+              <h2 id="add-milestone-title" className="text-xl font-semibold text-sf-text">Add milestone</h2>
+              <p className="text-sm text-sf-text-muted">Create a project-local milestone and optional initial tasks.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close add milestone dialog" onClick={() => setIsAddMilestoneDialogOpen(false)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="max-h-[68vh] space-y-4 overflow-auto p-4">
+            <div className="flex flex-wrap items-start gap-3">
+              <FormField label="Milestone name" controlWidthClassName="w-80">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={newMilestoneName} onChange={(event) => setNewMilestoneName(event.target.value)} />
+              </FormField>
+              <FormField label="Order" controlWidthClassName="w-24">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="number" min={1} value={newMilestoneOrder} onChange={(event) => setNewMilestoneOrder(Number(event.target.value) || 1)} />
+              </FormField>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-sf-text">Initial tasks</h3>
+                <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={addMilestoneTaskDraft}>
+                  + Add task
+                </button>
+              </div>
+              <div className="overflow-x-auto rounded border border-sf-border bg-white">
+                <table className="min-w-full border-collapse text-sm leading-tight">
+                  <thead className="bg-sf-surface-alt text-left">
+                    <tr>
+                      {['Task', 'Department', 'Resource', 'Status', 'Action'].map((label) => (
+                        <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {newMilestoneTasks.map((task, index) => (
+                      <tr key={index}>
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateMilestoneTaskDraft(index, { name: event.target.value })} />
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateMilestoneTaskDraft(index, { department: event.target.value })} />
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateMilestoneTaskDraft(index, { resource: event.target.value })} />
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <select className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateMilestoneTaskDraft(index, { status: event.target.value as 'OPEN' | 'DONE' })}>
+                            <option value="OPEN">Open</option>
+                            <option value="DONE">Done</option>
+                          </select>
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1">
+                          <button type="button" className="text-red-700 hover:underline" onClick={() => deleteMilestoneTaskDraft(index)}>Delete</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t border-sf-border p-4">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsAddMilestoneDialogOpen(false)}>
+              Cancel
+            </button>
+            <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={confirmAddMilestone}>
+              Add Milestone
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderMilestoneDialog() {
     if (!selectedMilestoneId) return null
     const milestone = (projectDraft.milestones ?? []).find((candidate) => candidate.id === selectedMilestoneId)
@@ -890,10 +1073,15 @@ export function ProjectFormPage() {
             </button>
           </div>
           <div className="max-h-[68vh] overflow-auto p-4">
+            <div className="mb-2 flex justify-end">
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => addTaskToMilestone(milestone.id)}>
+                + Add task
+              </button>
+            </div>
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Task', 'Department', 'Resource', 'Status'].map((label) => (
+                  {['Task', 'Department', 'Resource', 'Status', 'Action'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -913,6 +1101,12 @@ export function ProjectFormPage() {
                       <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
                     </td>
                     <td className="w-32 border border-sf-border px-1.5 py-1">{renderTaskStatusSelect(task)}</td>
+                    <td className="border border-sf-border px-1.5 py-1">
+                      <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteTaskFromMilestone(task.id)}>
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1396,6 +1590,7 @@ export function ProjectFormPage() {
                     : renderPlaceholderTab(activeTab)}
         </div>
       </div>
+      {renderAddMilestoneDialog()}
       {renderMilestoneDialog()}
       {renderAllocationDialog()}
     </div>
