@@ -104,13 +104,20 @@ function rowChangeState(row: unknown): 'New' | 'Updated' | null {
 
 function RowIndicator({ row }: { row: unknown }) {
   const state = rowChangeState(row)
-  if (!state) return <span className="block h-2 w-2" aria-hidden="true" />
+  if (!state) return <span className="block min-w-14" aria-hidden="true" />
   return (
     <span
-      className={['inline-flex h-2.5 w-2.5 rounded-full', state === 'New' ? 'bg-green-500' : 'bg-amber-500'].join(' ')}
+      className={[
+        'inline-flex min-w-14 items-center justify-center rounded-full border px-2 py-0.5 text-xs font-semibold',
+        state === 'New'
+          ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
+          : 'border-amber-300 bg-amber-100 text-amber-900',
+      ].join(' ')}
       title={state}
       aria-label={state}
-    />
+    >
+      {state}
+    </span>
   )
 }
 
@@ -1447,7 +1454,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div className="overflow-x-auto">
+        <div className="sf-scroll-x">
           <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (

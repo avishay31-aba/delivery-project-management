@@ -18,4 +18,28 @@
   .sf-card {
     @apply rounded-md border border-sf-border bg-sf-surface shadow-sf;
   }
+
+  .sf-scroll-x {
+    @apply overflow-x-auto border-b border-sf-border;
+    scrollbar-color: #94a3b8 #e2e8f0;
+    scrollbar-width: thin;
+  }
+
+  .sf-scroll-x::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  .sf-scroll-x::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 999px;
+  }
+
+  .sf-scroll-x::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 999px;
+  }
+
+  .sf-scroll-x::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
 }
