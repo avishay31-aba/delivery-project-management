@@ -296,10 +296,11 @@ export function TenantFormPage() {
       candidate.pid === tenantDraft.deliveryPid ||
       Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
   )
-  const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] =>
-    computeTenantWarranties(source, tenantDraft, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
+  const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
+    computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
+  const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
-  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusDisplay(draftComputedWarranties, tenantDraft.warrantyStatus)
+  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusDisplay(draftComputedWarranties)
 
   function warrantyOptionsForTenant(selectedTenantId: string, currentWarrantyId: string): Array<{ tenant: Tenant; warranty: TenantWarranty }> {
     if (selectedTenantId === tenantDraft.id) {
@@ -476,17 +477,18 @@ export function TenantFormPage() {
   function updateWarranty(id: string, key: WarrantyKey, value: string | boolean | null) {
     setDraft((current) => {
       if (!current) return current
+      const nextWarranties = (current.warranties ?? []).map((warranty) => {
+        if (warranty.id !== id) return warranty
+        const next = { ...warranty, [key]: value }
+        return {
+          ...next,
+          durationDays: daysBetween(next.startDate, next.endDate),
+          daysBeforeExpiration: daysBeforeExpiration(next.endDate),
+        }
+      })
       return {
         ...current,
-        warranties: (current.warranties ?? []).map((warranty) => {
-          if (warranty.id !== id) return warranty
-          const next = { ...warranty, [key]: value }
-          return {
-            ...next,
-            durationDays: daysBetween(next.startDate, next.endDate),
-            daysBeforeExpiration: daysBeforeExpiration(next.endDate),
-          }
-        }),
+        warranties: computedWarrantiesForTenant(current, nextWarranties),
       }
     })
   }
@@ -501,37 +503,44 @@ export function TenantFormPage() {
       if (!current) return current
       const warranties = current.warranties ?? []
       const warranty = createTenantWarranty(current, warranties, project, linkedOpportunityId)
-      return { ...current, warranties: [...warranties, warranty] }
+      const nextWarranties = [...warranties, warranty]
+      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
     })
   }
 
   function applyPredecessor(warrantyId: string) {
     const selection = predecessorSelections[warrantyId]
     if (!selection?.tenantId || !selection.warrantyId) return
-    if (selection.tenantId === tenantDraft.id && selection.warrantyId === warrantyId) return
+    const selectedWarranty = (tenantDraft.warranties ?? []).find((warranty) => warranty.id === warrantyId)
+    if (selection.tenantId === tenantDraft.id && selection.warrantyId === selectedWarranty?.warrantyId) return
     const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
     const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
     setDraft((current) => {
       if (!current) return current
+      const nextWarranties = (current.warranties ?? []).map((warranty) => {
+        if (warranty.id !== warrantyId) return warranty
+        const currentValues = splitWarrantyPredecessors(warranty.predecessor)
+        return {
+          ...warranty,
+          predecessor: currentValues.includes(predecessorValue)
+            ? warranty.predecessor
+            : [...currentValues, predecessorValue].join(';'),
+        }
+      })
       return {
         ...current,
-        warranties: (current.warranties ?? []).map((warranty) => {
-          if (warranty.id !== warrantyId) return warranty
-          const currentValues = splitWarrantyPredecessors(warranty.predecessor)
-          return {
-            ...warranty,
-            predecessor: currentValues.includes(predecessorValue)
-              ? warranty.predecessor
-              : [...currentValues, predecessorValue].join(';'),
-          }
-        }),
+        warranties: computedWarrantiesForTenant(current, nextWarranties),
       }
     })
   }
 
   function deleteWarranty(id: string) {
-    setDraft((current) => (current ? { ...current, warranties: (current.warranties ?? []).filter((warranty) => warranty.id !== id) } : current))
+    setDraft((current) => {
+      if (!current) return current
+      const nextWarranties = (current.warranties ?? []).filter((warranty) => warranty.id !== id)
+      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
+    })
   }
 
   function renderActionButtons() {
