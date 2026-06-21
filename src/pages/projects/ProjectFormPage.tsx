@@ -53,6 +53,14 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import {
+  APPLICATION_CONFIGURATION_FIELDS,
+  type ApplicationConfigurationFieldMetadata,
+} from '@/domain/application-configuration'
+import {
+  hostingContextFromSource,
+  type HostingContext,
+} from '@/domain/hosting-context'
+import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
   orderedProjectMilestones,
@@ -77,6 +85,18 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
   { key: 'region', label: 'Region' },
+]
+
+const LINKED_SYSTEM_HOSTING_FIELDS: Array<{ key: keyof HostingContext; label: string }> = [
+  { key: 'hostingType', label: 'Hosting Type' },
+  { key: 'cloudPlatform', label: 'Cloud Platform' },
+  { key: 'csp', label: 'CSP' },
+  { key: 'cloudRegion', label: 'Region' },
+  { key: 'url', label: 'URL' },
+  { key: 'performanceTier', label: 'Performance Tier' },
+  { key: 'vpnEnabled', label: 'VPN' },
+  { key: 'vpnType', label: 'VPN Type' },
+  { key: 'ipRestrictionEnabled', label: 'IP Restriction' },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -171,6 +191,28 @@ function NewRecordBadge({ record }: { record: { createdAt?: string; updatedAt?: 
       New
     </span>
   )
+}
+
+function formatReadOnlyDetailValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ') || '-'
+  if (value === null || value === undefined || value === '') return '-'
+  return String(value)
+}
+
+function systemApplicationConfigurationValue(system: System, field: ApplicationConfigurationFieldMetadata): unknown {
+  if (field.configKey === 'product') return system.productType
+  return (system as unknown as Record<string, unknown>)[field.configKey]
+}
+
+function detailGroups<T extends { group: string }>(fields: T[]): Array<{ group: string; fields: T[] }> {
+  return fields.reduce<Array<{ group: string; fields: T[] }>>((groups, field) => {
+    const existingGroup = groups.find((group) => group.group === field.group)
+    if (existingGroup) {
+      existingGroup.fields.push(field)
+      return groups
+    }
+    return [...groups, { group: field.group, fields: [field] }]
+  }, [])
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -327,6 +369,7 @@ export function ProjectFormPage() {
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
   const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
   const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
+  const [expandedLinkedSystemIds, setExpandedLinkedSystemIds] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
@@ -417,6 +460,12 @@ export function ProjectFormPage() {
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
+  }
+
+  function toggleLinkedSystemDetails(systemId: string) {
+    setExpandedLinkedSystemIds((current) =>
+      current.includes(systemId) ? current.filter((id) => id !== systemId) : [...current, systemId],
+    )
   }
 
   function openAllocationDialog() {
@@ -1054,6 +1103,44 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderLinkedSystemDetails(system: System) {
+    const hostingContext = hostingContextFromSource(system)
+    const configurationGroups = detailGroups(APPLICATION_CONFIGURATION_FIELDS)
+
+    return (
+      <div className="space-y-4 p-3">
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-sf-text">Hosting Context</h4>
+          <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {LINKED_SYSTEM_HOSTING_FIELDS.map((field) => (
+              <div key={field.key} className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1">
+                <dt className="text-xs font-semibold uppercase text-sf-text-muted">{field.label}</dt>
+                <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue(hostingContext[field.key])}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-sf-text">Application Configuration</h4>
+          {configurationGroups.map((group) => (
+            <div key={group.group} className="space-y-2">
+              <h5 className="text-xs font-semibold uppercase text-sf-text-muted">{group.group}</h5>
+              <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {group.fields.map((field) => (
+                  <div key={field.configKey} className="rounded border border-sf-border bg-white px-2 py-1">
+                    <dt className="text-xs font-medium text-sf-text-muted">{field.label}</dt>
+                    <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue(systemApplicationConfigurationValue(system, field))}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   function renderSystemsTenantsTab() {
     return (
       <CollapsibleSection
@@ -1086,7 +1173,7 @@ export function ProjectFormPage() {
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
-                    {['SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode', 'Allocation', 'Action'].map((label) => (
+                    {['Details', 'SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode', 'Allocation', 'Action'].map((label) => (
                       <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                         {label}
                       </th>
@@ -1096,8 +1183,20 @@ export function ProjectFormPage() {
                 <tbody>
                   {linkedSystems.map((system) => {
                     const link = activeSystemLinkBySystemId.get(system.id)
-                    return (
+                    const isExpanded = expandedLinkedSystemIds.includes(system.id)
+                    return [
                       <tr key={system.id} className="hover:bg-sf-surface-alt">
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
+                            aria-expanded={isExpanded}
+                            onClick={() => toggleLinkedSystemDetails(system.id)}
+                          >
+                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+                            Details
+                          </button>
+                        </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                           <span className="inline-flex items-center gap-2">
                             <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
@@ -1131,8 +1230,15 @@ export function ProjectFormPage() {
                             </button>
                           ) : null}
                         </td>
-                      </tr>
-                    )
+                      </tr>,
+                      isExpanded ? (
+                        <tr key={`${system.id}-details`}>
+                          <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10}>
+                            {renderLinkedSystemDetails(system)}
+                          </td>
+                        </tr>
+                      ) : null,
+                    ]
                   })}
                 </tbody>
               </table>
