@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, CirclePlay, Link2, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, CircleDashed, CirclePlay, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -235,10 +235,10 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
 
 function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
   if (status === 'DONE') {
-    return <CheckCircle2 className="h-4 w-4 text-blue-600" aria-label="Task status: Done" />
+    return <CheckCircle2 className="h-5 w-5 text-blue-600" aria-label="Task status: Done" />
   }
 
-  return <Circle className="h-4 w-4 text-slate-500" aria-label="Task status: Open" />
+  return <CircleDashed className="h-5 w-5 text-slate-600" aria-label="Task status: Open" />
 }
 
 function CollapsibleSection({
@@ -821,15 +821,15 @@ export function ProjectFormPage() {
   function renderTaskStatusSelect(task: NonNullable<Project['tasks']>[number]) {
     return (
       <div className="flex items-center gap-2">
-        <TaskStatusIcon status={task.status} />
         <select
-          className="h-8 w-full min-w-24 rounded border border-sf-border px-2 py-1 text-sm"
+          className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm"
           value={task.status}
           onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}
         >
           <option value="OPEN">Open</option>
           <option value="DONE">Done</option>
         </select>
+        <TaskStatusIcon status={task.status} />
       </div>
     )
   }
@@ -900,8 +900,8 @@ export function ProjectFormPage() {
                           {milestone.name}
                         </button>
                       </td>
-                      <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
-                      <td className="w-32 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
+                      <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">
                         <div className="h-2 overflow-hidden rounded-full bg-sf-surface-alt">
                           <div className="h-full bg-sf-brand" style={{ width: `${progress}%` }} />
                         </div>
@@ -951,10 +951,10 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-sf-surface-alt">
-                    <td className="w-44 border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
-                    <td className="min-w-56 border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
-                    <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
-                    <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
+                    <td className="w-40 border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
+                    <td className="max-w-96 border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                    <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
+                    <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
                     <td className="w-32 border border-sf-border px-1.5 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
                   </tr>
                 ))}
@@ -1019,10 +1019,10 @@ export function ProjectFormPage() {
                           <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateMilestoneTaskDraft(index, { name: event.target.value })} />
                         </td>
                         <td className="border border-sf-border px-1.5 py-1">
-                          <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateMilestoneTaskDraft(index, { department: event.target.value })} />
+                          <input className="h-8 w-28 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateMilestoneTaskDraft(index, { department: event.target.value })} />
                         </td>
                         <td className="border border-sf-border px-1.5 py-1">
-                          <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateMilestoneTaskDraft(index, { resource: event.target.value })} />
+                          <input className="h-8 w-28 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateMilestoneTaskDraft(index, { resource: event.target.value })} />
                         </td>
                         <td className="border border-sf-border px-1.5 py-1">
                           <select className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateMilestoneTaskDraft(index, { status: event.target.value as 'OPEN' | 'DONE' })}>
@@ -1091,14 +1091,14 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id}>
-                    <td className="min-w-64 border border-sf-border px-1.5 py-1">
+                    <td className="min-w-56 border border-sf-border px-1.5 py-1">
                       <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateTask(task.id, { name: event.target.value })} />
                     </td>
                     <td className="border border-sf-border px-1.5 py-1">
-                      <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateTask(task.id, { department: event.target.value })} />
+                      <input className="h-8 w-28 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateTask(task.id, { department: event.target.value })} />
                     </td>
                     <td className="border border-sf-border px-1.5 py-1">
-                      <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
+                      <input className="h-8 w-28 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
                     </td>
                     <td className="w-32 border border-sf-border px-1.5 py-1">{renderTaskStatusSelect(task)}</td>
                     <td className="border border-sf-border px-1.5 py-1">
