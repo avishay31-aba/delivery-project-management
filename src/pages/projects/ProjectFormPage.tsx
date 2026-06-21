@@ -66,6 +66,18 @@ import {
 
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
+type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
+
+const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey; label: string }> = [
+  { key: 'id', label: 'ID' },
+  { key: 'mid', label: 'MID' },
+  { key: 'source', label: 'Source' },
+  { key: 'status', label: 'Status' },
+  { key: 'product', label: 'Product' },
+  { key: 'cloudPlatform', label: 'Cloud Platform' },
+  { key: 'csp', label: 'CSP' },
+  { key: 'region', label: 'Region' },
+]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   projectHeader: false,
@@ -102,8 +114,42 @@ function candidatePrimaryId(candidate: AllocationCandidate): string {
   return candidate.id
 }
 
-function candidateSummary(candidate: AllocationCandidate): string {
-  return [candidate.productType, candidate.hostingType, candidate.cloudPlatform, candidate.cloudRegion].filter(Boolean).join(' | ')
+function candidateMachineId(candidate: AllocationCandidate): string {
+  return 'machineId' in candidate ? candidate.machineId ?? '' : ''
+}
+
+function candidateSource(candidate: AllocationCandidate): string {
+  return 'source' in candidate ? candidate.source ?? '' : ''
+}
+
+function candidateStatus(candidate: AllocationCandidate): string {
+  return 'status' in candidate ? candidate.status : candidate.operationalStatus
+}
+
+function candidateRegion(candidate: AllocationCandidate): string {
+  return candidate.cloudRegion ?? ''
+}
+
+function candidateSortValue(candidate: AllocationCandidate, sortKey: AllocationCandidateSortKey): string {
+  const values: Record<AllocationCandidateSortKey, string> = {
+    id: candidatePrimaryId(candidate),
+    mid: candidateMachineId(candidate),
+    source: candidateSource(candidate),
+    status: candidateStatus(candidate),
+    product: candidate.productType,
+    cloudPlatform: candidate.cloudPlatform ?? '',
+    csp: candidate.csp ?? '',
+    region: candidateRegion(candidate),
+  }
+  return values[sortKey]
+}
+
+function candidateSearchText(candidate: AllocationCandidate): string {
+  return ALLOCATION_CANDIDATE_SORT_OPTIONS
+    .map((option) => candidateSortValue(candidate, option.key))
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
 }
 
 function allocationStatusClassName(result: AllocationActionResult | null): string {
@@ -263,6 +309,9 @@ export function ProjectFormPage() {
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationId, setSelectedAllocationId] = useState('')
+  const [allocationCandidateSearch, setAllocationCandidateSearch] = useState('')
+  const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
+  const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
   const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
@@ -340,6 +389,17 @@ export function ProjectFormPage() {
       : selectedMode === 'REUSED_INTERNAL'
         ? availableReusedInternalCandidates(reusedInternalSystems)
         : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
+  const trimmedAllocationCandidateSearch = allocationCandidateSearch.trim().toLowerCase()
+  const visibleAllocationCandidates = [...availableAllocationCandidates]
+    .filter((candidate) =>
+      trimmedAllocationCandidateSearch ? candidateSearchText(candidate).includes(trimmedAllocationCandidateSearch) : true,
+    )
+    .sort((firstCandidate, secondCandidate) => {
+      const direction = allocationCandidateSortDirection === 'asc' ? 1 : -1
+      return candidateSortValue(firstCandidate, allocationCandidateSortKey).localeCompare(
+        candidateSortValue(secondCandidate, allocationCandidateSortKey),
+      ) * direction
+    })
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
@@ -355,6 +415,9 @@ export function ProjectFormPage() {
           : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
     setAllocationMode(initialMode)
     setSelectedAllocationId(initialCandidates[0]?.id ?? '')
+    setAllocationCandidateSearch('')
+    setAllocationCandidateSortKey('id')
+    setAllocationCandidateSortDirection('asc')
     setAllocationResult(null)
     setIsAllocationDialogOpen(true)
   }
@@ -368,6 +431,7 @@ export function ProjectFormPage() {
           : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
     setAllocationMode(mode)
     setSelectedAllocationId(nextCandidates[0]?.id ?? '')
+    setAllocationCandidateSearch('')
     setAllocationResult(null)
   }
 
@@ -877,17 +941,50 @@ export function ProjectFormPage() {
             {allocationResult ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
 
             {availableAllocationCandidates.length > 0 ? (
-              <div className="overflow-x-auto rounded border border-sf-border bg-white">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-end gap-2 rounded border border-sf-border bg-white p-2">
+                  <label className="block text-sm font-medium text-sf-text">
+                    Filter
+                    <input
+                      className="mt-1 h-8 rounded border border-sf-border px-2 text-sm"
+                      placeholder="Search candidates"
+                      value={allocationCandidateSearch}
+                      onChange={(event) => setAllocationCandidateSearch(event.target.value)}
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-sf-text">
+                    Sort by
+                    <select
+                      className="mt-1 h-8 rounded border border-sf-border px-2 text-sm"
+                      value={allocationCandidateSortKey}
+                      onChange={(event) => setAllocationCandidateSortKey(event.target.value as AllocationCandidateSortKey)}
+                    >
+                      {ALLOCATION_CANDIDATE_SORT_OPTIONS.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
+                    onClick={() => setAllocationCandidateSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'))}
+                  >
+                    {allocationCandidateSortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  </button>
+                </div>
+                <div className="sf-scroll-x rounded border border-sf-border bg-white">
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product / Hosting'].map((label) => (
+                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region'].map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {availableAllocationCandidates.map((candidate) => (
+                    {visibleAllocationCandidates.map((candidate) => (
                       <tr key={candidate.id} className="hover:bg-sf-surface-alt">
                         <td className="border border-sf-border px-1.5 py-1">
                           <input
@@ -898,14 +995,25 @@ export function ProjectFormPage() {
                           />
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'machineId' in candidate ? candidate.machineId ?? '' : ''}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'source' in candidate ? candidate.source ?? '' : ''}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'status' in candidate ? candidate.status : candidate.operationalStatus}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSummary(candidate) || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.csp || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegion(candidate) || '-'}</td>
                       </tr>
                     ))}
+                    {visibleAllocationCandidates.length === 0 ? (
+                      <tr>
+                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={9}>
+                          No systems match the current filter.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
+                </div>
               </div>
             ) : (
               <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
