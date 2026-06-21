@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, CirclePlay, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -230,6 +230,14 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
+}
+
+function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
+  if (status === 'DONE') {
+    return <CheckCircle2 className="h-4 w-4 text-blue-600" aria-label="Task status: Done" />
+  }
+
+  return <Circle className="h-4 w-4 text-slate-500" aria-label="Task status: Open" />
 }
 
 function CollapsibleSection({
@@ -714,6 +722,22 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function renderTaskStatusSelect(task: NonNullable<Project['tasks']>[number]) {
+    return (
+      <div className="flex items-center gap-2">
+        <TaskStatusIcon status={task.status} />
+        <select
+          className="h-8 w-full min-w-24 rounded border border-sf-border px-2 py-1 text-sm"
+          value={task.status}
+          onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}
+        >
+          <option value="OPEN">Open</option>
+          <option value="DONE">Done</option>
+        </select>
+      </div>
+    )
+  }
+
   function orderedMilestones(project: Project) {
     return orderedProjectMilestones(project)
   }
@@ -763,9 +787,9 @@ export function ProjectFormPage() {
                   const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestone.id).length ?? 0
                   return (
                     <tr key={milestone.id} className="hover:bg-sf-surface-alt">
-                      <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <td className="w-16 border border-sf-border px-1.5 py-1 text-sf-text">
                         <input
-                          className="h-8 w-20 rounded border border-sf-border px-2 py-1 text-sm"
+                          className="h-8 w-14 rounded border border-sf-border px-2 py-1 text-sm"
                           type="number"
                           min={1}
                           value={milestone.order}
@@ -777,14 +801,14 @@ export function ProjectFormPage() {
                           {milestone.name}
                         </button>
                       </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
-                      <td className="w-44 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
+                      <td className="w-32 border border-sf-border px-1.5 py-1 text-sf-text">
                         <div className="h-2 overflow-hidden rounded-full bg-sf-surface-alt">
                           <div className="h-full bg-sf-brand" style={{ width: `${progress}%` }} />
                         </div>
                         <span className="mt-1 block text-xs text-sf-text-muted">{progress}%</span>
                       </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">{taskCount}</td>
+                      <td className="w-16 border border-sf-border px-1.5 py-1 text-sf-text">{taskCount}</td>
                     </tr>
                   )
                 })}
@@ -828,16 +852,11 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-sf-surface-alt">
-                    <td className="w-56 border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
-                    <td className="min-w-64 border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
-                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
-                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
-                    <td className="w-36 border border-sf-border px-1.5 py-1 text-sf-text">
-                      <select className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}>
-                        <option value="OPEN">Open</option>
-                        <option value="DONE">Done</option>
-                      </select>
-                    </td>
+                    <td className="w-44 border border-sf-border px-1.5 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
+                    <td className="min-w-56 border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                    <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">{task.department}</td>
+                    <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">{task.resource}</td>
+                    <td className="w-32 border border-sf-border px-1.5 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -860,7 +879,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded border border-sf-border bg-white shadow-xl">
+        <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded border border-sf-border bg-white shadow-xl">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 className="text-xl font-semibold text-sf-text">{milestone.name}</h2>
@@ -884,21 +903,16 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id}>
-                    <td className="min-w-80 border border-sf-border px-1.5 py-1">
+                    <td className="min-w-64 border border-sf-border px-1.5 py-1">
                       <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateTask(task.id, { name: event.target.value })} />
                     </td>
                     <td className="border border-sf-border px-1.5 py-1">
-                      <input className="h-8 w-44 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateTask(task.id, { department: event.target.value })} />
+                      <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateTask(task.id, { department: event.target.value })} />
                     </td>
                     <td className="border border-sf-border px-1.5 py-1">
-                      <input className="h-8 w-44 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
+                      <input className="h-8 w-32 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
                     </td>
-                    <td className="border border-sf-border px-1.5 py-1">
-                      <select className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateTask(task.id, { status: event.target.value as 'OPEN' | 'DONE' })}>
-                        <option value="OPEN">Open</option>
-                        <option value="DONE">Done</option>
-                      </select>
-                    </td>
+                    <td className="w-32 border border-sf-border px-1.5 py-1">{renderTaskStatusSelect(task)}</td>
                   </tr>
                 ))}
               </tbody>
