@@ -30,7 +30,7 @@ import {
   type AllocationActionResult,
   type AllocationMode,
 } from '@/domain/allocation-context'
-import { systemSourceLabel } from '@/domain/system-inventory'
+import { systemRoutePath, systemSourceLabel } from '@/domain/system-inventory'
 import {
   linkedOpportunityForProject,
   projectTypeForOpportunity,
@@ -157,6 +157,20 @@ function allocationStatusClassName(result: AllocationActionResult | null): strin
   return result.ok
     ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
     : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
+}
+
+function isNewRecord(record: { createdAt?: string; updatedAt?: string }): boolean {
+  return Boolean(record.createdAt && record.updatedAt && record.createdAt === record.updatedAt)
+}
+
+function NewRecordBadge({ record }: { record: { createdAt?: string; updatedAt?: string } }) {
+  if (!isNewRecord(record)) return null
+
+  return (
+    <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+      New
+    </span>
+  )
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -1084,8 +1098,21 @@ export function ProjectFormPage() {
                     const link = activeSystemLinkBySystemId.get(system.id)
                     return (
                       <tr key={system.id} className="hover:bg-sf-surface-alt">
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.sid ?? ''}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.machineId ?? ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          <span className="inline-flex items-center gap-2">
+                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                              {system.sid ?? system.machineId ?? system.id}
+                            </Link>
+                            <NewRecordBadge record={system} />
+                          </span>
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {system.machineId ? (
+                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                              {system.machineId}
+                            </Link>
+                          ) : null}
+                        </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
@@ -1136,9 +1163,26 @@ export function ProjectFormPage() {
                     const system = systems.find((candidate) => candidate.id === tenant.systemId)
                     return (
                       <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tid}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantName}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system?.sid ?? ''}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          <span className="inline-flex items-center gap-2">
+                            <Link className="font-medium text-sf-brand hover:underline" to={`/tenants/${tenant.tid}`}>
+                              {tenant.tid}
+                            </Link>
+                            <NewRecordBadge record={tenant} />
+                          </span>
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          <Link className="font-medium text-sf-brand hover:underline" to={`/tenants/${tenant.tid}`}>
+                            {tenant.tenantName}
+                          </Link>
+                        </td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {system ? (
+                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                              {system.sid ?? system.machineId ?? ''}
+                            </Link>
+                          ) : null}
+                        </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.deliveryPid}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
