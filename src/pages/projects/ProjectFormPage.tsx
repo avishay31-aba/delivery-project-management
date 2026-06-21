@@ -869,11 +869,18 @@ export function ProjectFormPage() {
         </div>
         {milestones.length > 0 ? (
           <div className="overflow-x-auto rounded border border-sf-border bg-white">
-            <table className="min-w-full border-collapse text-sm leading-tight">
+            <table className="w-full table-fixed border-collapse text-sm leading-tight">
+              <colgroup>
+                <col className="w-14" />
+                <col />
+                <col className="w-24" />
+                <col className="w-24" />
+                <col className="w-14" />
+              </colgroup>
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
                   {['Order', 'Milestone', 'Status', 'Progress', 'Tasks'].map((label) => (
-                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
                   ))}
@@ -886,28 +893,28 @@ export function ProjectFormPage() {
                   const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestone.id).length ?? 0
                   return (
                     <tr key={milestone.id} className="hover:bg-sf-surface-alt">
-                      <td className="w-16 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <td className="border border-sf-border px-1 py-1 text-sf-text">
                         <input
-                          className="h-8 w-14 rounded border border-sf-border px-2 py-1 text-sm"
+                          className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
                           type="number"
                           min={1}
                           value={milestone.order}
                           onChange={(event) => updateMilestoneOrder(milestone.id, Number(event.target.value) || milestone.order)}
                         />
                       </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sf-text">
-                        <button type="button" className="font-medium text-sf-brand hover:underline" onClick={() => setSelectedMilestoneId(milestone.id)}>
+                      <td className="min-w-0 border border-sf-border px-1.5 py-1 text-sf-text">
+                        <button type="button" className="block max-w-full truncate font-medium text-sf-brand hover:underline" onClick={() => setSelectedMilestoneId(milestone.id)}>
                           {milestone.name}
                         </button>
                       </td>
-                      <td className="w-24 border border-sf-border px-1.5 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
-                      <td className="w-28 border border-sf-border px-1.5 py-1 text-sf-text">
+                      <td className="border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
+                      <td className="border border-sf-border px-1 py-1 text-sf-text">
                         <div className="h-3.5 overflow-hidden rounded-full bg-sf-surface-alt">
                           <div className={progress >= 100 ? 'h-full bg-blue-900' : 'h-full bg-amber-500'} style={{ width: `${progress}%` }} />
                         </div>
-                        <span className="mt-1 block text-xs text-sf-text-muted">{progress}%</span>
+                        <span className="mt-1 block text-center text-xs text-sf-text-muted">{progress}%</span>
                       </td>
-                      <td className="w-16 border border-sf-border px-1.5 py-1 text-sf-text">{taskCount}</td>
+                      <td className="border border-sf-border px-1 py-1 text-center text-sf-text">{taskCount}</td>
                     </tr>
                   )
                 })}
