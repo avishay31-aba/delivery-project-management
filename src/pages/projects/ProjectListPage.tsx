@@ -1,15 +1,24 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { projectListColumns } from '@/config/project-columns'
+import { createProjectListColumns } from '@/config/project-columns'
 import { projectListRowClassName } from '@/domain/project-lifecycle'
 
 export function ProjectListPage() {
 const navigate = useNavigate()
 const projects = useAppStore((s) => s.projects)
+const systems = useAppStore((s) => s.systems)
+const tenants = useAppStore((s) => s.tenants)
+const projectSystems = useAppStore((s) => s.projectSystems)
+const projectTenants = useAppStore((s) => s.projectTenants)
 const createProject = useAppStore((s) => s.createProject)
 const updateProject = useAppStore((s) => s.updateProject)
+const projectListColumns = useMemo(
+  () => createProjectListColumns({ systems, tenants, projectSystems, projectTenants }),
+  [projectSystems, projectTenants, systems, tenants],
+)
 
 return (
 <div>
