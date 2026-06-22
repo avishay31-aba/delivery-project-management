@@ -35,6 +35,7 @@ import {
   type SavedDashboardViewState,
 } from '@/store/dashboardViews'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
+import { RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 export interface DashboardColumn<T> {
@@ -95,30 +96,8 @@ function joinClassNames(...classNames: Array<string | false | undefined>): strin
   return classNames.filter(Boolean).join(' ')
 }
 
-function rowChangeState(row: unknown): 'New' | 'Updated' | null {
-  const timestampedRow = row as { createdAt?: string; updatedAt?: string }
-  if (!timestampedRow.createdAt || !timestampedRow.updatedAt) return null
-  if (timestampedRow.createdAt === timestampedRow.updatedAt) return 'New'
-  return timestampedRow.updatedAt > timestampedRow.createdAt ? 'Updated' : null
-}
-
 function RowIndicator({ row }: { row: unknown }) {
-  const state = rowChangeState(row)
-  if (!state) return <span className="block min-w-14" aria-hidden="true" />
-  return (
-    <span
-      className={[
-        'inline-flex min-w-14 items-center justify-center rounded-full border px-2 py-0.5 text-xs font-semibold',
-        state === 'New'
-          ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
-          : 'border-amber-300 bg-amber-100 text-amber-900',
-      ].join(' ')}
-      title={state}
-      aria-label={state}
-    >
-      {state}
-    </span>
-  )
+  return <RecordChangeBadge record={row as { createdAt?: string; updatedAt?: string }} placeholder />
 }
 
 function uniqueColumnOptions<T>(rows: T[], sourceColumn?: DashboardColumn<T>): string[] {
@@ -798,7 +777,7 @@ export function DataDashboard<T extends { id: string }>({
       {
         id: ROW_INDICATOR_COLUMN_ID,
         header: '',
-        accessorFn: (row) => rowChangeState(row) ?? '',
+        accessorFn: (row) => recordChangeState(row as { createdAt?: string; updatedAt?: string }) ?? '',
         enableSorting: true,
         enableGrouping: false,
         enableColumnFilter: true,
