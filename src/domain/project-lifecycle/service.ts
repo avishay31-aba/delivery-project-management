@@ -16,6 +16,7 @@ import type {
   ProjectDeliveryDateStatus,
   ProjectHealthReadModel,
   ProjectHealthStatus,
+  ProjectPortfolioHealthSummary,
   ProjectLifecycleContext,
   ProjectRequirementRow,
   ProjectSystemsTenantsContext,
@@ -176,6 +177,32 @@ export function projectHealthReadModel(
     missingTenants,
     deliveryDateStatus,
     deliveryDateStatusLabel: projectDeliveryDateStatusLabel(deliveryDateStatus),
+  }
+}
+
+export function projectPortfolioHealthSummary(
+  projects: Project[],
+  context: Omit<ProjectSystemsTenantsContext, 'project'>,
+  today = new Date(),
+): ProjectPortfolioHealthSummary {
+  const healthRows = projects.map((project) =>
+    projectHealthReadModel(
+      {
+        ...context,
+        project,
+      },
+      today,
+    ),
+  )
+
+  return {
+    totalProjects: healthRows.length,
+    healthyProjects: healthRows.filter((row) => row.healthStatus === 'HEALTHY').length,
+    warningProjects: healthRows.filter((row) => row.healthStatus === 'WARNING').length,
+    atRiskProjects: healthRows.filter((row) => row.healthStatus === 'AT_RISK').length,
+    completedProjects: healthRows.filter((row) => row.healthStatus === 'COMPLETED').length,
+    projectsMissingSystems: healthRows.filter((row) => row.missingSystems).length,
+    projectsMissingTenants: healthRows.filter((row) => row.missingTenants).length,
   }
 }
 
