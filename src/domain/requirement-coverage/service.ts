@@ -16,6 +16,7 @@ import type {
   RequirementCoverageRow,
   RequirementCoverageSource,
   RequirementCoverageStatus,
+  RequirementCoverageSummary,
 } from './types'
 
 function coverageRowId(source: RequirementCoverageSource): string {
@@ -283,4 +284,22 @@ function deriveProjectOnlyCoverageRow(
 
 export function requirementCoverageRows(context: RequirementCoverageContext): RequirementCoverageRow[] {
   return requirementCoverageSources(context).map((source) => deriveProjectOnlyCoverageRow(source, context))
+}
+
+export function requirementCoverageSummary(rows: RequirementCoverageRow[]): RequirementCoverageSummary {
+  return {
+    totalRequirements: rows.length,
+    covered: rows.filter((row) => row.coverageStatus === 'COVERED').length,
+    partiallyCovered: rows.filter((row) => row.coverageStatus === 'PARTIALLY_COVERED').length,
+    uncovered: rows.filter((row) => row.coverageStatus === 'UNCOVERED').length,
+    blocked: rows.filter((row) => row.coverageStatus === 'BLOCKED').length,
+    unknown: rows.filter((row) => row.coverageStatus === 'UNKNOWN').length,
+    missingProject: rows.filter((row) => row.missingStep === 'MISSING_PROJECT').length,
+    missingSystem: rows.filter((row) => row.missingStep === 'MISSING_SYSTEM_ALLOCATION').length,
+    missingTenant: rows.filter((row) => row.missingStep === 'MISSING_TENANT_CREATION').length,
+  }
+}
+
+export function requirementCoverageSummaryForContext(context: RequirementCoverageContext): RequirementCoverageSummary {
+  return requirementCoverageSummary(requirementCoverageRows(context))
 }
