@@ -54,6 +54,7 @@ import {
   splitWarrantyPredecessors,
   successorRefsForWarranty,
   tenantWarrantyHeaderStatusReadModel,
+  validateWarrantyEditDraft,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
 import {
@@ -245,6 +246,7 @@ export function TenantFormPage() {
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const [editingWarrantyId, setEditingWarrantyId] = useState<string | null>(null)
   const [warrantyDialogDraft, setWarrantyDialogDraft] = useState<WarrantyDialogDraft | null>(null)
+  const [warrantyDialogErrors, setWarrantyDialogErrors] = useState<string[]>([])
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
@@ -509,6 +511,7 @@ export function TenantFormPage() {
 
   function openWarrantyDialog(warranty: TenantWarranty) {
     setEditingWarrantyId(warranty.id)
+    setWarrantyDialogErrors([])
     setWarrantyDialogDraft({
       id: warranty.id,
       relatedProjectId: warranty.relatedProjectId,
@@ -523,10 +526,12 @@ export function TenantFormPage() {
   function closeWarrantyDialog() {
     setEditingWarrantyId(null)
     setWarrantyDialogDraft(null)
+    setWarrantyDialogErrors([])
   }
 
   function updateWarrantyDialogDraft(key: keyof WarrantyDialogDraft, value: string | null) {
     setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
+    setWarrantyDialogErrors([])
   }
 
   function addWarrantyDialogPredecessor() {
@@ -556,6 +561,16 @@ export function TenantFormPage() {
       ...warrantyDialogDraft,
       predecessor: splitWarrantyPredecessors(warrantyDialogDraft.predecessor).filter((candidate) => candidate !== value).join(';'),
     })
+  }
+
+  function saveWarrantyDialog() {
+    if (!warrantyDialogDraft) return
+    const errors = validateWarrantyEditDraft(warrantyDialogDraft)
+    if (errors.length > 0) {
+      setWarrantyDialogErrors(errors)
+      return
+    }
+    closeWarrantyDialog()
   }
 
   function addWarranty() {
@@ -1175,6 +1190,11 @@ export function TenantFormPage() {
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
+            {warrantyDialogErrors.length > 0 ? (
+              <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700 md:col-span-2">
+                {warrantyDialogErrors.map((error) => <div key={error}>{error}</div>)}
+              </div>
+            ) : null}
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Related Project ID</span>
               <select className="h-9 w-full rounded border border-sf-border px-2 py-1" value={warrantyDialogDraft.relatedProjectId} onChange={(event) => updateWarrantyDialogDraft('relatedProjectId', event.target.value)}>
@@ -1269,7 +1289,7 @@ export function TenantFormPage() {
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
-            <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm text-white" onClick={closeWarrantyDialog}>Save</button>
+            <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm text-white" onClick={saveWarrantyDialog}>Save</button>
           </div>
         </div>
       </div>,

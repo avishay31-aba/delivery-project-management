@@ -14,3 +14,4 @@ export const WARRANTY_STATUS_LABELS: Record<WarrantyStatus, string> = {
 
 export const WARRANTY_PENDING_ALERT = 'Expiring soon'
 export const WARRANTY_MANAGEABILITY_MESSAGE = 'Warranty can be managed only after the tenant is linked to a Project/Opportunity.'
+export const WARRANTY_RELATED_PROJECT_REQUIRED_MESSAGE = 'Related Project ID is required.'

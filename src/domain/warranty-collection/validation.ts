@@ -1,4 +1,7 @@
-import { WARRANTY_MANAGEABILITY_MESSAGE } from './metadata'
+import {
+  WARRANTY_MANAGEABILITY_MESSAGE,
+  WARRANTY_RELATED_PROJECT_REQUIRED_MESSAGE,
+} from './metadata'
 
 export function canManageWarrantyCollection(project: unknown, opportunityReference: string | null | undefined): boolean {
   return Boolean(project && opportunityReference)
@@ -6,4 +9,8 @@ export function canManageWarrantyCollection(project: unknown, opportunityReferen
 
 export function warrantyManageabilityMessage(): string {
   return WARRANTY_MANAGEABILITY_MESSAGE
+}
+
+export function validateWarrantyEditDraft(warranty: { relatedProjectId?: string | null }): string[] {
+  return warranty.relatedProjectId?.trim() ? [] : [WARRANTY_RELATED_PROJECT_REQUIRED_MESSAGE]
 }
