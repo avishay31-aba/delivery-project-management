@@ -1,3 +1,4 @@
+import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
@@ -7,10 +8,35 @@ import {
   tenantCountForSystem,
 } from '@/domain/system-inventory'
 
+function systemUrlColumn<T extends { url?: string }>(options: { replaceable?: boolean } = {}): DashboardColumn<T> {
+  return {
+    id: 'url',
+    label: 'System URL',
+    getValue: (row) => row.url ?? '',
+    editKey: options.replaceable ? 'url' as keyof T : undefined,
+    replaceable: options.replaceable,
+    render: (row) => {
+      if (!row.url) return ''
+      return createElement(
+        'a',
+        {
+          href: row.url,
+          target: '_blank',
+          rel: 'noreferrer',
+          className: 'text-sf-brand hover:underline',
+          onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+        },
+        row.url,
+      )
+    },
+  }
+}
+
 export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemInventoryItem>[] = [
   { id: 'sid', label: 'SID', getValue: (row) => row.sid },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
+  systemUrlColumn<ProductionSystemInventoryItem>(),
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
@@ -28,6 +54,7 @@ export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
   { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: REUSED_STATUS_OPTIONS },
+  systemUrlColumn<ReusedInternalSystem>(),
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
@@ -67,6 +94,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       label: 'Hosted Tenants',
       getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.tid)),
     },
+    systemUrlColumn<System>({ replaceable: true }),
     { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
