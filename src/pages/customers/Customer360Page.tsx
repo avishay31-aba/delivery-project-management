@@ -6,6 +6,7 @@ import type { Tenant } from '@/data/seed.types'
 import {
   customerAccount360ReadModel,
   customerDisplayName,
+  customerOpenProjects,
   customerTypeLabel,
 } from '@/domain/customer-account'
 import { systemIdentity } from '@/domain/system-inventory'
@@ -31,6 +32,15 @@ function readOnlyValue(label: string, value: string) {
     <div className="rounded border border-sf-border bg-white p-3">
       <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
       <div className="mt-1 text-sm font-medium text-sf-text">{value || '-'}</div>
+    </div>
+  )
+}
+
+function summaryCard(label: string, value: string | number) {
+  return (
+    <div className="rounded border border-sf-border bg-white p-3">
+      <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-sf-text">{value}</div>
     </div>
   )
 }
@@ -97,6 +107,8 @@ export function Customer360Page() {
     )
   }
 
+  const openProjects = customerOpenProjects(customer360.projects)
+
   return (
     <div className="space-y-4">
       <PageHeader title={customerDisplayName(account)} subtitle="Customer 360 workspace" />
@@ -107,6 +119,16 @@ export function Customer360Page() {
         {readOnlyValue('Region', account.region)}
         {readOnlyValue('Country', account.country)}
         {readOnlyValue('Customer Type', customerTypeLabel(account))}
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {summaryCard('Opportunities', customer360.opportunities.length)}
+        {summaryCard('Open Projects', openProjects.length)}
+        {summaryCard('Systems', customer360.systems.length)}
+        {summaryCard('Tenants', customer360.tenants.length)}
+        {summaryCard('Under Contract', customer360.warrantySummary.underContract)}
+        {summaryCard('Out Of Contract', customer360.warrantySummary.outOfContract)}
+        {summaryCard('Expiring 30 Days', customer360.warrantySummary.expiring30)}
       </section>
 
       <section className="rounded border border-sf-border bg-sf-surface">
@@ -127,8 +149,17 @@ export function Customer360Page() {
             </button>
           ))}
         </div>
-        <div className="min-h-64 p-3 text-sm text-sf-text-muted" role="tabpanel" aria-label={CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label}>
-          {activeTab === 'overview' ? 'Customer overview will appear here.' : `${CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label} will appear here.`}
+        <div className="min-h-64 p-3 text-sm text-sf-text" role="tabpanel" aria-label={CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label}>
+          {activeTab === 'overview' ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {summaryCard('Total Opportunities', customer360.opportunities.length)}
+              {summaryCard('Open Projects', openProjects.length)}
+              {summaryCard('Active Tenants', customer360.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
+              {summaryCard('Warranty Renewal Candidates', customer360.warrantySummary.renewalCandidates)}
+            </div>
+          ) : (
+            <div className="text-sf-text-muted">{CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label} will appear here.</div>
+          )}
         </div>
       </section>
     </div>
