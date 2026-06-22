@@ -45,8 +45,6 @@ import {
   canManageWarrantyCollection,
   computeTenantWarranties,
   createTenantWarranty,
-  daysBeforeExpiration,
-  daysBetween,
   displayWarrantyStatus,
   parseWarrantyPredecessorReference,
   predecessorRefsForWarranty,
@@ -72,16 +70,6 @@ type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documen
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
-type WarrantyKey = keyof Pick<
-  TenantWarranty,
-  | 'predecessor'
-  | 'relatedProjectId'
-  | 'startDate'
-  | 'endDate'
-  | 'noWarranty'
-  | 'outOfContract'
-  | 'remark'
->
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
 type WarrantyDialogDraft = Pick<TenantWarranty, 'id' | 'relatedProjectId' | 'predecessor' | 'startDate' | 'endDate' | 'noWarranty' | 'remark'>
 
@@ -490,25 +478,6 @@ export function TenantFormPage() {
     updateTenant(persistedTenant.id, { remarks })
   }
 
-  function updateWarranty(id: string, key: WarrantyKey, value: string | boolean | null) {
-    setDraft((current) => {
-      if (!current) return current
-      const nextWarranties = (current.warranties ?? []).map((warranty) => {
-        if (warranty.id !== id) return warranty
-        const next = { ...warranty, [key]: value }
-        return {
-          ...next,
-          durationDays: daysBetween(next.startDate, next.endDate),
-          daysBeforeExpiration: daysBeforeExpiration(next.endDate),
-        }
-      })
-      return {
-        ...current,
-        warranties: computedWarrantiesForTenant(current, nextWarranties),
-      }
-    })
-  }
-
   function openWarrantyDialog(warranty: TenantWarranty) {
     setEditingWarrantyId(warranty.id)
     setWarrantyDialogErrors([])
@@ -570,6 +539,32 @@ export function TenantFormPage() {
       setWarrantyDialogErrors(errors)
       return
     }
+    setDraft((current) => {
+      if (!current) return current
+      const currentWarranties = current.warranties ?? []
+      const currentComputedWarranties = computedWarrantiesForTenant(current, currentWarranties)
+      const currentWarranty = currentComputedWarranties.find((warranty) => warranty.id === warrantyDialogDraft.id)
+      const hasSuccessors = currentWarranty
+        ? successorRefsForWarranty(currentWarranty, currentComputedWarranties, current.tid).length > 0
+        : false
+      const nextWarranties = currentWarranties.map((warranty) =>
+        warranty.id === warrantyDialogDraft.id
+          ? {
+              ...warranty,
+              relatedProjectId: warrantyDialogDraft.relatedProjectId,
+              predecessor: warrantyDialogDraft.predecessor,
+              startDate: warrantyDialogDraft.startDate,
+              endDate: warrantyDialogDraft.endDate,
+              noWarranty: hasSuccessors ? 'NO' : warrantyDialogDraft.noWarranty ?? 'NO',
+              remark: warrantyDialogDraft.remark,
+            }
+          : warranty,
+      )
+      return {
+        ...current,
+        warranties: computedWarrantiesForTenant(current, nextWarranties),
+      }
+    })
     closeWarrantyDialog()
   }
 
@@ -1133,24 +1128,15 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 w-56 rounded border border-sf-border px-2 py-1" value={warranty.relatedProjectId} onChange={(event) => updateWarranty(warranty.id, 'relatedProjectId', event.target.value)}>
-                      <option value="">Select project</option>
-                      {relatedProjects.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {candidate.opportunityName} - {candidate.pid}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.relatedProjectId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={warranty.startDate ?? ''} onChange={(event) => updateWarranty(warranty.id, 'startDate', event.target.value || null)} /></td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={warranty.endDate ?? ''} onChange={(event) => updateWarranty(warranty.id, 'endDate', event.target.value || null)} /></td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.startDate ?? ''}</td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.endDate ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
-                  <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-48 rounded border border-sf-border px-2 py-1" value={warranty.remark} onChange={(event) => updateWarranty(warranty.id, 'remark', event.target.value)} /></td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.remark}</td>
                   <td className="border border-sf-border px-1.5 py-1">
                     <div className="flex items-center gap-2">
                       <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
