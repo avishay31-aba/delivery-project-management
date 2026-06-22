@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/record'
 import { PlaceholderCard } from '@/components/ui'
 import type { Tenant } from '@/data/seed.types'
@@ -7,9 +8,10 @@ import {
   customerAccount360ReadModel,
   customerDisplayName,
   customerOpenProjects,
+  customerProjectProgress,
   customerTypeLabel,
 } from '@/domain/customer-account'
-import { systemIdentity } from '@/domain/system-inventory'
+import { systemIdentity, systemRoutePath } from '@/domain/system-inventory'
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
@@ -43,6 +45,37 @@ function summaryCard(label: string, value: string | number) {
       <div className="mt-1 text-2xl font-semibold text-sf-text">{value}</div>
     </div>
   )
+}
+
+function readOnlyTable(headers: string[], rows: ReactNode[][], emptyText: string) {
+  return (
+    <div className="overflow-x-auto rounded border border-sf-border bg-white">
+      <table className="min-w-full border-collapse text-sm leading-tight">
+        <thead className="bg-sf-surface-alt text-left">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="whitespace-nowrap border border-sf-border px-2 py-1 text-sm font-semibold text-sf-text">{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length > 0 ? rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="hover:bg-sf-surface-alt">
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex} className="border border-sf-border px-2 py-1 align-top">{cell}</td>
+              ))}
+            </tr>
+          )) : (
+            <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={headers.length}>{emptyText}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function objectLink(to: string, label: string) {
+  return label ? <Link className="text-sf-brand hover:underline" to={to}>{label}</Link> : ''
 }
 
 export function Customer360Page() {
@@ -107,7 +140,105 @@ export function Customer360Page() {
     )
   }
 
-  const openProjects = customerOpenProjects(customer360.projects)
+  const customer = customer360
+  const openProjects = customerOpenProjects(customer.projects)
+
+  function renderTabContent() {
+    if (activeTab === 'overview') {
+      return (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {summaryCard('Total Opportunities', customer.opportunities.length)}
+          {summaryCard('Open Projects', openProjects.length)}
+          {summaryCard('Active Tenants', customer.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
+          {summaryCard('Warranty Renewal Candidates', customer.warrantySummary.renewalCandidates)}
+        </div>
+      )
+    }
+
+    if (activeTab === 'opportunities') {
+      return readOnlyTable(
+        ['Opportunity ID', 'Name', 'Stage', 'Type', 'Subtype', 'Delivery Date'],
+        customer.opportunities.map((opportunity) => [
+          objectLink(`/opportunities/${opportunity.opportunityId}`, opportunity.opportunityId),
+          opportunity.opportunityName,
+          opportunity.stage,
+          opportunity.type,
+          opportunity.subType,
+          opportunity.deliveryDate ?? '',
+        ]),
+        'No opportunities found for this customer.',
+      )
+    }
+
+    if (activeTab === 'projects') {
+      return readOnlyTable(
+        ['PID', 'Project Name', 'Type', 'Subtype', 'Status', 'Delivery Date', 'Progress'],
+        customer.projects.map((project) => [
+          objectLink(`/projects/${project.pid}`, project.pid),
+          project.opportunityName,
+          project.mainType,
+          project.subType,
+          project.progressStatus,
+          project.deliveryDate ?? '',
+          customerProjectProgress(project),
+        ]),
+        'No projects found for this customer.',
+      )
+    }
+
+    if (activeTab === 'systems') {
+      return readOnlyTable(
+        ['SID', 'Product', 'Hosting Type', 'Cloud Platform', 'CSP', 'Region', 'Status'],
+        customer.systems.map((system) => [
+          objectLink(systemRoutePath(system), systemIdentity(system)),
+          system.productType,
+          system.hostingType,
+          system.cloudPlatform ?? '',
+          system.csp ?? '',
+          system.cloudRegion ?? system.region ?? '',
+          system.operationalStatus,
+        ]),
+        'No systems found for this customer.',
+      )
+    }
+
+    if (activeTab === 'tenants') {
+      return readOnlyTable(
+        ['TID', 'Tenant Name', 'SID', 'Product', 'Operational Status', 'Country'],
+        customer.tenants.map((tenant) => [
+          objectLink(`/tenants/${tenant.tid}`, tenant.tid),
+          tenant.tenantName ?? '',
+          tenant.hostingSid ?? '',
+          tenant.productType,
+          tenant.operationalStatus,
+          tenant.country,
+        ]),
+        'No tenants found for this customer.',
+      )
+    }
+
+    if (activeTab === 'warranties') {
+      return readOnlyTable(
+        ['Warranty ID', 'Tenant TID', 'Tenant Name', 'SID', 'Related Project ID', 'Project Name', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
+        customer.warrantyRows.map((row) => [
+          row.warrantyId,
+          objectLink(`/tenants/${row.tenantTid}`, row.tenantTid),
+          row.tenantName,
+          row.sid,
+          row.relatedProjectId,
+          row.projectName,
+          row.endDate ?? '',
+          row.daysToExpiration ?? '',
+          row.warrantyStatusLabel,
+          row.tenantHeaderStatusLabel,
+          row.alerts,
+        ]),
+        'No warranty records found for this customer.',
+      )
+    }
+
+    return <div className="text-sf-text-muted">Documents will appear here.</div>
+  }
 
   return (
     <div className="space-y-4">
@@ -115,20 +246,20 @@ export function Customer360Page() {
 
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         {readOnlyValue('Account ID', account.accountCode)}
-        {readOnlyValue('Account Manager', customer360.accountManager)}
+        {readOnlyValue('Account Manager', customer.accountManager)}
         {readOnlyValue('Region', account.region)}
         {readOnlyValue('Country', account.country)}
         {readOnlyValue('Customer Type', customerTypeLabel(account))}
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        {summaryCard('Opportunities', customer360.opportunities.length)}
+        {summaryCard('Opportunities', customer.opportunities.length)}
         {summaryCard('Open Projects', openProjects.length)}
-        {summaryCard('Systems', customer360.systems.length)}
-        {summaryCard('Tenants', customer360.tenants.length)}
-        {summaryCard('Under Contract', customer360.warrantySummary.underContract)}
-        {summaryCard('Out Of Contract', customer360.warrantySummary.outOfContract)}
-        {summaryCard('Expiring 30 Days', customer360.warrantySummary.expiring30)}
+        {summaryCard('Systems', customer.systems.length)}
+        {summaryCard('Tenants', customer.tenants.length)}
+        {summaryCard('Under Contract', customer.warrantySummary.underContract)}
+        {summaryCard('Out Of Contract', customer.warrantySummary.outOfContract)}
+        {summaryCard('Expiring 30 Days', customer.warrantySummary.expiring30)}
       </section>
 
       <section className="rounded border border-sf-border bg-sf-surface">
@@ -150,16 +281,7 @@ export function Customer360Page() {
           ))}
         </div>
         <div className="min-h-64 p-3 text-sm text-sf-text" role="tabpanel" aria-label={CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label}>
-          {activeTab === 'overview' ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {summaryCard('Total Opportunities', customer360.opportunities.length)}
-              {summaryCard('Open Projects', openProjects.length)}
-              {summaryCard('Active Tenants', customer360.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
-              {summaryCard('Warranty Renewal Candidates', customer360.warrantySummary.renewalCandidates)}
-            </div>
-          ) : (
-            <div className="text-sf-text-muted">{CUSTOMER_360_TABS.find((tab) => tab.id === activeTab)?.label} will appear here.</div>
-          )}
+          {renderTabContent()}
         </div>
       </section>
     </div>
