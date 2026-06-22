@@ -47,6 +47,7 @@ import {
   daysBeforeExpiration,
   daysBetween,
   displayWarrantyStatus,
+  parseWarrantyPredecessorReference,
   predecessorRefsForWarranty,
   predecessorReference,
   splitWarrantyPredecessors,
@@ -138,6 +139,11 @@ function configurationFromTenant(tenant: Tenant, system?: System): TenantConfigu
 
 function formatWarrantyRefs(refs: Array<{ warrantyId: string; tenantId: string }>): string {
   return refs.map((ref) => `${ref.warrantyId};${ref.tenantId}`).join('; ')
+}
+
+function formatWarrantyCompatibilityRef(value: string, fallbackTenantId: string): string {
+  const ref = parseWarrantyPredecessorReference(value, fallbackTenantId)
+  return `${ref.warrantyId};${ref.tenantId}`
 }
 
 function licenseNumber(sid: string, pid: string): string {
@@ -522,6 +528,35 @@ export function TenantFormPage() {
     setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
   }
 
+  function addWarrantyDialogPredecessor() {
+    if (!editingWarrantyId || !warrantyDialogDraft) return
+    const selection = predecessorSelections[editingWarrantyId]
+    if (!selection?.tenantId || !selection.warrantyId) return
+    const currentWarranty = draftComputedWarranties.find((warranty) => warranty.id === editingWarrantyId)
+    if (selection.tenantId === tenantDraft.id && selection.warrantyId === currentWarranty?.warrantyId) return
+    const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
+    if (!selectedTenant) return
+    const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
+    const currentValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
+    if (currentValues.includes(predecessorValue)) return
+    setWarrantyDialogDraft({
+      ...warrantyDialogDraft,
+      predecessor: [...currentValues, predecessorValue].join(';'),
+    })
+    setPredecessorSelections((current) => ({
+      ...current,
+      [editingWarrantyId]: { tenantId: selection.tenantId, warrantyId: '' },
+    }))
+  }
+
+  function removeWarrantyDialogPredecessor(value: string) {
+    if (!warrantyDialogDraft) return
+    setWarrantyDialogDraft({
+      ...warrantyDialogDraft,
+      predecessor: splitWarrantyPredecessors(warrantyDialogDraft.predecessor).filter((candidate) => candidate !== value).join(';'),
+    })
+  }
+
   function addWarranty() {
     if (!canManageWarranties) {
       setMessages([warrantyManageabilityMessage()])
@@ -534,33 +569,6 @@ export function TenantFormPage() {
       const warranty = createTenantWarranty(current, warranties, project, linkedOpportunityId)
       const nextWarranties = [...warranties, warranty]
       return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
-    })
-  }
-
-  function applyPredecessor(warrantyId: string) {
-    const selection = predecessorSelections[warrantyId]
-    if (!selection?.tenantId || !selection.warrantyId) return
-    const selectedWarranty = (tenantDraft.warranties ?? []).find((warranty) => warranty.id === warrantyId)
-    if (selection.tenantId === tenantDraft.id && selection.warrantyId === selectedWarranty?.warrantyId) return
-    const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
-    if (!selectedTenant) return
-    const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
-    setDraft((current) => {
-      if (!current) return current
-      const nextWarranties = (current.warranties ?? []).map((warranty) => {
-        if (warranty.id !== warrantyId) return warranty
-        const currentValues = splitWarrantyPredecessors(warranty.predecessor)
-        return {
-          ...warranty,
-          predecessor: currentValues.includes(predecessorValue)
-            ? warranty.predecessor
-            : [...currentValues, predecessorValue].join(';'),
-        }
-      })
-      return {
-        ...current,
-        warranties: computedWarrantiesForTenant(current, nextWarranties),
-      }
     })
   }
 
@@ -1101,56 +1109,12 @@ export function TenantFormPage() {
             </thead>
             <tbody>
               {warranties.map((warranty) => {
-                const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
-                const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
                 return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
                   <td className="border border-sf-border px-1.5 py-1 text-center">{warranty.firstWarranty ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
-                  <td className="min-w-[24rem] border border-sf-border px-1.5 py-1">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <select
-                        className="h-8 rounded border border-sf-border px-2 py-1"
-                        value={predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id}
-                        onChange={(event) =>
-                          setPredecessorSelections((current) => ({
-                            ...current,
-                            [warranty.id]: { tenantId: event.target.value, warrantyId: '' },
-                          }))
-                        }
-                      >
-                        {tenants.map((tenant) => (
-                          <option key={tenant.id} value={tenant.id}>{tenant.tid}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="h-8 rounded border border-sf-border px-2 py-1"
-                        value={predecessorSelections[warranty.id]?.warrantyId ?? ''}
-                        onChange={(event) =>
-                          setPredecessorSelections((current) => ({
-                            ...current,
-                            [warranty.id]: {
-                              tenantId: current[warranty.id]?.tenantId ?? tenantDraft.id,
-                              warrantyId: event.target.value,
-                            },
-                          }))
-                        }
-                      >
-                        <option value="">Warranty ID</option>
-                        {predecessorOptions
-                          .map(({ tenant, warranty: option }) => (
-                            <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
-                              {option.warrantyId}
-                            </option>
-                          ))}
-                      </select>
-                      <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => applyPredecessor(warranty.id)}>
-                        Add
-                      </button>
-                    </div>
-                    <input className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1" value={warranty.predecessor} onChange={(event) => updateWarranty(warranty.id, 'predecessor', event.target.value)} />
-                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
                   <td className="border border-sf-border px-1.5 py-1">
@@ -1194,6 +1158,9 @@ export function TenantFormPage() {
     if (!editingWarrantyId || !warrantyDialogDraft) return null
     const warranty = draftComputedWarranties.find((candidate) => candidate.id === editingWarrantyId)
     if (!warranty) return null
+    const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
+    const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
+    const predecessorValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
@@ -1220,6 +1187,58 @@ export function TenantFormPage() {
             <div className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Generated Status</span>
               <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">{displayWarrantyStatus(warranty.warrantyStatus)}</div>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Predecessors</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 rounded border border-sf-border px-2 py-1"
+                  value={selectedPredecessorTenantId}
+                  onChange={(event) =>
+                    setPredecessorSelections((current) => ({
+                      ...current,
+                      [warranty.id]: { tenantId: event.target.value, warrantyId: '' },
+                    }))
+                  }
+                >
+                  {tenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>{tenant.tid}</option>
+                  ))}
+                </select>
+                <select
+                  className="h-9 rounded border border-sf-border px-2 py-1"
+                  value={predecessorSelections[warranty.id]?.warrantyId ?? ''}
+                  onChange={(event) =>
+                    setPredecessorSelections((current) => ({
+                      ...current,
+                      [warranty.id]: {
+                        tenantId: current[warranty.id]?.tenantId ?? tenantDraft.id,
+                        warrantyId: event.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="">Warranty ID</option>
+                  {predecessorOptions.map(({ tenant, warranty: option }) => (
+                    <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
+                      {option.warrantyId}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarrantyDialogPredecessor}>
+                  Add predecessor
+                </button>
+              </div>
+              <div className="flex min-h-9 flex-wrap gap-2 rounded border border-sf-border bg-sf-surface-alt p-2">
+                {predecessorValues.length > 0 ? predecessorValues.map((value) => (
+                  <span key={value} className="inline-flex items-center gap-2 rounded border border-sf-border bg-white px-2 py-1 text-xs">
+                    {formatWarrantyCompatibilityRef(value, tenantDraft.tid)}
+                    <button type="button" className="font-semibold text-red-700" aria-label={`Remove ${formatWarrantyCompatibilityRef(value, tenantDraft.tid)}`} onClick={() => removeWarrantyDialogPredecessor(value)}>
+                      ×
+                    </button>
+                  </span>
+                )) : <span className="text-sm text-sf-text-muted">No predecessors selected.</span>}
+              </div>
             </div>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
