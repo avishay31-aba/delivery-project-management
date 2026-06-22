@@ -35,7 +35,7 @@ import {
   type SavedDashboardViewState,
 } from '@/store/dashboardViews'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
-import { RecordChangeBadge, recordChangeState } from '@/components/ui'
+import { AlertStatusIcon, RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 export interface DashboardColumn<T> {
@@ -1427,9 +1427,12 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
         </div>
 
         {hiddenFilteredColumns.length > 0 ? (
-          <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
-            <span className="font-semibold">Hidden filtered columns:</span> {hiddenFilteredColumnNames.join(', ')}.
-            {' '}These hidden columns are still filtering the visible records.
+          <div className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+            <AlertStatusIcon variant="warning" label="Hidden filtered columns warning" className="mt-0.5" />
+            <span>
+              <span className="font-semibold">Hidden filtered columns:</span> {hiddenFilteredColumnNames.join(', ')}.
+              {' '}These hidden columns are still filtering the visible records.
+            </span>
           </div>
         ) : null}  
 
