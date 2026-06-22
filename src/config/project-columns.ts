@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { ProgressBar } from '@/components/ui'
+import { LinkId, ProgressBar } from '@/components/ui'
 import type { Project } from '@/data/seed.types'
 import {
   projectDashboardCurrentMilestone,
@@ -18,7 +18,7 @@ import {
 } from '@/domain/project-lifecycle'
 
 export const projectListColumns: DashboardColumn<Project>[] = [
-  { id: 'pid', label: 'PID#', getValue: (r) => r.pid },
+  { id: 'pid', label: 'PID#', getValue: (r) => r.pid, render: (r) => createElement(LinkId, { to: `/projects/${r.pid}` }, r.pid) },
   { id: 'projectName', label: 'Project Name', getValue: projectDashboardProjectName, editable: true, editKey: 'opportunityName' },
   { id: 'endUser', label: 'End User', getValue: projectDashboardEndUser, editable: true, editKey: 'accountName' },
   { id: 'payingCustomer', label: 'Paying Paying customer', getValue: projectDashboardPayingCustomer },

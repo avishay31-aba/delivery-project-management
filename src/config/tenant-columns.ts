@@ -1,4 +1,6 @@
+import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import { CountryFlag, LinkId } from '@/components/ui'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
@@ -28,17 +30,27 @@ function tenantRuntimeColumn(
 
 export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[] {
   return [
-    tenantRuntimeColumn('tid'),
+    { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(LinkId, { to: `/tenants/${row.tid}` }, row.tid) },
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
     { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
     { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
     { id: 'sid', label: 'SID', getValue: (row) => sidForTenant(row, systems) },
     { id: 'systemId', label: 'System ID/reference', getValue: (row) => row.systemId },
-    { id: 'deliveryPid', label: 'Delivery PID', getValue: (row) => row.deliveryPid ?? '' },
+    {
+      id: 'deliveryPid',
+      label: 'Delivery PID',
+      getValue: (row) => row.deliveryPid ?? '',
+      render: (row) => row.deliveryPid ? createElement(LinkId, { to: `/projects/${row.deliveryPid}` }, row.deliveryPid) : '',
+    },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
-    { id: 'mapCenter', label: 'Map Center', getValue: (row) => row.mapCenter ?? row.country },
+    {
+      id: 'mapCenter',
+      label: 'Map Center',
+      getValue: (row) => row.mapCenter ?? row.country,
+      render: (row) => createElement(CountryFlag, { value: row.mapCenter ?? row.country, country: row.country }),
+    },
     { id: 'licenses', label: 'Licenses', getValue: (row) => row.licenses ?? '' },
     { id: 'users', label: 'Users', getValue: (row) => row.users ?? '' },
     { id: 'concurrentSearches', label: 'Concurrent Searches', getValue: (row) => row.concurrentSearches ?? '' },

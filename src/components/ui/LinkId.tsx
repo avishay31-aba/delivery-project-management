@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 
 interface LinkIdProps {
   to: string
-  children: string
+  children?: ReactNode
   className?: string
 }
 

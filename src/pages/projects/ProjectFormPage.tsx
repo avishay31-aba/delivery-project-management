@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { FormField, PlaceholderCard, ProgressBar } from '@/components/ui'
+import { FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
@@ -178,20 +178,6 @@ function allocationStatusClassName(result: AllocationActionResult | null): strin
   return result.ok
     ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
     : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
-}
-
-function isNewRecord(record: { createdAt?: string; updatedAt?: string }): boolean {
-  return Boolean(record.createdAt && record.updatedAt && record.createdAt === record.updatedAt)
-}
-
-function NewRecordBadge({ record }: { record: { createdAt?: string; updatedAt?: string } }) {
-  if (!isNewRecord(record)) return null
-
-  return (
-    <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
-      New
-    </span>
-  )
 }
 
 function formatReadOnlyDetailValue(value: unknown): string {
@@ -1404,17 +1390,17 @@ export function ProjectFormPage() {
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                           <span className="inline-flex items-center gap-2">
-                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                            <LinkId to={systemRoutePath(system)}>
                               {system.sid ?? system.machineId ?? system.id}
-                            </Link>
-                            <NewRecordBadge record={system} />
+                            </LinkId>
+                            <RecordChangeBadge record={system} />
                           </span>
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                           {system.machineId ? (
-                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                            <LinkId to={systemRoutePath(system)}>
                               {system.machineId}
-                            </Link>
+                            </LinkId>
                           ) : null}
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
@@ -1476,25 +1462,27 @@ export function ProjectFormPage() {
                       <tr key={tenant.id} className="hover:bg-sf-surface-alt">
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                           <span className="inline-flex items-center gap-2">
-                            <Link className="font-medium text-sf-brand hover:underline" to={`/tenants/${tenant.tid}`}>
+                            <LinkId to={`/tenants/${tenant.tid}`}>
                               {tenant.tid}
-                            </Link>
-                            <NewRecordBadge record={tenant} />
+                            </LinkId>
+                            <RecordChangeBadge record={tenant} />
                           </span>
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          <Link className="font-medium text-sf-brand hover:underline" to={`/tenants/${tenant.tid}`}>
+                          <LinkId to={`/tenants/${tenant.tid}`}>
                             {tenant.tenantName}
-                          </Link>
+                          </LinkId>
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                           {system ? (
-                            <Link className="font-medium text-sf-brand hover:underline" to={systemRoutePath(system)}>
+                            <LinkId to={systemRoutePath(system)}>
                               {system.sid ?? system.machineId ?? ''}
-                            </Link>
+                            </LinkId>
                           ) : null}
                         </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.deliveryPid}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : null}
+                        </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
