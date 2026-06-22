@@ -50,7 +50,7 @@ import {
   displayWarrantyStatus,
   predecessorReference,
   splitWarrantyPredecessors,
-  tenantWarrantyHeaderStatusDisplay,
+  tenantWarrantyHeaderStatusReadModel,
   warrantyCanEditNoWarranty,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
@@ -300,7 +300,7 @@ export function TenantFormPage() {
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
-  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusDisplay(draftComputedWarranties)
+  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(draftComputedWarranties, tenantDraft.tid).label
 
   function warrantyOptionsForTenant(selectedTenantId: string, currentWarrantyId: string): Array<{ tenant: Tenant; warranty: TenantWarranty }> {
     if (selectedTenantId === tenantDraft.id) {
