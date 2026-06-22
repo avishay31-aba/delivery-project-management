@@ -3,7 +3,7 @@ import {
   WARRANTY_PENDING_ALERT,
   WARRANTY_STATUS_LABELS,
 } from './metadata'
-import type { TenantWarranty, WarrantyPredecessorRef, WarrantyRecord, WarrantyStatus } from './types'
+import type { TenantWarranty, WarrantyPredecessorRef, WarrantyRecord, WarrantyStatus, WarrantySuccessorRef } from './types'
 
 export function daysBetween(startDate: string | null, endDate: string | null): number | null {
   if (!startDate || !endDate) return null
@@ -111,10 +111,18 @@ export function predecessorRefsForWarranty(warranty: TenantWarranty, fallbackTen
   return splitWarrantyPredecessors(warranty.predecessor).map((value) => parseWarrantyPredecessorReference(value, fallbackTenantId))
 }
 
-export function successorForWarranty(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): string {
+export function successorRefsForWarranty(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): WarrantySuccessorRef[] {
   return warranties
-    .find((candidate) => splitWarrantyPredecessors(candidate.predecessor).includes(predecessorReference(warranty.warrantyId, tenantTid)))
-    ?.warrantyId ?? warranty.successor ?? ''
+    .filter((candidate) => predecessorRefsForWarranty(candidate, tenantTid).some((ref) => ref.warrantyId === warranty.warrantyId && ref.tenantId === tenantTid))
+    .map((candidate) => ({
+      warrantyId: candidate.warrantyId,
+      tenantId: tenantTid,
+      recordId: candidate.id,
+    }))
+}
+
+export function successorForWarranty(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): string {
+  return successorRefsForWarranty(warranty, warranties, tenantTid)[0]?.warrantyId ?? warranty.successor ?? ''
 }
 
 export function warrantyHasSuccessor(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): boolean {
