@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import { ProgressBar } from '@/components/ui'
 import type { Project } from '@/data/seed.types'
 import {
   projectDashboardCurrentMilestone,
@@ -15,21 +16,6 @@ import {
   projectDashboardStatus,
   projectDashboardType,
 } from '@/domain/project-lifecycle'
-
-function ProgressBar({ value }: { value: number }) {
-  const fillClassName = value >= 100 ? 'h-full bg-blue-900' : 'h-full bg-amber-500'
-
-  return createElement(
-    'div',
-    { className: 'min-w-32' },
-    createElement(
-      'div',
-      { className: 'h-3.5 overflow-hidden rounded-full bg-sf-surface-alt' },
-      createElement('div', { className: fillClassName, style: { width: `${value}%` } }),
-    ),
-    createElement('span', { className: 'mt-1 block text-xs text-sf-text-muted' }, `${value}%`),
-  )
-}
 
 export const projectListColumns: DashboardColumn<Project>[] = [
   { id: 'pid', label: 'PID#', getValue: (r) => r.pid },
@@ -54,7 +40,7 @@ export const projectListColumns: DashboardColumn<Project>[] = [
   { id: 'projectAlerts', label: 'Project Alerts', getValue: projectDashboardEmptyValue },
   { id: 'lastMilestone', label: 'Last Milestone', getValue: projectDashboardLastMilestone },
   { id: 'currentMilestone', label: 'Current Milestone', getValue: projectDashboardCurrentMilestone },
-  { id: 'percent', label: '%', getValue: projectDashboardPercent, render: (r) => createElement(ProgressBar, { value: projectDashboardPercent(r) }) },
+  { id: 'percent', label: '%', getValue: projectDashboardPercent, render: (r) => createElement(ProgressBar, { value: projectDashboardPercent(r), className: 'min-w-32' }) },
   { id: 'milestonesCompletion', label: 'Milestones Completion', getValue: projectDashboardMilestonesCompletion },
   { id: 'financialProfile', label: 'Financial Profile', getValue: projectDashboardEmptyValue },
   { id: 'directChannel', label: 'Direct/Channel', getValue: projectDashboardEmptyValue },

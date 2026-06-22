@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { FormField, PlaceholderCard } from '@/components/ui'
+import { FormField, PlaceholderCard, ProgressBar } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
@@ -901,11 +901,8 @@ export function ProjectFormPage() {
                         </button>
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
-                      <td className="w-20 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
-                        <div className="h-3.5 w-16 overflow-hidden rounded-full bg-sf-surface-alt">
-                          <div className={progress >= 100 ? 'h-full bg-blue-900' : 'h-full bg-amber-500'} style={{ width: `${progress}%` }} />
-                        </div>
-                        <span className="mt-1 block text-center text-xs text-sf-text-muted">{progress}%</span>
+                      <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                        <ProgressBar value={progress} className="min-w-20" />
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">{taskCount}</td>
                     </tr>
