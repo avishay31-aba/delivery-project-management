@@ -52,6 +52,7 @@ import {
   splitWarrantyPredecessors,
   successorRefsForWarranty,
   tenantWarrantyHeaderStatusReadModel,
+  isSelfWarrantyPredecessorSelection,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
@@ -508,7 +509,7 @@ export function TenantFormPage() {
     const selection = predecessorSelections[editingWarrantyId]
     if (!selection?.tenantId || !selection.warrantyId) return
     const currentWarranty = draftComputedWarranties.find((warranty) => warranty.id === editingWarrantyId)
-    if (selection.tenantId === tenantDraft.id && selection.warrantyId === currentWarranty?.warrantyId) return
+    if (currentWarranty && isSelfWarrantyPredecessorSelection(currentWarranty, tenantDraft.id, selection.tenantId, selection.warrantyId)) return
     const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
     const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
