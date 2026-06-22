@@ -13,14 +13,20 @@ import type {
   ChangeRequestRequirement,
   Opportunity,
   Project,
+  ProjectDeliveryDateStatus,
+  ProjectHealthReadModel,
+  ProjectHealthStatus,
   ProjectLifecycleContext,
   ProjectRequirementRow,
+  ProjectSystemsTenantsContext,
   ProjectSystemLink,
   ProjectTenantLink,
   StandardRenewalRequirement,
   System,
   Tenant,
 } from './types'
+
+const UPCOMING_DELIVERY_RISK_DAYS = 14
 
 export function projectLifecycleIdentity(project: Project): Project {
   return project
@@ -78,6 +84,99 @@ export function projectStatusLabel(status: string): string {
   if (status === 'DONE') return 'Done'
   if (status === 'IN_PROGRESS') return 'In progress'
   return 'Open'
+}
+
+export function projectHealthStatusLabel(status: ProjectHealthStatus): string {
+  if (status === 'COMPLETED') return 'Completed'
+  if (status === 'AT_RISK') return 'At Risk'
+  if (status === 'BLOCKED') return 'Blocked'
+  if (status === 'WARNING') return 'Warning'
+  return 'Healthy'
+}
+
+export function projectDeliveryDateStatusLabel(status: ProjectDeliveryDateStatus): string {
+  if (status === 'COMPLETED') return 'Completed'
+  if (status === 'OVERDUE') return 'Overdue'
+  if (status === 'UPCOMING_RISK') return 'Upcoming Risk'
+  if (status === 'ON_TRACK') return 'On Track'
+  return 'Not Set'
+}
+
+function dateOnly(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate())
+}
+
+function parseDateOnly(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : dateOnly(parsed)
+}
+
+export function projectDeliveryDateStatus(project: Project, completed: boolean, today = new Date()): ProjectDeliveryDateStatus {
+  if (completed) return 'COMPLETED'
+  const deliveryDate = parseDateOnly(project.deliveryDate)
+  if (!deliveryDate) return 'NOT_SET'
+  const todayDate = dateOnly(today)
+  const dayDifference = Math.ceil((deliveryDate.getTime() - todayDate.getTime()) / 86_400_000)
+  if (dayDifference < 0) return 'OVERDUE'
+  if (dayDifference <= UPCOMING_DELIVERY_RISK_DAYS) return 'UPCOMING_RISK'
+  return 'ON_TRACK'
+}
+
+export function projectTaskCounts(project: Project): { openTaskCount: number; completedTaskCount: number } {
+  const tasks = project.tasks ?? []
+  return {
+    openTaskCount: tasks.filter((task) => task.status !== 'DONE').length,
+    completedTaskCount: tasks.filter((task) => task.status === 'DONE').length,
+  }
+}
+
+export function projectHealthReadModel(
+  context: ProjectSystemsTenantsContext,
+  today = new Date(),
+): ProjectHealthReadModel {
+  const progress = deriveProjectProgress(context.project)
+  const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
+  const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
+  const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
+  const linkedTenants = linkedTenantsForProject(context.project, linkedSystems, context.projectTenants, context.tenants)
+  const taskCounts = projectTaskCounts(context.project)
+  const deliveryDateStatus = projectDeliveryDateStatus(context.project, completed, today)
+  const missingSystems = activeSystemLinks.length === 0
+  const missingTenants = linkedTenants.length === 0
+  const healthAlerts = [
+    deliveryDateStatus === 'OVERDUE' ? 'Delivery date overdue' : null,
+    deliveryDateStatus === 'UPCOMING_RISK' ? 'Delivery date approaching' : null,
+    missingSystems ? 'Missing system allocation' : null,
+    missingTenants ? 'Missing tenant allocation' : null,
+  ].filter((alert): alert is string => Boolean(alert))
+
+  const healthStatus: ProjectHealthStatus = completed
+    ? 'COMPLETED'
+    : deliveryDateStatus === 'OVERDUE'
+      ? 'AT_RISK'
+      : healthAlerts.length > 0
+        ? 'WARNING'
+        : 'HEALTHY'
+
+  return {
+    projectId: context.project.id,
+    pid: context.project.pid,
+    healthStatus,
+    healthLabel: projectHealthStatusLabel(healthStatus),
+    healthAlerts,
+    completionPercent: progress.percent,
+    currentMilestone: progress.currentMilestone,
+    lastCompletedMilestone: progress.lastMilestone,
+    openTaskCount: taskCounts.openTaskCount,
+    completedTaskCount: taskCounts.completedTaskCount,
+    activeSystemCount: activeSystemLinks.length,
+    activeTenantCount: linkedTenants.length,
+    missingSystems,
+    missingTenants,
+    deliveryDateStatus,
+    deliveryDateStatusLabel: projectDeliveryDateStatusLabel(deliveryDateStatus),
+  }
 }
 
 export function projectListRowClassName(project: Project): string {
