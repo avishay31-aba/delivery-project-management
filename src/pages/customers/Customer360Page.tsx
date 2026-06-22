@@ -11,6 +11,7 @@ import {
   customerProjectProgress,
   customerTypeLabel,
 } from '@/domain/customer-account'
+import { formatDocumentSize } from '@/domain/document-collection'
 import { systemIdentity, systemRoutePath } from '@/domain/system-inventory'
 import {
   warrantyDashboardRows,
@@ -237,7 +238,21 @@ export function Customer360Page() {
       )
     }
 
-    return <div className="text-sf-text-muted">Documents will appear here.</div>
+    return readOnlyTable(
+      ['File', 'Source Type', 'Source ID', 'Source Name', 'Type', 'Size', 'Uploaded At', 'Replaced At', 'Open'],
+      customer.documents.map((document) => [
+        document.fileName,
+        document.sourceObjectType,
+        document.sourceObjectId,
+        document.sourceObjectName,
+        document.fileType,
+        formatDocumentSize(document.fileSize),
+        document.uploadedAt,
+        document.replacedAt ?? '',
+        document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : '',
+      ]),
+      'No documents found across this customer portfolio.',
+    )
   }
 
   return (
