@@ -110,6 +110,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
       reusedInternalSystems: sanitizeDashboardScopeViews(value.dashboards.reusedInternalSystems),
       systems: sanitizeDashboardScopeViews(value.dashboards.systems),
       tenants: sanitizeDashboardScopeViews(value.dashboards.tenants),
+      warranties: sanitizeDashboardScopeViews(value.dashboards.warranties),
       customers: sanitizeDashboardScopeViews(value.dashboards.customers),
     },
   }

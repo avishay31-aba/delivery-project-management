@@ -11,5 +11,6 @@ export const DASHBOARD_VIEW_SCOPES: DashboardViewScope[] = [
   'productionSystemInventory',
   'reusedInternalSystems',
   'tenants',
+  'warranties',
   'customers',
 ]

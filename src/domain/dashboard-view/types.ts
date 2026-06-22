@@ -5,6 +5,7 @@ export type DashboardViewScope =
   | 'productionSystemInventory'
   | 'reusedInternalSystems'
   | 'tenants'
+  | 'warranties'
   | 'customers'
 
 export interface DashboardViewColumnFilter {
