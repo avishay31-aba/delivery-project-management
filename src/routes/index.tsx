@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '@/layouts/AppShell'
 import { OpportunityListPage } from '@/pages/opportunities/OpportunityListPage'
 import { OpportunityFormPage } from '@/pages/opportunities/OpportunityFormPage'
+import { Customer360Page } from '@/pages/customers/Customer360Page'
 import { CustomerListPage } from '@/pages/customers/CustomerListPage'
 import { ProjectListPage } from '@/pages/projects/ProjectListPage'
 import { ProjectFormPage } from '@/pages/projects/ProjectFormPage'
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/projects" replace /> },
       { path: 'customers', element: <CustomerListPage /> },
+      { path: 'customers/:accountCode', element: <Customer360Page /> },
       { path: 'accounts', element: <CustomerListPage /> },
       { path: 'opportunities', element: <OpportunityListPage /> },
       { path: 'opportunities/:opportunityId', element: <OpportunityFormPage /> },
