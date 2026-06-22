@@ -15,6 +15,7 @@ import {
 } from '@/pages/systems/SystemInventoryFormPages'
 import { TenantListPage } from '@/pages/tenants/TenantListPage'
 import { TenantFormPage } from '@/pages/tenants/TenantFormPage'
+import { WarrantyDashboardPage } from '@/pages/warranties/WarrantyDashboardPage'
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       { path: 'systems/:sid', element: <SystemFormPage /> },
       { path: 'tenants', element: <TenantListPage /> },
       { path: 'tenants/:tid', element: <TenantFormPage /> },
+      { path: 'warranties', element: <WarrantyDashboardPage /> },
     ],
   },
 ])
