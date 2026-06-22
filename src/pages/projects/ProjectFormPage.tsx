@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge } from '@/components/ui'
+import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, StatusBadge } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
@@ -47,6 +47,8 @@ import {
   projectRequirementRows,
   projectRequirementTitle,
   projectHeaderFieldValue,
+  projectHealthReadModel,
+  type ProjectHealthStatus,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
   projectStatusLabel,
@@ -227,6 +229,20 @@ function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
   return <Square className="h-8 w-8 fill-emerald-100 stroke-[3] text-emerald-600" aria-label="Task status: Open" />
 }
 
+function projectHealthBadgeVariant(status: ProjectHealthStatus) {
+  if (status === 'COMPLETED') return 'done'
+  if (status === 'AT_RISK' || status === 'BLOCKED') return 'error'
+  if (status === 'WARNING') return 'warning'
+  return 'default'
+}
+
+function projectHealthAlertVariant(status: ProjectHealthStatus) {
+  if (status === 'AT_RISK' || status === 'BLOCKED') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  if (status === 'COMPLETED') return 'success'
+  return 'info'
+}
+
 function CollapsibleSection({
   title,
   subtitle,
@@ -393,6 +409,16 @@ export function ProjectFormPage() {
   const linkedTenants = useMemo(() => {
     return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants)
   }, [currentDraft, linkedSystems, projectTenants, tenants])
+  const projectHealth = useMemo(() => {
+    if (!currentDraft) return null
+    return projectHealthReadModel({
+      project: currentDraft,
+      systems,
+      tenants,
+      projectSystems,
+      projectTenants,
+    })
+  }, [currentDraft, projectSystems, projectTenants, systems, tenants])
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
 
@@ -1521,6 +1547,49 @@ export function ProjectFormPage() {
             <div key={message}>{message}</div>
           ))}
         </div>
+      ) : null}
+
+      {projectHealth ? (
+        <section className="mb-4 rounded border border-sf-border bg-white p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold text-sf-text">Delivery Health</h2>
+              <p className="text-sm text-sf-text-muted">Read-only delivery summary from current project, milestone, and allocation data.</p>
+            </div>
+            <StatusBadge label={projectHealth.healthLabel} variant={projectHealthBadgeVariant(projectHealth.healthStatus)} />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5">
+              <div className="text-xs font-semibold uppercase text-sf-text-muted">Completion</div>
+              <ProgressBar value={projectHealth.completionPercent} className="mt-1 min-w-0" />
+            </div>
+            {[
+              ['Current Milestone', projectHealth.currentMilestone || '-'],
+              ['Last Completed', projectHealth.lastCompletedMilestone || '-'],
+              ['Open Tasks', projectHealth.openTaskCount],
+              ['Completed Tasks', projectHealth.completedTaskCount],
+              ['Systems Allocated', projectHealth.activeSystemCount],
+              ['Tenants Allocated', projectHealth.activeTenantCount],
+              ['Delivery Date Status', projectHealth.deliveryDateStatusLabel],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5">
+                <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
+                <div className="mt-1 text-sm font-medium text-sf-text">{value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 text-sm text-sf-text">
+            <span className="mr-2 text-xs font-semibold uppercase text-sf-text-muted">Alerts</span>
+            {projectHealth.healthAlerts.length > 0 ? (
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <AlertStatusIcon variant={projectHealthAlertVariant(projectHealth.healthStatus)} label={projectHealth.healthAlerts.join('; ')} />
+                {projectHealth.healthAlerts.join('; ')}
+              </span>
+            ) : (
+              <span>-</span>
+            )}
+          </div>
+        </section>
       ) : null}
 
       <CollapsibleSection
