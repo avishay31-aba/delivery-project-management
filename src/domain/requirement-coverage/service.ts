@@ -1,4 +1,6 @@
 import { createdProjectsForOpportunity } from '@/domain/opportunity-lifecycle'
+import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { systemIdentity, systemSource } from '@/domain/system-inventory'
 import {
   REQUIREMENT_COVERAGE_MISSING_STEP_LABELS,
   REQUIREMENT_COVERAGE_STATUS_LABELS,
@@ -6,6 +8,9 @@ import {
 import { requirementCoverageSources } from './adapters'
 import type {
   Project,
+  ProjectSystemLink,
+  System,
+  Tenant,
   RequirementCoverageContext,
   RequirementCoverageMissingStep,
   RequirementCoverageRow,
@@ -43,6 +48,66 @@ function requirementCloudPlatform(source: RequirementCoverageSource): string {
 
 function requirementDeploymentTarget(source: RequirementCoverageSource): string {
   return 'deployTarget' in source.requirement ? source.requirement.deployTarget : ''
+}
+
+function sourceRequirementIdCount(source: RequirementCoverageSource): number {
+  if (!source.requirement.requirementId) return 0
+  const rows =
+    source.requirementType === 'A'
+      ? source.opportunity.newTenantRequirements
+      : source.requirementType === 'B'
+        ? source.opportunity.changeRequestRequirements
+        : source.opportunity.standardRenewalRequirements
+  return rows.filter((row) => row.requirementId === source.requirement.requirementId).length
+}
+
+function activeSystemLinksForProjects(projects: Project[], projectSystems: ProjectSystemLink[]): ProjectSystemLink[] {
+  const projectIds = new Set(projects.map((project) => project.id))
+  return activeProjectSystemLinks(projectSystems).filter((link) => projectIds.has(link.projectId))
+}
+
+function systemsForLinks(links: ProjectSystemLink[], systems: System[]): System[] {
+  const systemIds = new Set(links.map((link) => link.systemId))
+  return systems.filter((system) => systemIds.has(system.id))
+}
+
+function tenantsForActiveLinks(projects: Project[], tenants: Tenant[], context: RequirementCoverageContext): Tenant[] {
+  const projectIds = new Set(projects.map((project) => project.id))
+  const tenantIds = new Set(
+    activeProjectTenantLinks(context.projectTenants)
+      .filter((link) => projectIds.has(link.projectId))
+      .map((link) => link.tenantId),
+  )
+  return tenants.filter((tenant) => tenantIds.has(tenant.id))
+}
+
+function tenantSystemId(tenant: Tenant): string {
+  return tenant.hostedSystemId ?? tenant.systemId
+}
+
+function firstSystemIdentity(systems: System[]): { systemId: string; sid: string; mid: string } {
+  const system = systems[0]
+  if (!system) return { systemId: '', sid: '', mid: '' }
+  const identity = systemIdentity(system)
+  return {
+    systemId: system.id,
+    sid: system.sid ?? '',
+    mid: system.machineId ?? (systemSource(system) === 'Reused Internal Systems' ? identity : ''),
+  }
+}
+
+function firstTenantIdentity(tenants: Tenant[]): { tenantId: string; tid: string } {
+  const tenant = tenants[0]
+  return {
+    tenantId: tenant?.id ?? '',
+    tid: tenant?.tid ?? '',
+  }
+}
+
+function coverageMissingConfiguration(source: RequirementCoverageSource): RequirementCoverageMissingStep | null {
+  if (!requirementHostingType(source)) return 'MISSING_HOSTING'
+  if (!requirementProduct(source)) return 'MISSING_PRODUCT_CONFIGURATION'
+  return null
 }
 
 function coverageRowBase(
@@ -83,6 +148,126 @@ function coverageRowBase(
   }
 }
 
+function coverageRowWithLinks(
+  source: RequirementCoverageSource,
+  linkedProjects: Project[],
+  systems: System[],
+  tenants: Tenant[],
+  status: RequirementCoverageStatus,
+  missingStep: RequirementCoverageMissingStep,
+  alerts: string[],
+): RequirementCoverageRow {
+  const systemIdentityFields = firstSystemIdentity(systems)
+  const tenantIdentityFields = firstTenantIdentity(tenants)
+  return {
+    ...coverageRowBase(source, linkedProjects, status, missingStep, alerts),
+    ...systemIdentityFields,
+    ...tenantIdentityFields,
+    linkedSystemCount: systems.length,
+    linkedTenantCount: tenants.length,
+  }
+}
+
+function deriveNewTenantCoverageRow(
+  source: RequirementCoverageSource,
+  context: RequirementCoverageContext,
+  linkedProjects: Project[],
+): RequirementCoverageRow {
+  const configurationMissingStep = coverageMissingConfiguration(source)
+  if (configurationMissingStep) {
+    return coverageRowWithLinks(
+      source,
+      linkedProjects,
+      [],
+      [],
+      'PARTIALLY_COVERED',
+      configurationMissingStep,
+      [REQUIREMENT_COVERAGE_MISSING_STEP_LABELS[configurationMissingStep]],
+    )
+  }
+
+  if (sourceRequirementIdCount(source) > 1) {
+    return coverageRowWithLinks(
+      source,
+      linkedProjects,
+      [],
+      [],
+      'UNKNOWN',
+      'MISSING_RELATED_REQUIREMENT_LINK',
+      ['Duplicate requirement ID prevents reliable tenant matching.'],
+    )
+  }
+
+  const activeSystemLinks = activeSystemLinksForProjects(linkedProjects, context.projectSystems)
+  const linkedSystems = systemsForLinks(activeSystemLinks, context.systems)
+  if (linkedSystems.length === 0) {
+    return coverageRowWithLinks(source, linkedProjects, [], [], 'PARTIALLY_COVERED', 'MISSING_SYSTEM_ALLOCATION', ['No active System allocation found.'])
+  }
+
+  const projectLinkedTenants = tenantsForActiveLinks(linkedProjects, context.tenants, context)
+  const linkedSystemIds = new Set(linkedSystems.map((system) => system.id))
+  const requirementTenants = context.tenants.filter(
+    (tenant) =>
+      tenant.sourceRequirementId === source.requirement.requirementId &&
+      linkedSystemIds.has(tenantSystemId(tenant)) &&
+      (projectLinkedTenants.length === 0 || projectLinkedTenants.some((linkedTenant) => linkedTenant.id === tenant.id)),
+  )
+
+  if (requirementTenants.length === 0) {
+    return coverageRowWithLinks(source, linkedProjects, linkedSystems, [], 'PARTIALLY_COVERED', 'MISSING_TENANT_CREATION', ['No Tenant created from this requirement.'])
+  }
+
+  return coverageRowWithLinks(source, linkedProjects, linkedSystems, requirementTenants, 'COVERED', 'NONE', [])
+}
+
+function deriveExistingTenantCoverageRow(
+  source: RequirementCoverageSource,
+  context: RequirementCoverageContext,
+  linkedProjects: Project[],
+): RequirementCoverageRow {
+  if (!('tenantId' in source.requirement) || !('systemId' in source.requirement)) {
+    return coverageRowWithLinks(source, linkedProjects, [], [], 'UNKNOWN', 'MISSING_DATA', ['Requirement is missing tenant or system references.'])
+  }
+
+  const requirement = source.requirement as { tenantId: string; systemId: string; warrantyRecordId?: string }
+  const tenant = context.tenants.find((candidate) => candidate.id === requirement.tenantId)
+  const system = context.systems.find((candidate) => candidate.id === requirement.systemId)
+  const warrantyExists =
+    source.requirementType !== 'C' ||
+    (Boolean(requirement.warrantyRecordId) && context.warrantyRecords.some((warranty) => warranty.warrantyRecordId === requirement.warrantyRecordId))
+
+  if (!tenant || !system) {
+    const missingStep = !tenant ? 'MISSING_TENANT_CREATION' : 'MISSING_SYSTEM_ALLOCATION'
+    return coverageRowWithLinks(
+      source,
+      linkedProjects,
+      system ? [system] : [],
+      tenant ? [tenant] : [],
+      'PARTIALLY_COVERED',
+      missingStep,
+      [!tenant ? 'Referenced Tenant was not found.' : 'Referenced System was not found.'],
+    )
+  }
+
+  if (tenantSystemId(tenant) !== system.id) {
+    return coverageRowWithLinks(
+      source,
+      linkedProjects,
+      [system],
+      [tenant],
+      'UNKNOWN',
+      'MISSING_RELATED_REQUIREMENT_LINK',
+      ['Referenced Tenant is not hosted on the referenced System.'],
+    )
+  }
+
+  if (!warrantyExists) {
+    return coverageRowWithLinks(source, linkedProjects, [system], [tenant], 'PARTIALLY_COVERED', 'MISSING_DATA', ['Referenced warranty context was not found.'])
+  }
+
+  return coverageRowWithLinks(source, linkedProjects, [system], [tenant], 'COVERED', 'NONE', [])
+}
+
 function deriveProjectOnlyCoverageRow(
   source: RequirementCoverageSource,
   context: RequirementCoverageContext,
@@ -92,7 +277,8 @@ function deriveProjectOnlyCoverageRow(
     return coverageRowBase(source, linkedProjects, 'UNCOVERED', 'MISSING_PROJECT', ['No linked Project found.'])
   }
 
-  return coverageRowBase(source, linkedProjects, 'PARTIALLY_COVERED', 'MISSING_SYSTEM_ALLOCATION', ['Project exists; coverage needs system and tenant checks.'])
+  if (source.requirementType === 'A') return deriveNewTenantCoverageRow(source, context, linkedProjects)
+  return deriveExistingTenantCoverageRow(source, context, linkedProjects)
 }
 
 export function requirementCoverageRows(context: RequirementCoverageContext): RequirementCoverageRow[] {
