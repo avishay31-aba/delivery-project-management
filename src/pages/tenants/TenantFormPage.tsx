@@ -27,6 +27,7 @@ import type {
   TenantFormType,
   TenantRemark,
   TenantWarranty,
+  YesNo,
 } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
@@ -1161,6 +1162,7 @@ export function TenantFormPage() {
     const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
     const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
     const predecessorValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
+    const hasSuccessors = successorRefsForWarranty(warranty, draftComputedWarranties, tenantDraft.tid).length > 0
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
@@ -1247,6 +1249,18 @@ export function TenantFormPage() {
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date</span>
               <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.endDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('endDate', event.target.value || null)} />
+            </label>
+            <label className="space-y-1">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">No Warranty</span>
+              <select
+                className="h-9 w-full rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                value={hasSuccessors ? 'NO' : warrantyDialogDraft.noWarranty === 'YES' ? 'YES' : 'NO'}
+                disabled={hasSuccessors}
+                title={hasSuccessors ? 'No Warranty is locked because this warranty has a successor.' : undefined}
+                onChange={(event) => updateWarrantyDialogDraft('noWarranty', event.target.value as YesNo)}
+              >
+                {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
             </label>
             <label className="space-y-1 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Remark</span>
