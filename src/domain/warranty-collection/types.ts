@@ -33,6 +33,45 @@ export interface TenantWarrantyHeaderStatusReadModel {
   label: string
 }
 
+export interface WarrantyDashboardRow {
+  id: string
+  warrantyId: string
+  customer: string
+  accountManager: string
+  tenantId: string
+  tenantTid: string
+  tenantName: string
+  sid: string
+  product: string
+  relatedProjectId: string
+  projectName: string
+  opportunityId: string
+  warrantyType: string
+  first: boolean
+  startDate: string | null
+  endDate: string | null
+  daysToExpiration: number | null
+  warrantyStatus: WarrantyStatus
+  warrantyStatusLabel: string
+  tenantHeaderStatus: TenantWarrantyHeaderStatus
+  tenantHeaderStatusLabel: string
+  alerts: string
+  predecessorCount: number
+  successorCount: number
+  isRenewalCandidate: boolean
+  isMissingRelatedProject: boolean
+}
+
+export interface WarrantyDashboardContext {
+  tenants: Tenant[]
+  accountNameForTenant: (tenant: Tenant) => string
+  accountManagerForTenant: (tenant: Tenant) => string
+  tenantNameForTenant: (tenant: Tenant) => string
+  sidForTenant: (tenant: Tenant) => string
+  productForTenant: (tenant: Tenant) => string
+  projectNameForProjectId: (projectId: string) => string
+}
+
 export interface WarrantyCollectionContext {
   tenant: Tenant
   projects: Project[]

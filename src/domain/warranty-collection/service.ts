@@ -6,6 +6,8 @@ import {
 import type {
   TenantWarranty,
   TenantWarrantyHeaderStatusReadModel,
+  WarrantyDashboardContext,
+  WarrantyDashboardRow,
   WarrantyPredecessorRef,
   WarrantyRecord,
   WarrantyRowReadModel,
@@ -199,6 +201,49 @@ export function tenantWarrantyHeaderStatusReadModelFromRows(rows: WarrantyRowRea
 
 export function tenantWarrantyHeaderStatusReadModel(warranties: TenantWarranty[], tenantTid: string): TenantWarrantyHeaderStatusReadModel {
   return tenantWarrantyHeaderStatusReadModelFromRows(warrantyCollectionReadModel(warranties, tenantTid))
+}
+
+export function isWarrantyRenewalCandidate(row: WarrantyRowReadModel): boolean {
+  return row.generatedStatus === 'PENDING' || row.generatedStatus === 'EXPIRED'
+}
+
+export function warrantyDashboardRows(context: WarrantyDashboardContext): WarrantyDashboardRow[] {
+  return context.tenants.flatMap((tenant) => {
+    const warrantyRows = warrantyCollectionReadModel(tenant.warranties ?? [], tenant.tid)
+    const headerStatus = tenantWarrantyHeaderStatusReadModelFromRows(warrantyRows)
+
+    return warrantyRows.map((row) => {
+      const warranty = row.warranty
+      return {
+        id: `${tenant.id}:${warranty.id}`,
+        warrantyId: warranty.warrantyId,
+        customer: context.accountNameForTenant(tenant),
+        accountManager: context.accountManagerForTenant(tenant),
+        tenantId: tenant.id,
+        tenantTid: tenant.tid,
+        tenantName: context.tenantNameForTenant(tenant),
+        sid: context.sidForTenant(tenant),
+        product: context.productForTenant(tenant),
+        relatedProjectId: warranty.relatedProjectId,
+        projectName: context.projectNameForProjectId(warranty.relatedProjectId),
+        opportunityId: warranty.opportunityId,
+        warrantyType: warranty.warrantyType,
+        first: row.firstWarranty,
+        startDate: warranty.startDate,
+        endDate: warranty.endDate,
+        daysToExpiration: daysBeforeExpiration(warranty.endDate),
+        warrantyStatus: row.generatedStatus,
+        warrantyStatusLabel: displayWarrantyStatus(row.generatedStatus),
+        tenantHeaderStatus: headerStatus.status,
+        tenantHeaderStatusLabel: headerStatus.label,
+        alerts: row.alert,
+        predecessorCount: row.predecessorRefs.length,
+        successorCount: row.successorRefs.length,
+        isRenewalCandidate: isWarrantyRenewalCandidate(row),
+        isMissingRelatedProject: !warranty.relatedProjectId,
+      }
+    })
+  })
 }
 
 export function warrantySummaryForAccount(accountId: string, tenants: Array<{ id: string; accountId: string }>, warrantyRecords: WarrantyRecord[]): string {
