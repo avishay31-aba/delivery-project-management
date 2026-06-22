@@ -1,5 +1,9 @@
-import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
+import { projectDashboardPercent } from '@/domain/project-lifecycle'
+import { systemIdentity } from '@/domain/system-inventory'
+import type { Account, Opportunity, Project, SalesManager, System, Tenant } from '@/data/seed.types'
+import { warrantyDashboardSummary, type WarrantyDashboardRow } from '@/domain/warranty-collection'
 import { CUSTOMER_TYPE_LABELS } from './metadata'
+import type { CustomerDocumentReadModel, CustomerAccount360ReadModel } from './types'
 
 export function joinCustomerPortfolioValues(values: Array<string | null | undefined>): string {
   return values.filter((value): value is string => Boolean(value)).join(';')
@@ -56,4 +60,94 @@ export function customerTidList(accountId: string, tenants: Tenant[]): string {
 
 export function customerTenantNameList(accountId: string, tenants: Tenant[]): string {
   return joinCustomerPortfolioValues(customerTenants(accountId, tenants).map(customerTenantDisplayName))
+}
+
+export function customerOpportunities(accountId: string, opportunities: Opportunity[]): Opportunity[] {
+  return opportunities.filter((opportunity) => opportunity.accountId === accountId)
+}
+
+export function customerProjects(account: Account, opportunities: Opportunity[], projects: Project[]): Project[] {
+  const opportunityIds = new Set(customerOpportunities(account.id, opportunities).map((opportunity) => opportunity.opportunityId))
+  return projects.filter((project) => {
+    if (project.opportunityId && opportunityIds.has(project.opportunityId)) return true
+    return project.accountName === account.accountName
+  })
+}
+
+export function customerRelatedSystems(
+  accountId: string,
+  systems: System[],
+  tenants: Tenant[],
+  projects: Project[] = [],
+): System[] {
+  const tenantSystemIds = new Set(customerTenants(accountId, tenants).map((tenant) => tenant.hostedSystemId ?? tenant.systemId).filter(Boolean))
+  const projectIds = new Set(projects.map((project) => project.id))
+  return systems.filter((system) => {
+    if (system.accountId === accountId) return true
+    if (tenantSystemIds.has(system.id)) return true
+    return system.linkedProjectIds?.some((projectId) => projectIds.has(projectId)) ?? false
+  })
+}
+
+export function customerWarrantyRowsForTenants(tenants: Tenant[], warrantyRows: WarrantyDashboardRow[]): WarrantyDashboardRow[] {
+  const tenantIds = new Set(tenants.map((tenant) => tenant.id))
+  return warrantyRows.filter((row) => tenantIds.has(row.tenantId))
+}
+
+export function customerOpenProjects(projects: Project[]): Project[] {
+  return projects.filter((project) => project.progressStatus !== 'DONE')
+}
+
+export function customerDocumentReadModels(projects: Project[], systems: System[], tenants: Tenant[]): CustomerDocumentReadModel[] {
+  return [
+    ...projects.flatMap((project) => (project.documents ?? []).map((document) => ({
+      ...document,
+      sourceObjectType: 'Project' as const,
+      sourceObjectId: project.pid,
+      sourceObjectName: project.opportunityName || project.pid,
+    }))),
+    ...systems.flatMap((system) => (system.documents ?? []).map((document) => ({
+      ...document,
+      sourceObjectType: 'System' as const,
+      sourceObjectId: systemIdentity(system),
+      sourceObjectName: systemIdentity(system),
+    }))),
+    ...tenants.flatMap((tenant) => (tenant.documents ?? []).map((document) => ({
+      ...document,
+      sourceObjectType: 'Tenant' as const,
+      sourceObjectId: tenant.tid,
+      sourceObjectName: customerTenantDisplayName(tenant),
+    }))),
+  ]
+}
+
+export function customerAccount360ReadModel(input: {
+  account: Account
+  salesManagers: SalesManager[]
+  opportunities: Opportunity[]
+  projects: Project[]
+  systems: System[]
+  tenants: Tenant[]
+  warrantyRows: WarrantyDashboardRow[]
+}): CustomerAccount360ReadModel {
+  const opportunities = customerOpportunities(input.account.id, input.opportunities)
+  const projects = customerProjects(input.account, input.opportunities, input.projects)
+  const tenants = customerTenants(input.account.id, input.tenants)
+  const systems = customerRelatedSystems(input.account.id, input.systems, tenants, projects)
+  const warrantyRows = customerWarrantyRowsForTenants(tenants, input.warrantyRows)
+  return {
+    account: input.account,
+    accountManager: accountManagerDisplayName(input.account.salesManagerId, input.salesManagers),
+    opportunities,
+    projects,
+    systems,
+    tenants,
+    warrantyRows,
+    warrantySummary: warrantyDashboardSummary(warrantyRows),
+    documents: customerDocumentReadModels(projects, systems, tenants),
+  }
+}
+
+export function customerProjectProgress(project: Project): string {
+  return `${projectDashboardPercent(project)}%`
 }
