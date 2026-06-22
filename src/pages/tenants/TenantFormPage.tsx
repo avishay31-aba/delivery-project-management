@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -27,7 +27,6 @@ import type {
   TenantFormType,
   TenantRemark,
   TenantWarranty,
-  YesNo,
 } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
@@ -48,10 +47,11 @@ import {
   daysBeforeExpiration,
   daysBetween,
   displayWarrantyStatus,
+  predecessorRefsForWarranty,
   predecessorReference,
   splitWarrantyPredecessors,
+  successorRefsForWarranty,
   tenantWarrantyHeaderStatusReadModel,
-  warrantyCanEditNoWarranty,
   warrantyManageabilityMessage,
 } from '@/domain/warranty-collection'
 import {
@@ -133,6 +133,10 @@ function formatLocalTimestamp(value = new Date()): string {
 
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
   return tenantConfigurationFromTenant(tenant, system)
+}
+
+function formatWarrantyRefs(refs: Array<{ warrantyId: string; tenantId: string }>): string {
+  return refs.map((ref) => `${ref.warrantyId};${ref.tenantId}`).join('; ')
 }
 
 function licenseNumber(sid: string, pid: string): string {
@@ -1032,9 +1036,9 @@ export function TenantFormPage() {
             rows={warranties.map((warranty) => [
               warranty.warrantyId,
               warranty.warrantyType,
-              warranty.firstWarranty ? 'Yes' : 'No',
-              warranty.predecessor,
-              warranty.successor,
+              warranty.firstWarranty ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : '',
+              formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid)),
+              formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid)),
               warranty.accountId,
               warranty.relatedProjectId,
               warranty.opportunityId,
@@ -1065,7 +1069,7 @@ export function TenantFormPage() {
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['Warranty ID', 'Warranty Type', 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'No Warranty', 'Out of Contract', 'Warranty Status', 'Alerts', 'Remark', 'Action'].map((header) => (
+                {['Warranty ID', 'Warranty Type', 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark', 'Action'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
                 ))}
               </tr>
@@ -1074,12 +1078,11 @@ export function TenantFormPage() {
               {warranties.map((warranty) => {
                 const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
                 const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
-                const canEditNoWarranty = warrantyCanEditNoWarranty(warranty, warranties, tenantDraft.tid)
                 return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
-                  <td className="border border-sf-border px-1.5 py-1 text-center">{warranty.firstWarranty ? 'Yes' : 'No'}</td>
+                  <td className="border border-sf-border px-1.5 py-1 text-center">{warranty.firstWarranty ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
                   <td className="min-w-[24rem] border border-sf-border px-1.5 py-1">
                     <div className="flex flex-wrap items-center gap-1">
                       <select
@@ -1123,7 +1126,7 @@ export function TenantFormPage() {
                     </div>
                     <input className="mt-1 h-8 w-full rounded border border-sf-border px-2 py-1" value={warranty.predecessor} onChange={(event) => updateWarranty(warranty.id, 'predecessor', event.target.value)} />
                   </td>
-                  <td className="border border-sf-border px-1.5 py-1">{warranty.successor}</td>
+                  <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
                   <td className="border border-sf-border px-1.5 py-1">
                     <select className="h-8 w-56 rounded border border-sf-border px-2 py-1" value={warranty.relatedProjectId} onChange={(event) => updateWarranty(warranty.id, 'relatedProjectId', event.target.value)}>
@@ -1140,22 +1143,6 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={warranty.endDate ?? ''} onChange={(event) => updateWarranty(warranty.id, 'endDate', event.target.value || null)} /></td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <select
-                      className="h-8 rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
-                      value={warranty.noWarranty === 'YES' ? 'YES' : 'NO'}
-                      disabled={!canEditNoWarranty}
-                      title={canEditNoWarranty ? undefined : 'No Warranty is locked because this warranty has a successor.'}
-                      onChange={(event) => updateWarranty(warranty.id, 'noWarranty', event.target.value as YesNo)}
-                    >
-                      {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 rounded border border-sf-border px-2 py-1" value={warranty.outOfContract === 'YES' ? 'YES' : 'NO'} onChange={(event) => updateWarranty(warranty.id, 'outOfContract', event.target.value as YesNo)}>
-                      {YES_NO_OPTIONS.filter(Boolean).map((option) => <option key={option} value={option}>{option}</option>)}
-                    </select>
-                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
                   <td className="border border-sf-border px-1.5 py-1"><input className="h-8 w-48 rounded border border-sf-border px-2 py-1" value={warranty.remark} onChange={(event) => updateWarranty(warranty.id, 'remark', event.target.value)} /></td>
@@ -1164,7 +1151,7 @@ export function TenantFormPage() {
                 )
               })}
               {warranties.length === 0 ? (
-                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={18}>No warranty records yet.</td></tr>
+                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={16}>No warranty records yet.</td></tr>
               ) : null}
             </tbody>
           </table>
