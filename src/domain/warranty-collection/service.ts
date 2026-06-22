@@ -3,7 +3,7 @@ import {
   WARRANTY_PENDING_ALERT,
   WARRANTY_STATUS_LABELS,
 } from './metadata'
-import type { TenantWarranty, WarrantyRecord, WarrantyStatus } from './types'
+import type { TenantWarranty, WarrantyPredecessorRef, WarrantyRecord, WarrantyStatus } from './types'
 
 export function daysBetween(startDate: string | null, endDate: string | null): number | null {
   if (!startDate || !endDate) return null
@@ -95,6 +95,20 @@ export function splitWarrantyPredecessors(value: string): string[] {
     .split(';')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+export function parseWarrantyPredecessorReference(rawValue: string, fallbackTenantId: string): WarrantyPredecessorRef {
+  const value = rawValue.trim()
+  const match = /^(W-\d+)(.+)$/.exec(value)
+  return {
+    warrantyId: match?.[1] ?? value,
+    tenantId: match?.[2] ?? fallbackTenantId,
+    rawValue: value,
+  }
+}
+
+export function predecessorRefsForWarranty(warranty: TenantWarranty, fallbackTenantId: string): WarrantyPredecessorRef[] {
+  return splitWarrantyPredecessors(warranty.predecessor).map((value) => parseWarrantyPredecessorReference(value, fallbackTenantId))
 }
 
 export function successorForWarranty(warranty: TenantWarranty, warranties: TenantWarranty[], tenantTid: string): string {
