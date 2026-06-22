@@ -1,12 +1,9 @@
 import type { Opportunity, Project, StandardRenewalRequirement, Tenant, TenantWarranty, WarrantyRecord } from '@/data/seed.types'
 import {
-  calculateWarrantyStatus,
   daysBeforeExpiration,
   daysBetween,
   nextWarrantyId,
-  normalizeNoWarrantyForSuccessor,
-  successorForWarranty,
-  warrantyAlertForStatus,
+  warrantyCollectionReadModel,
   warrantyTypeForProject,
 } from './service'
 
@@ -55,23 +52,22 @@ export function computeTenantWarranties(
   resolveOpportunity: (project: Project | undefined) => Opportunity | undefined,
   projectOpportunityReference: (project: Project | undefined) => string,
 ): TenantWarranty[] {
-  return source.map((warranty, index) => {
+  const readModel = warrantyCollectionReadModel(source, tenant.tid)
+  return readModel.map((row) => {
+    const warranty = row.warranty
     const selectedProject = projects.find((candidate) => candidate.id === warranty.relatedProjectId)
     const selectedOpportunity = resolveOpportunity(selectedProject)
-    const successor = successorForWarranty(warranty, source, tenant.tid)
-    const normalizedWarranty = normalizeNoWarrantyForSuccessor(warranty, Boolean(successor))
-    const status = calculateWarrantyStatus(normalizedWarranty, Boolean(successor))
     return {
-      ...normalizedWarranty,
-      firstWarranty: index === 0,
+      ...warranty,
+      firstWarranty: row.firstWarranty,
       accountId: tenant.accountId,
       warrantyType: warrantyTypeForProject(selectedProject),
       opportunityId: selectedOpportunity?.opportunityId ?? projectOpportunityReference(selectedProject),
-      successor,
+      successor: row.successorRefs[0]?.warrantyId ?? warranty.successor ?? '',
       durationDays: daysBetween(warranty.startDate, warranty.endDate),
       daysBeforeExpiration: daysBeforeExpiration(warranty.endDate),
-      warrantyStatus: status,
-      alerts: warrantyAlertForStatus(status),
+      warrantyStatus: row.generatedStatus,
+      alerts: row.alert,
     }
   })
 }
