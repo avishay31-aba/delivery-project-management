@@ -72,6 +72,16 @@ export interface WarrantyDashboardContext {
   projectNameForProjectId: (projectId: string) => string
 }
 
+export interface WarrantyDashboardSummary {
+  totalWarranties: number
+  underContract: number
+  outOfContract: number
+  expiring30: number
+  expired: number
+  noWarranty: number
+  renewalCandidates: number
+}
+
 export interface WarrantyCollectionContext {
   tenant: Tenant
   projects: Project[]

@@ -8,6 +8,7 @@ import type {
   TenantWarrantyHeaderStatusReadModel,
   WarrantyDashboardContext,
   WarrantyDashboardRow,
+  WarrantyDashboardSummary,
   WarrantyPredecessorRef,
   WarrantyRecord,
   WarrantyRowReadModel,
@@ -244,6 +245,18 @@ export function warrantyDashboardRows(context: WarrantyDashboardContext): Warran
       }
     })
   })
+}
+
+export function warrantyDashboardSummary(rows: WarrantyDashboardRow[]): WarrantyDashboardSummary {
+  return {
+    totalWarranties: rows.length,
+    underContract: rows.filter((row) => row.tenantHeaderStatus === 'UNDER_CONTRACT').length,
+    outOfContract: rows.filter((row) => row.tenantHeaderStatus === 'OUT_OF_CONTRACT').length,
+    expiring30: rows.filter((row) => row.warrantyStatus === 'PENDING' && row.daysToExpiration != null && row.daysToExpiration >= 0 && row.daysToExpiration <= 30).length,
+    expired: rows.filter((row) => row.warrantyStatus === 'EXPIRED').length,
+    noWarranty: rows.filter((row) => row.warrantyStatus === 'NO_WARRANTY').length,
+    renewalCandidates: rows.filter((row) => row.isRenewalCandidate).length,
+  }
 }
 
 export function warrantySummaryForAccount(accountId: string, tenants: Array<{ id: string; accountId: string }>, warrantyRecords: WarrantyRecord[]): string {
