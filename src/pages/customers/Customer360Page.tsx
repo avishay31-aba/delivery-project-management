@@ -87,6 +87,8 @@ export function Customer360Page() {
   const salesManagers = useAppStore((state) => state.salesManagers)
   const systems = useAppStore((state) => state.systems)
   const tenants = useAppStore((state) => state.tenants)
+  const projectSystems = useAppStore((state) => state.projectSystems)
+  const projectTenants = useAppStore((state) => state.projectTenants)
   const [activeTab, setActiveTab] = useState<Customer360Tab>('overview')
 
   const account = accounts.find((candidate) => candidate.accountCode === accountCode)
@@ -126,10 +128,12 @@ export function Customer360Page() {
             projects,
             systems,
             tenants,
+            projectSystems,
+            projectTenants,
             warrantyRows,
           })
         : null,
-    [account, opportunities, projects, salesManagers, systems, tenants, warrantyRows],
+    [account, opportunities, projectSystems, projectTenants, projects, salesManagers, systems, tenants, warrantyRows],
   )
 
   if (!account || !customer360) {
@@ -143,6 +147,7 @@ export function Customer360Page() {
 
   const customer = customer360
   const openProjects = customerOpenProjects(customer.projects)
+  const projectHealthByProjectId = new Map(customer.projectHealthRows.map((row) => [row.projectId, row]))
 
   function renderTabContent() {
     if (activeTab === 'overview') {
@@ -150,6 +155,8 @@ export function Customer360Page() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {summaryCard('Total Opportunities', customer.opportunities.length)}
           {summaryCard('Open Projects', openProjects.length)}
+          {summaryCard('Warning Projects', customer.projectHealthSummary.warningProjects)}
+          {summaryCard('At Risk Projects', customer.projectHealthSummary.atRiskProjects)}
           {summaryCard('Active Tenants', customer.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
           {summaryCard('Warranty Renewal Candidates', customer.warrantySummary.renewalCandidates)}
         </div>
@@ -173,16 +180,23 @@ export function Customer360Page() {
 
     if (activeTab === 'projects') {
       return readOnlyTable(
-        ['PID', 'Project Name', 'Type', 'Subtype', 'Status', 'Delivery Date', 'Progress'],
-        customer.projects.map((project) => [
-          objectLink(`/projects/${project.pid}`, project.pid),
-          project.opportunityName,
-          project.mainType,
-          project.subType,
-          project.progressStatus,
-          project.deliveryDate ?? '',
-          customerProjectProgress(project),
-        ]),
+        ['PID', 'Project Name', 'Type', 'Subtype', 'Status', 'Health Status', 'Delivery Date', 'Delivery Date Status', 'Completion %', 'Current Milestone', 'Alerts'],
+        customer.projects.map((project) => {
+          const health = projectHealthByProjectId.get(project.id)
+          return [
+            objectLink(`/projects/${project.pid}`, project.pid),
+            project.opportunityName,
+            project.mainType,
+            project.subType,
+            project.progressStatus,
+            health?.healthLabel ?? '',
+            project.deliveryDate ?? '',
+            health?.deliveryDateStatusLabel ?? '',
+            health ? `${health.completionPercent}%` : customerProjectProgress(project),
+            health?.currentMilestone ?? '',
+            health?.healthAlerts.join('; ') ?? '',
+          ]
+        }),
         'No projects found for this customer.',
       )
     }

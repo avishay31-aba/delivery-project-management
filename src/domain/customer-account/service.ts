@@ -1,6 +1,6 @@
-import { projectDashboardPercent } from '@/domain/project-lifecycle'
+import { projectDashboardPercent, projectHealthReadModel, projectPortfolioHealthSummary } from '@/domain/project-lifecycle'
 import { systemIdentity } from '@/domain/system-inventory'
-import type { Account, Opportunity, Project, SalesManager, System, Tenant } from '@/data/seed.types'
+import type { Account, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, SalesManager, System, Tenant } from '@/data/seed.types'
 import { warrantyDashboardSummary, type WarrantyDashboardRow } from '@/domain/warranty-collection'
 import { CUSTOMER_TYPE_LABELS } from './metadata'
 import type { CustomerDocumentReadModel, CustomerAccount360ReadModel } from './types'
@@ -128,6 +128,8 @@ export function customerAccount360ReadModel(input: {
   projects: Project[]
   systems: System[]
   tenants: Tenant[]
+  projectSystems: ProjectSystemLink[]
+  projectTenants: ProjectTenantLink[]
   warrantyRows: WarrantyDashboardRow[]
 }): CustomerAccount360ReadModel {
   const opportunities = customerOpportunities(input.account.id, input.opportunities)
@@ -135,6 +137,13 @@ export function customerAccount360ReadModel(input: {
   const tenants = customerTenants(input.account.id, input.tenants)
   const systems = customerRelatedSystems(input.account.id, input.systems, tenants, projects)
   const warrantyRows = customerWarrantyRowsForTenants(tenants, input.warrantyRows)
+  const projectHealthContext = {
+    systems: input.systems,
+    tenants: input.tenants,
+    projectSystems: input.projectSystems,
+    projectTenants: input.projectTenants,
+  }
+  const projectHealthRows = projects.map((project) => projectHealthReadModel({ project, ...projectHealthContext }))
   return {
     account: input.account,
     accountManager: accountManagerDisplayName(input.account.salesManagerId, input.salesManagers),
@@ -142,6 +151,8 @@ export function customerAccount360ReadModel(input: {
     projects,
     systems,
     tenants,
+    projectHealthRows,
+    projectHealthSummary: projectPortfolioHealthSummary(projects, projectHealthContext),
     warrantyRows,
     warrantySummary: warrantyDashboardSummary(warrantyRows),
     documents: customerDocumentReadModels(projects, systems, tenants),
