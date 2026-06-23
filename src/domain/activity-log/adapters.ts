@@ -1,6 +1,37 @@
 import { ACTIVITY_EVENT_SCHEMA_VERSION } from './metadata'
 import { validateActivityEventShape, validateActivityObjectRefShape } from './validation'
-import type { ActivityEvent, ActivityObjectRef } from './types'
+import type {
+  ActivityEvent,
+  ActivityEventCategory,
+  ActivityEventSeverity,
+  ActivityObjectRef,
+} from './types'
+
+export const LOCAL_ACTIVITY_ACTOR = {
+  actorId: null,
+  actorName: 'Local User',
+} as const
+
+export interface ActivityObjectRefInput {
+  objectType: string
+  id: string
+  businessId: string
+  displayLabel?: string
+  routePath?: string
+}
+
+export interface ActivityEventInput {
+  occurredAt: string
+  category: ActivityEventCategory
+  eventType: string
+  severity: ActivityEventSeverity
+  summary: string
+  primaryObject: ActivityObjectRefInput
+  relatedObjects?: ActivityObjectRefInput[]
+  details?: string
+  correlationId?: string
+  sequence?: number
+}
 
 function emptyObjectRef(): ActivityObjectRef {
   return {
@@ -52,4 +83,33 @@ export function normalizeActivityEvents(values: unknown): ActivityEvent[] {
     const event = normalizeActivityEvent(value)
     return event ? [event] : []
   })
+}
+
+export function activityObjectRef(input: ActivityObjectRefInput): ActivityObjectRef {
+  return {
+    objectType: input.objectType,
+    id: input.id,
+    businessId: input.businessId,
+    displayLabel: input.displayLabel ?? input.businessId,
+    ...(input.routePath ? { routePath: input.routePath } : {}),
+  }
+}
+
+export function createActivityEvent(input: ActivityEventInput): ActivityEvent {
+  return {
+    id: `activity-${crypto.randomUUID()}`,
+    occurredAt: input.occurredAt,
+    ...LOCAL_ACTIVITY_ACTOR,
+    source: 'USER',
+    category: input.category,
+    eventType: input.eventType,
+    severity: input.severity,
+    summary: input.summary,
+    primaryObject: activityObjectRef(input.primaryObject),
+    relatedObjects: (input.relatedObjects ?? []).map(activityObjectRef),
+    ...(input.details ? { details: input.details } : {}),
+    ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+    ...(typeof input.sequence === 'number' ? { sequence: input.sequence } : {}),
+    schemaVersion: ACTIVITY_EVENT_SCHEMA_VERSION,
+  }
 }
