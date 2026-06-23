@@ -12,8 +12,20 @@ import {
 import { systemIdentity } from '@/domain/system-inventory'
 import {
   renewalCandidateRows,
+  renewalCandidateSummary,
+  type RenewalCandidateSummary,
 } from '@/domain/warranty-collection'
 import { useAppStore } from '@/store/useAppStore'
+
+const KPI_LABELS: Array<{ key: keyof RenewalCandidateSummary; label: string }> = [
+  { key: 'totalCandidates', label: 'Total Candidates' },
+  { key: 'expiring30', label: 'Expiring 30' },
+  { key: 'expiring60', label: 'Expiring 60' },
+  { key: 'expiring90', label: 'Expiring 90' },
+  { key: 'expired', label: 'Expired' },
+  { key: 'noWarranty', label: 'No Warranty' },
+  { key: 'outOfContract', label: 'Out Of Contract' },
+]
 
 export function RenewalWorkQueuePage() {
   const navigate = useNavigate()
@@ -51,11 +63,21 @@ export function RenewalWorkQueuePage() {
       }),
     [accounts, projects, salesManagers, systems, tenants],
   )
+  const summary = useMemo(() => renewalCandidateSummary(rows), [rows])
   const columns = useMemo(() => createRenewalColumns(), [])
 
   return (
     <div className="space-y-4">
       <PageHeader title="Renewal Work Queue" subtitle="Read-only renewal readiness and warranty risk queue" />
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {KPI_LABELS.map((item) => (
+          <div key={item.key} className="rounded border border-sf-border bg-white p-3">
+            <div className="text-xs font-semibold uppercase text-sf-text-muted">{item.label}</div>
+            <div className="mt-1 text-2xl font-semibold text-sf-text">{summary[item.key]}</div>
+          </div>
+        ))}
+      </section>
 
       <DataDashboard
         title="Renewal candidates"
