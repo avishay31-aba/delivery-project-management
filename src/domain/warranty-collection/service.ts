@@ -6,6 +6,8 @@ import {
 import type {
   TenantWarranty,
   TenantWarrantyHeaderStatusReadModel,
+  RenewalCandidateCategory,
+  RenewalCandidateRow,
   WarrantyDashboardContext,
   WarrantyDashboardRow,
   WarrantyDashboardSummary,
@@ -257,6 +259,55 @@ export function warrantyDashboardSummary(rows: WarrantyDashboardRow[]): Warranty
     noWarranty: rows.filter((row) => row.warrantyStatus === 'NO_WARRANTY').length,
     renewalCandidates: rows.filter((row) => row.isRenewalCandidate).length,
   }
+}
+
+export function renewalCandidateCategory(row: WarrantyDashboardRow): RenewalCandidateCategory | null {
+  if (row.tenantHeaderStatus === 'OUT_OF_CONTRACT') return 'OUT_OF_CONTRACT'
+  if (row.warrantyStatus === 'NO_WARRANTY') return 'NO_WARRANTY'
+  if (row.warrantyStatus === 'EXPIRED') return 'EXPIRED'
+  if (row.daysToExpiration == null || row.daysToExpiration < 0) return null
+  if (row.daysToExpiration <= 30) return 'EXPIRING_30'
+  if (row.daysToExpiration <= 60) return 'EXPIRING_60'
+  if (row.daysToExpiration <= 90) return 'EXPIRING_90'
+  return null
+}
+
+export function renewalCandidateCategoryLabel(category: RenewalCandidateCategory): string {
+  if (category === 'EXPIRING_30') return 'Expiring in 30 days'
+  if (category === 'EXPIRING_60') return 'Expiring in 60 days'
+  if (category === 'EXPIRING_90') return 'Expiring in 90 days'
+  if (category === 'EXPIRED') return 'Expired'
+  if (category === 'NO_WARRANTY') return 'No Warranty'
+  return 'Out Of Contract'
+}
+
+export function renewalCandidateRows(context: WarrantyDashboardContext): RenewalCandidateRow[] {
+  return warrantyDashboardRows(context).flatMap((row) => {
+    const renewalCategory = renewalCandidateCategory(row)
+    if (!renewalCategory) return []
+
+    return [{
+      id: row.id,
+      warrantyId: row.warrantyId,
+      customer: row.customer,
+      accountManager: row.accountManager,
+      tenantId: row.tenantId,
+      tenantTid: row.tenantTid,
+      tenantName: row.tenantName,
+      sid: row.sid,
+      product: row.product,
+      relatedProjectId: row.relatedProjectId,
+      warrantyType: row.warrantyType,
+      endDate: row.endDate,
+      daysToExpiration: row.daysToExpiration,
+      warrantyStatus: row.warrantyStatus,
+      warrantyStatusLabel: row.warrantyStatusLabel,
+      tenantHeaderStatus: row.tenantHeaderStatus,
+      tenantHeaderStatusLabel: row.tenantHeaderStatusLabel,
+      renewalCategory,
+      renewalCategoryLabel: renewalCandidateCategoryLabel(renewalCategory),
+    }]
+  })
 }
 
 export function warrantySummaryForAccount(accountId: string, tenants: Array<{ id: string; accountId: string }>, warrantyRecords: WarrantyRecord[]): string {

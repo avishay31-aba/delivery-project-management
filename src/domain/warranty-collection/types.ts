@@ -82,6 +82,36 @@ export interface WarrantyDashboardSummary {
   renewalCandidates: number
 }
 
+export type RenewalCandidateCategory =
+  | 'EXPIRING_30'
+  | 'EXPIRING_60'
+  | 'EXPIRING_90'
+  | 'EXPIRED'
+  | 'NO_WARRANTY'
+  | 'OUT_OF_CONTRACT'
+
+export interface RenewalCandidateRow {
+  id: string
+  warrantyId: string
+  customer: string
+  accountManager: string
+  tenantId: string
+  tenantTid: string
+  tenantName: string
+  sid: string
+  product: string
+  relatedProjectId: string
+  warrantyType: string
+  endDate: string | null
+  daysToExpiration: number | null
+  warrantyStatus: WarrantyStatus
+  warrantyStatusLabel: string
+  tenantHeaderStatus: TenantWarrantyHeaderStatus
+  tenantHeaderStatusLabel: string
+  renewalCategory: RenewalCandidateCategory
+  renewalCategoryLabel: string
+}
+
 export interface WarrantyCollectionContext {
   tenant: Tenant
   projects: Project[]
