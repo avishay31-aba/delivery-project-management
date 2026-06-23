@@ -99,6 +99,14 @@ function systemRef(system: AppDataState['systems'][number] | AppDataState['produ
   return objectRef('SYSTEM', system.id, businessId, businessId)
 }
 
+function allocationRef(allocation: AppDataState['projectSystems'][number]): ActivityObjectRefInput {
+  return objectRef('ALLOCATION', allocation.id, allocation.id, allocation.id)
+}
+
+function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {
+  return refs.filter((ref): ref is ActivityObjectRefInput => Boolean(ref))
+}
+
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
   initialize: () => void
@@ -559,6 +567,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       productionSystemInventory: current.productionSystemInventory.filter((candidate) => candidate.id !== productionSystemId),
       systems: [allocatedSystem, ...current.systems],
       projectSystems: [allocation, ...current.projectSystems],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'ALLOCATION',
+        eventType: 'allocation.systemAllocated',
+        severity: 'SUCCESS',
+        summary: `System ${systemBusinessId(allocatedSystem)} allocated to project ${project.pid}.`,
+        primaryObject: allocationRef(allocation),
+        relatedObjects: relatedRefs(projectRef(project), systemRef(allocatedSystem)),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: 'Production system allocated.', allocationId: allocation.id }
@@ -604,6 +620,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ),
       systems: [allocatedSystem, ...current.systems],
       projectSystems: [allocation, ...current.projectSystems],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'ALLOCATION',
+        eventType: 'allocation.systemAllocated',
+        severity: 'SUCCESS',
+        summary: `System ${systemBusinessId(allocatedSystem)} allocated to project ${project.pid}.`,
+        primaryObject: allocationRef(allocation),
+        relatedObjects: relatedRefs(projectRef(project), systemRef(allocatedSystem), systemRef(reusedSystem)),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: 'Reused internal system allocated.', allocationId: allocation.id }
@@ -613,6 +637,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const invalid = validateExistingSystemLink({ projectId, systemId }, state)
     if (invalid) return invalid
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const system = state.systems.find((candidate) => candidate.id === systemId)
 
     const now = new Date().toISOString()
     const tenantIds: string[] = []
@@ -637,6 +663,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : candidate,
       ),
       projectSystems: [allocation, ...current.projectSystems],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'ALLOCATION',
+        eventType: 'allocation.existingSystemLinked',
+        severity: 'SUCCESS',
+        summary: `System ${system ? systemBusinessId(system) : systemId} linked to project ${project?.pid ?? projectId}.`,
+        primaryObject: allocationRef(allocation),
+        relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: 'Existing system linked.', allocationId: allocation.id }
@@ -648,6 +682,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const invalid = validateProjectSystemDeallocation(allocationId, state.projectSystems)
     if (invalid) return invalid
     if (!allocation) return { ok: false, message: 'Allocation not found.' }
+    const project = state.projects.find((candidate) => candidate.id === allocation.projectId)
+    const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
     const now = new Date().toISOString()
 
     set((current) => ({
@@ -671,6 +707,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ? releaseReusedInternalSystem(system, allocation.projectId, now)
           : system,
       ),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'ALLOCATION',
+        eventType: 'allocation.systemDeallocated',
+        severity: 'WARNING',
+        summary: `System ${system ? systemBusinessId(system) : allocation.systemId} deallocated from project ${project?.pid ?? allocation.projectId}.`,
+        primaryObject: allocationRef(allocation),
+        relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: 'System deallocated from project.', allocationId }
