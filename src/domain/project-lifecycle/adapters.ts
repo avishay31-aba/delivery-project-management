@@ -1,4 +1,5 @@
 import type { Project } from './types'
+import { normalizeMilestonePlanProject } from '@/domain/milestone-plan'
 
 export function cloneProjectDraft(project: Project): Project {
   return JSON.parse(JSON.stringify(project)) as Project
@@ -24,7 +25,7 @@ export function projectSourceFor(project: Project): Project['projectSource'] {
 
 export function normalizeProjectLifecycleProject(project: Project): Project {
   return {
-    ...project,
+    ...normalizeMilestonePlanProject(project),
     projectSource: projectSourceFor(project),
   }
 }

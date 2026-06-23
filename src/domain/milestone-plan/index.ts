@@ -21,6 +21,30 @@ export function orderedProjectMilestones(project: MilestonePlan): ProjectMilesto
   return [...(project.milestones ?? [])].sort((first, second) => first.order - second.order || first.name.localeCompare(second.name))
 }
 
+export function normalizeProjectMilestone(milestone: ProjectMilestone): ProjectMilestone {
+  return {
+    ...milestone,
+    deadline: milestone.deadline ?? null,
+    comment: milestone.comment ?? '',
+  }
+}
+
+export function normalizeProjectTask(task: ProjectTask): ProjectTask {
+  return {
+    ...task,
+    deadline: task.deadline ?? null,
+    comment: task.comment ?? '',
+  }
+}
+
+export function normalizeMilestonePlanProject<T extends MilestonePlan>(project: T): T {
+  return {
+    ...project,
+    milestones: project.milestones?.map(normalizeProjectMilestone),
+    tasks: project.tasks?.map(normalizeProjectTask),
+  }
+}
+
 export function orderedProjectTasks(project: MilestonePlan): ProjectTask[] {
   const milestoneOrder = new Map(orderedProjectMilestones(project).map((milestone, index) => [milestone.id, index]))
   return [...(project.tasks ?? [])].sort((first, second) => {

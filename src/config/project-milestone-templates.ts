@@ -1889,6 +1889,8 @@ export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTempl
         name: row.milestone,
         order: row.milestoneOrder,
         status: 'OPEN',
+        deadline: null,
+        comment: '',
       })
     }
     tasks.push({
@@ -1899,6 +1901,8 @@ export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTempl
       resource: row.resource,
       status: 'OPEN',
       order: index + 1,
+      deadline: null,
+      comment: '',
     })
   })
 
