@@ -88,6 +88,10 @@ function projectRef(project: AppDataState['projects'][number]): ActivityObjectRe
   return objectRef('PROJECT', project.id, project.pid, project.pid, `/projects/${project.pid}`)
 }
 
+function tenantRef(tenant: AppDataState['tenants'][number]): ActivityObjectRefInput {
+  return objectRef('TENANT', tenant.id, tenant.tid, tenant.tid, `/tenants/${tenant.tid}`)
+}
+
 function systemBusinessId(system: AppDataState['systems'][number] | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]): string {
   if ('sid' in system && system.sid) return system.sid
   if ('machineId' in system && system.machineId) return system.machineId
@@ -101,6 +105,15 @@ function systemRef(system: AppDataState['systems'][number] | AppDataState['produ
 
 function allocationRef(allocation: AppDataState['projectSystems'][number]): ActivityObjectRefInput {
   return objectRef('ALLOCATION', allocation.id, allocation.id, allocation.id)
+}
+
+function customerRef(account: AppDataState['accounts'][number] | undefined): ActivityObjectRefInput | null {
+  if (!account) return null
+  return objectRef('CUSTOMER', account.id, account.accountCode, account.accountName, `/customers/${account.accountCode}`)
+}
+
+function requirementRef(requirementId: string): ActivityObjectRefInput {
+  return objectRef('REQUIREMENT', requirementId, requirementId, requirementId)
 }
 
 function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {
@@ -215,6 +228,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   deleteTenantFromSystem: (id) => {
+    const state = get()
+    const tenant = state.tenants.find((candidate) => candidate.id === id)
+    const system = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
     const now = new Date().toISOString()
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
@@ -227,11 +243,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
           updatedAt: now,
         }
       }),
+      activityEvents: tenant
+        ? appendActivityEvent(state.activityEvents, now, {
+            category: 'TENANT',
+            eventType: 'tenant.deletedFromSystem',
+            severity: 'WARNING',
+            summary: `Tenant ${tenant.tid} removed from system.`,
+            primaryObject: tenantRef(tenant),
+            relatedObjects: relatedRefs(system ? systemRef(system) : null),
+          })
+        : state.activityEvents,
     }))
     get().saveToStorage()
   },
 
   moveTenantToSystem: (id, destinationSystemId) => {
+    const state = get()
+    const tenant = state.tenants.find((candidate) => candidate.id === id)
+    const sourceSystem = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
+    const destinationSystem = state.systems.find((candidate) => candidate.id === destinationSystemId)
     const now = new Date().toISOString()
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
@@ -244,6 +274,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
           updatedAt: now,
         }
       }),
+      activityEvents: tenant
+        ? appendActivityEvent(state.activityEvents, now, {
+            category: 'TENANT',
+            eventType: 'tenant.movedToSystem',
+            severity: 'INFO',
+            summary: `Tenant ${tenant.tid} moved to system ${destinationSystem ? systemBusinessId(destinationSystem) : destinationSystemId}.`,
+            primaryObject: tenantRef(tenant),
+            relatedObjects: relatedRefs(sourceSystem ? systemRef(sourceSystem) : null, destinationSystem ? systemRef(destinationSystem) : null),
+          })
+        : state.activityEvents,
     }))
     get().saveToStorage()
   },
@@ -273,6 +313,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : link,
       ),
       projectTenants: [projectTenant, ...current.projectTenants],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'TENANT',
+        eventType: 'tenant.createdFromRequirement',
+        severity: 'SUCCESS',
+        summary: `Tenant ${tenant.tid} created from requirement ${resolved.source.requirement.requirementId}.`,
+        primaryObject: tenantRef(tenant),
+        relatedObjects: relatedRefs(
+          projectRef(resolved.source.project),
+          systemRef(resolved.source.system),
+          requirementRef(resolved.source.requirement.requirementId),
+          customerRef(resolved.source.account),
+        ),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
