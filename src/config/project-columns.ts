@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { LinkId, ProgressBar, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, LinkId, ProgressBar, StatusBadge } from '@/components/ui'
 import type {
   Account,
   Opportunity,
@@ -47,6 +47,30 @@ function projectStatusVariant(status: string) {
   return 'default'
 }
 
+function renderChips(values: string[]) {
+  const visibleValues = values.filter(Boolean)
+  if (visibleValues.length === 0) return ''
+
+  return createElement(
+    'span',
+    { className: 'inline-flex max-w-80 flex-wrap gap-1' },
+    visibleValues.map((value) =>
+      createElement(
+        'span',
+        {
+          key: value,
+          className: 'rounded border border-sf-border bg-sf-surface-alt px-1.5 py-0.5 text-xs font-medium text-sf-text',
+        },
+        value,
+      ),
+    ),
+  )
+}
+
+function splitDashboardValues(value: string): string[] {
+  return value.split(';').map((part) => part.trim()).filter(Boolean)
+}
+
 export function createProjectListColumns(context: ProjectDashboardColumnContext): DashboardColumn<Project>[] {
   return [
     { id: 'pid', label: 'PID', getValue: (project) => projectRow(project, context).pid, render: (project) => createElement(LinkId, { to: `/projects/${project.pid}` }, project.pid) },
@@ -72,11 +96,35 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
     { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project, context).pocEndDate },
     { id: 'type', label: 'Type', getValue: (project) => projectRow(project, context).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
     { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project, context).hosting },
-    { id: 'product', label: 'Product', getValue: (project) => projectRow(project, context).product },
-    { id: 'modules', label: 'Modules', getValue: (project) => projectRow(project, context).modules.join('; ') },
+    {
+      id: 'product',
+      label: 'Product',
+      getValue: (project) => projectRow(project, context).product,
+      render: (project) => renderChips(splitDashboardValues(projectRow(project, context).product)),
+    },
+    {
+      id: 'modules',
+      label: 'Modules',
+      getValue: (project) => projectRow(project, context).modules.join('; '),
+      render: (project) => renderChips(projectRow(project, context).modules),
+    },
     { id: 'licenses', label: 'Licenses', getValue: (project) => projectRow(project, context).licenses },
     { id: 'users', label: 'Users', getValue: (project) => projectRow(project, context).users },
-    { id: 'projectAlerts', label: 'Project Alerts', getValue: (project) => projectRow(project, context).projectAlerts.join('; ') },
+    {
+      id: 'projectAlerts',
+      label: 'Project Alerts',
+      getValue: (project) => projectRow(project, context).projectAlerts.join('; '),
+      render: (project) => {
+        const row = projectRow(project, context)
+        if (row.projectAlerts.length === 0) return ''
+        return createElement(
+          'span',
+          { className: 'inline-flex items-center gap-1.5' },
+          createElement(AlertStatusIcon, { variant: row.projectAlertSeverity, label: row.projectAlerts.join('; ') }),
+          row.projectAlerts.join('; '),
+        )
+      },
+    },
     {
       id: 'milestoneCompletion',
       label: 'Milestone Completion',
