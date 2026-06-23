@@ -13,6 +13,8 @@ import type {
   ChangeRequestRequirement,
   Opportunity,
   Project,
+  ProjectDeliveryDashboardContext,
+  ProjectDeliveryDashboardReadModel,
   ProjectDeliveryDateStatus,
   ProjectHealthReadModel,
   ProjectHealthStatus,
@@ -28,6 +30,27 @@ import type {
 } from './types'
 
 const UPCOMING_DELIVERY_RISK_DAYS = 14
+
+function linkedOpportunityForProject(project: Project, opportunities: Opportunity[]): Opportunity | undefined {
+  return opportunities.find((opportunity) => opportunity.opportunityId === project.opportunityId)
+}
+
+function linkedAccountForProject(
+  project: Project,
+  opportunity: Opportunity | undefined,
+  accounts: ProjectDeliveryDashboardContext['accounts'],
+) {
+  return accounts.find((account) => account.id === opportunity?.accountId) ??
+    accounts.find((account) => account.accountName === project.accountName)
+}
+
+function linkedOwnerForProject(
+  project: Project,
+  account: ReturnType<typeof linkedAccountForProject>,
+  salesManagers: ProjectDeliveryDashboardContext['salesManagers'],
+): string {
+  return salesManagers.find((manager) => manager.id === account?.salesManagerId)?.name ?? project.dealOwner
+}
 
 export function projectLifecycleIdentity(project: Project): Project {
   return project
@@ -79,6 +102,41 @@ export function projectDashboardMilestonesCompletion(project: Project): string {
 
 export function projectDashboardEmptyValue(): string {
   return ''
+}
+
+export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashboardContext): ProjectDeliveryDashboardReadModel {
+  const opportunity = linkedOpportunityForProject(context.project, context.opportunities)
+  const account = linkedAccountForProject(context.project, opportunity, context.accounts)
+  const progress = deriveProjectProgress(context.project)
+
+  return {
+    projectId: context.project.id,
+    pid: context.project.pid,
+    projectName: context.project.opportunityName,
+    endUser: account?.accountName ?? context.project.accountName,
+    payingCustomer: account?.accountName ?? context.project.accountName,
+    region: opportunity?.region ?? account?.region ?? '',
+    country: opportunity?.country ?? account?.country ?? '',
+    status: context.project.progressStatus,
+    statusLabel: projectStatusLabel(context.project.progressStatus),
+    deliveryDate: context.project.deliveryDate ?? '',
+    pocStartDate: opportunity?.pocStartDate ?? '',
+    pocEndDate: opportunity?.pocEndDate ?? '',
+    type: context.project.mainType,
+    hosting: '',
+    product: '',
+    modules: [],
+    licenses: '',
+    users: '',
+    projectAlerts: [],
+    projectAlertSeverity: 'info',
+    milestoneCompletionPercent: progress.percent,
+    milestoneCompletion: `${progress.percent}%`,
+    lastMilestone: progress.lastMilestone,
+    currentMilestone: progress.currentMilestone,
+    financialProfile: '',
+    owner: linkedOwnerForProject(context.project, account, context.salesManagers),
+  }
 }
 
 export function projectStatusLabel(status: string): string {
