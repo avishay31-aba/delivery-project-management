@@ -71,6 +71,7 @@ import {
   projectMilestoneTaskProgress,
   resolveProjectMilestoneTemplate,
   updateMilestoneOrderInPlan,
+  updateTaskOrderInPlan,
   updateTaskInPlan,
 } from '@/domain/milestone-plan'
 
@@ -736,6 +737,11 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function updateTaskOrder(taskId: string, order: number) {
+    setDraft((current) => (current ? updateTaskOrderInPlan(current, taskId, order) : current))
+    setSaveMessages([])
+  }
+
   function updateMilestone(milestoneId: string, patch: Partial<NonNullable<Project['milestones']>[number]>) {
     setDraft((current) =>
       current
@@ -803,25 +809,25 @@ export function ProjectFormPage() {
       .filter((task) => task.name.trim() || task.department.trim() || task.resource.trim())
       .map((task, index) => createMilestoneTask(milestoneId, task, index + 1))
 
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            milestones: [
-              ...(current.milestones ?? []),
-              {
-                id: milestoneId,
-                name: milestoneName,
-                order: newMilestoneOrder,
-                status: 'OPEN',
-                deadline: newMilestoneDeadline || null,
-                comment: newMilestoneComment,
-              },
-            ],
-            tasks: [...(current.tasks ?? []), ...initialTasks],
-          }
-        : current,
-    )
+    setDraft((current) => {
+      if (!current) return current
+      const nextProject = {
+        ...current,
+        milestones: [
+          ...(current.milestones ?? []),
+          {
+            id: milestoneId,
+            name: milestoneName,
+            order: newMilestoneOrder,
+            status: 'OPEN' as const,
+            deadline: newMilestoneDeadline || null,
+            comment: newMilestoneComment,
+          },
+        ],
+        tasks: [...(current.tasks ?? []), ...initialTasks],
+      }
+      return updateMilestoneOrderInPlan(nextProject, milestoneId, newMilestoneOrder)
+    })
     setSaveMessages([])
     setIsAddMilestoneDialogOpen(false)
   }
@@ -975,7 +981,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Milestone', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
+                  {['Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -986,6 +992,15 @@ export function ProjectFormPage() {
                 {tasks.map((task) => (
                   <tr key={task.id} className="hover:bg-sf-surface-alt">
                     <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                      <input
+                        className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
+                        type="number"
+                        min={1}
+                        value={task.order}
+                        onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
+                      />
+                    </td>
                     <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
@@ -1141,7 +1156,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
+                  {['Order', 'Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1151,6 +1166,15 @@ export function ProjectFormPage() {
               <tbody>
                 {tasks.map((task) => (
                   <tr key={task.id}>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1">
+                      <input
+                        className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
+                        type="number"
+                        min={1}
+                        value={task.order}
+                        onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
+                      />
+                    </td>
                     <td className="max-w-96 border border-sf-border px-1 py-1">
                       <input className="h-8 w-96 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateTask(task.id, { name: event.target.value })} />
                     </td>
