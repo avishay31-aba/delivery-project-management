@@ -3,8 +3,24 @@ import { useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createRequirementCoverageColumns } from '@/config/requirement-coverage-columns'
-import { requirementCoverageRows } from '@/domain/requirement-coverage'
+import {
+  requirementCoverageRows,
+  requirementCoverageSummary,
+  type RequirementCoverageSummary,
+} from '@/domain/requirement-coverage'
 import { useAppStore } from '@/store/useAppStore'
+
+const KPI_LABELS: Array<{ key: keyof RequirementCoverageSummary; label: string }> = [
+  { key: 'totalRequirements', label: 'Total Requirements' },
+  { key: 'covered', label: 'Covered' },
+  { key: 'partiallyCovered', label: 'Partially Covered' },
+  { key: 'uncovered', label: 'Uncovered' },
+  { key: 'missingProject', label: 'Missing Project' },
+  { key: 'missingSystem', label: 'Missing System' },
+  { key: 'missingTenant', label: 'Missing Tenant' },
+  { key: 'unknown', label: 'Unknown' },
+  { key: 'blocked', label: 'Blocked' },
+]
 
 export function RequirementCoverageDashboardPage() {
   const navigate = useNavigate()
@@ -31,11 +47,21 @@ export function RequirementCoverageDashboardPage() {
       }),
     [accounts, opportunities, projectSystems, projectTenants, projects, systems, tenants, warrantyRecords],
   )
+  const summary = useMemo(() => requirementCoverageSummary(rows), [rows])
   const columns = useMemo(() => createRequirementCoverageColumns(), [])
 
   return (
     <div className="space-y-4">
       <PageHeader title="Requirement Coverage" subtitle="End-to-end requirement delivery traceability" />
+
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
+        {KPI_LABELS.map((item) => (
+          <div key={item.key} className="rounded border border-sf-border bg-white p-3">
+            <div className="text-xs font-semibold uppercase text-sf-text-muted">{item.label}</div>
+            <div className="mt-1 text-2xl font-semibold text-sf-text">{summary[item.key]}</div>
+          </div>
+        ))}
+      </section>
 
       <DataDashboard
         title="Requirement coverage"
