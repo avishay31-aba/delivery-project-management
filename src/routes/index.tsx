@@ -18,6 +18,7 @@ import { TenantListPage } from '@/pages/tenants/TenantListPage'
 import { TenantFormPage } from '@/pages/tenants/TenantFormPage'
 import { WarrantyDashboardPage } from '@/pages/warranties/WarrantyDashboardPage'
 import { RequirementCoverageDashboardPage } from '@/pages/requirement-coverage/RequirementCoverageDashboardPage'
+import { RenewalWorkQueuePage } from '@/pages/renewals/RenewalWorkQueuePage'
 
 export const router = createBrowserRouter([
   {
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: 'tenants', element: <TenantListPage /> },
       { path: 'tenants/:tid', element: <TenantFormPage /> },
       { path: 'warranties', element: <WarrantyDashboardPage /> },
+      { path: 'renewals', element: <RenewalWorkQueuePage /> },
       { path: 'requirement-coverage', element: <RequirementCoverageDashboardPage /> },
     ],
   },
