@@ -126,7 +126,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       },
     },
     {
-      id: 'milestoneCompletion',
+      id: 'milestonesCompletion',
       label: 'Milestone Completion',
       getValue: (project) => projectRow(project, context).milestoneCompletion,
       render: (project) => createElement(ProgressBar, { value: projectRow(project, context).milestoneCompletionPercent, className: 'min-w-32' }),
