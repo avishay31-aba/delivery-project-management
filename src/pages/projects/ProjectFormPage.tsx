@@ -79,6 +79,10 @@ import {
   updateTaskOrderInPlan,
   updateTaskInPlan,
 } from '@/domain/milestone-plan'
+import {
+  requirementCoverageRows,
+  requirementCoverageSummary,
+} from '@/domain/requirement-coverage'
 
 type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
@@ -375,6 +379,7 @@ export function ProjectFormPage() {
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
+  const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const updateProject = useAppStore((state) => state.updateProject)
   const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
@@ -454,6 +459,23 @@ export function ProjectFormPage() {
       projectTenants,
     })
   }, [currentDraft, projectSystems, projectTenants, systems, tenants])
+  const projectRequirementCoverageRows = useMemo(() => {
+    if (!currentDraft) return []
+    return requirementCoverageRows({
+      accounts,
+      opportunities,
+      projects,
+      systems,
+      tenants,
+      warrantyRecords,
+      projectSystems,
+      projectTenants,
+    }).filter((row) => row.projectId === currentDraft.id || row.pid === currentDraft.pid)
+  }, [accounts, currentDraft, opportunities, projectSystems, projectTenants, projects, systems, tenants, warrantyRecords])
+  const projectRequirementCoverageSummary = useMemo(
+    () => requirementCoverageSummary(projectRequirementCoverageRows),
+    [projectRequirementCoverageRows],
+  )
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
 
@@ -781,6 +803,7 @@ export function ProjectFormPage() {
           {renderWorkspaceMetric('Last Completed', projectHealth?.lastCompletedMilestone || '-')}
           {renderWorkspaceMetric('Open Tasks', projectHealth?.openTaskCount ?? 0)}
           {renderWorkspaceMetric('Completed Tasks', projectHealth?.completedTaskCount ?? 0)}
+          {renderWorkspaceMetric('Covered Requirements', `${projectRequirementCoverageSummary.covered}/${projectRequirementCoverageSummary.totalRequirements}`)}
           {renderWorkspaceMetric('Linked Systems', workspaceSystemSummary?.linkedSystems ?? 0, workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
           {renderWorkspaceMetric('Linked Tenants', workspaceTenantSummary?.linkedTenants ?? 0, workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
         </div>
@@ -817,6 +840,51 @@ export function ProjectFormPage() {
         onToggle={() => toggleSection('requirements')}
         className="space-y-3 p-3"
       >
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {renderWorkspaceMetric('Total Requirements', projectRequirementCoverageSummary.totalRequirements)}
+          {renderWorkspaceMetric('Covered', projectRequirementCoverageSummary.covered)}
+          {renderWorkspaceMetric('Partially Covered', projectRequirementCoverageSummary.partiallyCovered, projectRequirementCoverageSummary.partiallyCovered > 0 ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Missing System', projectRequirementCoverageSummary.missingSystem, projectRequirementCoverageSummary.missingSystem > 0 ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Missing Tenant', projectRequirementCoverageSummary.missingTenant, projectRequirementCoverageSummary.missingTenant > 0 ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Unknown', projectRequirementCoverageSummary.unknown, projectRequirementCoverageSummary.unknown > 0 ? 'warning' : 'default')}
+        </div>
+
+        {projectRequirementCoverageRows.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['Requirement ID', 'Grid', 'Product', 'Hosting', 'Coverage Status', 'Missing Step', 'PID', 'SID/MID', 'TID', 'Alerts'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {projectRequirementCoverageRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-sf-surface-alt">
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.requirementId}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.requirementGrid}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.product}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.hostingType}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.coverageStatusLabel}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.missingStepLabel}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.pid ? <LinkId to={`/projects/${row.pid}`}>{row.pid}</LinkId> : ''}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.sid || row.mid}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.tid ? <LinkId to={`/tenants/${row.tid}`}>{row.tid}</LinkId> : ''}</td>
+                    <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.coverageAlerts.join('; ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No Requirement Coverage rows are linked to this Project.
+          </div>
+        )}
+
         {linkedOpportunity ? (
           <div className="space-y-4">
             {requirementSections.map((section) => (
