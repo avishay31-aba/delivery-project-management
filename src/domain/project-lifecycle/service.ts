@@ -145,6 +145,13 @@ function projectFinancialProfile(project: Project, opportunity: Opportunity | un
   return project.mainType === 'DELIVERY' || project.mainType === 'RENEWAL' ? 'PAID' : ''
 }
 
+function projectDashboardAlertSeverity(status: ProjectHealthStatus): ProjectDeliveryDashboardReadModel['projectAlertSeverity'] {
+  if (status === 'AT_RISK' || status === 'BLOCKED') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  if (status === 'COMPLETED') return 'success'
+  return 'info'
+}
+
 export function projectLifecycleIdentity(project: Project): Project {
   return project
 }
@@ -202,6 +209,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const account = linkedAccountForProject(context.project, opportunity, context.accounts)
   const progress = deriveProjectProgress(context.project)
   const configuration = projectConfigurationSummary(context, opportunity)
+  const health = projectHealthReadModel(context)
 
   return {
     projectId: context.project.id,
@@ -222,8 +230,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     modules: configuration.modules,
     licenses: configuration.licenses,
     users: configuration.users,
-    projectAlerts: [],
-    projectAlertSeverity: 'info',
+    projectAlerts: health.healthAlerts,
+    projectAlertSeverity: projectDashboardAlertSeverity(health.healthStatus),
     milestoneCompletionPercent: progress.percent,
     milestoneCompletion: `${progress.percent}%`,
     lastMilestone: progress.lastMilestone,
