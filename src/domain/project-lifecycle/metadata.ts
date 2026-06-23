@@ -8,7 +8,7 @@ import type { ProjectMainType, ProjectSubType } from './types'
 
 export const PROJECT_NAME_REQUIRED_MESSAGE = 'Project name is required.'
 
-export type ProjectFormTab = 'overview' | 'requirements' | 'systems' | 'tenants' | 'milestones' | 'tasks' | 'documents'
+export type ProjectFormTab = 'overview' | 'requirements' | 'systems' | 'tenants' | 'milestones' | 'tasks' | 'documents' | 'activity'
 export type ProjectRequirementSectionKind = 'A' | 'B' | 'C'
 export type ProjectHeaderFieldKey =
   | 'opportunityName'
@@ -64,6 +64,7 @@ export const PROJECT_TABS: ProjectFormTab[] = [
   'milestones',
   'tasks',
   'documents',
+  'activity',
 ]
 
 const REPORTING_FIELDS: ProjectHeaderFieldMetadata[] = [
@@ -218,6 +219,7 @@ export function projectTabLabel(tab: ProjectFormTab): string {
     milestones: 'Milestones',
     tasks: 'Tasks',
     documents: 'Documents',
+    activity: 'Activity',
   }
   return labels[tab]
 }

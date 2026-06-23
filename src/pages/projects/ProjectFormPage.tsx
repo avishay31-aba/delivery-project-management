@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
+import { ActivityTimeline } from '@/components/activity'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -21,6 +22,7 @@ import { PageHeader } from '@/components/record'
 import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, StatusBadge } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
+import { activityEventsForProject } from '@/domain/activity-log'
 import {
   allocationModeLabel,
   allowedAllocationModes,
@@ -84,7 +86,7 @@ import {
   requirementCoverageSummary,
 } from '@/domain/requirement-coverage'
 
-type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents'
+type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents' | 'activity'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
@@ -120,6 +122,7 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   systems: false,
   tenants: false,
   documents: false,
+  activity: false,
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -362,6 +365,7 @@ function tabSectionId(tab: ProjectFormTab): CollapsibleSectionId {
     milestones: 'milestones',
     tasks: 'tasks',
     documents: 'documents',
+    activity: 'activity',
   }
   return ids[tab]
 }
@@ -380,6 +384,7 @@ export function ProjectFormPage() {
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const updateProject = useAppStore((state) => state.updateProject)
   const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
@@ -475,6 +480,10 @@ export function ProjectFormPage() {
   const projectRequirementCoverageSummary = useMemo(
     () => requirementCoverageSummary(projectRequirementCoverageRows),
     [projectRequirementCoverageRows],
+  )
+  const projectActivityEvents = useMemo(
+    () => currentDraft ? activityEventsForProject(activityEvents, currentDraft.id) : [],
+    [activityEvents, currentDraft],
   )
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
@@ -1604,6 +1613,23 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderActivityTab() {
+    return (
+      <CollapsibleSection
+        title="Activity"
+        subtitle="Read-only activity recorded for this Project."
+        collapsed={collapsedSections.activity}
+        onToggle={() => toggleSection('activity')}
+        className="space-y-3 p-3"
+      >
+        <ActivityTimeline
+          events={projectActivityEvents}
+          emptyText="No activity recorded for this project yet."
+        />
+      </CollapsibleSection>
+    )
+  }
+
   function renderLinkedSystemDetails(system: System) {
     const hostingContext = hostingContextFromSource(system)
     const configurationGroups = detailGroups(APPLICATION_CONFIGURATION_FIELDS)
@@ -1904,7 +1930,9 @@ export function ProjectFormPage() {
                       ? renderTasksTab()
                       : activeTab === 'documents'
                         ? renderDocumentsTab()
-                        : renderPlaceholderTab(activeTab)}
+                        : activeTab === 'activity'
+                          ? renderActivityTab()
+                          : renderPlaceholderTab(activeTab)}
         </div>
       </div>
       {renderAddMilestoneDialog()}
