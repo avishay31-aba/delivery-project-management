@@ -13,4 +13,5 @@ export const DASHBOARD_VIEW_SCOPES: DashboardViewScope[] = [
   'tenants',
   'warranties',
   'customers',
+  'requirementCoverage',
 ]

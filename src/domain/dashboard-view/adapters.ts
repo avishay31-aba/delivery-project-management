@@ -112,6 +112,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
       tenants: sanitizeDashboardScopeViews(value.dashboards.tenants),
       warranties: sanitizeDashboardScopeViews(value.dashboards.warranties),
       customers: sanitizeDashboardScopeViews(value.dashboards.customers),
+      requirementCoverage: sanitizeDashboardScopeViews(value.dashboards.requirementCoverage),
     },
   }
 }

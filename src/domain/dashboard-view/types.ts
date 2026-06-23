@@ -7,6 +7,7 @@ export type DashboardViewScope =
   | 'tenants'
   | 'warranties'
   | 'customers'
+  | 'requirementCoverage'
 
 export interface DashboardViewColumnFilter {
   id: string

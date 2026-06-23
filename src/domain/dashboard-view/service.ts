@@ -35,6 +35,7 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
       tenants: createEmptyScopeViews(),
       warranties: createEmptyScopeViews(),
       customers: createEmptyScopeViews(),
+      requirementCoverage: createEmptyScopeViews(),
     },
   }
 }
