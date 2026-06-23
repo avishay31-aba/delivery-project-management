@@ -84,12 +84,49 @@ export function deriveProjectProgress(project: MilestonePlan): ProjectProgressSu
   }
 }
 
+function clampOrder(order: number, itemCount: number): number {
+  if (!Number.isFinite(order)) return itemCount
+  return Math.min(Math.max(Math.trunc(order), 1), Math.max(itemCount, 1))
+}
+
+function reorderItems<T extends { id: string; order: number }>(items: T[], itemId: string, targetOrder: number): T[] {
+  const orderedItems = [...items].sort((first, second) => first.order - second.order || first.id.localeCompare(second.id))
+  const currentIndex = orderedItems.findIndex((item) => item.id === itemId)
+  if (currentIndex < 0) {
+    return orderedItems.map((item, index) => ({ ...item, order: index + 1 }))
+  }
+
+  const [movingItem] = orderedItems.splice(currentIndex, 1)
+  orderedItems.splice(clampOrder(targetOrder, orderedItems.length + 1) - 1, 0, movingItem)
+  return orderedItems.map((item, index) => ({ ...item, order: index + 1 }))
+}
+
+export function normalizeMilestoneOrdersInPlan(project: Project): Project {
+  return {
+    ...project,
+    milestones: reorderItems(project.milestones ?? [], '', Number.NaN),
+    tasks: (project.tasks ?? []).map((task) => ({ ...task })),
+  }
+}
+
 export function updateMilestoneOrderInPlan(project: Project, milestoneId: string, order: number): Project {
   return {
     ...project,
-    milestones: (project.milestones ?? []).map((milestone) =>
-      milestone.id === milestoneId ? { ...milestone, order } : milestone,
-    ),
+    milestones: reorderItems(project.milestones ?? [], milestoneId, order),
+  }
+}
+
+export function updateTaskOrderInPlan(project: Project, taskId: string, order: number): Project {
+  const task = project.tasks?.find((candidate) => candidate.id === taskId)
+  if (!task) return project
+
+  const taskGroup = (project.tasks ?? []).filter((candidate) => candidate.milestoneId === task.milestoneId)
+  const reorderedTaskGroup = reorderItems(taskGroup, taskId, order)
+  const taskById = new Map(reorderedTaskGroup.map((candidate) => [candidate.id, candidate]))
+
+  return {
+    ...project,
+    tasks: (project.tasks ?? []).map((candidate) => taskById.get(candidate.id) ?? candidate),
   }
 }
 
