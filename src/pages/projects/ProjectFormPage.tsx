@@ -1564,6 +1564,118 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderSystemsTab() {
+    return (
+      <CollapsibleSection
+        title="Systems"
+        subtitle="Allocate or link systems for this Project. Tenant creation happens from the linked System Form."
+        collapsed={collapsedSections.systems}
+        onToggle={() => toggleSection('systems')}
+        className="space-y-3 p-3"
+      >
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {renderWorkspaceMetric('Linked Systems', workspaceSystemSummary?.linkedSystems ?? 0, workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Production Systems', workspaceSystemSummary?.productionSystems ?? 0)}
+          {renderWorkspaceMetric('Reused/Internal Systems', workspaceSystemSummary?.reusedInternalSystems ?? 0)}
+          {renderWorkspaceMetric('Missing System Allocation', workspaceSystemSummary?.missingSystemAllocation ? 'Yes' : 'No', workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-sf-text-muted">
+            Allocation creates Project to System links only. It does not create tenants.
+          </p>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+            onClick={openAllocationDialog}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Allocate System
+          </button>
+        </div>
+
+        {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
+
+        {linkedSystems.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['Details', 'SID/MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Cloud Platform', 'CSP', 'Region', 'Operational Status', 'Allocation Type', 'Action'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {linkedSystems.map((system) => {
+                  const link = activeSystemLinkBySystemId.get(system.id)
+                  const isExpanded = expandedLinkedSystemIds.includes(system.id)
+                  return [
+                    <tr key={system.id} className="hover:bg-sf-surface-alt">
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
+                          aria-expanded={isExpanded}
+                          onClick={() => toggleLinkedSystemDetails(system.id)}
+                        >
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+                          Details
+                        </button>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        <span className="inline-flex items-center gap-2">
+                          <LinkId to={systemRoutePath(system)}>
+                            {system.sid ?? system.machineId ?? system.id}
+                          </LinkId>
+                          <RecordChangeBadge record={system} />
+                        </span>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudPlatform ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.csp ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudRegion ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{link ? allocationModeLabel(link.allocationType ?? 'EXISTING_SYSTEM') : '-'}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {link ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                            onClick={() => deallocateSystem(link)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Deallocate
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>,
+                    isExpanded ? (
+                      <tr key={`${system.id}-details`}>
+                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={12}>
+                          {renderLinkedSystemDetails(system)}
+                        </td>
+                      </tr>
+                    ) : null,
+                  ]
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No systems are linked to this Project yet.
+          </div>
+        )}
+      </CollapsibleSection>
+    )
+  }
+
   function renderSystemsTenantsTab() {
     return (
       <CollapsibleSection
@@ -1840,7 +1952,7 @@ export function ProjectFormPage() {
             : activeTab === 'requirements'
               ? renderRequirementsTab()
               : activeTab === 'systems'
-                ? renderSystemsTenantsTab()
+                ? renderSystemsTab()
                 : activeTab === 'tenants'
                   ? renderSystemsTenantsTab()
                   : activeTab === 'milestones'
