@@ -104,6 +104,8 @@ export interface ProjectMilestone {
   name: string
   order: number
   status: ProgressStatus
+  deadline?: string | null
+  comment?: string
 }
 
 export interface ProjectTask {
@@ -114,6 +116,8 @@ export interface ProjectTask {
   resource: string
   status: Exclude<ProgressStatus, 'IN_PROGRESS'>
   order: number
+  deadline?: string | null
+  comment?: string
 }
 
 export interface OpportunityRequirementBase {
