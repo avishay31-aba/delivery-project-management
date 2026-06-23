@@ -17,6 +17,8 @@ export interface ProjectProgressSummary {
   percent: number
 }
 
+export type MilestoneDeadlineAlertStatus = 'NONE' | 'WARNING' | 'OVERDUE'
+
 export function orderedProjectMilestones(project: MilestonePlan): ProjectMilestone[] {
   return [...(project.milestones ?? [])].sort((first, second) => first.order - second.order || first.name.localeCompare(second.name))
 }
@@ -66,6 +68,38 @@ export function projectMilestoneTaskProgress(project: MilestonePlan, milestoneId
   const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
   if (tasks.length === 0) return 0
   return Math.round((tasks.filter((task) => task.status === 'DONE').length / tasks.length) * 100)
+}
+
+function dateOnlyTimestamp(value: string): number | null {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day).getTime()
+}
+
+function todayTimestamp(today = new Date()): number {
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+}
+
+export function milestoneDeadlineAlertStatus(
+  deadline: string | null | undefined,
+  status: ProgressStatus,
+  today = new Date(),
+): MilestoneDeadlineAlertStatus {
+  if (!deadline || status === 'DONE') return 'NONE'
+
+  const deadlineTimestamp = dateOnlyTimestamp(deadline)
+  if (deadlineTimestamp === null) return 'NONE'
+
+  const daysUntilDeadline = Math.ceil((deadlineTimestamp - todayTimestamp(today)) / 86_400_000)
+  if (daysUntilDeadline < 0) return 'OVERDUE'
+  if (daysUntilDeadline < 90) return 'WARNING'
+  return 'NONE'
+}
+
+export function milestoneDeadlineAlertLabel(status: MilestoneDeadlineAlertStatus): string {
+  if (status === 'OVERDUE') return 'Overdue'
+  if (status === 'WARNING') return 'Due in less than 90 days'
+  return ''
 }
 
 export function deriveProjectProgress(project: MilestonePlan): ProjectProgressSummary {
