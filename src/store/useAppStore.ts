@@ -7,6 +7,12 @@ import type {
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import {
+  createActivityEvent,
+  type ActivityObjectRefInput,
+  type ActivityEventInput,
+  type ActivityEvent,
+} from '@/domain/activity-log'
+import {
   createInitialState,
   loadPersistedState,
   persistState,
@@ -45,6 +51,53 @@ import {
   resolveTenantCreationSource,
   tenantCreationDraftFromSource,
 } from '@/domain/tenant-operations'
+
+type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
+
+function appendActivityEvent(
+  events: ActivityEvent[],
+  now: string,
+  draft: ActivityEventDraft,
+): ActivityEvent[] {
+  return [
+    createActivityEvent({
+      ...draft,
+      occurredAt: now,
+    }),
+    ...events,
+  ]
+}
+
+function objectRef(
+  objectType: string,
+  id: string,
+  businessId: string,
+  displayLabel = businessId,
+  routePath?: string,
+): ActivityObjectRefInput {
+  return {
+    objectType,
+    id,
+    businessId,
+    displayLabel,
+    ...(routePath ? { routePath } : {}),
+  }
+}
+
+function projectRef(project: AppDataState['projects'][number]): ActivityObjectRefInput {
+  return objectRef('PROJECT', project.id, project.pid, project.pid, `/projects/${project.pid}`)
+}
+
+function systemBusinessId(system: AppDataState['systems'][number] | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]): string {
+  if ('sid' in system && system.sid) return system.sid
+  if ('machineId' in system && system.machineId) return system.machineId
+  return system.id
+}
+
+function systemRef(system: AppDataState['systems'][number] | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]): ActivityObjectRefInput {
+  const businessId = systemBusinessId(system)
+  return objectRef('SYSTEM', system.id, businessId, businessId)
+}
 
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
@@ -301,7 +354,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const project = createStandaloneProject(nextPid, now)
 
-    set((s) => ({ idCounters, projects: [project, ...s.projects] }))
+    set((s) => ({
+      idCounters,
+      projects: [project, ...s.projects],
+      activityEvents: appendActivityEvent(s.activityEvents, now, {
+        category: 'PROJECT',
+        eventType: 'project.created',
+        severity: 'SUCCESS',
+        summary: `Project ${project.pid} created.`,
+        primaryObject: projectRef(project),
+      }),
+    }))
     get().saveToStorage()
     return project
   },
@@ -317,6 +380,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => ({
       idCounters,
       productionSystemInventory: [system, ...currentState.productionSystemInventory],
+      activityEvents: appendActivityEvent(currentState.activityEvents, now, {
+        category: 'SYSTEM',
+        eventType: 'system.created',
+        severity: 'SUCCESS',
+        summary: `System ${system.sid} created.`,
+        primaryObject: systemRef(system),
+      }),
     }))
     get().saveToStorage()
     return system
@@ -333,6 +403,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => ({
       idCounters,
       reusedInternalSystems: [system, ...currentState.reusedInternalSystems],
+      activityEvents: appendActivityEvent(currentState.activityEvents, now, {
+        category: 'SYSTEM',
+        eventType: 'system.created',
+        severity: 'SUCCESS',
+        summary: `System ${system.machineId} created.`,
+        primaryObject: systemRef(system),
+      }),
     }))
     get().saveToStorage()
     return system
@@ -379,7 +456,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const system = createStandaloneSystem(nextSid, now)
 
-    set((s) => ({ idCounters, systems: [system, ...s.systems] }))
+    set((s) => ({
+      idCounters,
+      systems: [system, ...s.systems],
+      activityEvents: appendActivityEvent(s.activityEvents, now, {
+        category: 'SYSTEM',
+        eventType: 'system.created',
+        severity: 'SUCCESS',
+        summary: `System ${system.sid ?? system.id} created.`,
+        primaryObject: systemRef(system),
+      }),
+    }))
     get().saveToStorage()
     return system
   },
