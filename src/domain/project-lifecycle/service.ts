@@ -138,6 +138,13 @@ function projectConfigurationSummary(context: ProjectDeliveryDashboardContext, o
   }
 }
 
+function projectFinancialProfile(project: Project, opportunity: Opportunity | undefined): string {
+  if (project.mainType === 'POC') {
+    return opportunity?.subType === 'FREE' || opportunity?.subType === 'PAID' ? opportunity.subType : ''
+  }
+  return project.mainType === 'DELIVERY' || project.mainType === 'RENEWAL' ? 'PAID' : ''
+}
+
 export function projectLifecycleIdentity(project: Project): Project {
   return project
 }
@@ -221,7 +228,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     milestoneCompletion: `${progress.percent}%`,
     lastMilestone: progress.lastMilestone,
     currentMilestone: progress.currentMilestone,
-    financialProfile: '',
+    financialProfile: projectFinancialProfile(context.project, opportunity),
     owner: linkedOwnerForProject(context.project, account, context.salesManagers),
   }
 }
