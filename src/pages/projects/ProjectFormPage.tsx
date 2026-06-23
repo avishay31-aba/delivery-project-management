@@ -64,6 +64,7 @@ import {
   hostingContextFromSource,
   type HostingContext,
 } from '@/domain/hosting-context'
+import { tenantWarrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -1676,172 +1677,80 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderSystemsTenantsTab() {
+  function tenantWarrantyHeaderLabel(tenant: Tenant): string {
+    return tenantWarrantyHeaderStatusReadModel(tenant.warranties ?? [], tenant.tid).label
+  }
+
+  function renderTenantsTab() {
+    const warrantyLabels = linkedTenants.map(tenantWarrantyHeaderLabel)
+    const underContractCount = warrantyLabels.filter((label) => label === 'Under Contract').length
+    const outOfContractCount = warrantyLabels.filter((label) => label === 'Out Of Contract').length
+
     return (
       <CollapsibleSection
-        title="Systems and Tenants"
-        subtitle="Allocate or link systems for this Project. Tenant creation happens from the linked System Form."
-        collapsed={collapsedSections.systems}
-        onToggle={() => toggleSection('systems')}
+        title="Tenants"
+        subtitle="Read-only tenant links for this Project. Tenant creation remains available only from the linked System Form."
+        collapsed={collapsedSections.tenants}
+        onToggle={() => toggleSection('tenants')}
         className="space-y-3 p-3"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-sf-text-muted">
-            Allocation creates Project to System links only. It does not create tenants.
-          </p>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
-            onClick={openAllocationDialog}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Allocate System
-          </button>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {renderWorkspaceMetric('Linked Tenants', workspaceTenantSummary?.linkedTenants ?? 0, workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Customer Tenants', workspaceTenantSummary?.customerTenants ?? 0)}
+          {renderWorkspaceMetric('POC Tenants', workspaceTenantSummary?.pocTenants ?? 0)}
+          {renderWorkspaceMetric('Missing Tenant Creation', workspaceTenantSummary?.missingTenantCreation ? 'Yes' : 'No', workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
+          {renderWorkspaceMetric('Under Contract', underContractCount)}
+          {renderWorkspaceMetric('Out Of Contract', outOfContractCount, outOfContractCount > 0 ? 'warning' : 'default')}
         </div>
 
-        {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
-
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-sf-text">Linked Systems</h3>
-          {linkedSystems.length > 0 ? (
-            <div className="overflow-x-auto rounded border border-sf-border bg-white">
-              <table className="min-w-full border-collapse text-sm leading-tight">
-                <thead className="bg-sf-surface-alt text-left">
-                  <tr>
-                    {['Details', 'SID', 'MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Operational Mode', 'Allocation', 'Action'].map((label) => (
-                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedSystems.map((system) => {
-                    const link = activeSystemLinkBySystemId.get(system.id)
-                    const isExpanded = expandedLinkedSystemIds.includes(system.id)
-                    return [
-                      <tr key={system.id} className="hover:bg-sf-surface-alt">
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
-                            aria-expanded={isExpanded}
-                            onClick={() => toggleLinkedSystemDetails(system.id)}
-                          >
-                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
-                            Details
-                          </button>
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          <span className="inline-flex items-center gap-2">
-                            <LinkId to={systemRoutePath(system)}>
-                              {system.sid ?? system.machineId ?? system.id}
-                            </LinkId>
-                            <RecordChangeBadge record={system} />
-                          </span>
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {system.machineId ? (
-                            <LinkId to={systemRoutePath(system)}>
-                              {system.machineId}
-                            </LinkId>
-                          ) : null}
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{link ? allocationModeLabel(link.allocationType ?? 'EXISTING_SYSTEM') : '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {link ? (
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                              onClick={() => deallocateSystem(link)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              Deallocate
-                            </button>
-                          ) : null}
-                        </td>
-                      </tr>,
-                      isExpanded ? (
-                        <tr key={`${system.id}-details`}>
-                          <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10}>
-                            {renderLinkedSystemDetails(system)}
-                          </td>
-                        </tr>
-                      ) : null,
-                    ]
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-              No systems are linked to this Project yet.
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold text-sf-text">Linked Tenants</h3>
-          {linkedTenants.length > 0 ? (
-            <div className="overflow-x-auto rounded border border-sf-border bg-white">
-              <table className="min-w-full border-collapse text-sm leading-tight">
-                <thead className="bg-sf-surface-alt text-left">
-                  <tr>
-                    {['TID', 'Tenant Name', 'System SID', 'Delivery PID', 'Product', 'Hosting', 'Operational Mode'].map((label) => (
-                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedTenants.map((tenant) => {
-                    const system = systems.find((candidate) => candidate.id === tenant.systemId)
-                    return (
-                      <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          <span className="inline-flex items-center gap-2">
-                            <LinkId to={`/tenants/${tenant.tid}`}>
-                              {tenant.tid}
-                            </LinkId>
-                            <RecordChangeBadge record={tenant} />
-                          </span>
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          <LinkId to={`/tenants/${tenant.tid}`}>
-                            {tenant.tenantName}
-                          </LinkId>
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {system ? (
-                            <LinkId to={systemRoutePath(system)}>
-                              {system.sid ?? system.machineId ?? ''}
-                            </LinkId>
-                          ) : null}
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : null}
-                        </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-              No tenants are linked to this Project yet.
-            </div>
-          )}
-        </div>
+        {linkedTenants.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['TID', 'Tenant Name', 'System SID/MID', 'Delivery PID', 'Product', 'Hosting', 'Operational Status', 'Warranty Header Status', 'Source Requirement ID'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {linkedTenants.map((tenant) => {
+                  const system = systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
+                  return (
+                    <tr key={tenant.id} className="hover:bg-sf-surface-alt">
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        <span className="inline-flex items-center gap-2">
+                          <LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId>
+                          <RecordChangeBadge record={tenant} />
+                        </span>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        <LinkId to={`/tenants/${tenant.tid}`}>{tenant.tenantName}</LinkId>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {system ? <LinkId to={systemRoutePath(system)}>{system.sid ?? system.machineId ?? ''}</LinkId> : null}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : null}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantWarrantyHeaderLabel(tenant)}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.sourceRequirementId ?? ''}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No tenants are linked to this Project yet.
+          </div>
+        )}
       </CollapsibleSection>
     )
   }
@@ -1954,7 +1863,7 @@ export function ProjectFormPage() {
               : activeTab === 'systems'
                 ? renderSystemsTab()
                 : activeTab === 'tenants'
-                  ? renderSystemsTenantsTab()
+                  ? renderTenantsTab()
                   : activeTab === 'milestones'
                 ? renderMilestonesTab()
                 : activeTab === 'tasks'
