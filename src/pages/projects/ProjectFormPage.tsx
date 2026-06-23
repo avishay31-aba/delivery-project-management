@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import {
@@ -1009,27 +1009,41 @@ export function ProjectFormPage() {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-sf-surface-alt">
-                    <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestonesById.get(task.milestoneId)?.name ?? ''}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
-                      <input
-                        className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
-                        type="number"
-                        min={1}
-                        value={task.order}
-                        onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
-                      />
-                    </td>
-                    <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                    <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.comment ?? ''}</td>
-                  </tr>
-                ))}
+                {tasks.map((task, index) => {
+                  const milestone = milestonesById.get(task.milestoneId)
+                  const startsMilestoneGroup = index === 0 || tasks[index - 1]?.milestoneId !== task.milestoneId
+
+                  return (
+                    <Fragment key={task.id}>
+                      {startsMilestoneGroup ? (
+                        <tr className="border-t-2 border-sf-border bg-sf-surface-alt/70">
+                          <td colSpan={9} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+                            {milestone?.name ?? 'Unassigned milestone'}
+                          </td>
+                        </tr>
+                      ) : null}
+                      <tr className="hover:bg-sf-surface-alt">
+                        <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                          <input
+                            className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
+                            type="number"
+                            min={1}
+                            value={task.order}
+                            onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
+                          />
+                        </td>
+                        <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
+                        <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.comment ?? ''}</td>
+                      </tr>
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
