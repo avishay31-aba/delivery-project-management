@@ -6,6 +6,7 @@ export type DashboardViewScope =
   | 'reusedInternalSystems'
   | 'tenants'
   | 'warranties'
+  | 'renewals'
   | 'customers'
   | 'requirementCoverage'
 
