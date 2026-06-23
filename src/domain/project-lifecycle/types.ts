@@ -80,6 +80,20 @@ export interface ProjectPortfolioHealthSummary {
   projectsMissingTenants: number
 }
 
+export interface ProjectWorkspaceSystemSummary {
+  linkedSystems: number
+  productionSystems: number
+  reusedInternalSystems: number
+  missingSystemAllocation: boolean
+}
+
+export interface ProjectWorkspaceTenantSummary {
+  linkedTenants: number
+  customerTenants: number
+  pocTenants: number
+  missingTenantCreation: boolean
+}
+
 export interface ProjectDeliveryDashboardReadModel {
   projectId: string
   pid: string

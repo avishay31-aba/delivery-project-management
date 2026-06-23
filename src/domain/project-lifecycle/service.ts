@@ -24,6 +24,8 @@ import type {
   ProjectSystemsTenantsContext,
   ProjectSystemLink,
   ProjectTenantLink,
+  ProjectWorkspaceSystemSummary,
+  ProjectWorkspaceTenantSummary,
   StandardRenewalRequirement,
   System,
   Tenant,
@@ -363,6 +365,31 @@ export function projectPortfolioHealthSummary(
     completedProjects: healthRows.filter((row) => row.healthStatus === 'COMPLETED').length,
     projectsMissingSystems: healthRows.filter((row) => row.missingSystems).length,
     projectsMissingTenants: healthRows.filter((row) => row.missingTenants).length,
+  }
+}
+
+export function projectWorkspaceSystemSummary(context: ProjectSystemsTenantsContext): ProjectWorkspaceSystemSummary {
+  const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
+  const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
+
+  return {
+    linkedSystems: linkedSystems.length,
+    productionSystems: linkedSystems.filter((system) => system.source === 'Production').length,
+    reusedInternalSystems: linkedSystems.filter((system) => system.source === 'Reused Internal Systems').length,
+    missingSystemAllocation: activeSystemLinks.length === 0,
+  }
+}
+
+export function projectWorkspaceTenantSummary(context: ProjectSystemsTenantsContext): ProjectWorkspaceTenantSummary {
+  const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
+  const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
+  const linkedTenants = linkedTenantsForProject(context.project, linkedSystems, context.projectTenants, context.tenants)
+
+  return {
+    linkedTenants: linkedTenants.length,
+    customerTenants: linkedTenants.filter((tenant) => tenant.tenantType === 'CUSTOMER').length,
+    pocTenants: linkedTenants.filter((tenant) => tenant.tenantType === 'POC').length,
+    missingTenantCreation: linkedTenants.length === 0,
   }
 }
 
