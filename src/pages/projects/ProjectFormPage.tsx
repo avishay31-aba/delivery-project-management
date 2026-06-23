@@ -780,6 +780,12 @@ export function ProjectFormPage() {
   function renderOverviewTab() {
     const sectionId = tabSectionId('overview')
     const healthAlerts = projectHealth?.healthAlerts ?? []
+    const coverageAlerts = [
+      projectRequirementCoverageSummary.missingSystem > 0 ? `${projectRequirementCoverageSummary.missingSystem} requirement(s) missing System allocation` : null,
+      projectRequirementCoverageSummary.missingTenant > 0 ? `${projectRequirementCoverageSummary.missingTenant} requirement(s) missing Tenant creation` : null,
+      projectRequirementCoverageSummary.unknown > 0 ? `${projectRequirementCoverageSummary.unknown} requirement(s) need coverage review` : null,
+    ].filter((alert): alert is string => Boolean(alert))
+    const needsAttentionAlerts = Array.from(new Set([...healthAlerts, ...coverageAlerts]))
 
     return (
       <CollapsibleSection
@@ -813,17 +819,20 @@ export function ProjectFormPage() {
             <h3 className="text-base font-semibold text-sf-text">Needs Attention</h3>
             {projectHealth ? <StatusBadge label={projectHealth.deliveryDateStatusLabel} variant={projectHealth.healthStatus === 'AT_RISK' ? 'error' : projectHealth.healthStatus === 'WARNING' ? 'warning' : 'default'} /> : null}
           </div>
-          {healthAlerts.length > 0 ? (
+          {needsAttentionAlerts.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {healthAlerts.map((alert) => (
+              {needsAttentionAlerts.map((alert) => (
                 <span key={alert} className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-                  <AlertStatusIcon variant={projectHealthAlertVariant(projectHealth?.healthStatus ?? 'HEALTHY')} label={alert} />
+                  <AlertStatusIcon
+                    variant={healthAlerts.includes(alert) ? projectHealthAlertVariant(projectHealth?.healthStatus ?? 'HEALTHY') : 'warning'}
+                    label={alert}
+                  />
                   {alert}
                 </span>
               ))}
             </div>
           ) : (
-            <div className="text-sm text-sf-text-muted">No delivery alerts from current Project health data.</div>
+            <div className="text-sm text-sf-text-muted">No delivery or requirement coverage alerts from current read-only data.</div>
           )}
         </div>
       </CollapsibleSection>
