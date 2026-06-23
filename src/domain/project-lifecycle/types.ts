@@ -36,6 +36,17 @@ export interface ProjectSystemsTenantsContext {
   projectTenants: ProjectTenantLink[]
 }
 
+export interface ProjectDeliveryDashboardContext {
+  project: Project
+  opportunities: Opportunity[]
+  accounts: Account[]
+  salesManagers: SalesManager[]
+  systems: System[]
+  tenants: Tenant[]
+  projectSystems: ProjectSystemLink[]
+  projectTenants: ProjectTenantLink[]
+}
+
 export type ProjectHealthStatus = 'HEALTHY' | 'WARNING' | 'AT_RISK' | 'BLOCKED' | 'COMPLETED'
 
 export type ProjectDeliveryDateStatus = 'NOT_SET' | 'ON_TRACK' | 'UPCOMING_RISK' | 'OVERDUE' | 'COMPLETED'
@@ -67,6 +78,35 @@ export interface ProjectPortfolioHealthSummary {
   completedProjects: number
   projectsMissingSystems: number
   projectsMissingTenants: number
+}
+
+export interface ProjectDeliveryDashboardReadModel {
+  projectId: string
+  pid: string
+  projectName: string
+  endUser: string
+  payingCustomer: string
+  region: string
+  country: string
+  status: string
+  statusLabel: string
+  deliveryDate: string
+  pocStartDate: string
+  pocEndDate: string
+  type: string
+  hosting: string
+  product: string
+  modules: string[]
+  licenses: string
+  users: string
+  projectAlerts: string[]
+  projectAlertSeverity: 'danger' | 'warning' | 'info' | 'success'
+  milestoneCompletionPercent: number
+  milestoneCompletion: string
+  lastMilestone: string
+  currentMilestone: string
+  financialProfile: string
+  owner: string
 }
 
 export type {
