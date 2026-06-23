@@ -376,6 +376,8 @@ export function ProjectFormPage() {
   const [isAddMilestoneDialogOpen, setIsAddMilestoneDialogOpen] = useState(false)
   const [newMilestoneName, setNewMilestoneName] = useState('')
   const [newMilestoneOrder, setNewMilestoneOrder] = useState(1)
+  const [newMilestoneDeadline, setNewMilestoneDeadline] = useState('')
+  const [newMilestoneComment, setNewMilestoneComment] = useState('')
   const [newMilestoneTasks, setNewMilestoneTasks] = useState<NewMilestoneTaskDraft[]>([])
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
@@ -734,6 +736,20 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function updateMilestone(milestoneId: string, patch: Partial<NonNullable<Project['milestones']>[number]>) {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            milestones: (current.milestones ?? []).map((milestone) =>
+              milestone.id === milestoneId ? { ...milestone, ...patch } : milestone,
+            ),
+          }
+        : current,
+    )
+    setSaveMessages([])
+  }
+
   function updateTask(taskId: string, patch: Partial<NonNullable<Project['tasks']>[number]>) {
     setDraft((current) => (current ? updateTaskInPlan(current, taskId, patch) : current))
     setSaveMessages([])
@@ -743,6 +759,8 @@ export function ProjectFormPage() {
     const nextOrder = ((projectDraft.milestones ?? []).reduce((maxOrder, milestone) => Math.max(maxOrder, milestone.order), 0) || 0) + 1
     setNewMilestoneName('')
     setNewMilestoneOrder(nextOrder)
+    setNewMilestoneDeadline('')
+    setNewMilestoneComment('')
     setNewMilestoneTasks([{ name: '', department: '', resource: '', status: 'OPEN' }])
     setIsAddMilestoneDialogOpen(true)
   }
@@ -794,6 +812,8 @@ export function ProjectFormPage() {
                 name: milestoneName,
                 order: newMilestoneOrder,
                 status: 'OPEN',
+                deadline: newMilestoneDeadline || null,
+                comment: newMilestoneComment,
               },
             ],
             tasks: [...(current.tasks ?? []), ...initialTasks],
@@ -884,7 +904,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Order', 'Milestone', 'Status', 'Progress', 'Tasks'].map((label) => (
+                  {['Order', 'Milestone', 'Deadline', 'DL Alert', 'Status', 'Progress', 'Tasks', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -912,11 +932,14 @@ export function ProjectFormPage() {
                           {milestone.name}
                         </button>
                       </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone.deadline || ''}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"></td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
                       <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
                         <ProgressBar value={progress} className="min-w-20" />
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">{taskCount}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{milestone.comment ?? ''}</td>
                     </tr>
                   )
                 })}
@@ -1003,6 +1026,12 @@ export function ProjectFormPage() {
               <FormField label="Order" controlWidthClassName="w-24">
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="number" min={1} value={newMilestoneOrder} onChange={(event) => setNewMilestoneOrder(Number(event.target.value) || 1)} />
               </FormField>
+              <FormField label="Deadline" controlWidthClassName="w-40">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={newMilestoneDeadline} onChange={(event) => setNewMilestoneDeadline(event.target.value)} />
+              </FormField>
+              <FormField label="Comment" controlWidthClassName="w-96">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={newMilestoneComment} onChange={(event) => setNewMilestoneComment(event.target.value)} />
+              </FormField>
             </div>
 
             <div className="space-y-2">
@@ -1082,6 +1111,17 @@ export function ProjectFormPage() {
             </button>
           </div>
           <div className="max-h-[68vh] overflow-auto p-4">
+            <div className="mb-3 flex flex-wrap items-start gap-3">
+              <FormField label="Milestone name" controlWidthClassName="w-80">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={milestone.name} onChange={(event) => updateMilestone(milestone.id, { name: event.target.value })} />
+              </FormField>
+              <FormField label="Deadline" controlWidthClassName="w-40">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={milestone.deadline ?? ''} onChange={(event) => updateMilestone(milestone.id, { deadline: event.target.value || null })} />
+              </FormField>
+              <FormField label="Comment" controlWidthClassName="w-96">
+                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={milestone.comment ?? ''} onChange={(event) => updateMilestone(milestone.id, { comment: event.target.value })} />
+              </FormField>
+            </div>
             <div className="mb-2 flex justify-end">
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => addTaskToMilestone(milestone.id)}>
                 + Add task
