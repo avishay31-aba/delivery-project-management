@@ -31,6 +31,21 @@ import type {
 
 const UPCOMING_DELIVERY_RISK_DAYS = 14
 
+const MODULE_FIELD_LABELS: Array<[string, string]> = [
+  ['tangles', 'Tangles'],
+  ['tanglesGo', 'Tangles Go'],
+  ['webloc', 'Webloc'],
+  ['webeye', 'Webeye'],
+  ['ingest', 'Ingest'],
+  ['blockchain', 'Blockchain'],
+  ['apiEnabled', 'API'],
+  ['crossSystemFeatures', 'Additional Sources'],
+  ['aiFeatures', 'AI'],
+  ['additionalFeatures', 'Additional Features'],
+]
+
+type DashboardSourceRecord = Record<string, unknown>
+
 function linkedOpportunityForProject(project: Project, opportunities: Opportunity[]): Opportunity | undefined {
   return opportunities.find((opportunity) => opportunity.opportunityId === project.opportunityId)
 }
@@ -50,6 +65,77 @@ function linkedOwnerForProject(
   salesManagers: ProjectDeliveryDashboardContext['salesManagers'],
 ): string {
   return salesManagers.find((manager) => manager.id === account?.salesManagerId)?.name ?? project.dealOwner
+}
+
+function uniqueText(values: unknown[]): string[] {
+  return Array.from(new Set(values.map((value) => value == null ? '' : String(value).trim()).filter(Boolean)))
+}
+
+function joinUniqueText(values: unknown[]): string {
+  return uniqueText(values).join('; ')
+}
+
+function opportunityRequirementRows(opportunity: Opportunity | undefined): ProjectRequirementRow[] {
+  if (!opportunity) return []
+  return [
+    ...(opportunity.newTenantRequirements ?? []),
+    ...(opportunity.changeRequestRequirements ?? []),
+    ...(opportunity.standardRenewalRequirements ?? []),
+  ]
+}
+
+function projectConfigurationSources(context: ProjectDeliveryDashboardContext, opportunity: Opportunity | undefined) {
+  const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
+  const systems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
+  const tenants = linkedTenantsForProject(context.project, systems, context.projectTenants, context.tenants)
+  return {
+    systems,
+    tenants,
+    requirements: opportunityRequirementRows(opportunity),
+  }
+}
+
+function firstAvailableJoinedValue(sources: Array<Record<string, unknown>[]>, keys: string[]): string {
+  for (const source of sources) {
+    const values = joinUniqueText(source.flatMap((record) => keys.map((key) => record[key])))
+    if (values) return values
+  }
+  return ''
+}
+
+function enabledModuleLabels(records: Array<Record<string, unknown>>): string[] {
+  const labels: string[] = []
+  records.forEach((record) => {
+    MODULE_FIELD_LABELS.forEach(([field, label]) => {
+      const value = record[field]
+      if (Array.isArray(value) && value.length > 0) {
+        labels.push(...value.map(String).filter(Boolean))
+      } else if (typeof value === 'number' && value > 0) {
+        labels.push(label)
+      } else if (typeof value === 'string' && value && value !== 'NO') {
+        labels.push(label)
+      }
+    })
+  })
+  return Array.from(new Set(labels))
+}
+
+function projectConfigurationSummary(context: ProjectDeliveryDashboardContext, opportunity: Opportunity | undefined) {
+  const sources = projectConfigurationSources(context, opportunity)
+  const sourcePriority = [
+    sources.systems as unknown as DashboardSourceRecord[],
+    sources.tenants as unknown as DashboardSourceRecord[],
+    sources.requirements as unknown as DashboardSourceRecord[],
+  ]
+  const allRecords = sourcePriority.flat()
+
+  return {
+    hosting: firstAvailableJoinedValue(sourcePriority, ['hostingType']),
+    product: firstAvailableJoinedValue(sourcePriority, ['productType', 'product']),
+    modules: enabledModuleLabels(allRecords),
+    licenses: firstAvailableJoinedValue(sourcePriority, ['licenses']),
+    users: firstAvailableJoinedValue(sourcePriority, ['users']),
+  }
 }
 
 export function projectLifecycleIdentity(project: Project): Project {
@@ -108,6 +194,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const opportunity = linkedOpportunityForProject(context.project, context.opportunities)
   const account = linkedAccountForProject(context.project, opportunity, context.accounts)
   const progress = deriveProjectProgress(context.project)
+  const configuration = projectConfigurationSummary(context, opportunity)
 
   return {
     projectId: context.project.id,
@@ -123,11 +210,11 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     pocStartDate: opportunity?.pocStartDate ?? '',
     pocEndDate: opportunity?.pocEndDate ?? '',
     type: context.project.mainType,
-    hosting: '',
-    product: '',
-    modules: [],
-    licenses: '',
-    users: '',
+    hosting: configuration.hosting,
+    product: configuration.product,
+    modules: configuration.modules,
+    licenses: configuration.licenses,
+    users: configuration.users,
     projectAlerts: [],
     projectAlertSeverity: 'info',
     milestoneCompletionPercent: progress.percent,
