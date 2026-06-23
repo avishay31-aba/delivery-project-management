@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
 import { PlaceholderCard } from '@/components/ui'
 import type { Tenant } from '@/data/seed.types'
@@ -12,13 +13,14 @@ import {
   customerTypeLabel,
 } from '@/domain/customer-account'
 import { formatDocumentSize } from '@/domain/document-collection'
+import { activityEventsForCustomer } from '@/domain/activity-log'
 import { systemIdentity, systemRoutePath } from '@/domain/system-inventory'
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
 import { useAppStore } from '@/store/useAppStore'
 
-type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'documents'
+type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'documents' | 'activity'
 
 const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -28,6 +30,7 @@ const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
   { id: 'tenants', label: 'Tenants' },
   { id: 'warranties', label: 'Warranties' },
   { id: 'documents', label: 'Documents' },
+  { id: 'activity', label: 'Activity' },
 ]
 
 function readOnlyValue(label: string, value: string) {
@@ -89,6 +92,7 @@ export function Customer360Page() {
   const tenants = useAppStore((state) => state.tenants)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const [activeTab, setActiveTab] = useState<Customer360Tab>('overview')
 
   const account = accounts.find((candidate) => candidate.accountCode === accountCode)
@@ -148,6 +152,7 @@ export function Customer360Page() {
   const customer = customer360
   const openProjects = customerOpenProjects(customer.projects)
   const projectHealthByProjectId = new Map(customer.projectHealthRows.map((row) => [row.projectId, row]))
+  const customerActivityEvents = activityEventsForCustomer(activityEvents, account.id)
 
   function renderTabContent() {
     if (activeTab === 'overview') {
@@ -252,7 +257,8 @@ export function Customer360Page() {
       )
     }
 
-    return readOnlyTable(
+    if (activeTab === 'documents') {
+      return readOnlyTable(
       ['File', 'Source Type', 'Source ID', 'Source Name', 'Type', 'Size', 'Uploaded At', 'Replaced At', 'Open'],
       customer.documents.map((document) => [
         document.fileName,
@@ -266,6 +272,14 @@ export function Customer360Page() {
         document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : '',
       ]),
       'No documents found across this customer portfolio.',
+      )
+    }
+
+    return (
+      <ActivityTimeline
+        events={customerActivityEvents}
+        emptyText="No activity recorded for this customer yet."
+      />
     )
   }
 
