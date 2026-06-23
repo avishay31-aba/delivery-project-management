@@ -65,6 +65,8 @@ import {
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
+  milestoneDeadlineAlertLabel,
+  milestoneDeadlineAlertStatus,
   orderedProjectMilestones,
   orderedProjectTasks,
   projectMilestoneStatus,
@@ -874,6 +876,18 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderDeadlineAlert(deadline: string | null | undefined, status: string) {
+    const alertStatus = milestoneDeadlineAlertStatus(deadline, status as NonNullable<Project['milestones']>[number]['status'])
+    if (alertStatus === 'NONE') return null
+
+    return (
+      <AlertStatusIcon
+        variant={alertStatus === 'OVERDUE' ? 'danger' : 'warning'}
+        label={milestoneDeadlineAlertLabel(alertStatus)}
+      />
+    )
+  }
+
   function orderedMilestones(project: Project) {
     return orderedProjectMilestones(project)
   }
@@ -941,7 +955,7 @@ export function ProjectFormPage() {
                         </button>
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone.deadline || ''}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(milestone.deadline, status)}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
                       <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
                         <ProgressBar value={progress} className="min-w-20" />
@@ -1005,7 +1019,7 @@ export function ProjectFormPage() {
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"></td>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
                     <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.comment ?? ''}</td>
                   </tr>
