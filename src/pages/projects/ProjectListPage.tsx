@@ -8,7 +8,10 @@ import { projectListRowClassName } from '@/domain/project-lifecycle'
 
 export function ProjectListPage() {
 const navigate = useNavigate()
+const accounts = useAppStore((s) => s.accounts)
+const opportunities = useAppStore((s) => s.opportunities)
 const projects = useAppStore((s) => s.projects)
+const salesManagers = useAppStore((s) => s.salesManagers)
 const systems = useAppStore((s) => s.systems)
 const tenants = useAppStore((s) => s.tenants)
 const projectSystems = useAppStore((s) => s.projectSystems)
@@ -16,8 +19,8 @@ const projectTenants = useAppStore((s) => s.projectTenants)
 const createProject = useAppStore((s) => s.createProject)
 const updateProject = useAppStore((s) => s.updateProject)
 const projectListColumns = useMemo(
-  () => createProjectListColumns({ systems, tenants, projectSystems, projectTenants }),
-  [projectSystems, projectTenants, systems, tenants],
+  () => createProjectListColumns({ accounts, opportunities, salesManagers, systems, tenants, projectSystems, projectTenants }),
+  [accounts, opportunities, projectSystems, projectTenants, salesManagers, systems, tenants],
 )
 
 return (
