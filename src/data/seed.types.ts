@@ -1,3 +1,5 @@
+import type { ActivityEvent } from '@/domain/activity-log'
+
 /** Core enums and entity types for mock data (Phase A — no business logic). */
 
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
@@ -599,6 +601,7 @@ export interface AppDataState {
   systems: System[]
   tenants: Tenant[]
   warrantyRecords: WarrantyRecord[]
+  activityEvents: ActivityEvent[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
   idCounters: IdCounters

@@ -13,7 +13,8 @@ export const STORAGE_KEY = APP_STATE_STORAGE_KEY
 /** Default state loaded from seed file */
 export function createInitialState(): AppDataState {
   return normalizeAppDataState({
-    ...(seedJson as AppDataState),
+    ...(seedJson as unknown as AppDataState),
+    activityEvents: [],
     lastPersistedAt: null,
   })
 }

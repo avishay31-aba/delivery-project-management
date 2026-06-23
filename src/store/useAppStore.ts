@@ -111,6 +111,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       systems: state.systems,
       tenants: state.tenants,
       warrantyRecords: state.warrantyRecords,
+      activityEvents: state.activityEvents,
       projectSystems: state.projectSystems,
       projectTenants: state.projectTenants,
       idCounters: state.idCounters,

@@ -5,12 +5,13 @@ import {
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
+import { normalizeActivityEvents } from '@/domain/activity-log'
 import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
 import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
-  const seedState = seedJson as AppDataState
+  const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
   const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProjectLifecycleProject) : seedState.projects.map(normalizeProjectLifecycleProject)
   const opportunities = Array.isArray(state.opportunities)
     ? state.opportunities.map((opportunity) => normalizeOpportunityLifecycleOpportunity(opportunity, projects))
@@ -32,6 +33,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
       : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
+    activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
     projectSystems: Array.isArray(state.projectSystems)
       ? state.projectSystems.map(normalizeProjectSystemLink)
       : seedState.projectSystems.map(normalizeProjectSystemLink),
