@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, CheckCircle2, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -210,15 +210,21 @@ function detailGroups<T extends { group: string }>(fields: T[]): Array<{ group: 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
   const isDone = status === 'DONE'
   const isInProgress = status === 'IN_PROGRESS'
-  const Icon = isDone ? CheckCircle2 : CirclePlay
-  const color = isDone ? 'text-green-600' : isInProgress ? 'text-amber-500' : 'text-slate-500'
   if (large) {
-    return <Icon className={[color, 'h-8 w-8'].join(' ')} aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    if (isDone) return <Check className="h-8 w-8 stroke-[3.5] text-blue-800" aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    if (isInProgress) return <CirclePlay className="h-8 w-8 text-amber-500" aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    return <Square className="h-5 w-7 fill-emerald-100 stroke-0 text-emerald-100" aria-label={`Project status: ${projectStatusLabel(status)}`} />
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sf-text">
-      <Icon className={[color, 'h-4 w-4'].join(' ')} aria-hidden="true" />
+      {isDone ? (
+        <Check className="h-4 w-4 stroke-[3] text-blue-800" aria-hidden="true" />
+      ) : isInProgress ? (
+        <CirclePlay className="h-4 w-4 text-amber-500" aria-hidden="true" />
+      ) : (
+        <Square className="h-3 w-4 fill-emerald-100 stroke-0 text-emerald-100" aria-hidden="true" />
+      )}
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
@@ -229,7 +235,7 @@ function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
     return <Check className="h-8 w-8 stroke-[3.5] text-blue-800" aria-label="Task status: Done" />
   }
 
-  return <Square className="h-8 w-8 fill-emerald-100 stroke-[3] text-emerald-600" aria-label="Task status: Open" />
+  return <Square className="h-5 w-7 fill-emerald-100 stroke-0 text-emerald-100" aria-label="Task status: Open" />
 }
 
 function projectHealthBadgeVariant(status: ProjectHealthStatus) {
