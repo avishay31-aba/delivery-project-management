@@ -1,4 +1,3 @@
-import { ENGAGEMENT_CIRCLE_TAB_LABEL } from '@/domain/engagement-circle'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import {
   requirementAColumns,
@@ -9,7 +8,7 @@ import type { ProjectMainType, ProjectSubType } from './types'
 
 export const PROJECT_NAME_REQUIRED_MESSAGE = 'Project name is required.'
 
-export type ProjectFormTab = 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
+export type ProjectFormTab = 'overview' | 'requirements' | 'systems' | 'tenants' | 'milestones' | 'tasks' | 'documents'
 export type ProjectRequirementSectionKind = 'A' | 'B' | 'C'
 export type ProjectHeaderFieldKey =
   | 'opportunityName'
@@ -58,11 +57,12 @@ export interface ProjectFormMetadata {
 }
 
 export const PROJECT_TABS: ProjectFormTab[] = [
-  'tenantRequirements',
+  'overview',
+  'requirements',
+  'systems',
+  'tenants',
   'milestones',
   'tasks',
-  'systemsTenants',
-  'engagementCircles',
   'documents',
 ]
 
@@ -211,11 +211,12 @@ export function getProjectFormMetadata(mainType: ProjectMainType, subType: Proje
 
 export function projectTabLabel(tab: ProjectFormTab): string {
   const labels: Record<ProjectFormTab, string> = {
-    tenantRequirements: 'Tenant Requirements',
+    overview: 'Overview',
+    requirements: 'Requirements',
+    systems: 'Systems',
+    tenants: 'Tenants',
     milestones: 'Milestones',
     tasks: 'Tasks',
-    systemsTenants: 'Systems and Tenants',
-    engagementCircles: ENGAGEMENT_CIRCLE_TAB_LABEL,
     documents: 'Documents',
   }
   return labels[tab]
