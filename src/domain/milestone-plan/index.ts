@@ -178,3 +178,29 @@ export function updateTaskInPlan(project: Project, taskId: string, patch: Partia
     })),
   }
 }
+
+export function updateTasksStatusInPlan(project: Project, taskIds: string[], status: ProjectTask['status']): Project {
+  const selectedTaskIds = new Set(taskIds)
+  if (selectedTaskIds.size === 0) return project
+
+  const tasks = (project.tasks ?? []).map((task) =>
+    selectedTaskIds.has(task.id) ? { ...task, status } : task,
+  )
+  const nextProject = { ...project, tasks }
+
+  return {
+    ...nextProject,
+    milestones: (project.milestones ?? []).map((milestone) => ({
+      ...milestone,
+      status: projectMilestoneStatus(nextProject, milestone.id),
+    })),
+  }
+}
+
+export function markTasksDoneInPlan(project: Project, taskIds: string[]): Project {
+  return updateTasksStatusInPlan(project, taskIds, 'DONE')
+}
+
+export function resetAllTasksOpenInPlan(project: Project): Project {
+  return updateTasksStatusInPlan(project, (project.tasks ?? []).map((task) => task.id), 'OPEN')
+}
