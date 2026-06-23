@@ -112,6 +112,16 @@ export interface RenewalCandidateRow {
   renewalCategoryLabel: string
 }
 
+export interface RenewalCandidateSummary {
+  totalCandidates: number
+  expiring30: number
+  expiring60: number
+  expiring90: number
+  expired: number
+  noWarranty: number
+  outOfContract: number
+}
+
 export interface WarrantyCollectionContext {
   tenant: Tenant
   projects: Project[]

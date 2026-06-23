@@ -8,6 +8,7 @@ import type {
   TenantWarrantyHeaderStatusReadModel,
   RenewalCandidateCategory,
   RenewalCandidateRow,
+  RenewalCandidateSummary,
   WarrantyDashboardContext,
   WarrantyDashboardRow,
   WarrantyDashboardSummary,
@@ -308,6 +309,18 @@ export function renewalCandidateRows(context: WarrantyDashboardContext): Renewal
       renewalCategoryLabel: renewalCandidateCategoryLabel(renewalCategory),
     }]
   })
+}
+
+export function renewalCandidateSummary(rows: RenewalCandidateRow[]): RenewalCandidateSummary {
+  return {
+    totalCandidates: rows.length,
+    expiring30: rows.filter((row) => row.renewalCategory === 'EXPIRING_30').length,
+    expiring60: rows.filter((row) => row.renewalCategory === 'EXPIRING_60').length,
+    expiring90: rows.filter((row) => row.renewalCategory === 'EXPIRING_90').length,
+    expired: rows.filter((row) => row.renewalCategory === 'EXPIRED').length,
+    noWarranty: rows.filter((row) => row.renewalCategory === 'NO_WARRANTY').length,
+    outOfContract: rows.filter((row) => row.renewalCategory === 'OUT_OF_CONTRACT').length,
+  }
 }
 
 export function warrantySummaryForAccount(accountId: string, tenants: Array<{ id: string; accountId: string }>, warrantyRecords: WarrantyRecord[]): string {
