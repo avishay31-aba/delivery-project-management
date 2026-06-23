@@ -77,7 +77,7 @@ import {
 type CollapsibleSectionId = 'projectHeader' | 'tenantRequirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'engagementCircles' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
-type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status'>
+type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
 
 const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey; label: string }> = [
   { key: 'id', label: 'ID' },
@@ -761,12 +761,12 @@ export function ProjectFormPage() {
     setNewMilestoneOrder(nextOrder)
     setNewMilestoneDeadline('')
     setNewMilestoneComment('')
-    setNewMilestoneTasks([{ name: '', department: '', resource: '', status: 'OPEN' }])
+    setNewMilestoneTasks([{ name: '', department: '', resource: '', status: 'OPEN', deadline: null, comment: '' }])
     setIsAddMilestoneDialogOpen(true)
   }
 
   function addMilestoneTaskDraft() {
-    setNewMilestoneTasks((current) => [...current, { name: '', department: '', resource: '', status: 'OPEN' }])
+    setNewMilestoneTasks((current) => [...current, { name: '', department: '', resource: '', status: 'OPEN', deadline: null, comment: '' }])
   }
 
   function updateMilestoneTaskDraft(index: number, patch: Partial<NewMilestoneTaskDraft>) {
@@ -786,6 +786,8 @@ export function ProjectFormPage() {
       resource: task.resource.trim(),
       status: task.status,
       order,
+      deadline: task.deadline || null,
+      comment: task.comment ?? '',
     }
   }
 
@@ -827,7 +829,7 @@ export function ProjectFormPage() {
   function addTaskToMilestone(milestoneId: string) {
     const existingTasks = (projectDraft.tasks ?? []).filter((task) => task.milestoneId === milestoneId)
     const order = existingTasks.reduce((maxOrder, task) => Math.max(maxOrder, task.order), 0) + 1
-    const task = createMilestoneTask(milestoneId, { name: '', department: '', resource: '', status: 'OPEN' }, order)
+    const task = createMilestoneTask(milestoneId, { name: '', department: '', resource: '', status: 'OPEN', deadline: null, comment: '' }, order)
     setDraft((current) => (current ? { ...current, tasks: [...(current.tasks ?? []), task] } : current))
     setSaveMessages([])
   }
@@ -973,7 +975,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Milestone', 'Task', 'Department', 'Resource', 'Status'].map((label) => (
+                  {['Milestone', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -987,7 +989,10 @@ export function ProjectFormPage() {
                     <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"></td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
+                    <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.comment ?? ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1045,7 +1050,7 @@ export function ProjectFormPage() {
                 <table className="table-auto border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Task', 'Department', 'Resource', 'Status', 'Action'].map((label) => (
+                      {['Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
@@ -1063,10 +1068,16 @@ export function ProjectFormPage() {
                           <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateMilestoneTaskDraft(index, { resource: event.target.value })} />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
+                          <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={task.deadline ?? ''} onChange={(event) => updateMilestoneTaskDraft(index, { deadline: event.target.value || null })} />
+                        </td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                           <select className="h-8 w-20 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateMilestoneTaskDraft(index, { status: event.target.value as 'OPEN' | 'DONE' })}>
                             <option value="OPEN">Open</option>
                             <option value="DONE">Done</option>
                           </select>
+                        </td>
+                        <td className="max-w-64 border border-sf-border px-1 py-1">
+                          <input className="h-8 w-64 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.comment ?? ''} onChange={(event) => updateMilestoneTaskDraft(index, { comment: event.target.value })} />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                           <button type="button" className="text-red-700 hover:underline" onClick={() => deleteMilestoneTaskDraft(index)}>Delete</button>
@@ -1130,7 +1141,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Task', 'Department', 'Resource', 'Status', 'Action'].map((label) => (
+                  {['Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1149,7 +1160,13 @@ export function ProjectFormPage() {
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                       <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
                     </td>
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1">
+                      <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={task.deadline ?? ''} onChange={(event) => updateTask(task.id, { deadline: event.target.value || null })} />
+                    </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">{renderTaskStatusSelect(task)}</td>
+                    <td className="max-w-64 border border-sf-border px-1 py-1">
+                      <input className="h-8 w-64 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.comment ?? ''} onChange={(event) => updateTask(task.id, { comment: event.target.value })} />
+                    </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                       <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteTaskFromMilestone(task.id)}>
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
