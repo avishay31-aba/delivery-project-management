@@ -18,6 +18,26 @@ export interface ProjectProgressSummary {
 }
 
 export type MilestoneDeadlineAlertStatus = 'NONE' | 'WARNING' | 'OVERDUE'
+export type ProjectDeadlineRiskStatus = MilestoneDeadlineAlertStatus
+
+export interface ProjectDeadlineSummary {
+  overdueTaskCount: number
+  overdueMilestoneCount: number
+  upcomingTaskDeadlineCount: number
+  upcomingMilestoneDeadlineCount: number
+  nextDeadline: string
+  nextDeadlineLabel: string
+  deadlineRiskStatus: ProjectDeadlineRiskStatus
+  deadlineRiskLabel: string
+}
+
+interface DeadlineCandidate {
+  deadline: string
+  label: string
+  timestamp: number
+  alertStatus: MilestoneDeadlineAlertStatus
+  itemType: 'milestone' | 'task'
+}
 
 export function orderedProjectMilestones(project: MilestonePlan): ProjectMilestone[] {
   return [...(project.milestones ?? [])].sort((first, second) => first.order - second.order || first.name.localeCompare(second.name))
@@ -100,6 +120,87 @@ export function milestoneDeadlineAlertLabel(status: MilestoneDeadlineAlertStatus
   if (status === 'OVERDUE') return 'Overdue'
   if (status === 'WARNING') return 'Due in less than 90 days'
   return ''
+}
+
+function deadlineRiskLabel(status: ProjectDeadlineRiskStatus): string {
+  if (status === 'OVERDUE') return 'Overdue deadlines'
+  if (status === 'WARNING') return 'Upcoming deadlines'
+  return 'No deadline risk'
+}
+
+function nextDeadlineCandidate(candidates: DeadlineCandidate[], today = new Date()): DeadlineCandidate | null {
+  if (candidates.length === 0) return null
+
+  const todayValue = todayTimestamp(today)
+  const upcomingCandidates = candidates
+    .filter((candidate) => candidate.timestamp >= todayValue)
+    .sort((first, second) => first.timestamp - second.timestamp)
+
+  if (upcomingCandidates.length > 0) return upcomingCandidates[0]
+
+  return [...candidates].sort((first, second) => second.timestamp - first.timestamp)[0]
+}
+
+export function projectDeadlineSummary(project: MilestonePlan, today = new Date()): ProjectDeadlineSummary {
+  const milestoneCandidates = orderedProjectMilestones(project)
+    .map((milestone): DeadlineCandidate | null => {
+      const deadline = milestone.deadline
+      if (!deadline) return null
+      const timestamp = dateOnlyTimestamp(deadline)
+      if (timestamp === null) return null
+
+      const status = projectMilestoneStatus(project, milestone.id)
+      if (status === 'DONE') return null
+
+      return {
+        deadline,
+        label: milestone.name,
+        timestamp,
+        alertStatus: milestoneDeadlineAlertStatus(deadline, status, today),
+        itemType: 'milestone',
+      }
+    })
+    .filter((candidate): candidate is DeadlineCandidate => Boolean(candidate))
+
+  const taskCandidates = orderedProjectTasks(project)
+    .map((task): DeadlineCandidate | null => {
+      const deadline = task.deadline
+      if (!deadline) return null
+      const timestamp = dateOnlyTimestamp(deadline)
+      if (timestamp === null || task.status === 'DONE') return null
+
+      return {
+        deadline,
+        label: task.name,
+        timestamp,
+        alertStatus: milestoneDeadlineAlertStatus(deadline, task.status, today),
+        itemType: 'task',
+      }
+    })
+    .filter((candidate): candidate is DeadlineCandidate => Boolean(candidate))
+
+  const candidates = [...milestoneCandidates, ...taskCandidates]
+  const nextDeadline = nextDeadlineCandidate(candidates, today)
+  const overdueTaskCount = taskCandidates.filter((candidate) => candidate.alertStatus === 'OVERDUE').length
+  const overdueMilestoneCount = milestoneCandidates.filter((candidate) => candidate.alertStatus === 'OVERDUE').length
+  const upcomingTaskDeadlineCount = taskCandidates.filter((candidate) => candidate.alertStatus === 'WARNING').length
+  const upcomingMilestoneDeadlineCount = milestoneCandidates.filter((candidate) => candidate.alertStatus === 'WARNING').length
+  const deadlineRiskStatus: ProjectDeadlineRiskStatus = overdueTaskCount > 0 || overdueMilestoneCount > 0
+    ? 'OVERDUE'
+    : upcomingTaskDeadlineCount > 0 || upcomingMilestoneDeadlineCount > 0
+      ? 'WARNING'
+      : 'NONE'
+
+  return {
+    overdueTaskCount,
+    overdueMilestoneCount,
+    upcomingTaskDeadlineCount,
+    upcomingMilestoneDeadlineCount,
+    nextDeadline: nextDeadline?.deadline ?? '',
+    nextDeadlineLabel: nextDeadline ? `${nextDeadline.itemType === 'task' ? 'Task' : 'Milestone'}: ${nextDeadline.label}` : '',
+    deadlineRiskStatus,
+    deadlineRiskLabel: deadlineRiskLabel(deadlineRiskStatus),
+  }
 }
 
 export function deriveProjectProgress(project: MilestonePlan): ProjectProgressSummary {
