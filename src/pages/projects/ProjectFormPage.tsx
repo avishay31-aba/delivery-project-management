@@ -77,9 +77,12 @@ import {
   projectMilestoneStatus,
   projectMilestoneTaskProgress,
   resolveProjectMilestoneTemplate,
+  markTasksDoneInPlan,
+  resetAllTasksOpenInPlan,
   updateMilestoneOrderInPlan,
   updateTaskOrderInPlan,
   updateTaskInPlan,
+  updateTasksStatusInPlan,
 } from '@/domain/milestone-plan'
 import {
   requirementCoverageRows,
@@ -1148,6 +1151,24 @@ export function ProjectFormPage() {
     setSelectedTaskIds([])
   }
 
+  function markSelectedTasksDone() {
+    setDraft((current) => (current ? markTasksDoneInPlan(current, selectedTaskIds) : current))
+    clearTaskSelection()
+    setSaveMessages([])
+  }
+
+  function resetSelectedTasksOpen() {
+    setDraft((current) => (current ? updateTasksStatusInPlan(current, selectedTaskIds, 'OPEN') : current))
+    clearTaskSelection()
+    setSaveMessages([])
+  }
+
+  function resetAllTasksOpen() {
+    setDraft((current) => (current ? resetAllTasksOpenInPlan(current) : current))
+    clearTaskSelection()
+    setSaveMessages([])
+  }
+
   function renderMilestonesTab() {
     const sectionId = tabSectionId('milestones')
     const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
@@ -1282,6 +1303,30 @@ export function ProjectFormPage() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-sm text-sf-text-muted">{selectedTaskIds.length} task(s) selected</div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+              disabled={selectedTaskIds.length === 0}
+              onClick={markSelectedTasksDone}
+            >
+              Mark selected DONE
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+              disabled={selectedTaskIds.length === 0}
+              onClick={resetSelectedTasksOpen}
+            >
+              Reset selected OPEN
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+              disabled={tasks.length === 0}
+              onClick={resetAllTasksOpen}
+            >
+              Reset all OPEN
+            </button>
             <label className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-white px-2 py-1 text-sm text-sf-text">
               <input
                 type="checkbox"
@@ -1536,6 +1581,22 @@ export function ProjectFormPage() {
               </FormField>
             </div>
             <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                disabled={selectedTaskIds.length === 0}
+                onClick={markSelectedTasksDone}
+              >
+                Mark selected DONE
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                disabled={selectedTaskIds.length === 0}
+                onClick={resetSelectedTasksOpen}
+              >
+                Reset selected OPEN
+              </button>
               <label className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-white px-2 py-1 text-sm text-sf-text">
                 <input
                   type="checkbox"
