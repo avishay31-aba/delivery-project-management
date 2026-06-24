@@ -21,7 +21,7 @@ import {
 } from '@/domain/warranty-collection'
 import { useAppStore } from '@/store/useAppStore'
 
-type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'documents' | 'activity'
+type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'requirements' | 'documents' | 'activity'
 
 const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -30,6 +30,7 @@ const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
   { id: 'systems', label: 'Systems' },
   { id: 'tenants', label: 'Tenants' },
   { id: 'warranties', label: 'Warranties' },
+  { id: 'requirements', label: 'Requirements' },
   { id: 'documents', label: 'Documents' },
   { id: 'activity', label: 'Activity' },
 ]
@@ -176,6 +177,12 @@ export function Customer360Page() {
           {summaryCard('At Risk Projects', customer.projectHealthSummary.atRiskProjects)}
           {summaryCard('Active Tenants', customer.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
           {summaryCard('Warranty Renewal Candidates', customer.warrantySummary.renewalCandidates)}
+          {summaryCard('Requirements', customer.requirementCoverageSummary.totalRequirements)}
+          {summaryCard('Covered Requirements', customer.requirementCoverageSummary.covered)}
+          {summaryCard('Partially Covered', customer.requirementCoverageSummary.partiallyCovered)}
+          {summaryCard('Missing System', customer.requirementCoverageSummary.missingSystem)}
+          {summaryCard('Missing Tenant', customer.requirementCoverageSummary.missingTenant)}
+          {summaryCard('Unknown Coverage', customer.requirementCoverageSummary.unknown)}
         </div>
       )
     }
@@ -272,6 +279,26 @@ export function Customer360Page() {
       )
     }
 
+    if (activeTab === 'requirements') {
+      return readOnlyTable(
+        ['Requirement ID', 'Opportunity ID', 'Requirement Grid', 'Product', 'Hosting', 'PID', 'SID/MID', 'TID', 'Coverage Status', 'Missing Step', 'Alerts'],
+        customer.requirementCoverageRows.map((row) => [
+          row.requirementId,
+          objectLink(`/opportunities/${row.opportunityId}`, row.opportunityId),
+          row.requirementGrid,
+          row.product,
+          row.hostingType,
+          row.pid ? objectLink(`/projects/${row.pid}`, row.pid) : '',
+          row.sid || row.mid,
+          row.tid ? objectLink(`/tenants/${row.tid}`, row.tid) : '',
+          row.coverageStatusLabel,
+          row.missingStepLabel,
+          row.coverageAlerts.join('; '),
+        ]),
+        'No requirement coverage rows found for this customer.',
+      )
+    }
+
     if (activeTab === 'documents') {
       return readOnlyTable(
       ['File', 'Source Type', 'Source ID', 'Source Name', 'Type', 'Size', 'Uploaded At', 'Replaced At', 'Open'],
@@ -318,6 +345,9 @@ export function Customer360Page() {
         {summaryCard('Under Contract', customer.warrantySummary.underContract)}
         {summaryCard('Out Of Contract', customer.warrantySummary.outOfContract)}
         {summaryCard('Expiring 30 Days', customer.warrantySummary.expiring30)}
+        {summaryCard('Requirements', customer.requirementCoverageSummary.totalRequirements)}
+        {summaryCard('Missing System', customer.requirementCoverageSummary.missingSystem)}
+        {summaryCard('Missing Tenant', customer.requirementCoverageSummary.missingTenant)}
       </section>
 
       <section className="rounded border border-sf-border bg-sf-surface">

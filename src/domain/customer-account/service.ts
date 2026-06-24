@@ -1,5 +1,5 @@
 import { projectDashboardPercent, projectHealthReadModel, projectPortfolioHealthSummary } from '@/domain/project-lifecycle'
-import { requirementCoverageRowsForAccount, requirementCoverageSummary, type RequirementCoverageRow } from '@/domain/requirement-coverage'
+import { requirementCoverageRowsForAccount, requirementCoverageRowsForProject, requirementCoverageSummary, type RequirementCoverageRow } from '@/domain/requirement-coverage'
 import { systemIdentity } from '@/domain/system-inventory'
 import type { Account, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, SalesManager, System, Tenant } from '@/data/seed.types'
 import { warrantyDashboardSummary, type WarrantyDashboardRow } from '@/domain/warranty-collection'
@@ -146,7 +146,14 @@ export function customerAccount360ReadModel(input: {
     projectSystems: input.projectSystems,
     projectTenants: input.projectTenants,
   }
-  const projectHealthRows = projects.map((project) => projectHealthReadModel({ project, ...projectHealthContext }))
+  const projectHealthRows = projects.map((project) => {
+    const projectRequirementCoverageRows = requirementCoverageRowsForProject(requirementCoverageRows, project)
+    return projectHealthReadModel({
+      project,
+      ...projectHealthContext,
+      requirementCoverageSummary: requirementCoverageSummary(projectRequirementCoverageRows),
+    })
+  })
   return {
     account: input.account,
     accountManager: accountManagerDisplayName(input.account.salesManagerId, input.salesManagers),
