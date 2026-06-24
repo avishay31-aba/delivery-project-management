@@ -404,6 +404,8 @@ export function ProjectFormPage() {
   const [newMilestoneTasks, setNewMilestoneTasks] = useState<NewMilestoneTaskDraft[]>([])
   const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null)
   const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationId, setSelectedAllocationId] = useState('')
@@ -941,6 +943,21 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function dropTaskOnOrder(targetTaskId: string, targetOrder: number) {
+    if (!draggedTaskId || draggedTaskId === targetTaskId) return
+    const draggedTask = projectDraft.tasks?.find((task) => task.id === draggedTaskId)
+    const targetTask = projectDraft.tasks?.find((task) => task.id === targetTaskId)
+    if (!draggedTask || !targetTask || draggedTask.milestoneId !== targetTask.milestoneId) {
+      setDraggedTaskId(null)
+      setDragOverTaskId(null)
+      return
+    }
+
+    updateTaskOrder(draggedTaskId, targetOrder)
+    setDraggedTaskId(null)
+    setDragOverTaskId(null)
+  }
+
   function updateMilestone(milestoneId: string, patch: Partial<NonNullable<Project['milestones']>[number]>) {
     setDraft((current) =>
       current
@@ -1228,7 +1245,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
+                  {['Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1244,12 +1261,48 @@ export function ProjectFormPage() {
                     <Fragment key={task.id}>
                       {startsMilestoneGroup ? (
                         <tr className="border-t-2 border-sf-border bg-sf-surface-alt/70">
-                          <td colSpan={9} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+                          <td colSpan={10} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
                             {milestone?.name ?? 'Unassigned milestone'}
                           </td>
                         </tr>
                       ) : null}
-                      <tr className="hover:bg-sf-surface-alt">
+                      <tr
+                        className={[
+                          'hover:bg-sf-surface-alt',
+                          dragOverTaskId === task.id ? 'bg-amber-50 outline outline-2 outline-amber-300' : '',
+                        ].filter(Boolean).join(' ')}
+                        onDragOver={(event) => {
+                          const draggedTask = projectDraft.tasks?.find((candidate) => candidate.id === draggedTaskId)
+                          if (!draggedTaskId || draggedTaskId === task.id || draggedTask?.milestoneId !== task.milestoneId) return
+                          event.preventDefault()
+                          setDragOverTaskId(task.id)
+                        }}
+                        onDragLeave={() => setDragOverTaskId((current) => current === task.id ? null : current)}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          dropTaskOnOrder(task.id, task.order)
+                        }}
+                      >
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">
+                          <button
+                            type="button"
+                            className="inline-flex cursor-grab items-center justify-center rounded border border-sf-border bg-white p-1 text-sf-text-muted hover:bg-sf-surface-alt active:cursor-grabbing"
+                            draggable
+                            aria-label={`Drag ${task.name}`}
+                            title="Drag to reorder task within this milestone"
+                            onDragStart={(event) => {
+                              setDraggedTaskId(task.id)
+                              event.dataTransfer.effectAllowed = 'move'
+                              event.dataTransfer.setData('text/plain', task.id)
+                            }}
+                            onDragEnd={() => {
+                              setDraggedTaskId(null)
+                              setDragOverTaskId(null)
+                            }}
+                          >
+                            <GripVertical className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </td>
                         <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
                           <input
@@ -1417,7 +1470,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Order', 'Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
+                  {['Move', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1426,7 +1479,41 @@ export function ProjectFormPage() {
               </thead>
               <tbody>
                 {tasks.map((task) => (
-                  <tr key={task.id}>
+                  <tr
+                    key={task.id}
+                    className={dragOverTaskId === task.id ? 'bg-amber-50 outline outline-2 outline-amber-300' : ''}
+                    onDragOver={(event) => {
+                      const draggedTask = projectDraft.tasks?.find((candidate) => candidate.id === draggedTaskId)
+                      if (!draggedTaskId || draggedTaskId === task.id || draggedTask?.milestoneId !== task.milestoneId) return
+                      event.preventDefault()
+                      setDragOverTaskId(task.id)
+                    }}
+                    onDragLeave={() => setDragOverTaskId((current) => current === task.id ? null : current)}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      dropTaskOnOrder(task.id, task.order)
+                    }}
+                  >
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center">
+                      <button
+                        type="button"
+                        className="inline-flex cursor-grab items-center justify-center rounded border border-sf-border bg-white p-1 text-sf-text-muted hover:bg-sf-surface-alt active:cursor-grabbing"
+                        draggable
+                        aria-label={`Drag ${task.name}`}
+                        title="Drag to reorder task within this milestone"
+                        onDragStart={(event) => {
+                          setDraggedTaskId(task.id)
+                          event.dataTransfer.effectAllowed = 'move'
+                          event.dataTransfer.setData('text/plain', task.id)
+                        }}
+                        onDragEnd={() => {
+                          setDraggedTaskId(null)
+                          setDragOverTaskId(null)
+                        }}
+                      >
+                        <GripVertical className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                       <input
                         className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
