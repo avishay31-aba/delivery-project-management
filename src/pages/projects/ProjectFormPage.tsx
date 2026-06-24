@@ -818,6 +818,10 @@ export function ProjectFormPage() {
           {renderWorkspaceMetric('Last Completed', projectHealth?.lastCompletedMilestone || '-')}
           {renderWorkspaceMetric('Open Tasks', projectHealth?.openTaskCount ?? 0)}
           {renderWorkspaceMetric('Completed Tasks', projectHealth?.completedTaskCount ?? 0)}
+          {renderWorkspaceMetric('Deadline Risk', projectHealth?.deadlineRiskLabel ?? '-')}
+          {renderWorkspaceMetric('Next Deadline', projectHealth?.nextDeadline || '-')}
+          {renderWorkspaceMetric('Overdue Tasks', projectHealth?.overdueTaskCount ?? 0, (projectHealth?.overdueTaskCount ?? 0) > 0 ? 'danger' : 'default')}
+          {renderWorkspaceMetric('Overdue Milestones', projectHealth?.overdueMilestoneCount ?? 0, (projectHealth?.overdueMilestoneCount ?? 0) > 0 ? 'danger' : 'default')}
           {renderWorkspaceMetric('Covered Requirements', `${projectRequirementCoverageSummary.covered}/${projectRequirementCoverageSummary.totalRequirements}`)}
           {renderWorkspaceMetric('Linked Systems', workspaceSystemSummary?.linkedSystems ?? 0, workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
           {renderWorkspaceMetric('Linked Tenants', workspaceTenantSummary?.linkedTenants ?? 0, workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
