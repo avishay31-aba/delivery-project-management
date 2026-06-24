@@ -1,4 +1,5 @@
 import { projectDashboardPercent, projectHealthReadModel, projectPortfolioHealthSummary } from '@/domain/project-lifecycle'
+import { requirementCoverageRowsForAccount, requirementCoverageSummary, type RequirementCoverageRow } from '@/domain/requirement-coverage'
 import { systemIdentity } from '@/domain/system-inventory'
 import type { Account, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, SalesManager, System, Tenant } from '@/data/seed.types'
 import { warrantyDashboardSummary, type WarrantyDashboardRow } from '@/domain/warranty-collection'
@@ -131,12 +132,14 @@ export function customerAccount360ReadModel(input: {
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
   warrantyRows: WarrantyDashboardRow[]
+  requirementCoverageRows: RequirementCoverageRow[]
 }): CustomerAccount360ReadModel {
   const opportunities = customerOpportunities(input.account.id, input.opportunities)
   const projects = customerProjects(input.account, input.opportunities, input.projects)
   const tenants = customerTenants(input.account.id, input.tenants)
   const systems = customerRelatedSystems(input.account.id, input.systems, tenants, projects)
   const warrantyRows = customerWarrantyRowsForTenants(tenants, input.warrantyRows)
+  const requirementCoverageRows = requirementCoverageRowsForAccount(input.requirementCoverageRows, input.account)
   const projectHealthContext = {
     systems: input.systems,
     tenants: input.tenants,
@@ -153,6 +156,8 @@ export function customerAccount360ReadModel(input: {
     tenants,
     projectHealthRows,
     projectHealthSummary: projectPortfolioHealthSummary(projects, projectHealthContext),
+    requirementCoverageRows,
+    requirementCoverageSummary: requirementCoverageSummary(requirementCoverageRows),
     warrantyRows,
     warrantySummary: warrantyDashboardSummary(warrantyRows),
     documents: customerDocumentReadModels(projects, systems, tenants),

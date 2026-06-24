@@ -14,6 +14,7 @@ import {
 } from '@/domain/customer-account'
 import { formatDocumentSize } from '@/domain/document-collection'
 import { activityEventsForCustomer } from '@/domain/activity-log'
+import { requirementCoverageRows } from '@/domain/requirement-coverage'
 import { systemIdentity, systemRoutePath } from '@/domain/system-inventory'
 import {
   warrantyDashboardRows,
@@ -92,6 +93,7 @@ export function Customer360Page() {
   const tenants = useAppStore((state) => state.tenants)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
+  const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const activityEvents = useAppStore((state) => state.activityEvents)
   const [activeTab, setActiveTab] = useState<Customer360Tab>('overview')
 
@@ -135,9 +137,19 @@ export function Customer360Page() {
             projectSystems,
             projectTenants,
             warrantyRows,
+            requirementCoverageRows: requirementCoverageRows({
+              accounts,
+              opportunities,
+              projects,
+              systems,
+              tenants,
+              warrantyRecords,
+              projectSystems,
+              projectTenants,
+            }),
           })
         : null,
-    [account, opportunities, projectSystems, projectTenants, projects, salesManagers, systems, tenants, warrantyRows],
+    [account, accounts, opportunities, projectSystems, projectTenants, projects, salesManagers, systems, tenants, warrantyRecords, warrantyRows],
   )
 
   if (!account || !customer360) {

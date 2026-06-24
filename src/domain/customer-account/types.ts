@@ -1,5 +1,6 @@
 import type { Account, DocumentRecord, Opportunity, Project, SalesManager, System, Tenant, WarrantyRecord } from '@/data/seed.types'
 import type { ProjectHealthReadModel, ProjectPortfolioHealthSummary } from '@/domain/project-lifecycle'
+import type { RequirementCoverageRow, RequirementCoverageSummary } from '@/domain/requirement-coverage'
 import type { WarrantyDashboardRow, WarrantyDashboardSummary } from '@/domain/warranty-collection'
 
 export type CustomerAccount = Account
@@ -34,6 +35,8 @@ export interface CustomerAccount360ReadModel {
   tenants: Tenant[]
   projectHealthRows: ProjectHealthReadModel[]
   projectHealthSummary: ProjectPortfolioHealthSummary
+  requirementCoverageRows: RequirementCoverageRow[]
+  requirementCoverageSummary: RequirementCoverageSummary
   warrantyRows: WarrantyDashboardRow[]
   warrantySummary: WarrantyDashboardSummary
   documents: CustomerDocumentReadModel[]
