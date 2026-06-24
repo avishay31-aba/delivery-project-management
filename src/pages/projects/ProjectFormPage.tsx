@@ -406,6 +406,7 @@ export function ProjectFormPage() {
   const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationId, setSelectedAllocationId] = useState('')
@@ -419,6 +420,11 @@ export function ProjectFormPage() {
   useEffect(() => {
     setDraft(savedProject ? cloneProjectDraft(savedProject) : null)
   }, [savedProject])
+
+  useEffect(() => {
+    const taskIds = new Set((draft?.tasks ?? []).map((task) => task.id))
+    setSelectedTaskIds((current) => current.filter((taskId) => taskIds.has(taskId)))
+  }, [draft?.tasks])
 
   const currentDraft = draft ?? savedProject
   const metadata = currentDraft ? getProjectFormMetadata(currentDraft.mainType, currentDraft.subType) : null
@@ -1110,6 +1116,38 @@ export function ProjectFormPage() {
     return orderedProjectTasks(project)
   }
 
+  const selectedTaskIdSet = new Set(selectedTaskIds)
+
+  function setTaskSelected(taskId: string, selected: boolean) {
+    setSelectedTaskIds((current) => {
+      const next = new Set(current)
+      if (selected) {
+        next.add(taskId)
+      } else {
+        next.delete(taskId)
+      }
+      return Array.from(next)
+    })
+  }
+
+  function setTasksSelected(taskIds: string[], selected: boolean) {
+    setSelectedTaskIds((current) => {
+      const next = new Set(current)
+      taskIds.forEach((taskId) => {
+        if (selected) {
+          next.add(taskId)
+        } else {
+          next.delete(taskId)
+        }
+      })
+      return Array.from(next)
+    })
+  }
+
+  function clearTaskSelection() {
+    setSelectedTaskIds([])
+  }
+
   function renderMilestonesTab() {
     const sectionId = tabSectionId('milestones')
     const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
@@ -1231,6 +1269,7 @@ export function ProjectFormPage() {
     const sectionId = tabSectionId('tasks')
     const tasks = orderedTasks(projectDraft)
     const milestonesById = new Map((projectDraft.milestones ?? []).map((milestone) => [milestone.id, milestone]))
+    const allVisibleTasksSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIdSet.has(task.id))
 
     return (
       <CollapsibleSection
@@ -1240,12 +1279,28 @@ export function ProjectFormPage() {
         onToggle={() => toggleSection(sectionId)}
         className="space-y-3 p-3"
       >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm text-sf-text-muted">{selectedTaskIds.length} task(s) selected</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-white px-2 py-1 text-sm text-sf-text">
+              <input
+                type="checkbox"
+                checked={allVisibleTasksSelected}
+                onChange={(event) => setTasksSelected(tasks.map((task) => task.id), event.target.checked)}
+              />
+              Select all visible
+            </label>
+            <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-sm hover:bg-sf-surface-alt" onClick={clearTaskSelection}>
+              Clear selection
+            </button>
+          </div>
+        </div>
         {tasks.length > 0 ? (
           <div className="overflow-x-auto rounded border border-sf-border bg-white">
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
+                  {['Select', 'Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1256,13 +1311,22 @@ export function ProjectFormPage() {
                 {tasks.map((task, index) => {
                   const milestone = milestonesById.get(task.milestoneId)
                   const startsMilestoneGroup = index === 0 || tasks[index - 1]?.milestoneId !== task.milestoneId
+                  const milestoneTasks = tasks.filter((candidate) => candidate.milestoneId === task.milestoneId)
+                  const milestoneTasksSelected = milestoneTasks.length > 0 && milestoneTasks.every((candidate) => selectedTaskIdSet.has(candidate.id))
 
                   return (
                     <Fragment key={task.id}>
                       {startsMilestoneGroup ? (
                         <tr className="border-t-2 border-sf-border bg-sf-surface-alt/70">
-                          <td colSpan={10} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
-                            {milestone?.name ?? 'Unassigned milestone'}
+                          <td colSpan={11} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={milestoneTasksSelected}
+                                onChange={(event) => setTasksSelected(milestoneTasks.map((candidate) => candidate.id), event.target.checked)}
+                              />
+                              {milestone?.name ?? 'Unassigned milestone'}
+                            </label>
                           </td>
                         </tr>
                       ) : null}
@@ -1283,6 +1347,14 @@ export function ProjectFormPage() {
                           dropTaskOnOrder(task.id, task.order)
                         }}
                       >
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">
+                          <input
+                            type="checkbox"
+                            checked={selectedTaskIdSet.has(task.id)}
+                            onChange={(event) => setTaskSelected(task.id, event.target.checked)}
+                            aria-label={`Select ${task.name}`}
+                          />
+                        </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">
                           <button
                             type="button"
@@ -1437,6 +1509,7 @@ export function ProjectFormPage() {
     const milestone = (projectDraft.milestones ?? []).find((candidate) => candidate.id === selectedMilestoneId)
     if (!milestone) return null
     const tasks = orderedTasks(projectDraft).filter((task) => task.milestoneId === milestone.id)
+    const allMilestoneTasksSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIdSet.has(task.id))
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
@@ -1462,7 +1535,15 @@ export function ProjectFormPage() {
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={milestone.comment ?? ''} onChange={(event) => updateMilestone(milestone.id, { comment: event.target.value })} />
               </FormField>
             </div>
-            <div className="mb-2 flex justify-end">
+            <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+              <label className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-white px-2 py-1 text-sm text-sf-text">
+                <input
+                  type="checkbox"
+                  checked={allMilestoneTasksSelected}
+                  onChange={(event) => setTasksSelected(tasks.map((task) => task.id), event.target.checked)}
+                />
+                Select all milestone tasks
+              </label>
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => addTaskToMilestone(milestone.id)}>
                 + Add task
               </button>
@@ -1470,7 +1551,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Move', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
+                  {['Select', 'Move', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1494,6 +1575,14 @@ export function ProjectFormPage() {
                       dropTaskOnOrder(task.id, task.order)
                     }}
                   >
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedTaskIdSet.has(task.id)}
+                        onChange={(event) => setTaskSelected(task.id, event.target.checked)}
+                        aria-label={`Select ${task.name}`}
+                      />
+                    </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center">
                       <button
                         type="button"
