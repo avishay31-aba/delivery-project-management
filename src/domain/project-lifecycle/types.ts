@@ -123,6 +123,11 @@ export interface ProjectDeliveryDashboardReadModel {
   users: string
   projectAlerts: string[]
   projectAlertSeverity: 'danger' | 'warning' | 'info' | 'success'
+  deadlineRiskLabel: string
+  deadlineRiskSeverity: 'danger' | 'warning' | 'info' | 'success'
+  nextDeadline: string
+  overdueTaskCount: number
+  overdueMilestoneCount: number
   milestoneCompletionPercent: number
   milestoneCompletion: string
   lastMilestone: string

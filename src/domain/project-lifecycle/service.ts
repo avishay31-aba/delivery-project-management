@@ -165,6 +165,14 @@ function projectDashboardAlertSeverity(status: ProjectHealthStatus): ProjectDeli
   return 'info'
 }
 
+function projectDashboardDeadlineRiskSeverity(
+  status: ProjectHealthReadModel['deadlineRiskStatus'],
+): ProjectDeliveryDashboardReadModel['deadlineRiskSeverity'] {
+  if (status === 'OVERDUE') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  return 'info'
+}
+
 export function projectLifecycleIdentity(project: Project): Project {
   return project
 }
@@ -245,6 +253,11 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     users: configuration.users,
     projectAlerts: health.healthAlerts,
     projectAlertSeverity: projectDashboardAlertSeverity(health.healthStatus),
+    deadlineRiskLabel: health.deadlineRiskLabel,
+    deadlineRiskSeverity: projectDashboardDeadlineRiskSeverity(health.deadlineRiskStatus),
+    nextDeadline: health.nextDeadline,
+    overdueTaskCount: health.overdueTaskCount,
+    overdueMilestoneCount: health.overdueMilestoneCount,
     milestoneCompletionPercent: progress.percent,
     milestoneCompletion: `${progress.percent}%`,
     lastMilestone: progress.lastMilestone,
