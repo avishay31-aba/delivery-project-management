@@ -15,6 +15,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import type { ProjectDeadlineRiskStatus } from '@/domain/milestone-plan'
+import type { RequirementCoverageSummary } from '@/domain/requirement-coverage'
 
 export type ProjectLifecycleProject = Project
 export type ProjectLifecycleMainType = ProjectMainType
@@ -35,6 +36,7 @@ export interface ProjectSystemsTenantsContext {
   tenants: Tenant[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
+  requirementCoverageSummary?: RequirementCoverageSummary
 }
 
 export interface ProjectDeliveryDashboardContext {
@@ -76,6 +78,11 @@ export interface ProjectHealthReadModel {
   nextDeadline: string
   deadlineRiskStatus: ProjectDeadlineRiskStatus
   deadlineRiskLabel: string
+  uncoveredRequirementCount: number
+  partiallyCoveredRequirementCount: number
+  missingRequirementSystemCount: number
+  missingRequirementTenantCount: number
+  unknownRequirementCoverageCount: number
 }
 
 export interface ProjectPortfolioHealthSummary {

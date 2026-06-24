@@ -44,6 +44,18 @@ const EMPTY_PROJECT_DEADLINE_SUMMARY = {
   deadlineRiskLabel: 'No deadline risk',
 }
 
+const EMPTY_REQUIREMENT_COVERAGE_SUMMARY = {
+  totalRequirements: 0,
+  covered: 0,
+  partiallyCovered: 0,
+  uncovered: 0,
+  blocked: 0,
+  unknown: 0,
+  missingProject: 0,
+  missingSystem: 0,
+  missingTenant: 0,
+}
+
 const MODULE_FIELD_LABELS: Array<[string, string]> = [
   ['tangles', 'Tangles'],
   ['tanglesGo', 'Tangles Go'],
@@ -332,6 +344,7 @@ export function projectHealthReadModel(
   const deliveryDateStatus = projectDeliveryDateStatus(context.project, completed, today)
   const missingSystems = activeSystemLinks.length === 0
   const missingTenants = linkedTenants.length === 0
+  const coverageSummary = context.requirementCoverageSummary ?? EMPTY_REQUIREMENT_COVERAGE_SUMMARY
   const healthAlerts = [
     deliveryDateStatus === 'OVERDUE' ? 'Delivery date overdue' : null,
     deliveryDateStatus === 'UPCOMING_RISK' ? 'Delivery date approaching' : null,
@@ -341,6 +354,11 @@ export function projectHealthReadModel(
     deadlineSummary.deadlineRiskStatus === 'WARNING' && deadlineSummary.upcomingMilestoneDeadlineCount > 0 ? `${deadlineSummary.upcomingMilestoneDeadlineCount} upcoming milestone deadline${deadlineSummary.upcomingMilestoneDeadlineCount === 1 ? '' : 's'}` : null,
     missingSystems ? 'Missing system allocation' : null,
     missingTenants ? 'Missing tenant allocation' : null,
+    coverageSummary.uncovered > 0 ? `${coverageSummary.uncovered} uncovered requirement${coverageSummary.uncovered === 1 ? '' : 's'}` : null,
+    coverageSummary.partiallyCovered > 0 ? `${coverageSummary.partiallyCovered} partially covered requirement${coverageSummary.partiallyCovered === 1 ? '' : 's'}` : null,
+    coverageSummary.missingSystem > 0 ? `${coverageSummary.missingSystem} requirement${coverageSummary.missingSystem === 1 ? '' : 's'} missing System coverage` : null,
+    coverageSummary.missingTenant > 0 ? `${coverageSummary.missingTenant} requirement${coverageSummary.missingTenant === 1 ? '' : 's'} missing Tenant coverage` : null,
+    coverageSummary.unknown > 0 ? `${coverageSummary.unknown} requirement coverage item${coverageSummary.unknown === 1 ? '' : 's'} need review` : null,
   ].filter((alert): alert is string => Boolean(alert))
 
   const healthStatus: ProjectHealthStatus = completed
@@ -375,6 +393,11 @@ export function projectHealthReadModel(
     nextDeadline: deadlineSummary.nextDeadline,
     deadlineRiskStatus: deadlineSummary.deadlineRiskStatus,
     deadlineRiskLabel: deadlineSummary.deadlineRiskLabel,
+    uncoveredRequirementCount: coverageSummary.uncovered,
+    partiallyCoveredRequirementCount: coverageSummary.partiallyCovered,
+    missingRequirementSystemCount: coverageSummary.missingSystem,
+    missingRequirementTenantCount: coverageSummary.missingTenant,
+    unknownRequirementCoverageCount: coverageSummary.unknown,
   }
 }
 
