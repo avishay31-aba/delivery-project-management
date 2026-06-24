@@ -9,6 +9,7 @@ export type DashboardViewScope =
   | 'renewals'
   | 'customers'
   | 'requirementCoverage'
+  | 'activityLog'
 
 export interface DashboardViewColumnFilter {
   id: string

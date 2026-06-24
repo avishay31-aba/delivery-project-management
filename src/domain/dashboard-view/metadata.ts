@@ -15,4 +15,5 @@ export const DASHBOARD_VIEW_SCOPES: DashboardViewScope[] = [
   'renewals',
   'customers',
   'requirementCoverage',
+  'activityLog',
 ]
