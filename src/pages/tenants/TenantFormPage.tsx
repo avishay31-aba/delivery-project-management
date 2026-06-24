@@ -303,6 +303,7 @@ export function TenantFormPage() {
   )
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
+      .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
   const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(draftComputedWarranties, tenantDraft.tid).label
@@ -502,6 +503,17 @@ export function TenantFormPage() {
   function updateWarrantyDialogDraft(key: keyof WarrantyDialogDraft, value: string | null) {
     setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
     setWarrantyDialogErrors([])
+  }
+
+  function updateWarrantyInline(id: string, patch: Partial<Pick<TenantWarranty, 'relatedProjectId' | 'startDate' | 'endDate'>>) {
+    setDraft((current) => {
+      if (!current) return current
+      const nextWarranties = (current.warranties ?? []).map((warranty) =>
+        warranty.id === id ? { ...warranty, ...patch } : warranty,
+      )
+      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
+    })
+    setMessages([])
   }
 
   function addWarrantyDialogPredecessor() {
@@ -1078,10 +1090,10 @@ export function TenantFormPage() {
           </div>
           <ReadonlyTable
             headers={['Warranty ID', 'Warranty Type', 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark']}
-            rows={warranties.map((warranty) => [
+            rows={warranties.map((warranty, warrantyIndex) => [
               warranty.warrantyId,
               warranty.warrantyType,
-              warranty.firstWarranty ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : '',
+              warrantyIndex === 0 ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : '',
               formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid)),
               formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid)),
               warranty.accountId,
@@ -1120,19 +1132,32 @@ export function TenantFormPage() {
               </tr>
             </thead>
             <tbody>
-              {warranties.map((warranty) => {
+              {warranties.map((warranty, warrantyIndex) => {
                 return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
-                  <td className="border border-sf-border px-1.5 py-1 text-center">{warranty.firstWarranty ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
+                  <td className="border border-sf-border px-1.5 py-1 text-center">{warrantyIndex === 0 ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{warranty.relatedProjectId}</td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <select className="h-8 min-w-44 rounded border border-sf-border px-2 py-1 text-sm" value={warranty.relatedProjectId} onChange={(event) => updateWarrantyInline(warranty.id, { relatedProjectId: event.target.value })}>
+                      <option value="">Select project</option>
+                      {relatedProjects.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.pid}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{warranty.startDate ?? ''}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{warranty.endDate ?? ''}</td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={warranty.startDate ?? ''} onChange={(event) => updateWarrantyInline(warranty.id, { startDate: event.target.value || null })} />
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={warranty.endDate ?? ''} onChange={(event) => updateWarrantyInline(warranty.id, { endDate: event.target.value || null })} />
+                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
@@ -1172,7 +1197,6 @@ export function TenantFormPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 id="warranty-dialog-title" className="text-lg font-semibold">Edit warranty {warranty.warrantyId}</h2>
-              <p className="text-sm text-sf-text-muted">Warranty status is generated by the warranty collection.</p>
             </div>
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
           </div>
@@ -1194,9 +1218,17 @@ export function TenantFormPage() {
               </select>
             </label>
             <div className="space-y-1">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Generated Status</span>
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Status</span>
               <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">{displayWarrantyStatus(warranty.warrantyStatus)}</div>
             </div>
+            <label className="space-y-1">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
+              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.startDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('startDate', event.target.value || null)} />
+            </label>
+            <label className="space-y-1">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date</span>
+              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.endDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('endDate', event.target.value || null)} />
+            </label>
             <div className="space-y-2 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Predecessors</span>
               <div className="flex flex-wrap items-center gap-2">
@@ -1249,15 +1281,7 @@ export function TenantFormPage() {
                 )) : <span className="text-sm text-sf-text-muted">No predecessors selected.</span>}
               </div>
             </div>
-            <label className="space-y-1">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
-              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.startDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('startDate', event.target.value || null)} />
-            </label>
-            <label className="space-y-1">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date</span>
-              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.endDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('endDate', event.target.value || null)} />
-            </label>
-            <label className="space-y-1">
+            <label className="space-y-1 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">No Warranty</span>
               <select
                 className="h-9 w-full rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
@@ -1270,7 +1294,7 @@ export function TenantFormPage() {
               </select>
             </label>
             <label className="space-y-1 md:col-span-2">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Remark</span>
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Remarks</span>
               <textarea className="min-h-20 w-full rounded border border-sf-border px-2 py-1" value={warrantyDialogDraft.remark} onChange={(event) => updateWarrantyDialogDraft('remark', event.target.value)} />
             </label>
           </div>
