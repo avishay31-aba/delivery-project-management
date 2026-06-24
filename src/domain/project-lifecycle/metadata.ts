@@ -57,14 +57,9 @@ export interface ProjectFormMetadata {
 }
 
 export const PROJECT_TABS: ProjectFormTab[] = [
-  'overview',
-  'requirements',
-  'systems',
-  'tenants',
   'milestones',
   'tasks',
   'documents',
-  'activity',
 ]
 
 const REPORTING_FIELDS: ProjectHeaderFieldMetadata[] = [

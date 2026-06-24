@@ -1,7 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, CirclePlay, GripVertical, Link2, Plus, Square, Trash2, X } from 'lucide-react'
-import { ActivityTimeline } from '@/components/activity'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -19,10 +18,9 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
-import { activityEventsForProject } from '@/domain/activity-log'
 import {
   allocationModeLabel,
   allowedAllocationModes,
@@ -32,7 +30,7 @@ import {
   type AllocationActionResult,
   type AllocationMode,
 } from '@/domain/allocation-context'
-import { systemRoutePath, systemSourceLabel } from '@/domain/system-inventory'
+import { systemRoutePath } from '@/domain/system-inventory'
 import {
   linkedOpportunityForProject,
   projectTypeForOpportunity,
@@ -49,10 +47,6 @@ import {
   projectRequirementRows,
   projectRequirementTitle,
   projectHeaderFieldValue,
-  projectHealthReadModel,
-  projectWorkspaceSystemSummary,
-  projectWorkspaceTenantSummary,
-  type ProjectHealthStatus,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
   projectStatusLabel,
@@ -66,7 +60,6 @@ import {
   hostingContextFromSource,
   type HostingContext,
 } from '@/domain/hosting-context'
-import { tenantWarrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -84,13 +77,8 @@ import {
   updateTaskInPlan,
   updateTasksStatusInPlan,
 } from '@/domain/milestone-plan'
-import {
-  requirementCoverageRows,
-  requirementCoverageRowsForProject,
-  requirementCoverageSummary,
-} from '@/domain/requirement-coverage'
 
-type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents' | 'activity'
+type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
@@ -123,10 +111,8 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   requirements: false,
   milestones: false,
   tasks: false,
-  systems: false,
-  tenants: false,
+  systemsTenants: false,
   documents: false,
-  activity: false,
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -210,6 +196,31 @@ function systemApplicationConfigurationValue(system: System, field: ApplicationC
   return (system as unknown as Record<string, unknown>)[field.configKey]
 }
 
+function applicationConfigurationValueForRecord(record: System | Tenant, field: ApplicationConfigurationFieldMetadata): unknown {
+  if (field.configKey === 'product') return record.productType
+  if ('configuration' in record && record.configuration) {
+    const configurationValue = (record.configuration as unknown as Record<string, unknown>)[field.configKey]
+    if (configurationValue !== undefined) return configurationValue
+  }
+  const directRecord = record as unknown as Record<string, unknown>
+  return directRecord[field.configKey] ?? directRecord[field.key]
+}
+
+function applicationConfigurationSummary(record: System | Tenant, groups: string[]): string {
+  const values = APPLICATION_CONFIGURATION_FIELDS
+    .filter((field) => groups.includes(field.group))
+    .map((field) => {
+      const value = applicationConfigurationValueForRecord(record, field)
+      if (Array.isArray(value)) return value.length > 0 ? `${field.label}: ${value.join(', ')}` : ''
+      if (value === null || value === undefined || value === '' || value === 'NO') return ''
+      if (typeof value === 'number' && value <= 0) return ''
+      return `${field.label}: ${String(value)}`
+    })
+    .filter(Boolean)
+
+  return values.join('; ') || '-'
+}
+
 function detailGroups<T extends { group: string }>(fields: T[]): Array<{ group: string; fields: T[] }> {
   return fields.reduce<Array<{ group: string; fields: T[] }>>((groups, field) => {
     const existingGroup = groups.find((group) => group.group === field.group)
@@ -250,20 +261,6 @@ function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
   }
 
   return <Square className="h-5 w-7 fill-emerald-100 stroke-0 text-emerald-100" aria-label="Task status: Open" />
-}
-
-function projectHealthBadgeVariant(status: ProjectHealthStatus) {
-  if (status === 'COMPLETED') return 'done'
-  if (status === 'AT_RISK' || status === 'BLOCKED') return 'error'
-  if (status === 'WARNING') return 'warning'
-  return 'default'
-}
-
-function projectHealthAlertVariant(status: ProjectHealthStatus) {
-  if (status === 'AT_RISK' || status === 'BLOCKED') return 'danger'
-  if (status === 'WARNING') return 'warning'
-  if (status === 'COMPLETED') return 'success'
-  return 'info'
 }
 
 function CollapsibleSection({
@@ -360,20 +357,6 @@ function RequirementSection({
   )
 }
 
-function tabSectionId(tab: ProjectFormTab): CollapsibleSectionId {
-  const ids: Record<ProjectFormTab, CollapsibleSectionId> = {
-    overview: 'projectHeader',
-    requirements: 'requirements',
-    systems: 'systems',
-    tenants: 'tenants',
-    milestones: 'milestones',
-    tasks: 'tasks',
-    documents: 'documents',
-    activity: 'activity',
-  }
-  return ids[tab]
-}
-
 export function ProjectFormPage() {
   const { pid } = useParams<{ pid: string }>()
   const navigate = useNavigate()
@@ -387,8 +370,6 @@ export function ProjectFormPage() {
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
-  const warrantyRecords = useAppStore((state) => state.warrantyRecords)
-  const activityEvents = useAppStore((state) => state.activityEvents)
   const updateProject = useAppStore((state) => state.updateProject)
   const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
@@ -396,7 +377,7 @@ export function ProjectFormPage() {
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProjectDraft(savedProject) : null)
-  const [activeTab, setActiveTab] = useState<ProjectFormTab>('overview')
+  const [activeTab, setActiveTab] = useState<ProjectFormTab>('milestones')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
@@ -448,63 +429,6 @@ export function ProjectFormPage() {
   const linkedTenants = useMemo(() => {
     return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants)
   }, [currentDraft, linkedSystems, projectTenants, tenants])
-  const allRequirementCoverageRows = useMemo(
-    () =>
-      requirementCoverageRows({
-        accounts,
-        opportunities,
-        projects,
-        systems,
-        tenants,
-        warrantyRecords,
-        projectSystems,
-        projectTenants,
-      }),
-    [accounts, opportunities, projectSystems, projectTenants, projects, systems, tenants, warrantyRecords],
-  )
-  const projectRequirementCoverageRows = useMemo(
-    () => requirementCoverageRowsForProject(allRequirementCoverageRows, currentDraft),
-    [allRequirementCoverageRows, currentDraft],
-  )
-  const projectRequirementCoverageSummary = useMemo(
-    () => requirementCoverageSummary(projectRequirementCoverageRows),
-    [projectRequirementCoverageRows],
-  )
-  const projectHealth = useMemo(() => {
-    if (!currentDraft) return null
-    return projectHealthReadModel({
-      project: currentDraft,
-      systems,
-      tenants,
-      projectSystems,
-      projectTenants,
-      requirementCoverageSummary: projectRequirementCoverageSummary,
-    })
-  }, [currentDraft, projectRequirementCoverageSummary, projectSystems, projectTenants, systems, tenants])
-  const workspaceSystemSummary = useMemo(() => {
-    if (!currentDraft) return null
-    return projectWorkspaceSystemSummary({
-      project: currentDraft,
-      systems,
-      tenants,
-      projectSystems,
-      projectTenants,
-    })
-  }, [currentDraft, projectSystems, projectTenants, systems, tenants])
-  const workspaceTenantSummary = useMemo(() => {
-    if (!currentDraft) return null
-    return projectWorkspaceTenantSummary({
-      project: currentDraft,
-      systems,
-      tenants,
-      projectSystems,
-      projectTenants,
-    })
-  }, [currentDraft, projectSystems, projectTenants, systems, tenants])
-  const projectActivityEvents = useMemo(
-    () => currentDraft ? activityEventsForProject(activityEvents, currentDraft.id) : [],
-    [activityEvents, currentDraft],
-  )
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
 
@@ -790,89 +714,7 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderWorkspaceMetric(label: string, value: ReactNode, tone: 'default' | 'warning' | 'danger' = 'default') {
-    const toneClassName =
-      tone === 'danger'
-        ? 'border-red-200 bg-red-50'
-        : tone === 'warning'
-          ? 'border-amber-200 bg-amber-50'
-          : 'border-sf-border bg-sf-surface-alt'
-
-    return (
-      <div className={['rounded border px-2 py-1.5', toneClassName].join(' ')}>
-        <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
-        <div className="mt-1 text-sm font-medium text-sf-text">{value}</div>
-      </div>
-    )
-  }
-
-  function renderOverviewTab() {
-    const sectionId = tabSectionId('overview')
-    const healthAlerts = projectHealth?.healthAlerts ?? []
-    const coverageAlerts = [
-      projectRequirementCoverageSummary.missingSystem > 0 ? `${projectRequirementCoverageSummary.missingSystem} requirement(s) missing System allocation` : null,
-      projectRequirementCoverageSummary.missingTenant > 0 ? `${projectRequirementCoverageSummary.missingTenant} requirement(s) missing Tenant creation` : null,
-      projectRequirementCoverageSummary.unknown > 0 ? `${projectRequirementCoverageSummary.unknown} requirement(s) need coverage review` : null,
-    ].filter((alert): alert is string => Boolean(alert))
-    const needsAttentionAlerts = Array.from(new Set([...healthAlerts, ...coverageAlerts]))
-
-    return (
-      <CollapsibleSection
-        title="Overview"
-        subtitle="Read-only delivery workspace summary for this Project."
-        collapsed={collapsedSections[sectionId]}
-        onToggle={() => toggleSection(sectionId)}
-        className="space-y-4 p-3"
-      >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          {renderWorkspaceMetric(
-            'Delivery Health',
-            projectHealth ? <StatusBadge label={projectHealth.healthLabel} variant={projectHealthBadgeVariant(projectHealth.healthStatus)} /> : '-',
-            projectHealth?.healthStatus === 'AT_RISK' || projectHealth?.healthStatus === 'BLOCKED' ? 'danger' : projectHealth?.healthStatus === 'WARNING' ? 'warning' : 'default',
-          )}
-          <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5">
-            <div className="text-xs font-semibold uppercase text-sf-text-muted">Milestone Completion</div>
-            <ProgressBar value={projectHealth?.completionPercent ?? 0} className="mt-1 min-w-0" />
-          </div>
-          {renderWorkspaceMetric('Current Milestone', projectHealth?.currentMilestone || '-')}
-          {renderWorkspaceMetric('Last Completed', projectHealth?.lastCompletedMilestone || '-')}
-          {renderWorkspaceMetric('Open Tasks', projectHealth?.openTaskCount ?? 0)}
-          {renderWorkspaceMetric('Completed Tasks', projectHealth?.completedTaskCount ?? 0)}
-          {renderWorkspaceMetric('Deadline Risk', projectHealth?.deadlineRiskLabel ?? '-')}
-          {renderWorkspaceMetric('Next Deadline', projectHealth?.nextDeadline || '-')}
-          {renderWorkspaceMetric('Overdue Tasks', projectHealth?.overdueTaskCount ?? 0, (projectHealth?.overdueTaskCount ?? 0) > 0 ? 'danger' : 'default')}
-          {renderWorkspaceMetric('Overdue Milestones', projectHealth?.overdueMilestoneCount ?? 0, (projectHealth?.overdueMilestoneCount ?? 0) > 0 ? 'danger' : 'default')}
-          {renderWorkspaceMetric('Covered Requirements', `${projectRequirementCoverageSummary.covered}/${projectRequirementCoverageSummary.totalRequirements}`)}
-          {renderWorkspaceMetric('Linked Systems', workspaceSystemSummary?.linkedSystems ?? 0, workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Linked Tenants', workspaceTenantSummary?.linkedTenants ?? 0, workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
-        </div>
-
-        <div className="rounded border border-sf-border bg-white p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-sf-text">Needs Attention</h3>
-            {projectHealth ? <StatusBadge label={projectHealth.deliveryDateStatusLabel} variant={projectHealth.healthStatus === 'AT_RISK' ? 'error' : projectHealth.healthStatus === 'WARNING' ? 'warning' : 'default'} /> : null}
-          </div>
-          {needsAttentionAlerts.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {needsAttentionAlerts.map((alert) => (
-                <span key={alert} className="inline-flex items-center gap-1.5 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-                  <AlertStatusIcon
-                    variant={healthAlerts.includes(alert) ? projectHealthAlertVariant(projectHealth?.healthStatus ?? 'HEALTHY') : 'warning'}
-                    label={alert}
-                  />
-                  {alert}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-sf-text-muted">No delivery or requirement coverage alerts from current read-only data.</div>
-          )}
-        </div>
-      </CollapsibleSection>
-    )
-  }
-
-  function renderRequirementsTab() {
+  function renderRequirementsSection() {
     const requirementSections = completeProjectRequirementSections(formMetadata.requirementSections, linkedOpportunity)
     return (
       <CollapsibleSection
@@ -882,51 +724,6 @@ export function ProjectFormPage() {
         onToggle={() => toggleSection('requirements')}
         className="space-y-3 p-3"
       >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {renderWorkspaceMetric('Total Requirements', projectRequirementCoverageSummary.totalRequirements)}
-          {renderWorkspaceMetric('Covered', projectRequirementCoverageSummary.covered)}
-          {renderWorkspaceMetric('Partially Covered', projectRequirementCoverageSummary.partiallyCovered, projectRequirementCoverageSummary.partiallyCovered > 0 ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Missing System', projectRequirementCoverageSummary.missingSystem, projectRequirementCoverageSummary.missingSystem > 0 ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Missing Tenant', projectRequirementCoverageSummary.missingTenant, projectRequirementCoverageSummary.missingTenant > 0 ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Unknown', projectRequirementCoverageSummary.unknown, projectRequirementCoverageSummary.unknown > 0 ? 'warning' : 'default')}
-        </div>
-
-        {projectRequirementCoverageRows.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
-            <table className="min-w-full border-collapse text-sm leading-tight">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  {['Requirement ID', 'Grid', 'Product', 'Hosting', 'Coverage Status', 'Missing Step', 'PID', 'SID/MID', 'TID', 'Alerts'].map((label) => (
-                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {projectRequirementCoverageRows.map((row) => (
-                  <tr key={row.id} className="hover:bg-sf-surface-alt">
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.requirementId}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.requirementGrid}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.product}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.hostingType}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.coverageStatusLabel}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.missingStepLabel}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.pid ? <LinkId to={`/projects/${row.pid}`}>{row.pid}</LinkId> : ''}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.sid || row.mid}</td>
-                    <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.tid ? <LinkId to={`/tenants/${row.tid}`}>{row.tid}</LinkId> : ''}</td>
-                    <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{row.coverageAlerts.join('; ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-            No Requirement Coverage rows are linked to this Project.
-          </div>
-        )}
-
         {linkedOpportunity ? (
           <div className="space-y-4">
             {requirementSections.map((section) => (
@@ -1177,7 +974,7 @@ export function ProjectFormPage() {
   }
 
   function renderMilestonesTab() {
-    const sectionId = tabSectionId('milestones')
+    const sectionId: CollapsibleSectionId = 'milestones'
     const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
     const template = PROJECT_MILESTONE_TASK_TEMPLATES[resolution.templateId]
     const milestones = orderedMilestones(projectDraft)
@@ -1294,7 +1091,7 @@ export function ProjectFormPage() {
   }
 
   function renderTasksTab() {
-    const sectionId = tabSectionId('tasks')
+    const sectionId: CollapsibleSectionId = 'tasks'
     const tasks = orderedTasks(projectDraft)
     const milestonesById = new Map((projectDraft.milestones ?? []).map((milestone) => [milestone.id, milestone]))
     const allVisibleTasksSelected = tasks.length > 0 && tasks.every((task) => selectedTaskIdSet.has(task.id))
@@ -1725,29 +1522,8 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderPlaceholderTab(tab: ProjectFormTab) {
-    const sectionId = tabSectionId(tab)
-    return (
-      <CollapsibleSection
-        title={projectTabLabel(tab)}
-        subtitle={
-          tab === 'milestones' || tab === 'tasks'
-            ? `Template reference: ${formMetadata.milestoneTemplate}. Editing is planned for a later phase.`
-            : 'Execution workflow will be implemented in a later phase.'
-        }
-        collapsed={collapsedSections[sectionId]}
-        onToggle={() => toggleSection(sectionId)}
-        className="space-y-3 p-3"
-      >
-        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-          {projectTabLabel(tab)} workspace is not editable in this MVP scope.
-        </div>
-      </CollapsibleSection>
-    )
-  }
-
   function renderDocumentsTab() {
-    const sectionId = tabSectionId('documents')
+    const sectionId: CollapsibleSectionId = 'documents'
     return (
       <CollapsibleSection
         title="Documents"
@@ -1906,23 +1682,6 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderActivityTab() {
-    return (
-      <CollapsibleSection
-        title="Activity"
-        subtitle="Read-only activity recorded for this Project."
-        collapsed={collapsedSections.activity}
-        onToggle={() => toggleSection('activity')}
-        className="space-y-3 p-3"
-      >
-        <ActivityTimeline
-          events={projectActivityEvents}
-          emptyText="No activity recorded for this project yet."
-        />
-      </CollapsibleSection>
-    )
-  }
-
   function renderLinkedSystemDetails(system: System) {
     const hostingContext = hostingContextFromSource(system)
     const configurationGroups = detailGroups(APPLICATION_CONFIGURATION_FIELDS)
@@ -1961,22 +1720,15 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderSystemsTab() {
+  function renderSystemsTenantsSection() {
     return (
       <CollapsibleSection
-        title="Systems"
-        subtitle="Allocate or link systems for this Project. Tenant creation happens from the linked System Form."
-        collapsed={collapsedSections.systems}
-        onToggle={() => toggleSection('systems')}
+        title="Systems and Tenants"
+        subtitle="Systems linked to this Project and their tenants. Tenant creation happens from the linked System Form."
+        collapsed={collapsedSections.systemsTenants}
+        onToggle={() => toggleSection('systemsTenants')}
         className="space-y-3 p-3"
       >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {renderWorkspaceMetric('Linked Systems', workspaceSystemSummary?.linkedSystems ?? 0, workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Production Systems', workspaceSystemSummary?.productionSystems ?? 0)}
-          {renderWorkspaceMetric('Reused/Internal Systems', workspaceSystemSummary?.reusedInternalSystems ?? 0)}
-          {renderWorkspaceMetric('Missing System Allocation', workspaceSystemSummary?.missingSystemAllocation ? 'Yes' : 'No', workspaceSystemSummary?.missingSystemAllocation ? 'warning' : 'default')}
-        </div>
-
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-sf-text-muted">
             Allocation creates Project to System links only. It does not create tenants.
@@ -1993,12 +1745,14 @@ export function ProjectFormPage() {
 
         {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
 
-        {linkedSystems.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+        <div className="space-y-2">
+          <h3 className="text-base font-semibold text-sf-text">Systems</h3>
+          {linkedSystems.length > 0 ? (
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Details', 'SID/MID', 'Source', 'Purpose', 'Product', 'Hosting', 'Cloud Platform', 'CSP', 'Region', 'Operational Status', 'Allocation Type', 'Action'].map((label) => (
+                  {['Details', 'Actions', 'SID', 'PIDs', 'Time Group', 'Operational Status', 'Environment', 'Hosting', 'Product', 'Modules', 'AI', 'Additional Features'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -2023,23 +1777,6 @@ export function ProjectFormPage() {
                         </button>
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <span className="inline-flex items-center gap-2">
-                          <LinkId to={systemRoutePath(system)}>
-                            {system.sid ?? system.machineId ?? system.id}
-                          </LinkId>
-                          <RecordChangeBadge record={system} />
-                        </span>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemSourceLabel(system)}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudPlatform ?? ''}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.csp ?? ''}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudRegion ?? ''}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{link ? allocationModeLabel(link.allocationType ?? 'EXISTING_SYSTEM') : '-'}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         {link ? (
                           <button
                             type="button"
@@ -2051,6 +1788,32 @@ export function ProjectFormPage() {
                           </button>
                         ) : null}
                       </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        <span className="inline-flex items-center gap-2">
+                          <LinkId to={systemRoutePath(system)}>
+                            {system.sid ?? system.machineId ?? system.id}
+                          </LinkId>
+                          <RecordChangeBadge record={system} />
+                        </span>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {(system.linkedProjectIds?.length ? system.linkedProjectIds : [projectDraft.id]).map((projectId) => {
+                          const linkedProject = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
+                          return linkedProject ? (
+                            <span key={projectId} className="mr-2 inline-block">
+                              <LinkId to={`/projects/${linkedProject.pid}`}>{linkedProject.pid}</LinkId>
+                            </span>
+                          ) : null
+                        })}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
+                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Modules / #users', 'Modules'])}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['AI'])}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Additional features'])}</td>
                     </tr>,
                     isExpanded ? (
                       <tr key={`${system.id}-details`}>
@@ -2069,42 +1832,16 @@ export function ProjectFormPage() {
             No systems are linked to this Project yet.
           </div>
         )}
-      </CollapsibleSection>
-    )
-  }
-
-  function tenantWarrantyHeaderLabel(tenant: Tenant): string {
-    return tenantWarrantyHeaderStatusReadModel(tenant.warranties ?? [], tenant.tid).label
-  }
-
-  function renderTenantsTab() {
-    const warrantyLabels = linkedTenants.map(tenantWarrantyHeaderLabel)
-    const underContractCount = warrantyLabels.filter((label) => label === 'Under Contract').length
-    const outOfContractCount = warrantyLabels.filter((label) => label === 'Out Of Contract').length
-
-    return (
-      <CollapsibleSection
-        title="Tenants"
-        subtitle="Read-only tenant links for this Project. Tenant creation remains available only from the linked System Form."
-        collapsed={collapsedSections.tenants}
-        onToggle={() => toggleSection('tenants')}
-        className="space-y-3 p-3"
-      >
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-          {renderWorkspaceMetric('Linked Tenants', workspaceTenantSummary?.linkedTenants ?? 0, workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Customer Tenants', workspaceTenantSummary?.customerTenants ?? 0)}
-          {renderWorkspaceMetric('POC Tenants', workspaceTenantSummary?.pocTenants ?? 0)}
-          {renderWorkspaceMetric('Missing Tenant Creation', workspaceTenantSummary?.missingTenantCreation ? 'Yes' : 'No', workspaceTenantSummary?.missingTenantCreation ? 'warning' : 'default')}
-          {renderWorkspaceMetric('Under Contract', underContractCount)}
-          {renderWorkspaceMetric('Out Of Contract', outOfContractCount, outOfContractCount > 0 ? 'warning' : 'default')}
         </div>
 
-        {linkedTenants.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+        <div className="space-y-2">
+          <h3 className="text-base font-semibold text-sf-text">Tenants</h3>
+          {linkedTenants.length > 0 ? (
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['TID', 'Tenant Name', 'System SID/MID', 'Delivery PID', 'Product', 'Hosting', 'Operational Status', 'Warranty Header Status', 'Source Requirement ID'].map((label) => (
+                  {['TID', 'SID', 'Account Name', 'Country', 'Time Group', 'Operational Status', 'Environment', 'Hosting', 'Product', 'Modules', 'AI', 'Additional Features'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -2123,19 +1860,18 @@ export function ProjectFormPage() {
                         </span>
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <LinkId to={`/tenants/${tenant.tid}`}>{tenant.tenantName}</LinkId>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         {system ? <LinkId to={systemRoutePath(system)}>{system.sid ?? system.machineId ?? ''}</LinkId> : null}
                       </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : null}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantWarrantyHeaderLabel(tenant)}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.sourceRequirementId ?? ''}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
+                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Modules / #users', 'Modules'])}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['AI'])}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Additional features'])}</td>
                     </tr>
                   )
                 })}
@@ -2147,6 +1883,7 @@ export function ProjectFormPage() {
             No tenants are linked to this Project yet.
           </div>
         )}
+        </div>
       </CollapsibleSection>
     )
   }
@@ -2190,6 +1927,11 @@ export function ProjectFormPage() {
         </div>
       </CollapsibleSection>
 
+      <div className="mt-4 space-y-4">
+        {renderRequirementsSection()}
+        {renderSystemsTenantsSection()}
+      </div>
+
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
         <div className="flex flex-wrap border-b border-sf-border">
           {visibleTabs.map((tab) => (
@@ -2209,23 +1951,11 @@ export function ProjectFormPage() {
           ))}
         </div>
         <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
-          {activeTab === 'overview'
-            ? renderOverviewTab()
-            : activeTab === 'requirements'
-              ? renderRequirementsTab()
-              : activeTab === 'systems'
-                ? renderSystemsTab()
-                : activeTab === 'tenants'
-                  ? renderTenantsTab()
-                  : activeTab === 'milestones'
-                    ? renderMilestonesTab()
-                    : activeTab === 'tasks'
-                      ? renderTasksTab()
-                      : activeTab === 'documents'
-                        ? renderDocumentsTab()
-                        : activeTab === 'activity'
-                          ? renderActivityTab()
-                          : renderPlaceholderTab(activeTab)}
+          {activeTab === 'milestones'
+            ? renderMilestonesTab()
+            : activeTab === 'tasks'
+              ? renderTasksTab()
+              : renderDocumentsTab()}
         </div>
       </div>
       {renderAddMilestoneDialog()}
