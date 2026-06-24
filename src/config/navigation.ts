@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, RefreshCcw, Server, ServerCog, ShieldCheck, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, History, RefreshCcw, Server, ServerCog, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -68,5 +68,11 @@ export const mainNavigation: NavItem[] = [
     path: '/requirement-coverage',
     icon: ClipboardCheck,
     description: 'Requirement delivery traceability',
+  },
+  {
+    label: 'Activity Log',
+    path: '/activity-log',
+    icon: History,
+    description: 'Operational activity timeline',
   },
 ]
