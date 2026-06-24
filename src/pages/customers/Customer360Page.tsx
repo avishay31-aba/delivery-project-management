@@ -185,7 +185,7 @@ export function Customer360Page() {
 
     if (activeTab === 'projects') {
       return readOnlyTable(
-        ['PID', 'Project Name', 'Type', 'Subtype', 'Status', 'Health Status', 'Delivery Date', 'Delivery Date Status', 'Completion %', 'Current Milestone', 'Alerts'],
+        ['PID', 'Project Name', 'Type', 'Subtype', 'Status', 'Health Status', 'Delivery Date', 'Delivery Date Status', 'Completion %', 'Current Milestone', 'Deadline Risk', 'Next Deadline', 'Overdue Tasks', 'Alerts'],
         customer.projects.map((project) => {
           const health = projectHealthByProjectId.get(project.id)
           return [
@@ -199,6 +199,9 @@ export function Customer360Page() {
             health?.deliveryDateStatusLabel ?? '',
             health ? `${health.completionPercent}%` : customerProjectProgress(project),
             health?.currentMilestone ?? '',
+            health?.deadlineRiskLabel ?? '',
+            health?.nextDeadline ?? '',
+            health?.overdueTaskCount ?? 0,
             health?.healthAlerts.join('; ') ?? '',
           ]
         }),
