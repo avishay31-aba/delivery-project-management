@@ -8,11 +8,9 @@ import {
   Crosshair,
   Database,
   DoorOpen,
-  Edit3,
   Globe2,
   Grid3X3,
   LockKeyhole,
-  MoveRight,
   Network,
   Plus,
   PowerOff,
@@ -24,7 +22,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { FormField, PlaceholderCard } from '@/components/ui'
+import { FormField, LinkId, PlaceholderCard } from '@/components/ui'
 import {
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
@@ -61,7 +59,6 @@ import {
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
   SYSTEM_SOURCE_REUSED_INTERNAL,
-  systemDisplayName as systemDisplayNameForRecord,
   systemIdentity,
   systemTimeGroup,
   systemTimeGroupAlert,
@@ -351,20 +348,12 @@ function InventoryForm<T extends InventoryRecord>({
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
   const projectSystems = useAppStore((state) => state.projectSystems)
-  const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
-  const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
-  const allocatedSystems = useAppStore((state) => state.systems)
-  const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
-  const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
-  const [movingTenantId, setMovingTenantId] = useState<string | null>(null)
-  const [destinationSystemId, setDestinationSystemId] = useState('')
-  const [tenantPendingDelete, setTenantPendingDelete] = useState<Tenant | null>(null)
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
@@ -722,17 +711,19 @@ function InventoryForm<T extends InventoryRecord>({
     return Array.from(new Set(values)).join('; ') || '-'
   }
 
-  function allDestinationSystems(): InventoryRecord[] {
-    return [...productionSystemInventory, ...reusedInternalSystems, ...allocatedSystems]
-      .filter((system) => system.id !== activeRecord.id)
-  }
-
-  function systemDisplayName(system: InventoryRecord): string {
-    return systemDisplayNameForRecord(system)
-  }
-
   function tenantFieldValue(tenant: Tenant, field: SharedFieldMetadata): string {
     return textValue(tenantConfigurationValue(tenant, field)) || '-'
+  }
+
+  function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {
+    const moduleKeys: Array<keyof NewTenantRequirement> = ['tangles', 'tanglesGo', 'webloc', 'webeye', 'ingest', 'blockchain']
+    const moduleCount = moduleKeys.reduce((count, key) => {
+      const value = requirement[key]
+      if (typeof value === 'number') return value > 0 ? count + 1 : count
+      return value === 'YES' ? count + 1 : count
+    }, 0)
+    const aiCount = requirement.aiFeatures?.length ?? 0
+    return `${requirement.requirementId} | Users: ${requirement.users ?? '-'} | Licenses: ${requirement.licenses ?? '-'} | Modules: ${moduleCount} | AI: ${aiCount}`
   }
 
   function projectOpportunity(project: Project): Opportunity | undefined {
@@ -784,67 +775,10 @@ function InventoryForm<T extends InventoryRecord>({
     }
   }
 
-  function handleDeleteTenant(tenant: Tenant) {
-    setTenantPendingDelete(tenant)
-  }
-
-  function confirmTenantDelete() {
-    if (!tenantPendingDelete) return
-    deleteTenantFromSystem(tenantPendingDelete.id)
-    setTenantPendingDelete(null)
-  }
-
-  function handleMoveTenant(tenant: Tenant) {
-    if (!destinationSystemId) return
-    moveTenantToSystem(tenant.id, destinationSystemId)
-    setMovingTenantId(null)
-    setDestinationSystemId('')
-  }
-
   function renderTenantRows(hostedTenants: Tenant[]) {
-    const destinationSystems = allDestinationSystems()
-
     return hostedTenants.map((tenant) => (
       <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-        <td className="sticky left-0 z-10 min-w-52 border border-sf-border bg-white px-1.5 py-1 align-top text-sf-text">
-          <div className="flex flex-wrap gap-1">
-            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={() => navigate(`/tenants/${tenant.tid}`)}>
-              <Edit3 className="h-3.5 w-3.5" aria-hidden="true" />
-              Edit
-            </button>
-            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={() => handleDeleteTenant(tenant)}>
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Delete
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
-              onClick={() => {
-                setMovingTenantId(tenant.id)
-                setDestinationSystemId(destinationSystems[0]?.id ?? '')
-              }}
-            >
-              <MoveRight className="h-3.5 w-3.5" aria-hidden="true" />
-              Move
-            </button>
-          </div>
-          {movingTenantId === tenant.id ? (
-            <div className="mt-2 flex min-w-72 items-center gap-1">
-              <select className="h-8 min-w-52 rounded border border-sf-border px-2 py-1 text-xs" value={destinationSystemId} onChange={(event) => setDestinationSystemId(event.target.value)}>
-                {destinationSystems.map((system) => (
-                  <option key={system.id} value={system.id}>{systemDisplayName(system)}</option>
-                ))}
-              </select>
-              <button type="button" className="rounded bg-sf-brand px-2 py-1 text-xs font-semibold text-white disabled:opacity-50" disabled={!destinationSystemId} onClick={() => handleMoveTenant(tenant)}>
-                Apply
-              </button>
-              <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setMovingTenantId(null)}>
-                Cancel
-              </button>
-            </div>
-          ) : null}
-        </td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.tid}</td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId></td>
         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName || '-'}</td>
         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.deliveryPid || '-'}</td>
         <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={tenant.operationalStatus} /></td>
@@ -862,7 +796,6 @@ function InventoryForm<T extends InventoryRecord>({
     const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
     const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
     const tenantHeaders = [
-      'Action',
       'TID',
       'Customer / End User Name',
       'Delivery PID',
@@ -900,28 +833,23 @@ function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+            disabled={linkedProjectsForSystem().length === 0}
+            onClick={openAddTenantDialog}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add Tenant
+          </button>
+          {linkedProjectsForSystem().length === 0 ? (
+            <div className="text-sm text-sf-text-muted">Link this system to a project before adding tenants.</div>
+          ) : null}
+        </div>
+
         {renderHostedTenantSection('Under Contract', underContractTenants)}
         {renderHostedTenantSection('Out of Contract', outOfContractTenants)}
-
-        <section className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-lg font-semibold text-sf-text">Tenant Actions</h3>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
-              disabled={linkedProjectsForSystem().length === 0}
-              onClick={openAddTenantDialog}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add Tenant
-            </button>
-          </div>
-          {linkedProjectsForSystem().length === 0 ? (
-            <div className="rounded border border-dashed border-sf-border bg-white p-3 text-sm text-sf-text-muted">
-              Link this system to a project before adding tenants.
-            </div>
-          ) : null}
-        </section>
 
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
@@ -1063,7 +991,7 @@ function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="w-full max-w-xl rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
+        <div className="w-full max-w-3xl rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="add-tenant-title" className="text-lg font-semibold text-sf-text">Add tenant</h2>
@@ -1074,7 +1002,7 @@ function InventoryForm<T extends InventoryRecord>({
             </button>
           </div>
 
-          <div className="space-y-4 p-4">
+          <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <FormField label="PID" controlWidthClassName="w-full">
               <select className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
                 {linkedProjects.map((project) => (
@@ -1087,7 +1015,7 @@ function InventoryForm<T extends InventoryRecord>({
 
             <FormField label="Tenant Requirement ID" controlWidthClassName="w-full">
               <select
-                className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm"
                 value={selectedRequirementId}
                 disabled={selectedRequirements.length === 0}
                 onChange={(event) => setSelectedRequirementId(event.target.value)}
@@ -1095,13 +1023,13 @@ function InventoryForm<T extends InventoryRecord>({
                 {selectedRequirements.length === 0 ? <option value="">No new tenant requirements</option> : null}
                 {selectedRequirements.map((requirement) => (
                   <option key={requirement.id} value={requirement.id}>
-                    {requirement.requirementId} - {requirement.productType}
+                    {tenantRequirementOptionLabel(requirement)}
                   </option>
                 ))}
               </select>
             </FormField>
 
-            <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text-muted">
+            <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text-muted md:col-span-2">
               {selectedProject
                 ? `Only New Tenant Requirement rows from ${selectedProject.pid} are available here. Change Request and Standard Renewal rows are excluded.`
                 : 'No linked project is available for this system.'}
@@ -1214,24 +1142,6 @@ function InventoryForm<T extends InventoryRecord>({
               </button>
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.reset?.()}>
                 Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {tenantPendingDelete ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="delete-tenant-title">
-            <h2 id="delete-tenant-title" className="text-lg font-semibold text-sf-text">Delete tenant from system</h2>
-            <p className="mt-2 text-sm text-sf-text-muted">
-              Delete tenant {tenantPendingDelete.tid} from this system? The tenant remains in tenant history and dashboards, and its operational status will be set to Deleted.
-            </p>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setTenantPendingDelete(null)}>
-                Cancel
-              </button>
-              <button type="button" className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700" onClick={confirmTenantDelete}>
-                Delete
               </button>
             </div>
           </div>
