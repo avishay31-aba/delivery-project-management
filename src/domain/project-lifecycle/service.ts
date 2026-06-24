@@ -1,4 +1,4 @@
-import { deriveProjectProgress } from '@/domain/milestone-plan'
+import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/milestone-plan'
 import { opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
@@ -32,6 +32,17 @@ import type {
 } from './types'
 
 const UPCOMING_DELIVERY_RISK_DAYS = 14
+
+const EMPTY_PROJECT_DEADLINE_SUMMARY = {
+  overdueTaskCount: 0,
+  overdueMilestoneCount: 0,
+  upcomingTaskDeadlineCount: 0,
+  upcomingMilestoneDeadlineCount: 0,
+  nextDeadline: '',
+  nextDeadlineLabel: '',
+  deadlineRiskStatus: 'NONE' as const,
+  deadlineRiskLabel: 'No deadline risk',
+}
 
 const MODULE_FIELD_LABELS: Array<[string, string]> = [
   ['tangles', 'Tangles'],
@@ -300,6 +311,7 @@ export function projectHealthReadModel(
 ): ProjectHealthReadModel {
   const progress = deriveProjectProgress(context.project)
   const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
+  const deadlineSummary = completed ? EMPTY_PROJECT_DEADLINE_SUMMARY : projectDeadlineSummary(context.project, today)
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
   const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
   const linkedTenants = linkedTenantsForProject(context.project, linkedSystems, context.projectTenants, context.tenants)
@@ -310,13 +322,17 @@ export function projectHealthReadModel(
   const healthAlerts = [
     deliveryDateStatus === 'OVERDUE' ? 'Delivery date overdue' : null,
     deliveryDateStatus === 'UPCOMING_RISK' ? 'Delivery date approaching' : null,
+    deadlineSummary.overdueTaskCount > 0 ? `${deadlineSummary.overdueTaskCount} overdue task deadline${deadlineSummary.overdueTaskCount === 1 ? '' : 's'}` : null,
+    deadlineSummary.overdueMilestoneCount > 0 ? `${deadlineSummary.overdueMilestoneCount} overdue milestone deadline${deadlineSummary.overdueMilestoneCount === 1 ? '' : 's'}` : null,
+    deadlineSummary.deadlineRiskStatus === 'WARNING' && deadlineSummary.upcomingTaskDeadlineCount > 0 ? `${deadlineSummary.upcomingTaskDeadlineCount} upcoming task deadline${deadlineSummary.upcomingTaskDeadlineCount === 1 ? '' : 's'}` : null,
+    deadlineSummary.deadlineRiskStatus === 'WARNING' && deadlineSummary.upcomingMilestoneDeadlineCount > 0 ? `${deadlineSummary.upcomingMilestoneDeadlineCount} upcoming milestone deadline${deadlineSummary.upcomingMilestoneDeadlineCount === 1 ? '' : 's'}` : null,
     missingSystems ? 'Missing system allocation' : null,
     missingTenants ? 'Missing tenant allocation' : null,
   ].filter((alert): alert is string => Boolean(alert))
 
   const healthStatus: ProjectHealthStatus = completed
     ? 'COMPLETED'
-    : deliveryDateStatus === 'OVERDUE'
+    : deliveryDateStatus === 'OVERDUE' || deadlineSummary.deadlineRiskStatus === 'OVERDUE'
       ? 'AT_RISK'
       : healthAlerts.length > 0
         ? 'WARNING'
@@ -339,6 +355,13 @@ export function projectHealthReadModel(
     missingTenants,
     deliveryDateStatus,
     deliveryDateStatusLabel: projectDeliveryDateStatusLabel(deliveryDateStatus),
+    overdueTaskCount: deadlineSummary.overdueTaskCount,
+    overdueMilestoneCount: deadlineSummary.overdueMilestoneCount,
+    upcomingTaskDeadlineCount: deadlineSummary.upcomingTaskDeadlineCount,
+    upcomingMilestoneDeadlineCount: deadlineSummary.upcomingMilestoneDeadlineCount,
+    nextDeadline: deadlineSummary.nextDeadline,
+    deadlineRiskStatus: deadlineSummary.deadlineRiskStatus,
+    deadlineRiskLabel: deadlineSummary.deadlineRiskLabel,
   }
 }
 

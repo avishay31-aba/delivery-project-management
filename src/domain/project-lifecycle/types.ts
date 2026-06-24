@@ -14,6 +14,7 @@ import type {
   System,
   Tenant,
 } from '@/data/seed.types'
+import type { ProjectDeadlineRiskStatus } from '@/domain/milestone-plan'
 
 export type ProjectLifecycleProject = Project
 export type ProjectLifecycleMainType = ProjectMainType
@@ -68,6 +69,13 @@ export interface ProjectHealthReadModel {
   missingTenants: boolean
   deliveryDateStatus: ProjectDeliveryDateStatus
   deliveryDateStatusLabel: string
+  overdueTaskCount: number
+  overdueMilestoneCount: number
+  upcomingTaskDeadlineCount: number
+  upcomingMilestoneDeadlineCount: number
+  nextDeadline: string
+  deadlineRiskStatus: ProjectDeadlineRiskStatus
+  deadlineRiskLabel: string
 }
 
 export interface ProjectPortfolioHealthSummary {
