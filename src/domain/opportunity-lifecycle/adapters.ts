@@ -137,7 +137,7 @@ export function normalizeOpportunityLifecycleOpportunity(opportunity: Opportunit
 
   return {
     ...opportunity,
-    stage: opportunity.stage === 'WON' ? 'WON' : 'OPEN',
+    stage: opportunity.stage === 'WON' ? 'WON' : opportunity.stage === 'POC' ? 'POC' : 'OPEN',
     engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
     pocProjectIds,
     finalProjectId,

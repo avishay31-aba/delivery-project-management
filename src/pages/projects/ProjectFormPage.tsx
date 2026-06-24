@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge } from '@/components/ui'
+import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
@@ -608,6 +608,8 @@ export function ProjectFormPage() {
     const isChanged = fieldChanged(field.key)
     const isMissing = missingFields.has(field.key)
     const value = headerFieldValue(projectDraft, field.key)
+    const isManualProjectWithoutOpportunity = !linkedOpportunity && !projectDraft.opportunityId
+    const isEditable = field.editable || isManualProjectWithoutOpportunity
     const label = (
       <>
         {field.label}
@@ -615,7 +617,7 @@ export function ProjectFormPage() {
       </>
     )
 
-    if (!field.editable) {
+    if (!isEditable) {
       return (
         <FormField key={field.key} label={label} controlWidthClassName="w-44">
           <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
@@ -1074,7 +1076,7 @@ export function ProjectFormPage() {
                         <ProgressBar value={progress} className="min-w-20" />
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">{taskCount}</td>
-                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{milestone.comment ?? ''}</td>
+                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text"><RichTextContent value={milestone.comment ?? ''} /></td>
                     </tr>
                   )
                 })}
@@ -1240,7 +1242,7 @@ export function ProjectFormPage() {
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                        <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.comment ?? ''}</td>
+                        <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text"><RichTextContent value={task.comment ?? ''} /></td>
                       </tr>
                     </Fragment>
                   )
@@ -1262,7 +1264,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-milestone-title">
+        <div className="max-h-[88vh] w-full max-w-6xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-milestone-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="add-milestone-title" className="text-xl font-semibold text-sf-text">Add milestone</h2>
@@ -1285,7 +1287,7 @@ export function ProjectFormPage() {
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={newMilestoneDeadline} onChange={(event) => setNewMilestoneDeadline(event.target.value)} />
               </FormField>
               <FormField label="Comment" controlWidthClassName="w-96">
-                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={newMilestoneComment} onChange={(event) => setNewMilestoneComment(event.target.value)} />
+                <RichTextEditor value={newMilestoneComment} onChange={setNewMilestoneComment} minHeightClassName="min-h-16" />
               </FormField>
             </div>
 
@@ -1296,8 +1298,8 @@ export function ProjectFormPage() {
                   + Add task
                 </button>
               </div>
-              <div className="overflow-x-auto rounded border border-sf-border bg-white">
-                <table className="table-auto border-collapse text-sm leading-tight">
+              <div className="rounded border border-sf-border bg-white">
+                <table className="w-full table-auto border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
                       {['Task', 'Department', 'Resource', 'Deadline', 'Status', 'Comment', 'Action'].map((label) => (
@@ -1308,8 +1310,8 @@ export function ProjectFormPage() {
                   <tbody>
                     {newMilestoneTasks.map((task, index) => (
                       <tr key={index}>
-                        <td className="max-w-96 border border-sf-border px-1 py-1">
-                          <input className="h-8 w-96 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateMilestoneTaskDraft(index, { name: event.target.value })} />
+                        <td className="border border-sf-border px-1 py-1">
+                          <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateMilestoneTaskDraft(index, { name: event.target.value })} />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                           <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" value={task.department} onChange={(event) => updateMilestoneTaskDraft(index, { department: event.target.value })} />
@@ -1326,8 +1328,8 @@ export function ProjectFormPage() {
                             <option value="DONE">Done</option>
                           </select>
                         </td>
-                        <td className="max-w-64 border border-sf-border px-1 py-1">
-                          <input className="h-8 w-64 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.comment ?? ''} onChange={(event) => updateMilestoneTaskDraft(index, { comment: event.target.value })} />
+                        <td className="w-64 border border-sf-border px-1 py-1">
+                          <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateMilestoneTaskDraft(index, { comment: value })} minHeightClassName="min-h-16" />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                           <button type="button" className="text-red-700 hover:underline" onClick={() => deleteMilestoneTaskDraft(index)}>Delete</button>
@@ -1381,7 +1383,7 @@ export function ProjectFormPage() {
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={milestone.deadline ?? ''} onChange={(event) => updateMilestone(milestone.id, { deadline: event.target.value || null })} />
               </FormField>
               <FormField label="Comment" controlWidthClassName="w-96">
-                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={milestone.comment ?? ''} onChange={(event) => updateMilestone(milestone.id, { comment: event.target.value })} />
+                <RichTextEditor value={milestone.comment ?? ''} onChange={(value) => updateMilestone(milestone.id, { comment: value })} minHeightClassName="min-h-16" />
               </FormField>
             </div>
             <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
@@ -1491,7 +1493,7 @@ export function ProjectFormPage() {
                     </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">{renderTaskStatusSelect(task)}</td>
                     <td className="max-w-64 border border-sf-border px-1 py-1">
-                      <input className="h-8 w-64 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.comment ?? ''} onChange={(event) => updateTask(task.id, { comment: event.target.value })} />
+                      <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-16" />
                     </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                       <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteTaskFromMilestone(task.id)}>
@@ -1752,7 +1754,7 @@ export function ProjectFormPage() {
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Details', 'Actions', 'SID', 'PIDs', 'Time Group', 'Operational Status', 'Environment', 'Hosting', 'Product', 'Modules', 'AI', 'Additional Features'].map((label) => (
+                  {['Details', 'Actions', 'SID', 'PIDs', 'Time Group', 'Operational Status', 'Environment', 'Core Details', 'Modules', 'AI', 'Additional Features'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1787,6 +1789,13 @@ export function ProjectFormPage() {
                             Deallocate
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          className="ml-1 inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                          onClick={() => navigate(systemRoutePath(system))}
+                        >
+                          Move
+                        </button>
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         <span className="inline-flex items-center gap-2">
@@ -1809,15 +1818,14 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
+                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Core Details'])}</td>
                       <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Modules / #users', 'Modules'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['AI'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Additional features'])}</td>
                     </tr>,
                     isExpanded ? (
                       <tr key={`${system.id}-details`}>
-                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={12}>
+                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={11}>
                           {renderLinkedSystemDetails(system)}
                         </td>
                       </tr>
@@ -1841,7 +1849,7 @@ export function ProjectFormPage() {
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['TID', 'SID', 'Account Name', 'Country', 'Time Group', 'Operational Status', 'Environment', 'Hosting', 'Product', 'Modules', 'AI', 'Additional Features'].map((label) => (
+                  {['TID', 'SID', 'Account Name', 'Country', 'Time Group', 'Operational Status', 'Environment', 'Core Details', 'Modules', 'AI', 'Additional Features'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1867,8 +1875,7 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.hostingType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.productType}</td>
+                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Core Details'])}</td>
                       <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Modules / #users', 'Modules'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['AI'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Additional features'])}</td>

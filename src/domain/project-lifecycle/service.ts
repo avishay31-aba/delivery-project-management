@@ -185,6 +185,12 @@ function projectDashboardDeadlineRiskSeverity(
   return 'info'
 }
 
+function isPastDate(value: string | null | undefined, today = new Date()): boolean {
+  const date = parseDateOnly(value)
+  if (!date) return false
+  return date.getTime() < dateOnly(today).getTime()
+}
+
 export function projectLifecycleIdentity(project: Project): Project {
   return project
 }
@@ -243,6 +249,11 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const progress = deriveProjectProgress(context.project)
   const configuration = projectConfigurationSummary(context, opportunity)
   const health = projectHealthReadModel(context)
+  const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
+  const projectAlerts = [
+    ...health.healthAlerts,
+    !completed && isPastDate(opportunity?.pocStartDate) ? 'POC start date overdue' : null,
+  ].filter((alert): alert is string => Boolean(alert))
 
   return {
     projectId: context.project.id,
@@ -263,8 +274,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     modules: configuration.modules,
     licenses: configuration.licenses,
     users: configuration.users,
-    projectAlerts: health.healthAlerts,
-    projectAlertSeverity: projectDashboardAlertSeverity(health.healthStatus),
+    projectAlerts,
+    projectAlertSeverity: projectAlerts.some((alert) => alert.toLowerCase().includes('overdue')) ? 'danger' : projectDashboardAlertSeverity(health.healthStatus),
     deadlineRiskLabel: health.deadlineRiskLabel,
     deadlineRiskSeverity: projectDashboardDeadlineRiskSeverity(health.deadlineRiskStatus),
     nextDeadline: health.nextDeadline,

@@ -5,7 +5,7 @@ import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { FormField, PlaceholderCard } from '@/components/ui'
+import { FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
@@ -1017,8 +1017,8 @@ export function TenantFormPage() {
                       </td>
                       <td className="min-w-96 border border-sf-border px-1.5 py-1">
                         {isEditing ? (
-                          <textarea className="min-h-20 w-full rounded border border-sf-border px-2 py-1" value={remark.content} onChange={(event) => updateRemark(remark.id, 'content', event.target.value)} />
-                        ) : remark.content}
+                          <RichTextEditor value={remark.content} onChange={(value) => updateRemark(remark.id, 'content', value)} />
+                        ) : <RichTextContent value={remark.content} />}
                       </td>
                       <td className="border border-sf-border px-1.5 py-1">
                         {isEditing ? (
@@ -1162,7 +1162,7 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{warranty.remark}</td>
+                  <td className="border border-sf-border px-1.5 py-1"><RichTextContent value={warranty.remark} /></td>
                   <td className="border border-sf-border px-1.5 py-1">
                     <div className="flex items-center gap-2">
                       <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
@@ -1295,7 +1295,7 @@ export function TenantFormPage() {
             </label>
             <label className="space-y-1 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Remarks</span>
-              <textarea className="min-h-20 w-full rounded border border-sf-border px-2 py-1" value={warrantyDialogDraft.remark} onChange={(event) => updateWarrantyDialogDraft('remark', event.target.value)} />
+              <RichTextEditor value={warrantyDialogDraft.remark} onChange={(value) => updateWarrantyDialogDraft('remark', value)} />
             </label>
           </div>
           <div className="mt-4 flex justify-end gap-2">

@@ -126,24 +126,6 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       },
     },
     {
-      id: 'deadlineRisk',
-      label: 'Deadline Risk',
-      getValue: (project) => projectRow(project, context).deadlineRiskLabel,
-      render: (project) => {
-        const row = projectRow(project, context)
-        if (row.deadlineRiskSeverity === 'info') return row.deadlineRiskLabel
-        return createElement(
-          'span',
-          { className: 'inline-flex items-center gap-1.5' },
-          createElement(AlertStatusIcon, { variant: row.deadlineRiskSeverity, label: row.deadlineRiskLabel }),
-          row.deadlineRiskLabel,
-        )
-      },
-    },
-    { id: 'nextDeadline', label: 'Next Deadline', getValue: (project) => projectRow(project, context).nextDeadline },
-    { id: 'overdueTasks', label: 'Overdue Tasks', getValue: (project) => projectRow(project, context).overdueTaskCount },
-    { id: 'overdueMilestones', label: 'Overdue Milestones', getValue: (project) => projectRow(project, context).overdueMilestoneCount },
-    {
       id: 'milestonesCompletion',
       label: 'Milestone Completion',
       getValue: (project) => projectRow(project, context).milestoneCompletion,

@@ -1341,17 +1341,32 @@ export function OpportunityFormPage() {
   function renderStageField() {
     const isWonLocked = currentSavedOpportunity.stage === 'WON'
     return (
-      <FormField label="Stage" controlWidthClassName={headerFieldWidthClass('stage')}>
-        <select
-          className={headerControlClassName(headerChanged('stage'), !isWonLocked, headerMissing('stage'))}
-          value={currentDraft.stage}
-          disabled={isWonLocked}
-          onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
-        >
-          <option value="OPEN">Open</option>
-          <option value="WON">Won</option>
-        </select>
-      </FormField>
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField label="Stage" controlWidthClassName={headerFieldWidthClass('stage')}>
+          <select
+            className={headerControlClassName(headerChanged('stage'), !isWonLocked, headerMissing('stage'))}
+            value={currentDraft.stage}
+            disabled={isWonLocked}
+            onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
+          >
+            <option value="OPEN">Open</option>
+            <option value="POC">POC</option>
+            <option value="WON">Won</option>
+          </select>
+        </FormField>
+        {currentDraft.stage === 'POC' ? (
+          <FormField label="POC Financial Profile" controlWidthClassName="w-32">
+            <select
+              className={headerControlClassName(headerChanged('subType'), true, false)}
+              value={currentDraft.subType === 'PAID' ? 'PAID' : 'FREE'}
+              onChange={(event) => patchDraft({ type: 'POC', subType: event.target.value as Opportunity['subType'] })}
+            >
+              <option value="FREE">Free</option>
+              <option value="PAID">Paid</option>
+            </select>
+          </FormField>
+        ) : null}
+      </div>
     )
   }
 
