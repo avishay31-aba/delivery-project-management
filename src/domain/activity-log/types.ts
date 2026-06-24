@@ -51,3 +51,15 @@ export interface ActivityLogSummary {
   danger: number
   byCategory: Record<ActivityEventCategory, number>
 }
+
+export interface ActivityLogDashboardSummary {
+  totalEvents: number
+  today: number
+  thisWeek: number
+  warnings: number
+  danger: number
+  projectEvents: number
+  allocationEvents: number
+  tenantEvents: number
+  systemEvents: number
+}

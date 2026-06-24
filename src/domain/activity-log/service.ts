@@ -2,6 +2,7 @@ import { ACTIVITY_EVENT_CATEGORIES } from './metadata'
 import type {
   ActivityEvent,
   ActivityEventCategory,
+  ActivityLogDashboardSummary,
   ActivityLogSummary,
 } from './types'
 
@@ -75,5 +76,33 @@ export function activityLogSummary(events: ActivityEvent[]): ActivityLogSummary 
         events.filter((event) => event.category === category).length,
       ]),
     ) as ActivityLogSummary['byCategory'],
+  }
+}
+
+function startOfTodayIso(today: Date): string {
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
+}
+
+function startOfWeekIso(today: Date): string {
+  const dayOfWeek = today.getDay()
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOfWeek).toISOString()
+}
+
+export function activityLogDashboardSummary(
+  events: ActivityEvent[],
+  today = new Date(),
+): ActivityLogDashboardSummary {
+  const summary = activityLogSummary(events)
+
+  return {
+    totalEvents: summary.totalEvents,
+    today: activityEventsByDateRange(events, startOfTodayIso(today)).length,
+    thisWeek: activityEventsByDateRange(events, startOfWeekIso(today)).length,
+    warnings: summary.warning,
+    danger: summary.danger,
+    projectEvents: summary.byCategory.PROJECT,
+    allocationEvents: summary.byCategory.ALLOCATION,
+    tenantEvents: summary.byCategory.TENANT,
+    systemEvents: summary.byCategory.SYSTEM,
   }
 }

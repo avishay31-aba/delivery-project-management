@@ -5,21 +5,8 @@ import {
   activityDashboardRows,
   createActivityLogColumns,
 } from '@/config/activity-log-columns'
-import {
-  activityEventsByDateRange,
-  activityLogSummary,
-} from '@/domain/activity-log'
+import { activityLogDashboardSummary } from '@/domain/activity-log'
 import { useAppStore } from '@/store/useAppStore'
-
-function startOfTodayIso(today = new Date()): string {
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
-}
-
-function startOfWeekIso(today = new Date()): string {
-  const dayOfWeek = today.getDay()
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOfWeek)
-  return start.toISOString()
-}
 
 function kpiCard(label: string, value: number) {
   return (
@@ -33,9 +20,7 @@ function kpiCard(label: string, value: number) {
 export function ActivityLogDashboardPage() {
   const activityEvents = useAppStore((state) => state.activityEvents)
   const rows = useMemo(() => activityDashboardRows(activityEvents), [activityEvents])
-  const summary = useMemo(() => activityLogSummary(activityEvents), [activityEvents])
-  const todayCount = useMemo(() => activityEventsByDateRange(activityEvents, startOfTodayIso()).length, [activityEvents])
-  const thisWeekCount = useMemo(() => activityEventsByDateRange(activityEvents, startOfWeekIso()).length, [activityEvents])
+  const summary = useMemo(() => activityLogDashboardSummary(activityEvents), [activityEvents])
   const columns = useMemo(() => createActivityLogColumns(), [])
 
   return (
@@ -44,14 +29,14 @@ export function ActivityLogDashboardPage() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
         {kpiCard('Total Events', summary.totalEvents)}
-        {kpiCard('Today', todayCount)}
-        {kpiCard('This Week', thisWeekCount)}
-        {kpiCard('Warnings', summary.warning)}
+        {kpiCard('Today', summary.today)}
+        {kpiCard('This Week', summary.thisWeek)}
+        {kpiCard('Warnings', summary.warnings)}
         {kpiCard('Danger', summary.danger)}
-        {kpiCard('Project Events', summary.byCategory.PROJECT)}
-        {kpiCard('Allocation Events', summary.byCategory.ALLOCATION)}
-        {kpiCard('Tenant Events', summary.byCategory.TENANT)}
-        {kpiCard('System Events', summary.byCategory.SYSTEM)}
+        {kpiCard('Project Events', summary.projectEvents)}
+        {kpiCard('Allocation Events', summary.allocationEvents)}
+        {kpiCard('Tenant Events', summary.tenantEvents)}
+        {kpiCard('System Events', summary.systemEvents)}
       </section>
 
       <DataDashboard
