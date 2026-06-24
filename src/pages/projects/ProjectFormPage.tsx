@@ -86,6 +86,7 @@ import {
 } from '@/domain/milestone-plan'
 import {
   requirementCoverageRows,
+  requirementCoverageRowsForProject,
   requirementCoverageSummary,
 } from '@/domain/requirement-coverage'
 
@@ -447,6 +448,28 @@ export function ProjectFormPage() {
   const linkedTenants = useMemo(() => {
     return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants)
   }, [currentDraft, linkedSystems, projectTenants, tenants])
+  const allRequirementCoverageRows = useMemo(
+    () =>
+      requirementCoverageRows({
+        accounts,
+        opportunities,
+        projects,
+        systems,
+        tenants,
+        warrantyRecords,
+        projectSystems,
+        projectTenants,
+      }),
+    [accounts, opportunities, projectSystems, projectTenants, projects, systems, tenants, warrantyRecords],
+  )
+  const projectRequirementCoverageRows = useMemo(
+    () => requirementCoverageRowsForProject(allRequirementCoverageRows, currentDraft),
+    [allRequirementCoverageRows, currentDraft],
+  )
+  const projectRequirementCoverageSummary = useMemo(
+    () => requirementCoverageSummary(projectRequirementCoverageRows),
+    [projectRequirementCoverageRows],
+  )
   const projectHealth = useMemo(() => {
     if (!currentDraft) return null
     return projectHealthReadModel({
@@ -455,8 +478,9 @@ export function ProjectFormPage() {
       tenants,
       projectSystems,
       projectTenants,
+      requirementCoverageSummary: projectRequirementCoverageSummary,
     })
-  }, [currentDraft, projectSystems, projectTenants, systems, tenants])
+  }, [currentDraft, projectRequirementCoverageSummary, projectSystems, projectTenants, systems, tenants])
   const workspaceSystemSummary = useMemo(() => {
     if (!currentDraft) return null
     return projectWorkspaceSystemSummary({
@@ -477,23 +501,6 @@ export function ProjectFormPage() {
       projectTenants,
     })
   }, [currentDraft, projectSystems, projectTenants, systems, tenants])
-  const projectRequirementCoverageRows = useMemo(() => {
-    if (!currentDraft) return []
-    return requirementCoverageRows({
-      accounts,
-      opportunities,
-      projects,
-      systems,
-      tenants,
-      warrantyRecords,
-      projectSystems,
-      projectTenants,
-    }).filter((row) => row.projectId === currentDraft.id || row.pid === currentDraft.pid)
-  }, [accounts, currentDraft, opportunities, projectSystems, projectTenants, projects, systems, tenants, warrantyRecords])
-  const projectRequirementCoverageSummary = useMemo(
-    () => requirementCoverageSummary(projectRequirementCoverageRows),
-    [projectRequirementCoverageRows],
-  )
   const projectActivityEvents = useMemo(
     () => currentDraft ? activityEventsForProject(activityEvents, currentDraft.id) : [],
     [activityEvents, currentDraft],
