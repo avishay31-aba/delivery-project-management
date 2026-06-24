@@ -7,6 +7,8 @@ import {
 } from './metadata'
 import { requirementCoverageSources } from './adapters'
 import type {
+  Account,
+  Opportunity,
   Project,
   ProjectSystemLink,
   System,
@@ -284,6 +286,31 @@ function deriveProjectOnlyCoverageRow(
 
 export function requirementCoverageRows(context: RequirementCoverageContext): RequirementCoverageRow[] {
   return requirementCoverageSources(context).map((source) => deriveProjectOnlyCoverageRow(source, context))
+}
+
+export function requirementCoverageRowsForProject(
+  rows: RequirementCoverageRow[],
+  project: Pick<Project, 'id' | 'pid'> | null | undefined,
+): RequirementCoverageRow[] {
+  if (!project) return []
+  return rows.filter((row) => row.projectId === project.id || row.pid === project.pid)
+}
+
+export function requirementCoverageRowsForAccount(
+  rows: RequirementCoverageRow[],
+  account: Pick<Account, 'id'> | null | undefined,
+): RequirementCoverageRow[] {
+  if (!account) return []
+  return rows.filter((row) => row.accountId === account.id)
+}
+
+export function requirementCoverageRowsForOpportunity(
+  rows: RequirementCoverageRow[],
+  opportunity: Pick<Opportunity, 'opportunityId'> | string | null | undefined,
+): RequirementCoverageRow[] {
+  if (!opportunity) return []
+  const opportunityId = typeof opportunity === 'string' ? opportunity : opportunity.opportunityId
+  return rows.filter((row) => row.opportunityId === opportunityId)
 }
 
 export function requirementCoverageSummary(rows: RequirementCoverageRow[]): RequirementCoverageSummary {
