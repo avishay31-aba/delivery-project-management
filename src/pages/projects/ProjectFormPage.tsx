@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, ChevronRight, CirclePlay, Link2, Plus, Square, Trash2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, CirclePlay, GripVertical, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import { ActivityTimeline } from '@/components/activity'
 import {
   getProjectFormMetadata,
@@ -402,6 +402,8 @@ export function ProjectFormPage() {
   const [newMilestoneDeadline, setNewMilestoneDeadline] = useState('')
   const [newMilestoneComment, setNewMilestoneComment] = useState('')
   const [newMilestoneTasks, setNewMilestoneTasks] = useState<NewMilestoneTaskDraft[]>([])
+  const [draggedMilestoneId, setDraggedMilestoneId] = useState<string | null>(null)
+  const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null)
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationId, setSelectedAllocationId] = useState('')
@@ -927,6 +929,13 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function dropMilestoneOnOrder(targetOrder: number) {
+    if (!draggedMilestoneId) return
+    updateMilestoneOrder(draggedMilestoneId, targetOrder)
+    setDraggedMilestoneId(null)
+    setDragOverMilestoneId(null)
+  }
+
   function updateTaskOrder(taskId: string, order: number) {
     setDraft((current) => (current ? updateTaskOrderInPlan(current, taskId, order) : current))
     setSaveMessages([])
@@ -1114,7 +1123,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Order', 'Milestone', 'Deadline', 'DL Alert', 'Status', 'Progress', 'Tasks', 'Comment'].map((label) => (
+                  {['Move', 'Order', 'Milestone', 'Deadline', 'DL Alert', 'Status', 'Progress', 'Tasks', 'Comment'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1127,7 +1136,43 @@ export function ProjectFormPage() {
                   const progress = projectMilestoneTaskProgress(projectDraft, milestone.id)
                   const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestone.id).length ?? 0
                   return (
-                    <tr key={milestone.id} className="hover:bg-sf-surface-alt">
+                    <tr
+                      key={milestone.id}
+                      className={[
+                        'hover:bg-sf-surface-alt',
+                        dragOverMilestoneId === milestone.id ? 'bg-amber-50 outline outline-2 outline-amber-300' : '',
+                      ].filter(Boolean).join(' ')}
+                      onDragOver={(event) => {
+                        if (!draggedMilestoneId || draggedMilestoneId === milestone.id) return
+                        event.preventDefault()
+                        setDragOverMilestoneId(milestone.id)
+                      }}
+                      onDragLeave={() => setDragOverMilestoneId((current) => current === milestone.id ? null : current)}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        dropMilestoneOnOrder(milestone.order)
+                      }}
+                    >
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">
+                        <button
+                          type="button"
+                          className="inline-flex cursor-grab items-center justify-center rounded border border-sf-border bg-white p-1 text-sf-text-muted hover:bg-sf-surface-alt active:cursor-grabbing"
+                          draggable
+                          aria-label={`Drag ${milestone.name}`}
+                          title="Drag to reorder milestone"
+                          onDragStart={(event) => {
+                            setDraggedMilestoneId(milestone.id)
+                            event.dataTransfer.effectAllowed = 'move'
+                            event.dataTransfer.setData('text/plain', milestone.id)
+                          }}
+                          onDragEnd={() => {
+                            setDraggedMilestoneId(null)
+                            setDragOverMilestoneId(null)
+                          }}
+                        >
+                          <GripVertical className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </td>
                       <td className="border border-sf-border px-1 py-1 text-sf-text">
                         <input
                           className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
