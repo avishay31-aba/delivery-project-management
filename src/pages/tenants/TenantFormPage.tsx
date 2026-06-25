@@ -1310,7 +1310,7 @@ export function TenantFormPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       {navigationBlocker.state === 'blocked' ? (
         <UnsavedChangesDialog
           onSave={() => saveTenant(true, () => navigationBlocker.proceed?.())}
@@ -1323,6 +1323,7 @@ export function TenantFormPage() {
         subtitle={`${formType === 'POC' ? 'Tenant form-POC' : 'Tenant form-Customer'} foundation`}
         actions={renderActionButtons()}
       />
+      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
       {messages.length > 0 ? (
         <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
           {messages.map((message) => <div key={message}>{message}</div>)}
@@ -1331,7 +1332,7 @@ export function TenantFormPage() {
       {renderHeader()}
       {renderWarrantyDialog()}
       <section className="rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-16 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
+        <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
           {TENANT_TABS.map((tab) => (
             <button
               key={tab.id}
@@ -1354,6 +1355,7 @@ export function TenantFormPage() {
       </section>
       {renderRemarks()}
       {formType === 'POC' ? renderConfigurationHistory() : renderWarranties()}
+      </div>
     </div>
   )
 }

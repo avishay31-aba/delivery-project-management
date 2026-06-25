@@ -1939,7 +1939,7 @@ export function ProjectFormPage() {
   }
 
   return (
-    <div>
+    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
@@ -1951,6 +1951,7 @@ export function ProjectFormPage() {
         actions={renderActionButtons()}
       />
 
+      <div className="min-h-0 flex-1 overflow-auto pr-1">
       {saveMessages.length > 0 ? (
         <div className={saveMessages.some((message) => message.includes('required')) ? 'mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'mb-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {saveMessages.map((message) => (
@@ -1980,7 +1981,7 @@ export function ProjectFormPage() {
       <div className="mt-4 space-y-4">{renderRequirementsSection()}</div>
 
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-16 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
+        <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
           {visibleTabs.map((tab) => (
             <button
               key={tab}
@@ -2008,6 +2009,7 @@ export function ProjectFormPage() {
                   ? renderEngagementTab()
                   : renderDocumentsTab()}
         </div>
+      </div>
       </div>
       {renderAddMilestoneDialog()}
       {renderMilestoneDialog()}

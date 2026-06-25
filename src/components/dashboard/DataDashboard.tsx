@@ -885,8 +885,8 @@ export function DataDashboard<T extends { id: string }>({
   function frozenColumnClassName(index: number, isHeader = false): string {
     if (index >= 3) return ''
     return joinClassNames(
-      'sticky bg-white shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
-      isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20',
+      'sticky shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
+      isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20 bg-inherit',
     )
   }
 
@@ -1280,7 +1280,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col space-y-4 overflow-hidden">
       {pendingViewId ? (
         <UnsavedChangesDialog
           onSave={saveChangesAndApplyPendingView}
@@ -1353,7 +1353,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sf-text-muted">
           <span className="font-semibold text-sf-text">{title}</span>
           {' · '}Showing {table.getFilteredRowModel().rows.length} record
@@ -1362,8 +1362,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
         {toolbar}
       </div>
 
-      <div className="sf-card flex max-h-[calc(100vh-9rem)] flex-col space-y-3 overflow-hidden p-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="sf-card flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden p-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-sf-text-muted">View</span>
             <select
@@ -1474,7 +1474,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div ref={tableContainerRef} className="min-h-0 flex-1 overflow-auto border-b border-sf-border">
+        <div ref={tableContainerRef} className="min-h-0 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border">
           <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -1565,7 +1565,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={joinClassNames('hover:bg-sf-surface-alt', getRowClassName?.(row.original))}
+                  className={joinClassNames('bg-white hover:bg-sf-surface-alt', getRowClassName?.(row.original))}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell, cellIndex) => (

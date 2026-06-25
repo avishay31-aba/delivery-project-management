@@ -1067,7 +1067,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
@@ -1079,6 +1079,7 @@ function InventoryForm<T extends InventoryRecord>({
         actions={renderActionButtons()}
       />
 
+      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
       {messages.length > 0 ? (
         <div className={messages.some((message) => message.includes('cannot') || message.includes('required') || message.includes('unique')) ? 'rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {messages.map((message) => (
@@ -1109,7 +1110,7 @@ function InventoryForm<T extends InventoryRecord>({
         onToggle={() => toggleSection('tabs')}
       >
         <div className="overflow-hidden rounded border border-sf-border bg-sf-surface">
-          <div className="sticky top-16 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
+          <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
             {metadata.tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -1137,6 +1138,7 @@ function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       </CollapsibleSection>
+      </div>
 
       {navigationBlocker.state === 'blocked' ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">

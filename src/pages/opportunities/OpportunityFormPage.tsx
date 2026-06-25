@@ -1597,13 +1597,13 @@ export function OpportunityFormPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       <PageHeader
         title={`Opportunity ${currentDraft.opportunityId}`}
         subtitle={`${metadata.sourceSheet} - ${visibleRequirementTypes.join('+') || 'No'} visible requirement grids`}
       />
 
-      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border border-sf-border bg-white p-3 shadow-sm">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 border border-sf-border bg-white p-3 shadow-sm">
         <div className="text-sm text-sf-text-muted">
           {isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}
         </div>
@@ -1660,6 +1660,7 @@ export function OpportunityFormPage() {
         </div>
       </div>
 
+      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
       {saveMessages.length > 0 ? (
         <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <p className="font-semibold">Save blocked</p>
@@ -1816,7 +1817,7 @@ export function OpportunityFormPage() {
       {renderExistingTenantsAndSystemsSection()}
 
       <section className="sf-card overflow-hidden">
-        <div className="sticky top-16 z-30 flex border-b border-sf-border bg-sf-surface-alt">
+        <div className="sticky top-0 z-30 flex border-b border-sf-border bg-sf-surface-alt">
           <button
             type="button"
             className={[
@@ -1910,6 +1911,7 @@ export function OpportunityFormPage() {
         )}
         </div>
       </section>
+      </div>
     </div>
   )
 }
