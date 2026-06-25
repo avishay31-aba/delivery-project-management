@@ -1,4 +1,5 @@
 import type {
+  Opportunity,
   ProductionSystemInventoryItem,
   Project,
   ProjectSystemLink,
@@ -22,7 +23,7 @@ export function isPocProject(project: Project): boolean {
 }
 
 export function allowedAllocationModes(project: Project): AllocationMode[] {
-  return isPocProject(project) ? ['REUSED_INTERNAL'] : ['PRODUCTION', 'EXISTING_SYSTEM']
+  return isPocProject(project) ? ['REUSED_INTERNAL', 'EXISTING_SYSTEM'] : ['PRODUCTION', 'EXISTING_SYSTEM']
 }
 
 export function activeSystemLinksForProject(projectId: string, links: ProjectSystemLink[]): ProjectSystemLink[] {
@@ -70,4 +71,31 @@ export function availableExistingSystemCandidatesForProject(
     if (isPocProject(project)) return linkedProject?.mainType === 'POC'
     return linkedProject?.mainType === 'DELIVERY' || linkedProject?.mainType === 'RENEWAL'
   })
+}
+
+export function requestedSystemCandidatesForProject(
+  project: Project,
+  opportunity: Opportunity | undefined,
+  systems: System[],
+  projectSystems: ProjectSystemLink[],
+): System[] {
+  const requestedSystemIds = new Set<string>()
+  opportunity?.newTenantRequirements.forEach((requirement) => {
+    if (requirement.deployTarget === 'EXISTING_SID' && requirement.existingSystemId) {
+      requestedSystemIds.add(requirement.existingSystemId)
+    }
+  })
+  opportunity?.changeRequestRequirements.forEach((requirement) => {
+    if (requirement.systemId) requestedSystemIds.add(requirement.systemId)
+  })
+  opportunity?.standardRenewalRequirements.forEach((requirement) => {
+    if (requirement.systemId) requestedSystemIds.add(requirement.systemId)
+  })
+
+  const activeLinks = activeProjectSystemLinks(projectSystems)
+  return systems.filter(
+    (system) =>
+      requestedSystemIds.has(system.id) &&
+      !activeLinks.some((link) => link.projectId === project.id && link.systemId === system.id),
+  )
 }

@@ -1,5 +1,5 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { getVisibleRequirementTypes } from '@/config/opportunity-metadata'
+import { getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
 import type { Account, Opportunity, SalesManager, System, Tenant } from '@/data/seed.types'
 import { getHiddenRequirementTypesWithRows, validateOpportunity } from '@/utils/opportunity-validation'
 
@@ -30,7 +30,7 @@ export function createOpportunityColumns(
     {
       id: 'visibleRequirementTypes',
       label: 'Visible Requirement Types',
-      getValue: (row) => getVisibleRequirementTypes(row.type, row.subType).join('+'),
+      getValue: (row) => getVisibleRequirementTypesForOpportunity(row).join('+'),
     },
     {
       id: 'requirementRowCount',

@@ -13,8 +13,8 @@ import {
   CROSS_SYSTEM_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
   YES_NO_OPTIONS,
-  getOpportunityMetadata,
-  getVisibleRequirementTypes,
+  getOpportunityMetadataForOpportunity,
+  getVisibleRequirementTypesForOpportunity,
   requirementAColumns,
   requirementBColumns,
   requirementCColumns,
@@ -811,9 +811,9 @@ export function OpportunityFormPage() {
     setProjectChanges([])
   }, [opportunityId])
 
-  const metadata = useMemo(() => (draft ? getOpportunityMetadata(draft.type, draft.subType) : null), [draft])
+  const metadata = useMemo(() => (draft ? getOpportunityMetadataForOpportunity(draft) : null), [draft])
   const visibleRequirementTypes = useMemo(
-    () => (draft ? getVisibleRequirementTypes(draft.type, draft.subType) : []),
+    () => (draft ? getVisibleRequirementTypesForOpportunity(draft) : []),
     [draft],
   )
   const account = useMemo(
@@ -987,6 +987,25 @@ export function OpportunityFormPage() {
   function updateType(type: OpportunityType) {
     const nextSubType = opportunitySubTypeForTypeChange(currentDraft.subType, type)
     requestOpportunityTypeChange({ type, subType: nextSubType })
+  }
+
+  function updateStage(stage: Opportunity['stage']) {
+    if (stage === 'POC') {
+      patchDraft({
+        stage,
+        subType: currentDraft.subType === 'PAID' ? 'PAID' : 'FREE',
+      })
+      return
+    }
+
+    patchDraft({
+      stage,
+      type: currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type,
+      subType:
+        currentDraft.subType === 'FREE' || currentDraft.subType === 'PAID'
+          ? opportunitySubTypeForTypeChange('NEW', currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type)
+          : currentDraft.subType,
+    })
   }
 
   function addRequirement(kind: RequirementGridKind) {
@@ -1218,6 +1237,7 @@ export function OpportunityFormPage() {
     }
 
     if (field.key === 'subType') {
+      if (currentDraft.stage === 'POC') return null
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
@@ -1350,15 +1370,15 @@ export function OpportunityFormPage() {
             className={headerControlClassName(headerChanged('stage'), !isWonLocked, headerMissing('stage'))}
             value={currentDraft.stage}
             disabled={isWonLocked}
-            onChange={(event) => patchDraft({ stage: event.target.value as Opportunity['stage'] })}
+            onChange={(event) => updateStage(event.target.value as Opportunity['stage'])}
           >
             <option value="OPEN">Open</option>
             <option value="POC">POC</option>
             <option value="WON">Won</option>
           </select>
         </FormField>
-        {currentDraft.stage === 'POC' && currentDraft.type === 'POC' ? (
-          <FormField label="POC Financial Profile" controlWidthClassName="w-32">
+        {currentDraft.stage === 'POC' ? (
+          <FormField label="Financial Profile" controlWidthClassName="w-32">
             <select
               className={headerControlClassName(headerChanged('subType'), true, false)}
               value={currentDraft.subType === 'PAID' ? 'PAID' : 'FREE'}

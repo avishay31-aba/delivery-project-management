@@ -1449,6 +1449,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                         key={header.id}
                         className={joinClassNames(
                           'whitespace-nowrap px-3 py-2 font-semibold text-sf-text transition-colors',
+                          'sticky top-0 z-10 bg-sf-surface-alt',
                           draggedColumnId === header.column.id && 'opacity-60',
                           dragOverColumnId === header.column.id &&
                             draggedColumnId !== header.column.id &&

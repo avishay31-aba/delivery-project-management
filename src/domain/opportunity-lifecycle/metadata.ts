@@ -4,7 +4,7 @@ import {
   requirementBColumns,
   requirementCColumns,
 } from '@/domain/tenant-requirement'
-import type { OpportunitySubType, OpportunityType, RequirementType } from './types'
+import type { Opportunity, OpportunitySubType, OpportunityType, RequirementType } from './types'
 
 export const OPPORTUNITY_SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   POC: ['FREE', 'PAID'],
@@ -182,6 +182,17 @@ export function getOpportunityMetadata(type: OpportunityType, subType: Opportuni
   )
 }
 
+export function getOpportunityMetadataForOpportunity(opportunity: Opportunity): OpportunityMetadata {
+  if (opportunity.stage === 'POC') {
+    return getOpportunityMetadata('POC', opportunity.subType === 'PAID' ? 'PAID' : 'FREE')
+  }
+  return getOpportunityMetadata(opportunity.type, opportunity.subType)
+}
+
 export function getVisibleRequirementTypes(type: OpportunityType, subType: OpportunitySubType): RequirementType[] {
   return getOpportunityMetadata(type, subType).visibleRequirementTypes
+}
+
+export function getVisibleRequirementTypesForOpportunity(opportunity: Opportunity): RequirementType[] {
+  return getOpportunityMetadataForOpportunity(opportunity).visibleRequirementTypes
 }

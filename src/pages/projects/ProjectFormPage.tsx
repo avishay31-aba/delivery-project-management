@@ -22,11 +22,11 @@ import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, Recor
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
 import {
-  allocationModeLabel,
+  allocationModeLabelForProject,
   allowedAllocationModes,
-  availableExistingSystemCandidatesForProject,
   availableProductionCandidates,
   availableReusedInternalCandidates,
+  requestedSystemCandidatesForProject,
   type AllocationActionResult,
   type AllocationMode,
 } from '@/domain/allocation-context'
@@ -484,7 +484,7 @@ export function ProjectFormPage() {
       ? availableProductionCandidates(productionSystemInventory)
       : selectedMode === 'REUSED_INTERNAL'
         ? availableReusedInternalCandidates(reusedInternalSystems)
-        : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
+        : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
   const trimmedAllocationCandidateSearch = allocationCandidateSearch.trim().toLowerCase()
   const visibleAllocationCandidates = [...availableAllocationCandidates]
     .filter((candidate) =>
@@ -514,7 +514,7 @@ export function ProjectFormPage() {
         ? availableProductionCandidates(productionSystemInventory)
         : initialMode === 'REUSED_INTERNAL'
           ? availableReusedInternalCandidates(reusedInternalSystems)
-          : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
+          : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
     setAllocationMode(initialMode)
     setSelectedAllocationId(initialCandidates[0]?.id ?? '')
     setAllocationCandidateSearch('')
@@ -530,7 +530,7 @@ export function ProjectFormPage() {
         ? availableProductionCandidates(productionSystemInventory)
         : mode === 'REUSED_INTERNAL'
           ? availableReusedInternalCandidates(reusedInternalSystems)
-          : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
+          : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
     setAllocationMode(mode)
     setSelectedAllocationId(nextCandidates[0]?.id ?? '')
     setAllocationCandidateSearch('')
@@ -1581,7 +1581,7 @@ export function ProjectFormPage() {
                   onClick={() => changeAllocationMode(mode)}
                 >
                   {mode === 'EXISTING_SYSTEM' ? <Link2 className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-                  {allocationModeLabel(mode)}
+                  {allocationModeLabelForProject(mode, projectDraft)}
                 </button>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { TopHeader } from '@/layouts/TopHeader'
 import { mainNavigation } from '@/config/navigation'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
+import { useDraggableDialogs } from '@/hooks/useDraggableDialogs'
 
 function resolveHeaderTitle(pathname: string): string {
   const match = mainNavigation
@@ -13,6 +14,7 @@ function resolveHeaderTitle(pathname: string): string {
 }
 
 export function AppShell() {
+  useDraggableDialogs()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const pendingNavigation = useUnsavedChangesGuardStore((state) => state.pendingNavigation)

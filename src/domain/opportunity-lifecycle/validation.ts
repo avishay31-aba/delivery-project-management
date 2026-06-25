@@ -7,13 +7,17 @@ import {
   type TenantRequirementContext,
   type ValidationMessage,
 } from '@/domain/tenant-requirement'
-import { getOpportunityMetadata, getVisibleRequirementTypes, WON_IRREVERSIBLE_MESSAGE } from './metadata'
+import {
+  getOpportunityMetadataForOpportunity,
+  getVisibleRequirementTypesForOpportunity,
+  WON_IRREVERSIBLE_MESSAGE,
+} from './metadata'
 import type { Opportunity, OpportunityValidationContext, Project, RequirementType } from './types'
 
 export type OpportunityContext = TenantRequirementContext
 
 export function getHiddenRequirementTypesWithRows(opportunity: Opportunity): RequirementType[] {
-  const visibleTypes = new Set(getVisibleRequirementTypes(opportunity.type, opportunity.subType))
+  const visibleTypes = new Set(getVisibleRequirementTypesForOpportunity(opportunity))
   const allTypes: RequirementType[] = ['A', 'B', 'C']
 
   return allTypes.filter((requirementType) => !visibleTypes.has(requirementType) && hasTenantRequirementRows(opportunity, requirementType))
@@ -24,7 +28,7 @@ function requiredText(value: string | null | undefined, label: string): Validati
 }
 
 export function validateOpportunityHeader(opportunity: Opportunity, context: OpportunityContext): ValidationMessage[] {
-  const metadata = getOpportunityMetadata(opportunity.type, opportunity.subType)
+  const metadata = getOpportunityMetadataForOpportunity(opportunity)
   const visibleHeaderKeys = new Set(metadata.headerFields.map((field) => field.key))
   const messages: ValidationMessage[] = [
     ...requiredText(opportunity.opportunityId, 'Salesforce Opportunity ID'),
@@ -46,7 +50,7 @@ export function validateOpportunityHeader(opportunity: Opportunity, context: Opp
   }
 
   if (
-    opportunity.type === 'POC' &&
+    opportunity.stage === 'POC' &&
     opportunity.pocStartDate &&
     opportunity.pocEndDate &&
     opportunity.pocEndDate < opportunity.pocStartDate
@@ -69,7 +73,7 @@ export function validateOpportunityRequirements(
   opportunity: Opportunity,
   context: OpportunityContext,
 ): ValidationMessage[] {
-  const visibleTypes = getVisibleRequirementTypes(opportunity.type, opportunity.subType)
+  const visibleTypes = getVisibleRequirementTypesForOpportunity(opportunity)
   const visibleRows = visibleTypes.reduce((count, requirementType) => {
     if (requirementType === 'A') return count + opportunity.newTenantRequirements.length
     if (requirementType === 'B') return count + opportunity.changeRequestRequirements.length
