@@ -19,7 +19,7 @@ export type OpportunityLifecycleType = OpportunityType
 export type OpportunityLifecycleSubType = OpportunitySubType
 export type OpportunityLifecycleStage = OpportunityStage
 
-export type PocProjectSyncAction = 'UPDATE_EXISTING_POC' | 'CREATE_NEW_POC'
+export type PocProjectSyncAction = 'UPDATE_EXISTING_POC' | 'CREATE_NEW_POC' | 'DO_NOT_CREATE'
 
 export interface OpportunityProjectSyncOptions {
   pocAction?: PocProjectSyncAction

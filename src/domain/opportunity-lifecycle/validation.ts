@@ -7,8 +7,7 @@ import {
   type TenantRequirementContext,
   type ValidationMessage,
 } from '@/domain/tenant-requirement'
-import { getOpportunityMetadata, getVisibleRequirementTypes, WON_IRREVERSIBLE_MESSAGE, WON_POC_MESSAGE } from './metadata'
-import { activePocProjectForOpportunity } from './service'
+import { getOpportunityMetadata, getVisibleRequirementTypes, WON_IRREVERSIBLE_MESSAGE } from './metadata'
 import type { Opportunity, OpportunityValidationContext, Project, RequirementType } from './types'
 
 export type OpportunityContext = TenantRequirementContext
@@ -121,10 +120,6 @@ export function validateOpportunityTransition(opportunity: Opportunity, savedOpp
     messages.push(WON_IRREVERSIBLE_MESSAGE)
   }
 
-  if (opportunity.stage === 'WON' && opportunity.type === 'POC') {
-    messages.push(WON_POC_MESSAGE)
-  }
-
   return messages
 }
 
@@ -132,12 +127,8 @@ export function shouldConfirmWonTransition(opportunity: Opportunity, savedOpport
   return savedOpportunity.stage !== 'WON' && opportunity.stage === 'WON'
 }
 
-export function shouldConfirmPocProjectSync(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): boolean {
-  return (
-    opportunity.stage !== 'WON' &&
-    opportunity.type === 'POC' &&
-    Boolean(activePocProjectForOpportunity(opportunity, savedOpportunity, projects))
-  )
+export function shouldConfirmPocProjectSync(opportunity: Opportunity, _savedOpportunity: Opportunity, _projects: Project[]): boolean {
+  return opportunity.stage === 'POC'
 }
 
 export function opportunityValidationContext(context: OpportunityValidationContext): OpportunityValidationContext {

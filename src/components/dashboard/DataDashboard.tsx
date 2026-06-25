@@ -759,11 +759,6 @@ export function DataDashboard<T extends { id: string }>({
   const [replaceValue, setReplaceValue] = useState('')
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
-  const tableScrollRef = useRef<HTMLDivElement | null>(null)
-  const stickyScrollRef = useRef<HTMLDivElement | null>(null)
-  const tableElementRef = useRef<HTMLTableElement | null>(null)
-  const syncingScrollRef = useRef(false)
-  const [tableScrollWidth, setTableScrollWidth] = useState(0)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
 
@@ -856,37 +851,6 @@ export function DataDashboard<T extends { id: string }>({
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
   })
-
-  useLayoutEffect(() => {
-    const updateScrollWidth = () => {
-      setTableScrollWidth(tableElementRef.current?.scrollWidth ?? tableScrollRef.current?.scrollWidth ?? 0)
-    }
-
-    updateScrollWidth()
-    const tableElement = tableElementRef.current
-    if (!tableElement || typeof ResizeObserver === 'undefined') return
-
-    const observer = new ResizeObserver(updateScrollWidth)
-    observer.observe(tableElement)
-    return () => observer.disconnect()
-  }, [columnOrder, columnVisibility, rows.length])
-
-  function syncHorizontalScroll(source: 'table' | 'sticky') {
-    if (syncingScrollRef.current) return
-    const tableScroll = tableScrollRef.current
-    const stickyScroll = stickyScrollRef.current
-    if (!tableScroll || !stickyScroll) return
-
-    syncingScrollRef.current = true
-    if (source === 'table') {
-      stickyScroll.scrollLeft = tableScroll.scrollLeft
-    } else {
-      tableScroll.scrollLeft = stickyScroll.scrollLeft
-    }
-    window.requestAnimationFrame(() => {
-      syncingScrollRef.current = false
-    })
-  }
 
   const runtimeDashboardViews = useMemo(
     () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds),
@@ -1472,8 +1436,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div ref={tableScrollRef} className="sf-scroll-x" onScroll={() => syncHorizontalScroll('table')}>
-          <table ref={tableElementRef} className="min-w-full divide-y divide-sf-border text-sm">
+        <div className="border-b border-sf-border">
+          <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -1581,14 +1545,6 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               ))}
             </tbody>
           </table>
-        </div>
-        <div
-          ref={stickyScrollRef}
-          className="sf-scroll-x sticky bottom-0 z-20 h-4 bg-white"
-          aria-hidden="true"
-          onScroll={() => syncHorizontalScroll('sticky')}
-        >
-          <div style={{ width: tableScrollWidth, height: 1 }} />
         </div>
       </div>
     </div>

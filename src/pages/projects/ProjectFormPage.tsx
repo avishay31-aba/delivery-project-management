@@ -24,7 +24,7 @@ import { useAppStore } from '@/store/useAppStore'
 import {
   allocationModeLabel,
   allowedAllocationModes,
-  availableExistingSystemCandidates,
+  availableExistingSystemCandidatesForProject,
   availableProductionCandidates,
   availableReusedInternalCandidates,
   type AllocationActionResult,
@@ -60,6 +60,10 @@ import {
   hostingContextFromSource,
   type HostingContext,
 } from '@/domain/hosting-context'
+import {
+  ENGAGEMENT_CIRCLE_EMPTY_TEXT,
+  ENGAGEMENT_CIRCLE_TABLE_HEADERS,
+} from '@/domain/engagement-circle'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -480,7 +484,7 @@ export function ProjectFormPage() {
       ? availableProductionCandidates(productionSystemInventory)
       : selectedMode === 'REUSED_INTERNAL'
         ? availableReusedInternalCandidates(reusedInternalSystems)
-        : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
+        : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
   const trimmedAllocationCandidateSearch = allocationCandidateSearch.trim().toLowerCase()
   const visibleAllocationCandidates = [...availableAllocationCandidates]
     .filter((candidate) =>
@@ -510,7 +514,7 @@ export function ProjectFormPage() {
         ? availableProductionCandidates(productionSystemInventory)
         : initialMode === 'REUSED_INTERNAL'
           ? availableReusedInternalCandidates(reusedInternalSystems)
-          : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
+          : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
     setAllocationMode(initialMode)
     setSelectedAllocationId(initialCandidates[0]?.id ?? '')
     setAllocationCandidateSearch('')
@@ -526,7 +530,7 @@ export function ProjectFormPage() {
         ? availableProductionCandidates(productionSystemInventory)
         : mode === 'REUSED_INTERNAL'
           ? availableReusedInternalCandidates(reusedInternalSystems)
-          : availableExistingSystemCandidates(projectDraft.id, systems, projectSystems)
+          : availableExistingSystemCandidatesForProject(projectDraft, systems, projectSystems, projects)
     setAllocationMode(mode)
     setSelectedAllocationId(nextCandidates[0]?.id ?? '')
     setAllocationCandidateSearch('')
@@ -1550,8 +1554,8 @@ export function ProjectFormPage() {
     if (!isAllocationDialogOpen) return null
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="project-allocation-title">
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
+        <div className="flex h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="project-allocation-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>
@@ -1562,7 +1566,7 @@ export function ProjectFormPage() {
             </button>
           </div>
 
-          <div className="space-y-4 overflow-auto p-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             <div className="flex flex-wrap gap-2">
               {permittedAllocationModes.map((mode) => (
                 <button
@@ -1895,6 +1899,45 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderEngagementTab() {
+    const engagementRows = linkedOpportunity?.engagementCircles ?? []
+
+    return (
+      <div className="p-4">
+        {engagementRows.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {ENGAGEMENT_CIRCLE_TABLE_HEADERS.map((header) => (
+                    <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {engagementRows.map((circle) => (
+                  <tr key={circle.id} className="hover:bg-sf-surface-alt">
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{circle.subject}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{circle.role}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{circle.userName}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{circle.email}</td>
+                    <td className="border border-sf-border px-1.5 py-1 text-sf-text">{circle.phone ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            {ENGAGEMENT_CIRCLE_EMPTY_TEXT}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
       <PageHeader
@@ -1934,10 +1977,7 @@ export function ProjectFormPage() {
         </div>
       </CollapsibleSection>
 
-      <div className="mt-4 space-y-4">
-        {renderRequirementsSection()}
-        {renderSystemsTenantsSection()}
-      </div>
+      <div className="mt-4 space-y-4">{renderRequirementsSection()}</div>
 
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
         <div className="flex flex-wrap border-b border-sf-border">
@@ -1962,7 +2002,11 @@ export function ProjectFormPage() {
             ? renderMilestonesTab()
             : activeTab === 'tasks'
               ? renderTasksTab()
-              : renderDocumentsTab()}
+              : activeTab === 'systemsTenants'
+                ? <div className="p-4">{renderSystemsTenantsSection()}</div>
+                : activeTab === 'engagement'
+                  ? renderEngagementTab()
+                  : renderDocumentsTab()}
         </div>
       </div>
       {renderAddMilestoneDialog()}

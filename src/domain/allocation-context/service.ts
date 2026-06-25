@@ -53,3 +53,21 @@ export function availableExistingSystemCandidates(
       !activeLinks.some((link) => link.projectId === projectId && link.systemId === system.id),
   )
 }
+
+export function availableExistingSystemCandidatesForProject(
+  project: Project,
+  systems: System[],
+  projectSystems: ProjectSystemLink[],
+  projects: Project[],
+): System[] {
+  const activeLinks = activeProjectSystemLinks(projectSystems)
+  const activeLinkForProject = (system: System) =>
+    activeLinks.find((link) => link.projectId !== project.id && link.systemId === system.id)
+  const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
+
+  return availableExistingSystemCandidates(project.id, systems, projectSystems).filter((system) => {
+    const linkedProject = projectById.get(activeLinkForProject(system)?.projectId ?? '')
+    if (isPocProject(project)) return linkedProject?.mainType === 'POC'
+    return linkedProject?.mainType === 'DELIVERY' || linkedProject?.mainType === 'RENEWAL'
+  })
+}
