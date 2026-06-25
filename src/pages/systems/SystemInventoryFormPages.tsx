@@ -347,6 +347,7 @@ function InventoryForm<T extends InventoryRecord>({
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
+  const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
@@ -379,6 +380,15 @@ function InventoryForm<T extends InventoryRecord>({
   const activeRecord = record
   const activeDraft = draft
   const invalidFields = new Set<string>()
+
+  function allocatedSystemForTenantCreation(): System | undefined {
+    if ('systemClass' in activeRecord) return activeRecord
+    return allocatedSystems.find((system) => {
+      const sameSid = 'sid' in activeRecord && activeRecord.sid && system.sid === activeRecord.sid
+      const sameMachine = 'machineId' in activeRecord && activeRecord.machineId && system.machineId === activeRecord.machineId
+      return sameSid || sameMachine
+    })
+  }
 
   function updateField(key: string, value: unknown) {
     setDraft((current) => {
@@ -737,8 +747,9 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function linkedProjectsForSystem(): Project[] {
+    const linkRecord = allocatedSystemForTenantCreation() ?? activeRecord
     const projectIds = new Set(
-      linkedProjectIdsForSystem(activeRecord, projectSystems),
+      linkedProjectIdsForSystem(linkRecord, projectSystems),
     )
     return projects.filter((project) => projectIds.has(project.id))
   }
@@ -766,7 +777,8 @@ function InventoryForm<T extends InventoryRecord>({
 
   function createTenantFromSelection() {
     if (!selectedProjectId || !selectedRequirementId) return
-    const result = createTenantFromSystemRequirement(selectedProjectId, activeRecord.id, selectedRequirementId)
+    const systemId = allocatedSystemForTenantCreation()?.id ?? activeRecord.id
+    const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     setMessages([result.message])
     if (result.ok) {
       setAddTenantOpen(false)

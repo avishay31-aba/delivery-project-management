@@ -277,7 +277,13 @@ export function TenantFormPage() {
   const persistedTenant = savedTenant
   const tenantDraft = draft
   const activeSystem = systems.find((candidate) => candidate.id === (tenantDraft.hostedSystemId ?? tenantDraft.systemId)) ?? system
-  const project = resolveProject(tenantDraft, projects, projectTenants, systems)
+  const linkedProjects = projects.filter(
+    (candidate) =>
+      projectTenants.some((link) => link.tenantId === tenantDraft.id && link.projectId === candidate.id) ||
+      candidate.pid === tenantDraft.deliveryPid ||
+      Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
+  )
+  const project = resolveProject(tenantDraft, projects, projectTenants, systems) ?? linkedProjects[0]
   const opportunity = resolveOpportunity(project, opportunities)
   const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
   const canManageWarranties = canManageWarrantyCollection(project, linkedOpportunityId)
@@ -295,12 +301,7 @@ export function TenantFormPage() {
       ].filter((value): value is string => Boolean(value)),
     ),
   ).sort((first, second) => first.localeCompare(second))
-  const relatedProjects = projects.filter(
-    (candidate) =>
-      projectTenants.some((link) => link.tenantId === tenantDraft.id && link.projectId === candidate.id) ||
-      candidate.pid === tenantDraft.deliveryPid ||
-      Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
-  )
+  const relatedProjects = linkedProjects
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))

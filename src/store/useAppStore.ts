@@ -367,7 +367,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
-  createOpportunity: (type = 'POC', subType = 'FREE') => {
+  createOpportunity: (type = 'DELIVERY', subType = 'NEW') => {
     const state = get()
     const now = new Date().toISOString()
     const defaultAccount = state.accounts[0]

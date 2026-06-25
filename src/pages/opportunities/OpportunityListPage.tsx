@@ -34,7 +34,7 @@ export function OpportunityListPage() {
             type="button"
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
-              const opportunity = createOpportunity('POC', 'FREE')
+              const opportunity = createOpportunity('DELIVERY', 'NEW')
               navigate(`/opportunities/${opportunity.opportunityId}`)
             }}
           >

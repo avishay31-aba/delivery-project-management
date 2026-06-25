@@ -11,6 +11,7 @@ import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
   CROSS_SYSTEM_OPTIONS,
+  OPPORTUNITY_TYPE_OPTIONS,
   YES_NO_OPTIONS,
   getOpportunityMetadata,
   getVisibleRequirementTypes,
@@ -1203,12 +1204,14 @@ export function OpportunityFormPage() {
         <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
             className={headerControlClassName(headerChanged('type'), true, headerMissing(field.key))}
-            value={currentDraft.type}
+            value={currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type}
             onChange={(event) => updateType(event.target.value as OpportunityType)}
           >
-            <option value="POC">POC</option>
-            <option value="DELIVERY">Delivery</option>
-            <option value="RENEWAL">Renewal</option>
+            {OPPORTUNITY_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type}>
+                {type === 'DELIVERY' ? 'Delivery' : 'Renewal'}
+              </option>
+            ))}
           </select>
         </FormField>
       )
@@ -1354,12 +1357,12 @@ export function OpportunityFormPage() {
             <option value="WON">Won</option>
           </select>
         </FormField>
-        {currentDraft.stage === 'POC' ? (
+        {currentDraft.stage === 'POC' && currentDraft.type === 'POC' ? (
           <FormField label="POC Financial Profile" controlWidthClassName="w-32">
             <select
               className={headerControlClassName(headerChanged('subType'), true, false)}
               value={currentDraft.subType === 'PAID' ? 'PAID' : 'FREE'}
-              onChange={(event) => patchDraft({ type: 'POC', subType: event.target.value as Opportunity['subType'] })}
+              onChange={(event) => patchDraft({ subType: event.target.value as Opportunity['subType'] })}
             >
               <option value="FREE">Free</option>
               <option value="PAID">Paid</option>
@@ -1684,21 +1687,22 @@ export function OpportunityFormPage() {
         </div>
       ) : null}
 
-      {pendingPocSave && activePocProject(currentDraft, currentSavedOpportunity) ? (
+      {pendingPocSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-base font-semibold text-sf-text">Active POC project exists</h2>
+            <h2 className="text-base font-semibold text-sf-text">Create POC project?</h2>
             <p className="mt-2 text-sm text-sf-text-muted">
-              POC Project {activePocProject(currentDraft, currentSavedOpportunity)?.pid} is not Done. What would you like
-              to do?
+              {activePocProject(currentDraft, currentSavedOpportunity)
+                ? `POC Project ${activePocProject(currentDraft, currentSavedOpportunity)?.pid} is not Done. What would you like to do?`
+                : 'This Opportunity is in POC stage. What would you like to do?'}
             </p>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
-                onClick={() => setPendingPocSave(null)}
+                onClick={() => executeSave(pendingPocSave, { pocAction: 'DO_NOT_CREATE' })}
               >
-                Cancel
+                Do Not Create
               </button>
               <button
                 type="button"
@@ -1707,13 +1711,15 @@ export function OpportunityFormPage() {
               >
                 Create New POC
               </button>
-              <button
-                type="button"
-                className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
-                onClick={() => executeSave(pendingPocSave, { pocAction: 'UPDATE_EXISTING_POC' })}
-              >
-                Update Existing POC
-              </button>
+              {activePocProject(currentDraft, currentSavedOpportunity) ? (
+                <button
+                  type="button"
+                  className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                  onClick={() => executeSave(pendingPocSave, { pocAction: 'UPDATE_EXISTING_POC' })}
+                >
+                  Update Latest POC
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1768,14 +1774,14 @@ export function OpportunityFormPage() {
         }
       >
         <div className="space-y-3">
-          <div className="flex flex-wrap items-start gap-3">
-            {renderHeaderFields(lineOneKeys)}
-            {renderStageField()}
-          </div>
+          <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineOneKeys)}</div>
 
           <div className="border-t border-sf-border" />
 
-          <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineTwoKeys)}</div>
+          <div className="flex flex-wrap items-start gap-3">
+            {renderHeaderFields(lineTwoKeys)}
+            {renderStageField()}
+          </div>
 
           <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineThreeKeys)}</div>
 

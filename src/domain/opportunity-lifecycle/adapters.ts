@@ -88,12 +88,12 @@ export function syncOpportunityProjectsFromOpportunity(
     return project
   }
 
-  if (nextOpportunity.stage !== 'WON' && nextOpportunity.type === 'POC') {
+  if (nextOpportunity.stage === 'POC') {
     const activePocProject = activePocProjectForOpportunity(nextOpportunity, savedOpportunity, projects)
 
     if (activePocProject && options?.pocAction === 'UPDATE_EXISTING_POC') {
       updateProjectFromOpportunity(activePocProject, 'POC')
-    } else if (!activePocProject || options?.pocAction === 'CREATE_NEW_POC') {
+    } else if (options?.pocAction === 'CREATE_NEW_POC') {
       const project = createProjectFromOpportunity('POC')
       nextOpportunity.pocProjectIds = uniqueOpportunityValues([...nextOpportunity.pocProjectIds, project.id])
     }
