@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, FormEvent, KeyboardEvent, ReactNode } from 'react'
+import type { CSSProperties, DragEvent, FormEvent, KeyboardEvent, ReactNode } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -759,6 +759,8 @@ export function DataDashboard<T extends { id: string }>({
   const [replaceValue, setReplaceValue] = useState('')
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
+  const tableContainerRef = useRef<HTMLDivElement | null>(null)
+  const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
 
@@ -851,6 +853,42 @@ export function DataDashboard<T extends { id: string }>({
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
   })
+
+  useLayoutEffect(() => {
+    const container = tableContainerRef.current
+    if (!container) return
+
+    const measureFrozenColumns = () => {
+      const headers = Array.from(container.querySelectorAll('thead th')).slice(0, 3) as HTMLElement[]
+      const offsets = headers.reduce<number[]>((nextOffsets, _header, index) => {
+        nextOffsets[index] = index === 0 ? 0 : (nextOffsets[index - 1] ?? 0) + (headers[index - 1]?.offsetWidth ?? 0)
+        return nextOffsets
+      }, [])
+      const nextOffsets = [offsets[0] ?? 0, offsets[1] ?? 0, offsets[2] ?? 0]
+      setFrozenColumnOffsets((currentOffsets) =>
+        currentOffsets.every((offset, index) => offset === nextOffsets[index]) ? currentOffsets : nextOffsets,
+      )
+    }
+
+    measureFrozenColumns()
+    if (typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(measureFrozenColumns)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [columnOrder, columnVisibility, rows.length])
+
+  function frozenColumnStyle(index: number): CSSProperties | undefined {
+    return index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
+  }
+
+  function frozenColumnClassName(index: number, isHeader = false): string {
+    if (index >= 3) return ''
+    return joinClassNames(
+      'sticky bg-white shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
+      isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20',
+    )
+  }
 
   const runtimeDashboardViews = useMemo(
     () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds),
@@ -1324,7 +1362,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
         {toolbar}
       </div>
 
-      <div className="sf-card space-y-3 p-3">
+      <div className="sf-card flex max-h-[calc(100vh-9rem)] flex-col space-y-3 overflow-hidden p-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-sf-text-muted">View</span>
@@ -1436,20 +1474,22 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div className="border-b border-sf-border">
+        <div ref={tableContainerRef} className="min-h-0 flex-1 overflow-auto border-b border-sf-border">
           <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
+                  {headerGroup.headers.map((header, headerIndex) => {
                     const sourceColumn = columns.find((column) => column.id === header.column.id)
 
                     return (
                       <th
                         key={header.id}
+                        style={frozenColumnStyle(headerIndex)}
                         className={joinClassNames(
                           'whitespace-nowrap px-3 py-2 font-semibold text-sf-text transition-colors',
                           'sticky top-0 z-10 bg-sf-surface-alt',
+                          frozenColumnClassName(headerIndex, true),
                           draggedColumnId === header.column.id && 'opacity-60',
                           dragOverColumnId === header.column.id &&
                             draggedColumnId !== header.column.id &&
@@ -1528,8 +1568,12 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                   className={joinClassNames('hover:bg-sf-surface-alt', getRowClassName?.(row.original))}
                   onClick={() => onRowClick?.(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-2 align-middle">
+                  {row.getVisibleCells().map((cell, cellIndex) => (
+                    <td
+                      key={cell.id}
+                      style={frozenColumnStyle(cellIndex)}
+                      className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex))}
+                    >
                       {cell.getIsGrouped() ? (
                         <>
                           <button type="button" onClick={row.getToggleExpandedHandler()}>

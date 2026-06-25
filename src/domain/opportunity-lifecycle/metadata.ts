@@ -184,7 +184,7 @@ export function getOpportunityMetadata(type: OpportunityType, subType: Opportuni
 
 export function getOpportunityMetadataForOpportunity(opportunity: Opportunity): OpportunityMetadata {
   if (opportunity.stage === 'POC') {
-    return getOpportunityMetadata('POC', opportunity.subType === 'PAID' ? 'PAID' : 'FREE')
+    return getOpportunityMetadata('POC', opportunity.financialProfile ?? (opportunity.subType === 'PAID' ? 'PAID' : 'FREE'))
   }
   return getOpportunityMetadata(opportunity.type, opportunity.subType)
 }

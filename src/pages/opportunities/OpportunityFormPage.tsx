@@ -993,19 +993,12 @@ export function OpportunityFormPage() {
     if (stage === 'POC') {
       patchDraft({
         stage,
-        subType: currentDraft.subType === 'PAID' ? 'PAID' : 'FREE',
+        financialProfile: currentDraft.financialProfile ?? (currentDraft.subType === 'PAID' ? 'PAID' : 'FREE'),
       })
       return
     }
 
-    patchDraft({
-      stage,
-      type: currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type,
-      subType:
-        currentDraft.subType === 'FREE' || currentDraft.subType === 'PAID'
-          ? opportunitySubTypeForTypeChange('NEW', currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type)
-          : currentDraft.subType,
-    })
+    patchDraft({ stage })
   }
 
   function addRequirement(kind: RequirementGridKind) {
@@ -1237,7 +1230,6 @@ export function OpportunityFormPage() {
     }
 
     if (field.key === 'subType') {
-      if (currentDraft.stage === 'POC') return null
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
           <select
@@ -1381,8 +1373,8 @@ export function OpportunityFormPage() {
           <FormField label="Financial Profile" controlWidthClassName="w-32">
             <select
               className={headerControlClassName(headerChanged('subType'), true, false)}
-              value={currentDraft.subType === 'PAID' ? 'PAID' : 'FREE'}
-              onChange={(event) => patchDraft({ subType: event.target.value as Opportunity['subType'] })}
+              value={currentDraft.financialProfile ?? (currentDraft.subType === 'PAID' ? 'PAID' : 'FREE')}
+              onChange={(event) => patchDraft({ financialProfile: event.target.value as Opportunity['financialProfile'] })}
             >
               <option value="FREE">Free</option>
               <option value="PAID">Paid</option>
@@ -1824,7 +1816,7 @@ export function OpportunityFormPage() {
       {renderExistingTenantsAndSystemsSection()}
 
       <section className="sf-card overflow-hidden">
-        <div className="flex border-b border-sf-border bg-sf-surface-alt">
+        <div className="sticky top-16 z-30 flex border-b border-sf-border bg-sf-surface-alt">
           <button
             type="button"
             className={[

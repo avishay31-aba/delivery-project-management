@@ -9,6 +9,7 @@ export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
 export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
 export type OpportunityStage = 'OPEN' | 'POC' | 'WON'
+export type OpportunityFinancialProfile = 'FREE' | 'PAID'
 export type RequirementType = 'A' | 'B' | 'C'
 export type RequirementDeployTarget = 'NEW_SYSTEM' | 'EXISTING_SID'
 export type YesNo = 'YES' | 'NO' | ''
@@ -193,6 +194,7 @@ export interface Opportunity {
   salesManagerId: string
   type: OpportunityType
   subType: OpportunitySubType
+  financialProfile?: OpportunityFinancialProfile
   deliveryDate: string | null
   pocStartDate: string | null
   pocEndDate: string | null
