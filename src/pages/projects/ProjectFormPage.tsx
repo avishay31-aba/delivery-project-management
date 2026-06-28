@@ -63,6 +63,7 @@ import {
   hostingContextFromSource,
   type HostingContext,
 } from '@/domain/hosting-context'
+import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -266,10 +267,13 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
 
 function OperationalStatusBadge({ status }: { status: string }) {
   const normalized = status.toUpperCase()
-  const Icon = normalized.includes('DELETED') || normalized.includes('INACTIVE') ? X : normalized.includes('ACTIVE') ? Check : Square
-  const colorClass = normalized.includes('DELETED') || normalized.includes('INACTIVE')
+  const isBlocked = normalized.includes('BLOCKED')
+  const isDeleted = normalized.includes('DELETED') || normalized.includes('CANCELLED') || normalized.includes('CANCELED') || normalized.includes('INACTIVE')
+  const isOn = normalized.includes('ACTIVE') || normalized.includes('ON')
+  const Icon = isDeleted || isBlocked ? X : isOn ? Check : Square
+  const colorClass = isDeleted || isBlocked
     ? 'text-red-600'
-    : normalized.includes('ACTIVE')
+    : isOn
       ? 'text-emerald-500'
       : 'fill-emerald-200 stroke-emerald-500 text-emerald-500'
 
@@ -1895,12 +1899,20 @@ export function ProjectFormPage() {
         )}
         </div>
 
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold text-sf-text">Tenants</h3>
         {[
-          { title: 'Under Contract', rows: linkedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT') },
-          { title: 'Out of Contract', rows: linkedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT') },
+          {
+            title: 'Under Contract',
+            rows: linkedTenants.filter((tenant) => tenant.warrantyStatus !== 'OUT_OF_CONTRACT' && tenant.contractStatus !== 'OUT_OF_CONTRACT'),
+          },
+          {
+            title: 'Out of Contract',
+            rows: linkedTenants.filter((tenant) => tenant.warrantyStatus === 'OUT_OF_CONTRACT' || tenant.contractStatus === 'OUT_OF_CONTRACT'),
+          },
         ].map((section) => (
         <div key={section.title} className="space-y-2">
-          <h3 className="text-base font-semibold text-sf-text">{section.title}</h3>
+          <h4 className="text-sm font-semibold text-sf-text">{section.title}</h4>
           {section.rows.length > 0 ? (
           <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="min-w-full border-collapse text-sm leading-tight">
@@ -1944,7 +1956,7 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={tenant.operationalStatus} /></td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={effectiveTenantOperationalMode(tenant, system)} /></td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantType}</td>
                       {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
                         <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -1964,6 +1976,7 @@ export function ProjectFormPage() {
         )}
         </div>
         ))}
+        </div>
       </CollapsibleSection>
     )
   }

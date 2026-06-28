@@ -372,6 +372,7 @@ function InventoryForm<T extends InventoryRecord>({
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
+  const [tenantAddedInSession, setTenantAddedInSession] = useState(false)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -504,10 +505,11 @@ function InventoryForm<T extends InventoryRecord>({
     onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
-    if (!stayOnPage) {
+    if (!stayOnPage && !tenantAddedInSession) {
       navigate(dashboardPath)
       return
     }
+    setTenantAddedInSession(false)
     navigate(recordPath(nextDraft), { replace: true })
   }
 
@@ -808,6 +810,7 @@ function InventoryForm<T extends InventoryRecord>({
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     setMessages([result.message])
     if (result.ok) {
+      setTenantAddedInSession(true)
       setAddTenantOpen(false)
       setSelectedProjectId('')
       setSelectedRequirementId('')
@@ -894,13 +897,14 @@ function InventoryForm<T extends InventoryRecord>({
 
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="w-max border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
                   {APPLICATION_SUMMARY_FIELDS.map((column) => (
-                    <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                      {column.label}
+                    <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                      <span>{column.label}</span>
+                      <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
                     </th>
                   ))}
                 </tr>

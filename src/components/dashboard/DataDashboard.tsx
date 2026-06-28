@@ -932,7 +932,7 @@ export function DataDashboard<T extends { id: string }>({
     return joinClassNames(
       'sticky',
       isLastFrozenColumn
-        ? 'shadow-[2px_0_0_0_rgba(16,185,129,0.65)]'
+        ? 'relative shadow-[4px_0_0_0_rgba(16,185,129,0.85)] after:absolute after:right-0 after:top-0 after:h-full after:w-1 after:bg-emerald-500 after:content-[""]'
         : 'shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
       isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20 bg-inherit',
     )

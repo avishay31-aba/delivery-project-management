@@ -688,17 +688,20 @@ export function TenantFormPage() {
     const selectValue = isManualTenantOperationalMode(tenantDraft.operationalStatus) ? tenantDraft.operationalStatus : '__DERIVED__'
 
     return (
-      <FormField label="Operational mode" controlWidthClassName="w-64">
-        <select
-          className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
-          value={selectValue}
-          onChange={(event) => updateTenantOperationalMode(event.target.value)}
-        >
-          <option value="__DERIVED__">{derivedMode}</option>
-          {TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => (
-            <option key={mode} value={mode}>{mode}</option>
-          ))}
-        </select>
+      <FormField label="Operational Status" controlWidthClassName="w-72">
+        <div className="flex items-center gap-2">
+          {renderSystemStatus(currentMode)}
+          <select
+            className="h-8 min-w-0 flex-1 rounded border border-sf-border bg-white px-2 py-1 text-sm"
+            value={selectValue}
+            onChange={(event) => updateTenantOperationalMode(event.target.value)}
+          >
+            <option value="__DERIVED__">{derivedMode}</option>
+            {TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+        </div>
         <span className="block pt-1 text-xs text-sf-text-muted">
           {currentMode === derivedMode ? 'Derived from linked System' : 'Manual override'}
         </span>
