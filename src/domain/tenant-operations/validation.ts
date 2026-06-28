@@ -39,13 +39,13 @@ export function resolveTenantCreationSource(
   }
 
   const activeTenantLinks = activeProjectTenantLinks(context.projectTenants)
-  const alreadyLinked = context.tenants.some((tenant) => {
+  const alreadyLinkedToRequirement = context.tenants.some((tenant) => {
     const linkedToProject = activeTenantLinks.some(
       (link) => link.projectId === input.projectId && link.tenantId === tenant.id,
     )
-    return linkedToProject && tenant.systemId === input.systemId && tenant.sourceRequirementId === requirement.requirementId
+    return linkedToProject && tenant.sourceRequirementId === requirement.requirementId
   })
-  if (alreadyLinked) return { error: tenantOperationError('A tenant already exists for this requirement on this system.') }
+  if (alreadyLinkedToRequirement) return { error: tenantOperationError('A tenant already exists for this requirement.') }
 
   return {
     source: {

@@ -2,7 +2,7 @@ import type { System, Tenant, TenantFormType, TenantHostedSystemHistory } from '
 import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 
 export type TenantOperationalMode =
-  | 'System On'
+  | 'Operative'
   | 'Service Blocked'
   | 'Access Blocked'
   | 'Deleted'
@@ -28,7 +28,7 @@ export function derivedTenantOperationalMode(system?: System): TenantOperational
   const status = system?.operationalStatus?.toLocaleLowerCase() ?? ''
   if (status.includes('service blocked')) return 'Service Blocked'
   if (status.includes('access blocked')) return 'Access Blocked'
-  return 'System On'
+  return 'Operative'
 }
 
 export function isManualTenantOperationalMode(value: string | undefined | null): value is TenantOperationalMode {

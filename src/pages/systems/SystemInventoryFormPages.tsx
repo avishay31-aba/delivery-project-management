@@ -51,6 +51,9 @@ import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, 
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
+  activeProjectTenantLinks,
+} from '@/domain/allocation-context'
+import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
   validateHostingContext,
@@ -354,6 +357,7 @@ function InventoryForm<T extends InventoryRecord>({
   const tenants = useAppStore((state) => state.tenants)
   const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
+  const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const {
     value: draft,
@@ -776,10 +780,28 @@ function InventoryForm<T extends InventoryRecord>({
     return projectOpportunity(project)?.newTenantRequirements ?? []
   }
 
+  function usedRequirementIdsForProject(projectId: string): Set<string> {
+    const activeTenantLinks = activeProjectTenantLinks(projectTenants)
+    const linkedTenantIds = new Set(
+      activeTenantLinks.filter((link) => link.projectId === projectId).map((link) => link.tenantId),
+    )
+    return new Set(
+      tenants
+        .filter((tenant) => linkedTenantIds.has(tenant.id) && tenant.sourceRequirementId)
+        .map((tenant) => tenant.sourceRequirementId as string),
+    )
+  }
+
+  function firstAvailableRequirementId(projectId: string): string {
+    const usedRequirementIds = usedRequirementIdsForProject(projectId)
+    return newTenantRequirementsForProject(projectId)
+      .find((requirement) => !usedRequirementIds.has(requirement.requirementId))?.id ?? ''
+  }
+
   function openAddTenantDialog() {
     const linkedProjects = linkedProjectsForSystem()
     const firstProjectId = linkedProjects[0]?.id ?? ''
-    const firstRequirementId = firstProjectId ? newTenantRequirementsForProject(firstProjectId)[0]?.id ?? '' : ''
+    const firstRequirementId = firstProjectId ? firstAvailableRequirementId(firstProjectId) : ''
     setSelectedProjectId(firstProjectId)
     setSelectedRequirementId(firstRequirementId)
     setAddTenantOpen(true)
@@ -788,7 +810,7 @@ function InventoryForm<T extends InventoryRecord>({
 
   function handleSelectedProjectChange(projectId: string) {
     setSelectedProjectId(projectId)
-    setSelectedRequirementId(newTenantRequirementsForProject(projectId)[0]?.id ?? '')
+    setSelectedRequirementId(firstAvailableRequirementId(projectId))
   }
 
   function createTenantFromSelection() {
@@ -1036,6 +1058,14 @@ function InventoryForm<T extends InventoryRecord>({
     const linkedProjects = linkedProjectsForSystem()
     const selectedRequirements = newTenantRequirementsForProject(selectedProjectId)
     const selectedProject = linkedProjects.find((project) => project.id === selectedProjectId)
+    const usedRequirementIds = usedRequirementIdsForProject(selectedProjectId)
+    const addTenantMessages = messages.filter((message) =>
+      message.includes('tenant') ||
+      message.includes('Tenant') ||
+      message.includes('requirement') ||
+      message.includes('Requirement') ||
+      message.includes('product'),
+    )
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
@@ -1051,6 +1081,13 @@ function InventoryForm<T extends InventoryRecord>({
           </div>
 
           <div className="grid gap-4 p-4 lg:grid-cols-2">
+            {addTenantMessages.length > 0 ? (
+              <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700 lg:col-span-2" role="alert">
+                {addTenantMessages.map((message) => (
+                  <div key={message}>{message}</div>
+                ))}
+              </div>
+            ) : null}
             <FormField label="PID" controlWidthClassName="w-full min-w-0">
               <select className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
                 {linkedProjects.map((project) => (
@@ -1070,8 +1107,13 @@ function InventoryForm<T extends InventoryRecord>({
               >
                 {selectedRequirements.length === 0 ? <option value="">No new tenant requirements</option> : null}
                 {selectedRequirements.map((requirement) => (
-                  <option key={requirement.id} value={requirement.id}>
+                  <option
+                    key={requirement.id}
+                    value={requirement.id}
+                    disabled={usedRequirementIds.has(requirement.requirementId)}
+                  >
                     {tenantRequirementOptionLabel(requirement)}
+                    {usedRequirementIds.has(requirement.requirementId) ? ' - Already used' : ''}
                   </option>
                 ))}
               </select>

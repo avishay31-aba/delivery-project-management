@@ -950,12 +950,15 @@ export function ProjectFormPage() {
   function renderDeadlineAlert(deadline: string | null | undefined, status: string) {
     const alertStatus = milestoneDeadlineAlertStatus(deadline, status as NonNullable<Project['milestones']>[number]['status'])
     if (alertStatus === 'NONE') return null
+    const label = milestoneDeadlineAlertLabel(alertStatus)
 
     return (
-      <AlertStatusIcon
-        variant={alertStatus === 'OVERDUE' ? 'danger' : 'warning'}
-        label={milestoneDeadlineAlertLabel(alertStatus)}
-      />
+      <span title={label}>
+        <AlertStatusIcon
+          variant={alertStatus === 'OVERDUE' ? 'danger' : 'warning'}
+          label={label}
+        />
+      </span>
     )
   }
 
@@ -1193,7 +1196,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Select', 'Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Deadline', 'DL Alert', 'Status', 'Comment'].map((label) => (
+                  {['Select', 'Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Status', 'Comment', 'Deadline', 'DL Alert'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1281,10 +1284,12 @@ export function ProjectFormPage() {
                         <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
+                        <td className="min-w-72 max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">
+                          <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-16" />
+                        </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
-                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                        <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text"><RichTextContent value={task.comment ?? ''} /></td>
                       </tr>
                     </Fragment>
                   )

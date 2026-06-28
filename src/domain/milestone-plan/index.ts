@@ -118,7 +118,7 @@ export function milestoneDeadlineAlertStatus(
 
 export function milestoneDeadlineAlertLabel(status: MilestoneDeadlineAlertStatus): string {
   if (status === 'OVERDUE') return 'Overdue'
-  if (status === 'WARNING') return 'Due in less than 90 days'
+  if (status === 'WARNING') return 'Pending'
   return ''
 }
 
