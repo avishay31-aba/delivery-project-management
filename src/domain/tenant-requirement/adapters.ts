@@ -115,6 +115,17 @@ export function createNewTenantRequirement(
   }
 }
 
+export function newTenantRequirementWithDealPackage(
+  requirement: NewTenantRequirement,
+  mapCenter = '',
+  dealPackage: OpportunityDealPackage = 'Silver',
+): NewTenantRequirement {
+  return {
+    ...requirement,
+    ...dealPackagePatch(dealPackage, mapCenter),
+  }
+}
+
 export function createChangeRequestRequirement(index: number, tenant?: Tenant, mapCenter = ''): ChangeRequestRequirement {
   return {
     ...createBaseRequirement(`B-${String(index + 1).padStart(3, '0')}`),

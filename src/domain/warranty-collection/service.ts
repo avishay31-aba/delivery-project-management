@@ -49,6 +49,13 @@ export function displayWarrantyStatus(status: WarrantyStatus): string {
   return WARRANTY_STATUS_LABELS[status]
 }
 
+export function warrantyStatusSeverity(status: WarrantyStatus): 'danger' | 'warning' | 'info' | 'success' {
+  if (status === 'EXPIRED' || status === 'OUT_OF_CONTRACT' || status === 'NO_WARRANTY') return 'danger'
+  if (status === 'PENDING' || status === 'PLANNED') return 'warning'
+  if (status === 'VALID' || status === 'RENEWED') return 'success'
+  return 'info'
+}
+
 export function tenantWarrantyHeaderStatusDisplay(
   warranties: TenantWarranty[],
   fallbackStatus: WarrantyStatus | string = 'NOT_SET',

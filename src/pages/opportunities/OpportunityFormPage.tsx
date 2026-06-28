@@ -52,6 +52,7 @@ import {
   createChangeRequestRequirement,
   createNewTenantRequirement,
   createStandardRenewalRequirement,
+  newTenantRequirementWithDealPackage,
 } from '@/domain/tenant-requirement'
 import {
   activePocProjectForOpportunity,
@@ -264,6 +265,7 @@ function RequirementGrid({
   onSelectAllTenants,
   onAddRow,
   onDeleteRow,
+  onChangePackage,
   onUpdateRow,
   onToggleCollapsed,
 }: {
@@ -283,6 +285,7 @@ function RequirementGrid({
   onSelectAllTenants?: () => void
   onAddRow: () => void
   onDeleteRow: (rowId: string) => void
+  onChangePackage?: (rowId: string, dealPackage: OpportunityDealPackage) => void
   onUpdateRow: (rowId: string, key: string, value: string | string[] | number | null) => void
   onToggleCollapsed: () => void
 }) {
@@ -712,6 +715,9 @@ function RequirementGrid({
         <table className="min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
+              <th className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                Action
+              </th>
               {columns.map((column) => (
                 <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
                   <span>
@@ -729,26 +735,44 @@ function RequirementGrid({
                   ) : null}
                 </th>
               ))}
-              <th className="border border-sf-border px-2 py-1" />
             </tr>
           </thead>
           <tbody className="bg-white">
             {rows.map((row, rowIndex) => (
               <tr key={row.id} className="hover:bg-sf-surface-alt">
+                <td className="min-w-40 border border-sf-border px-1.5 py-px align-top text-sm">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <button
+                      type="button"
+                      className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
+                      onClick={() => onDeleteRow(row.id)}
+                    >
+                      Delete
+                    </button>
+                    {kind === 'A' && onChangePackage ? (
+                      <select
+                        className="h-6 rounded border border-sf-border bg-white px-1 text-[11px]"
+                        value=""
+                        aria-label={`Change package for ${row.requirementId}`}
+                        onChange={(event) => {
+                          if (!event.target.value) return
+                          onChangePackage(row.id, event.target.value as OpportunityDealPackage)
+                          event.currentTarget.value = ''
+                        }}
+                      >
+                        <option value="">Change Package</option>
+                        <option value="Silver">Silver</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Platinum">Platinum</option>
+                      </select>
+                    ) : null}
+                  </div>
+                </td>
                 {columns.map((column) => (
                   <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm">
                     {renderCell(row, column, rowIndex)}
                   </td>
                 ))}
-                <td className="border border-sf-border px-1.5 py-px align-top text-sm">
-                  <button
-                    type="button"
-                    className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
-                    onClick={() => onDeleteRow(row.id)}
-                  >
-                    Delete
-                  </button>
-                </td>
               </tr>
             ))}
             {rows.length === 0 ? (
@@ -1054,6 +1078,16 @@ export function OpportunityFormPage() {
     }
 
     patchDraft({ standardRenewalRequirements: currentDraft.standardRenewalRequirements.filter((row) => row.id !== rowId) })
+  }
+
+  function changeRequirementPackage(rowId: string, dealPackage: OpportunityDealPackage) {
+    patchDraft({
+      newTenantRequirements: currentDraft.newTenantRequirements.map((row) =>
+        row.id === rowId
+          ? newTenantRequirementWithDealPackage(row, currentDraft.country, dealPackage)
+          : row,
+      ),
+    })
   }
 
   function updateRequirement(kind: RequirementGridKind, rowId: string, key: string, value: string | string[] | number | null) {
@@ -1408,7 +1442,7 @@ export function OpportunityFormPage() {
 
   const headerFieldByKey = new Map(metadata.headerFields.map((field) => [field.key, field]))
   const lineOneKeys: OpportunityHeaderField['key'][] = ['salesManagerId']
-  const lineTwoKeys: OpportunityHeaderField['key'][] = ['opportunityId', 'opportunityName', 'type', 'subType']
+  const lineTwoKeys: OpportunityHeaderField['key'][] = ['opportunityId', 'opportunityName', 'type', 'subType', 'dealPackage']
   const locationFieldKeys: OpportunityHeaderField['key'][] = ['accountId', 'region', 'country', 'state', 'timeZone']
   const lineThreeKeys: OpportunityHeaderField['key'][] = [
     'accountId',
@@ -1418,7 +1452,6 @@ export function OpportunityFormPage() {
     'timeZone',
   ]
   const commercialTermKeys: OpportunityHeaderField['key'][] = [
-    'dealPackage',
     'warrantyRecordId',
     'deliveryDate',
     'pocStartDate',
@@ -1561,6 +1594,7 @@ export function OpportunityFormPage() {
           isSystemOptionDisabled={systemSelectionDisabled}
           onAddRow={() => addRequirement('A')}
           onDeleteRow={(rowId) => deleteRequirement('A', rowId)}
+          onChangePackage={changeRequirementPackage}
           onUpdateRow={(rowId, key, value) => updateRequirement('A', rowId, key, value)}
           onToggleCollapsed={() => toggleSection('gridA')}
         />

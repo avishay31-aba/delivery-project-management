@@ -1,6 +1,20 @@
 import type { System, Tenant, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
 import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 
+export type TenantOperationalMode =
+  | 'System On'
+  | 'Service Blocked'
+  | 'Access Blocked'
+  | 'Deleted'
+  | 'Cancelled'
+  | 'Access Blocked - Password Reset'
+
+export const TENANT_MANUAL_OPERATIONAL_MODES: TenantOperationalMode[] = [
+  'Deleted',
+  'Cancelled',
+  'Access Blocked - Password Reset',
+]
+
 export function tenantFormType(tenant: Tenant): TenantFormType {
   return tenant.tenantFormType ?? (tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER')
 }
@@ -8,6 +22,23 @@ export function tenantFormType(tenant: Tenant): TenantFormType {
 export function tenantFormTypeForSystem(system: System): TenantFormType {
   if (system.systemClass === SYSTEM_CLASS_POC_DEMO_TRAINING || isReusedInternalSystem(system)) return 'POC'
   return 'CUSTOMER'
+}
+
+export function derivedTenantOperationalMode(system?: System): TenantOperationalMode {
+  const status = system?.operationalStatus?.toLocaleLowerCase() ?? ''
+  if (status.includes('service blocked')) return 'Service Blocked'
+  if (status.includes('access blocked')) return 'Access Blocked'
+  return 'System On'
+}
+
+export function isManualTenantOperationalMode(value: string | undefined | null): value is TenantOperationalMode {
+  return TENANT_MANUAL_OPERATIONAL_MODES.includes(value as TenantOperationalMode)
+}
+
+export function effectiveTenantOperationalMode(tenant: Tenant, system?: System): TenantOperationalMode {
+  return isManualTenantOperationalMode(tenant.operationalStatus)
+    ? tenant.operationalStatus
+    : derivedTenantOperationalMode(system)
 }
 
 export function tenantHostedSystemHistory(tenant: Tenant): TenantHostedSystemHistory[] {

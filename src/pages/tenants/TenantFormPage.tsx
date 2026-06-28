@@ -5,7 +5,7 @@ import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
+import { AlertStatusIcon, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
@@ -56,17 +56,23 @@ import {
   isSelfWarrantyPredecessorSelection,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
+  warrantyStatusSeverity,
 } from '@/domain/warranty-collection'
 import {
   cloneTenant,
+  derivedTenantOperationalMode,
+  effectiveTenantOperationalMode,
+  isManualTenantOperationalMode,
   tenantConfigurationFromTenant,
   tenantConfigurationSaveDraft,
   tenantDraftWithAttachedSystem,
   tenantFormType,
+  TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
   TENANT_REMARK_TYPES,
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
+import { systemRoutePath } from '@/domain/system-inventory'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -138,10 +144,8 @@ function formatWarrantyCompatibilityRef(value: string, fallbackTenantId: string)
   return `${ref.warrantyId};${ref.tenantId}`
 }
 
-function licenseNumber(sid: string, pid: string): string {
-  if (sid && pid) return `${pid}${sid}`
-  if (sid) return sid
-  return ''
+function licenseNumber(pid: string, sid: string, tid: string): string {
+  return [pid, sid, tid].filter(Boolean).join('')
 }
 
 function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
@@ -669,6 +673,64 @@ export function TenantFormPage() {
     )
   }
 
+  function updateTenantOperationalMode(value: string) {
+    const nextOperationalStatus =
+      value === '__DERIVED__'
+        ? derivedTenantOperationalMode(activeSystem)
+        : value
+    setDraft((current) => (current ? { ...current, operationalStatus: nextOperationalStatus } : current))
+    setMessages([])
+  }
+
+  function renderOperationalModeField() {
+    const derivedMode = derivedTenantOperationalMode(activeSystem)
+    const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
+    const selectValue = isManualTenantOperationalMode(tenantDraft.operationalStatus) ? tenantDraft.operationalStatus : '__DERIVED__'
+
+    return (
+      <FormField label="Operational mode" controlWidthClassName="w-64">
+        <select
+          className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
+          value={selectValue}
+          onChange={(event) => updateTenantOperationalMode(event.target.value)}
+        >
+          <option value="__DERIVED__">{derivedMode}</option>
+          {TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => (
+            <option key={mode} value={mode}>{mode}</option>
+          ))}
+        </select>
+        <span className="block pt-1 text-xs text-sf-text-muted">
+          {currentMode === derivedMode ? 'Derived from linked System' : 'Manual override'}
+        </span>
+      </FormField>
+    )
+  }
+
+  function renderSystemStatus(value: string) {
+    const normalized = value.toLocaleLowerCase()
+    const variant = normalized.includes('service')
+        ? 'warning'
+        : normalized.includes('blocked') || normalized.includes('off') || normalized.includes('deleted')
+          ? 'danger'
+          : 'success'
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <AlertStatusIcon variant={variant} />
+        <span>{value || '-'}</span>
+      </span>
+    )
+  }
+
+  function renderWarrantyHeaderStatus() {
+    const latestStatus = draftComputedWarranties.at(-1)?.warrantyStatus ?? tenantDraft.warrantyStatus
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <AlertStatusIcon variant={warrantyStatusSeverity(latestStatus)} />
+        <span>{tenantWarrantyHeaderStatus}</span>
+      </span>
+    )
+  }
+
   function renderTenantTypeField() {
     return (
       <FormField label="Tenant Type" controlWidthClassName="w-44">
@@ -710,9 +772,9 @@ export function TenantFormPage() {
   function renderHeader() {
     const commonFields = [
       renderTenantTypeField(),
-      renderHeaderField('Operational mode', tenantDraft.operationalStatus),
-      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(hosting.sid, tenantDraft.deliveryPid ?? ''), 'w-56') : null,
-      formType === 'CUSTOMER' ? renderHeaderField('Warranty status', tenantWarrantyHeaderStatus) : null,
+      renderOperationalModeField(),
+      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(tenantDraft.deliveryPid ?? '', hosting.sid, tenantDraft.tid), 'w-64') : null,
+      formType === 'CUSTOMER' ? renderHeaderField('Warranty status', renderWarrantyHeaderStatus()) : null,
       renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : ''),
     ].filter(Boolean)
 
@@ -722,7 +784,9 @@ export function TenantFormPage() {
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Project Type', project?.mainType ?? '')}
           {renderHeaderField('Project Name', project?.opportunityName ?? '')}
-          {renderHeaderField('Project ID', project ? <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>{project.pid}</Link> : '')}
+          {renderHeaderField('Delivery PID', project ? <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>{project.pid}</Link> : '')}
+          {renderHeaderField('SID', activeSystem ? <Link className="text-sf-brand hover:underline" to={systemRoutePath(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</Link> : hosting.sid)}
+          {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
           {formType === 'POC'
             ? renderHeaderField('POC Start Date', tenantDraft.pocStartDate ?? opportunity?.pocStartDate ?? '')
             : renderHeaderField('Delivery Date', project?.deliveryDate ?? '')}
