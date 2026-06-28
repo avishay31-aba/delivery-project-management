@@ -23,6 +23,7 @@ import {
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { FormField, LinkId, PlaceholderCard } from '@/components/ui'
+import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
@@ -350,7 +351,16 @@ function InventoryForm<T extends InventoryRecord>({
   const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
-  const [draft, setDraft] = useState<T | null>(record ? cloneRecord(record) : null)
+  const {
+    value: draft,
+    setValue: setDraft,
+    reset: resetDraft,
+    undo: undoDraft,
+    canUndo,
+  } = useUndoHistory<T | null>(record ? cloneRecord(record) : null, {
+    clone: (value) => (value ? cloneRecord(value) : value),
+    isEqual: valuesEqual,
+  })
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
@@ -365,8 +375,8 @@ function InventoryForm<T extends InventoryRecord>({
   const navigationBlocker = useBlocker(isDirty)
 
   useEffect(() => {
-    setDraft(record ? cloneRecord(record) : null)
-  }, [record])
+    resetDraft(record ? cloneRecord(record) : null)
+  }, [record, resetDraft])
 
   if (!record || !draft) {
     return (
@@ -792,7 +802,9 @@ function InventoryForm<T extends InventoryRecord>({
       <tr key={tenant.id} className="hover:bg-sf-surface-alt">
         <td className="border border-sf-border px-1.5 py-1 text-sf-text"><LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId></td>
         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName || '-'}</td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.deliveryPid || '-'}</td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text">
+          {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : '-'}
+        </td>
         <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={tenant.operationalStatus} /></td>
         {TENANT_CONFIGURATION_FIELDS.map((column) => (
           <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
@@ -972,7 +984,10 @@ function InventoryForm<T extends InventoryRecord>({
             </div>
           ) : null}
         </div>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!isDirty} onClick={() => setDraft(cloneRecord(activeRecord))}>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
+          Undo
+        </button>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!isDirty} onClick={() => resetDraft(cloneRecord(activeRecord))}>
           Revert
         </button>
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigate(dashboardPath)}>

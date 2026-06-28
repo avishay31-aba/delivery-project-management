@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, DragEvent, FormEvent, KeyboardEvent, ReactNode } from 'react'
+import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, ReactNode, SetStateAction } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -745,6 +745,7 @@ export function DataDashboard<T extends { id: string }>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     Object.fromEntries([ROW_INDICATOR_COLUMN_ID, ...columns.map((column) => column.id)].map((columnId) => [columnId, true])),
   )
+  const [dashboardUndoStack, setDashboardUndoStack] = useState<SavedDashboardViewState[]>([])
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null)
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
@@ -761,8 +762,51 @@ export function DataDashboard<T extends { id: string }>({
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
+  const [isFreezeEnabled, setIsFreezeEnabled] = useState(true)
+  const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
+
+  const dashboardViewStateSnapshot = useCallback(
+    () =>
+      normalizeDashboardViewState(
+        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter },
+        sourceColumnIds,
+      ),
+    [columnFilters, columnOrder, columnVisibility, globalFilter, grouping, sorting, sourceColumnIds],
+  )
+
+  function recordDashboardUndoSnapshot() {
+    if (isApplyingDashboardUndoRef.current) return
+    const snapshot = dashboardViewStateSnapshot()
+    setDashboardUndoStack((current) =>
+      current.length > 0 && areDashboardViewStatesEqual(current[current.length - 1], snapshot, sourceColumnIds)
+        ? current
+        : [...current, snapshot],
+    )
+  }
+
+  function updateDashboardState<TState>(
+    setState: Dispatch<SetStateAction<TState>>,
+    updater: SetStateAction<TState>,
+  ) {
+    recordDashboardUndoSnapshot()
+    setState(updater)
+  }
+
+  function applyDashboardViewState(state: SavedDashboardViewState) {
+    const normalizedState = normalizeDashboardViewState(state, sourceColumnIds)
+    isApplyingDashboardUndoRef.current = true
+    setGlobalFilter(normalizedState.globalFilter)
+    setSorting(normalizedState.sorting)
+    setGrouping(normalizedState.grouping)
+    setColumnFilters(normalizedState.columnFilters)
+    setColumnOrder(normalizedState.columnOrder)
+    setColumnVisibility(normalizedState.columnVisibility)
+    window.setTimeout(() => {
+      isApplyingDashboardUndoRef.current = false
+    }, 0)
+  }
 
   useEffect(() => {
     setColumnOrder((currentColumnOrder) => {
@@ -842,12 +886,12 @@ export function DataDashboard<T extends { id: string }>({
     data: rows,
     columns: tableColumns,
     state: { globalFilter, sorting, grouping, columnFilters, columnOrder, columnVisibility },
-    onGlobalFilterChange: setGlobalFilter,
-    onSortingChange: setSorting,
-    onGroupingChange: setGrouping,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnOrderChange: setColumnOrder,
-    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: (updater) => updateDashboardState(setGlobalFilter, updater),
+    onSortingChange: (updater) => updateDashboardState(setSorting, updater),
+    onGroupingChange: (updater) => updateDashboardState(setGrouping, updater),
+    onColumnFiltersChange: (updater) => updateDashboardState(setColumnFilters, updater),
+    onColumnOrderChange: (updater) => updateDashboardState(setColumnOrder, updater),
+    onColumnVisibilityChange: (updater) => updateDashboardState(setColumnVisibility, updater),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -876,14 +920,14 @@ export function DataDashboard<T extends { id: string }>({
     const observer = new ResizeObserver(measureFrozenColumns)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [columnOrder, columnVisibility, rows.length])
+  }, [columnOrder, columnVisibility, rows.length, isFreezeEnabled])
 
   function frozenColumnStyle(index: number): CSSProperties | undefined {
-    return index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
+    return isFreezeEnabled && index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
   }
 
   function frozenColumnClassName(index: number, isHeader = false): string {
-    if (index >= 3) return ''
+    if (!isFreezeEnabled || index >= 3) return ''
     return joinClassNames(
       'sticky shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
       isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20 bg-inherit',
@@ -918,14 +962,8 @@ export function DataDashboard<T extends { id: string }>({
 
   const applyDashboardView = useCallback(
     (view: RuntimeDashboardView) => {
-      const normalizedState = normalizeDashboardViewState(view.state, sourceColumnIds)
-
-      setGlobalFilter(normalizedState.globalFilter)
-      setSorting(normalizedState.sorting)
-      setGrouping(normalizedState.grouping)
-      setColumnFilters(normalizedState.columnFilters)
-      setColumnOrder(normalizedState.columnOrder)
-      setColumnVisibility(normalizedState.columnVisibility)
+      applyDashboardViewState(view.state)
+      setDashboardUndoStack([])
       setSelectedViewId(view.id)
       setOpenMenuColumnId(null)
     },
@@ -1170,12 +1208,21 @@ export function DataDashboard<T extends { id: string }>({
     }
   }
 
+  function undoDashboardChange() {
+    setDashboardUndoStack((current) => {
+      const previous = current[current.length - 1]
+      if (!previous) return current
+      applyDashboardViewState(previous)
+      return current.slice(0, -1)
+    })
+  }
+
   function updateColumnOrder(sourceColumnId: string, targetColumnId: string, placement: ColumnDropPlacement = 'before') {
-    setColumnOrder((currentColumnOrder) => moveColumn(currentColumnOrder, sourceColumnId, targetColumnId, placement))
+    updateDashboardState(setColumnOrder, (currentColumnOrder) => moveColumn(currentColumnOrder, sourceColumnId, targetColumnId, placement))
   }
 
   function moveColumnByOffset(columnId: string, offset: -1 | 1) {
-    setColumnOrder((currentColumnOrder) => {
+    updateDashboardState(setColumnOrder, (currentColumnOrder) => {
       const columnIndex = currentColumnOrder.indexOf(columnId)
       const targetColumnId = currentColumnOrder[columnIndex + offset]
 
@@ -1240,9 +1287,14 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
 )
 
   function clearAllFiltersAndSearch() {
-  setColumnFilters([])
-  setGlobalFilter('')
-}
+    recordDashboardUndoSnapshot()
+    setColumnFilters([])
+    setGlobalFilter('')
+  }
+
+  function dashboardRowClassName(row: T): string {
+    return getRowClassName?.(row) || 'bg-white hover:bg-sf-surface-alt'
+  }
 
   function exportCsv() {
     const visibleColumns = table.getVisibleLeafColumns()
@@ -1403,10 +1455,29 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           ) : null}
 
           {isSelectedViewModified ? (
+            <button
+              type="button"
+              onClick={undoDashboardChange}
+              disabled={dashboardUndoStack.length === 0}
+              className="rounded border border-sf-border px-3 py-1 disabled:cursor-not-allowed disabled:text-sf-text-muted"
+            >
+              Undo
+            </button>
+          ) : null}
+
+          {isSelectedViewModified ? (
             <button type="button" onClick={revertSelectedView} className="rounded border border-sf-border px-3 py-1">
               Revert
             </button>
           ) : null}
+
+          <button
+            type="button"
+            className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt"
+            onClick={() => setIsFreezeEnabled((current) => !current)}
+          >
+            {isFreezeEnabled ? 'Unfreeze Columns' : 'Freeze Columns'}
+          </button>
 
 <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -1414,14 +1485,14 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                 placeholder="Search"
                 className="rounded border border-sf-border px-2 py-1 pr-7"
                 value={globalFilter}
-                onChange={(event) => setGlobalFilter(event.target.value)}
+                onChange={(event) => updateDashboardState(setGlobalFilter, event.target.value)}
               />
               {hasGlobalSearch ? (
                 <button
                   type="button"
                   className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-sf-text-muted hover:bg-sf-surface-alt hover:text-sf-text"
                   aria-label="Clear search"
-                  onClick={() => setGlobalFilter('')}
+                  onClick={() => updateDashboardState<string>(setGlobalFilter, '')}
                 >
                   ×
                 </button>
@@ -1474,7 +1545,11 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div ref={tableContainerRef} className="min-h-0 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border">
+        <div
+          ref={tableContainerRef}
+          className="min-h-0 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -1543,8 +1618,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                               sourceColumn={sourceColumn}
                               rows={rows}
                               grouping={grouping}
-                              setGrouping={setGrouping}
-                              setSorting={setSorting}
+                              setGrouping={(nextGrouping) => updateDashboardState(setGrouping, nextGrouping)}
+                              setSorting={(nextSorting) => updateDashboardState(setSorting, nextSorting)}
                               isOpen={openMenuColumnId === header.column.id}
                               onToggle={() =>
                                 setOpenMenuColumnId((columnId) =>
@@ -1565,7 +1640,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               {table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className={joinClassNames('bg-white hover:bg-sf-surface-alt', getRowClassName?.(row.original))}
+                  className={joinClassNames(dashboardRowClassName(row.original))}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell, cellIndex) => (

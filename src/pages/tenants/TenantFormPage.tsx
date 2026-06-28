@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
+import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
@@ -227,7 +228,16 @@ export function TenantFormPage() {
     () => systems.find((candidate) => candidate.id === (savedTenant?.hostedSystemId ?? savedTenant?.systemId)),
     [savedTenant, systems],
   )
-  const [draft, setDraft] = useState<Tenant | null>(savedTenant ? cloneTenant(savedTenant) : null)
+  const {
+    value: draft,
+    setValue: setDraft,
+    reset: resetDraft,
+    undo: undoDraft,
+    canUndo,
+  } = useUndoHistory<Tenant | null>(savedTenant ? cloneTenant(savedTenant) : null, {
+    clone: (value) => (value ? cloneTenant(value) : value),
+    isEqual: valuesEqual,
+  })
   const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
@@ -243,8 +253,8 @@ export function TenantFormPage() {
   const navigationBlocker = useBlocker(isDirty)
 
   useEffect(() => {
-    setDraft(savedTenant ? cloneTenant(savedTenant) : null)
-  }, [savedTenant])
+    resetDraft(savedTenant ? cloneTenant(savedTenant) : null)
+  }, [savedTenant, resetDraft])
 
   useEffect(() => {
     if (!activeMultiSelect) return
@@ -424,12 +434,12 @@ export function TenantFormPage() {
   }
 
   function revertTenant() {
-    setDraft(cloneTenant(persistedTenant))
+    resetDraft(cloneTenant(persistedTenant))
     setMessages([])
   }
 
   function cancelTenant() {
-    setDraft(cloneTenant(persistedTenant))
+    resetDraft(cloneTenant(persistedTenant))
     navigate('/tenants')
   }
 
@@ -608,6 +618,14 @@ export function TenantFormPage() {
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canUndo}
+          onClick={undoDraft}
+        >
+          Undo
+        </button>
         <button
           type="button"
           className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"

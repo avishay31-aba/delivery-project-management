@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/record'
 import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { useAppStore } from '@/store/useAppStore'
+import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   allocationModeLabelForProject,
   allowedAllocationModes,
@@ -380,7 +381,16 @@ export function ProjectFormPage() {
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
-  const [draft, setDraft] = useState<Project | null>(savedProject ? cloneProjectDraft(savedProject) : null)
+  const {
+    value: draft,
+    setValue: setDraft,
+    reset: resetDraft,
+    undo: undoDraft,
+    canUndo,
+  } = useUndoHistory<Project | null>(savedProject ? cloneProjectDraft(savedProject) : null, {
+    clone: (value) => (value ? cloneProjectDraft(value) : value),
+    isEqual: valuesEqual,
+  })
   const [activeTab, setActiveTab] = useState<ProjectFormTab>('milestones')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
@@ -407,8 +417,8 @@ export function ProjectFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
   useEffect(() => {
-    setDraft(savedProject ? cloneProjectDraft(savedProject) : null)
-  }, [savedProject])
+    resetDraft(savedProject ? cloneProjectDraft(savedProject) : null)
+  }, [savedProject, resetDraft])
 
   useEffect(() => {
     const taskIds = new Set((draft?.tasks ?? []).map((task) => task.id))
@@ -599,12 +609,12 @@ export function ProjectFormPage() {
   }
 
   function revertProject() {
-    setDraft(cloneProjectDraft(persistedProject))
+    resetDraft(cloneProjectDraft(persistedProject))
     setSaveMessages([])
   }
 
   function cancelProject() {
-    setDraft(cloneProjectDraft(persistedProject))
+    resetDraft(cloneProjectDraft(persistedProject))
     navigate('/projects')
   }
 
@@ -710,6 +720,9 @@ export function ProjectFormPage() {
             </div>
           ) : null}
         </div>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
+          Undo
+        </button>
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
           Revert
         </button>
@@ -1758,7 +1771,21 @@ export function ProjectFormPage() {
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Details', 'Actions', 'SID', 'PIDs', 'Time Group', 'Operational Status', 'Environment', 'Core Details', 'Modules', 'AI', 'Additional Features'].map((label) => (
+                  {[
+                    'Details',
+                    'Actions',
+                    'SID',
+                    'PIDs',
+                    'Time Group',
+                    'Operational Status',
+                    'Environment',
+                    'Hosting',
+                    'Cloud Platform',
+                    'Product',
+                    'Modules',
+                    'AI',
+                    'Additional Features',
+                  ].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1822,14 +1849,16 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Core Details'])}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudPlatform}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
                       <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Modules / #users', 'Modules'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['AI'])}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Additional features'])}</td>
                     </tr>,
                     isExpanded ? (
                       <tr key={`${system.id}-details`}>
-                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={11}>
+                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={13}>
                           {renderLinkedSystemDetails(system)}
                         </td>
                       </tr>
