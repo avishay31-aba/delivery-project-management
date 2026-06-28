@@ -928,8 +928,12 @@ export function DataDashboard<T extends { id: string }>({
 
   function frozenColumnClassName(index: number, isHeader = false): string {
     if (!isFreezeEnabled || index >= 3) return ''
+    const isLastFrozenColumn = index === 2
     return joinClassNames(
-      'sticky shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
+      'sticky',
+      isLastFrozenColumn
+        ? 'shadow-[2px_0_0_0_rgba(16,185,129,0.65)]'
+        : 'shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
       isHeader ? 'z-30 bg-sf-surface-alt' : 'z-20 bg-inherit',
     )
   }
@@ -1473,7 +1477,13 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
 
           <button
             type="button"
-            className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt"
+            aria-pressed={isFreezeEnabled}
+            className={joinClassNames(
+              'rounded border px-3 py-1 font-medium',
+              isFreezeEnabled
+                ? 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                : 'border-sf-border text-sf-text hover:bg-sf-surface-alt',
+            )}
             onClick={() => setIsFreezeEnabled((current) => !current)}
           >
             {isFreezeEnabled ? 'Unfreeze Columns' : 'Freeze Columns'}
