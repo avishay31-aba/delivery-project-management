@@ -1094,7 +1094,7 @@ function InventoryForm<T extends InventoryRecord>({
         actions={renderActionButtons()}
       />
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
+      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
       {messages.length > 0 ? (
         <div className={messages.some((message) => message.includes('cannot') || message.includes('required') || message.includes('unique')) ? 'rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {messages.map((message) => (

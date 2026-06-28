@@ -762,7 +762,7 @@ export function DataDashboard<T extends { id: string }>({
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
-  const [isFreezeEnabled, setIsFreezeEnabled] = useState(true)
+  const [isFreezeEnabled, setIsFreezeEnabled] = useState(false)
   const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)

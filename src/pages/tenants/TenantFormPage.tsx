@@ -1341,7 +1341,7 @@ export function TenantFormPage() {
         subtitle={`${formType === 'POC' ? 'Tenant form-POC' : 'Tenant form-Customer'} foundation`}
         actions={renderActionButtons()}
       />
-      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
+      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
       {messages.length > 0 ? (
         <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
           {messages.map((message) => <div key={message}>{message}</div>)}

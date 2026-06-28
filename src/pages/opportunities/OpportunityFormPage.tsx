@@ -1660,7 +1660,7 @@ export function OpportunityFormPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-auto pr-1">
+      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
       {saveMessages.length > 0 ? (
         <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <p className="font-semibold">Save blocked</p>

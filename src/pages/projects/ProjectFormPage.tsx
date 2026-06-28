@@ -55,8 +55,10 @@ import {
 } from '@/domain/project-lifecycle'
 import {
   APPLICATION_CONFIGURATION_FIELDS,
+  type SharedFieldMetadata,
   type ApplicationConfigurationFieldMetadata,
 } from '@/domain/application-configuration'
+import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import {
   hostingContextFromSource,
   type HostingContext,
@@ -201,29 +203,31 @@ function systemApplicationConfigurationValue(system: System, field: ApplicationC
   return (system as unknown as Record<string, unknown>)[field.configKey]
 }
 
-function applicationConfigurationValueForRecord(record: System | Tenant, field: ApplicationConfigurationFieldMetadata): unknown {
-  if (field.configKey === 'product') return record.productType
+function deliveryConfigurationValue(record: System | Tenant, field: SharedFieldMetadata): unknown {
+  if (field.key === 'hostingType') {
+    return 'hostingSnapshot' in record && record.hostingSnapshot
+      ? record.hostingSnapshot.hostingType
+      : record.hostingType
+  }
+  if (field.key === 'cloudPlatform') {
+    return 'hostingSnapshot' in record && record.hostingSnapshot
+      ? record.hostingSnapshot.platform
+      : record.cloudPlatform
+  }
+  if (field.key === 'productType') {
+    return 'configuration' in record && record.configuration?.product
+      ? record.configuration.product
+      : record.productType
+  }
   if ('configuration' in record && record.configuration) {
-    const configurationValue = (record.configuration as unknown as Record<string, unknown>)[field.configKey]
+    const configurationValue = (record.configuration as unknown as Record<string, unknown>)[field.key]
     if (configurationValue !== undefined) return configurationValue
   }
-  const directRecord = record as unknown as Record<string, unknown>
-  return directRecord[field.configKey] ?? directRecord[field.key]
+  return (record as unknown as Record<string, unknown>)[field.key]
 }
 
-function applicationConfigurationSummary(record: System | Tenant, groups: string[]): string {
-  const values = APPLICATION_CONFIGURATION_FIELDS
-    .filter((field) => groups.includes(field.group))
-    .map((field) => {
-      const value = applicationConfigurationValueForRecord(record, field)
-      if (Array.isArray(value)) return value.length > 0 ? `${field.label}: ${value.join(', ')}` : ''
-      if (value === null || value === undefined || value === '' || value === 'NO') return ''
-      if (typeof value === 'number' && value <= 0) return ''
-      return `${field.label}: ${String(value)}`
-    })
-    .filter(Boolean)
-
-  return values.join('; ') || '-'
+function deliveryConfigurationDisplayValue(record: System | Tenant, field: SharedFieldMetadata): string {
+  return formatReadOnlyDetailValue(deliveryConfigurationValue(record, field))
 }
 
 function detailGroups<T extends { group: string }>(fields: T[]): Array<{ group: string; fields: T[] }> {
@@ -256,6 +260,23 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
         <Square className="h-3 w-4 fill-emerald-100 stroke-0 text-emerald-100" aria-hidden="true" />
       )}
       <span>{projectStatusLabel(status)}</span>
+    </span>
+  )
+}
+
+function OperationalStatusBadge({ status }: { status: string }) {
+  const normalized = status.toUpperCase()
+  const Icon = normalized.includes('DELETED') || normalized.includes('INACTIVE') ? X : normalized.includes('ACTIVE') ? Check : Square
+  const colorClass = normalized.includes('DELETED') || normalized.includes('INACTIVE')
+    ? 'text-red-600'
+    : normalized.includes('ACTIVE')
+      ? 'text-blue-800'
+      : 'fill-emerald-100 stroke-0 text-emerald-100'
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon className={`h-4 w-4 ${colorClass}`} aria-hidden="true" />
+      <span>{status || '-'}</span>
     </span>
   )
 }
@@ -1778,13 +1799,8 @@ export function ProjectFormPage() {
                     'PIDs',
                     'Time Group',
                     'Operational Status',
-                    'Environment',
-                    'Hosting',
-                    'Cloud Platform',
-                    'Product',
-                    'Modules',
-                    'AI',
-                    'Additional Features',
+                    'Delivery',
+                    ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => field.label),
                   ].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
@@ -1847,18 +1863,17 @@ export function ProjectFormPage() {
                         })}
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.operationalStatus}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={system.operationalStatus} /></td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.hostingType}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.cloudPlatform}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.productType}</td>
-                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Modules / #users', 'Modules'])}</td>
-                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['AI'])}</td>
-                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(system, ['Additional features'])}</td>
+                      {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
+                        <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {deliveryConfigurationDisplayValue(system, field)}
+                        </td>
+                      ))}
                     </tr>,
                     isExpanded ? (
                       <tr key={`${system.id}-details`}>
-                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={13}>
+                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={7 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
                           {renderLinkedSystemDetails(system)}
                         </td>
                       </tr>
@@ -1875,14 +1890,27 @@ export function ProjectFormPage() {
         )}
         </div>
 
-        <div className="space-y-2">
-          <h3 className="text-base font-semibold text-sf-text">Tenants</h3>
-          {linkedTenants.length > 0 ? (
+        {[
+          { title: 'Under Contract', rows: linkedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT') },
+          { title: 'Out of Contract', rows: linkedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT') },
+        ].map((section) => (
+        <div key={section.title} className="space-y-2">
+          <h3 className="text-base font-semibold text-sf-text">{section.title}</h3>
+          {section.rows.length > 0 ? (
           <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['TID', 'SID', 'Account Name', 'Country', 'Time Group', 'Operational Status', 'Environment', 'Core Details', 'Modules', 'AI', 'Additional Features'].map((label) => (
+                  {[
+                    'TID',
+                    'SID',
+                    'Account Name',
+                    'Country',
+                    'Time Group',
+                    'Operational Status',
+                    'Environment',
+                    ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => field.label),
+                  ].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1890,7 +1918,7 @@ export function ProjectFormPage() {
                 </tr>
               </thead>
               <tbody>
-                {linkedTenants.map((tenant) => {
+                {section.rows.map((tenant) => {
                   const system = systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
                   return (
                     <tr key={tenant.id} className="hover:bg-sf-surface-alt">
@@ -1906,12 +1934,13 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.operationalStatus}</td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={tenant.operationalStatus} /></td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantType}</td>
-                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Core Details'])}</td>
-                      <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Modules / #users', 'Modules'])}</td>
-                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['AI'])}</td>
-                      <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">{applicationConfigurationSummary(tenant, ['Additional features'])}</td>
+                      {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
+                        <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                          {deliveryConfigurationDisplayValue(tenant, field)}
+                        </td>
+                      ))}
                     </tr>
                   )
                 })}
@@ -1920,10 +1949,11 @@ export function ProjectFormPage() {
           </div>
         ) : (
           <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-            No tenants are linked to this Project yet.
+            No {section.title.toLowerCase()} tenants are linked to this Project.
           </div>
         )}
         </div>
+        ))}
       </CollapsibleSection>
     )
   }
@@ -1980,7 +2010,7 @@ export function ProjectFormPage() {
         actions={renderActionButtons()}
       />
 
-      <div className="min-h-0 flex-1 overflow-auto pr-1">
+      <div className="sf-form-content-scroll min-h-0 flex-1 pb-2 pr-1">
       {saveMessages.length > 0 ? (
         <div className={saveMessages.some((message) => message.includes('required')) ? 'mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'mb-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {saveMessages.map((message) => (
