@@ -29,13 +29,16 @@ export function RecordChangeBadge({
   record,
   className,
   placeholder = false,
+  labels,
 }: {
   record: { createdAt?: string; updatedAt?: string }
   className?: string
   placeholder?: boolean
+  labels?: Partial<Record<RecordChangeState, string>>
 }) {
   const state = recordChangeState(record)
   if (!state) return placeholder ? <span className="block min-w-14" aria-hidden="true" /> : null
+  const label = labels?.[state] ?? state
 
   return (
     <span
@@ -46,10 +49,10 @@ export function RecordChangeBadge({
           : 'border-amber-300 bg-amber-100 text-amber-900',
         className,
       )}
-      title={state}
-      aria-label={state}
+      title={label}
+      aria-label={label}
     >
-      {state}
+      {label}
     </span>
   )
 }

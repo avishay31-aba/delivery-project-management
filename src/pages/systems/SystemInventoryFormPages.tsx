@@ -128,7 +128,7 @@ function ProductLogoIcon({ product }: { product: string }) {
 }
 
 const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
-  On: 'text-green-500',
+  On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
   Off: 'text-red-500',
   'Access blocked': 'text-amber-500',
   'Service blocked': 'text-orange-500',
@@ -172,6 +172,10 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 function textValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
   return value == null ? '' : String(value)
+}
+
+function normalizeProduct(value: unknown): string {
+  return textValue(value).trim().toLocaleLowerCase()
 }
 
 function readRecordValue(record: InventoryRecord, key: string): unknown {
@@ -255,7 +259,7 @@ function OperationalStatusBadge({ value }: { value: string }) {
 
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <Icon className={['h-4 w-4', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
+      <Icon className={['h-5 w-5 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
       {value || 'Not set'}
     </span>
   )
@@ -278,7 +282,7 @@ function LargeStatusIcon({ status }: { status: string }) {
                 : ServerOff
 
   return (
-    <Icon className={['h-8 w-8', OPERATIONAL_STATUS_ICON_STYLES[status] ?? 'text-slate-400'].join(' ')} aria-label={`Operational status: ${status || 'Not set'}`} />
+    <Icon className={['h-9 w-9 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[status] ?? 'text-slate-400'].join(' ')} aria-label={`Operational status: ${status || 'Not set'}`} />
   )
 }
 
@@ -787,7 +791,20 @@ function InventoryForm<T extends InventoryRecord>({
 
   function createTenantFromSelection() {
     if (!selectedProjectId || !selectedRequirementId) return
-    const systemId = allocatedSystemForTenantCreation()?.id ?? activeRecord.id
+    const selectedRequirement = newTenantRequirementsForProject(selectedProjectId).find(
+      (requirement) => requirement.id === selectedRequirementId,
+    )
+    const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
+    const systemProduct = normalizeProduct(readRecordValue(systemForTenant, 'productType'))
+    const requirementProduct = normalizeProduct(selectedRequirement?.productType)
+    if (selectedRequirement && systemProduct && requirementProduct && systemProduct !== requirementProduct) {
+      setMessages([
+        `Tenant cannot be added because the requirement product (${selectedRequirement.productType}) does not match this system product (${textValue(readRecordValue(systemForTenant, 'productType'))}).`,
+      ])
+      return
+    }
+
+    const systemId = systemForTenant.id
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     setMessages([result.message])
     if (result.ok) {
@@ -819,26 +836,26 @@ function InventoryForm<T extends InventoryRecord>({
     const hostedTenants = hostedTenantsForDraft()
     const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
     const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
-    const tenantHeaders = [
-      'TID',
-      'Customer / End User Name',
-      'Delivery PID',
-      'Operational Status',
-      ...TENANT_CONFIGURATION_FIELDS.map((column) => column.label),
-    ]
+    const tenantHeaders = ['TID', 'Customer / End User Name', 'Delivery PID', 'Operational Status']
 
     function renderHostedTenantSection(title: string, sectionTenants: Tenant[]) {
       return (
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">{title}</h3>
           {sectionTenants.length > 0 ? (
-            <div className="overflow-x-auto rounded border border-sf-border bg-white">
+            <div className="sf-scroll-x rounded border border-sf-border bg-white">
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
                     {tenantHeaders.map((label) => (
                       <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                         {label}
+                      </th>
+                    ))}
+                    {TENANT_CONFIGURATION_FIELDS.map((column) => (
+                      <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                        <span>{column.label}</span>
+                        <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
                       </th>
                     ))}
                   </tr>
@@ -1029,9 +1046,9 @@ function InventoryForm<T extends InventoryRecord>({
             </button>
           </div>
 
-          <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-            <FormField label="PID" controlWidthClassName="w-full">
-              <select className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
+          <div className="grid gap-4 p-4 lg:grid-cols-2">
+            <FormField label="PID" controlWidthClassName="w-full min-w-0">
+              <select className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
                 {linkedProjects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.pid} - {project.opportunityName}
@@ -1040,7 +1057,7 @@ function InventoryForm<T extends InventoryRecord>({
               </select>
             </FormField>
 
-            <FormField label="Tenant Requirement ID" controlWidthClassName="w-full">
+            <FormField label="Tenant Requirement ID" controlWidthClassName="w-full min-w-0">
               <select
                 className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm"
                 value={selectedRequirementId}
@@ -1056,7 +1073,7 @@ function InventoryForm<T extends InventoryRecord>({
               </select>
             </FormField>
 
-            <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text-muted md:col-span-2">
+            <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text-muted lg:col-span-2">
               {selectedProject
                 ? `Only New Tenant Requirement rows from ${selectedProject.pid} are available here. Change Request and Standard Renewal rows are excluded.`
                 : 'No linked project is available for this system.'}

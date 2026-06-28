@@ -20,9 +20,10 @@
   }
 
   .sf-scroll-x {
-    @apply overflow-x-auto border-b border-sf-border;
+    @apply overflow-x-scroll border-b border-sf-border;
     scrollbar-color: #94a3b8 #e2e8f0;
     scrollbar-width: thin;
+    scrollbar-gutter: stable;
   }
 
   .sf-scroll-x::-webkit-scrollbar {

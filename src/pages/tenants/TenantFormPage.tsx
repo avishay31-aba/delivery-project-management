@@ -182,14 +182,14 @@ function resolveOpportunity(project: Project | undefined, opportunities: Opportu
   )
 }
 
-function ReadonlyTable({ headers, rows, emptyText }: { headers: string[]; rows: ReactNode[][]; emptyText: string }) {
+function ReadonlyTable({ headers, rows, emptyText }: { headers: ReactNode[]; rows: ReactNode[][]; emptyText: string }) {
   return rows.length > 0 ? (
     <div className="overflow-x-auto rounded border border-sf-border bg-white">
       <table className="min-w-full border-collapse text-sm leading-tight">
         <thead className="bg-sf-surface-alt text-left">
           <tr>
-            {headers.map((header) => (
-              <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+            {headers.map((header, index) => (
+              <th key={index} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                 {header}
               </th>
             ))}
@@ -1085,7 +1085,17 @@ export function TenantFormPage() {
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>
         <ReadonlyTable
-          headers={['Record ID', 'Timestamp', 'Recorded By', ...CONFIGURATION_FIELDS.map((field) => field.label)]}
+          headers={[
+            'Record ID',
+            'Timestamp',
+            'Recorded By',
+            ...CONFIGURATION_FIELDS.map((field) => (
+              <span key={field.key}>
+                <span>{field.label}</span>
+                <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
+              </span>
+            )),
+          ]}
           rows={records.map((record: TenantConfigurationHistoryRecord) => [
             record.recordId,
             record.timestamp,

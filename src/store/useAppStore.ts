@@ -382,6 +382,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       salesManagerId: defaultSalesManagerId,
       type,
       subType,
+      dealPackage: 'Silver',
       deliveryDate: null,
       pocStartDate: null,
       pocEndDate: null,

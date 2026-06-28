@@ -25,6 +25,7 @@ import type {
   ChangeRequestRequirement,
   NewTenantRequirement,
   Opportunity,
+  OpportunityDealPackage,
   OpportunitySubType,
   OpportunityType,
   Project,
@@ -929,7 +930,7 @@ export function OpportunityFormPage() {
     if (key === 'salesManagerId') return 'w-56'
     if (key === 'opportunityId' || key === 'timeZone') return 'w-48'
     if (key === 'deliveryDate' || key === 'pocStartDate' || key === 'pocEndDate') return 'w-40'
-    if (key === 'warrantyServiceMonths') return 'w-36'
+    if (key === 'warrantyServiceMonths' || key === 'dealPackage') return 'w-36'
     if (key === 'type' || key === 'subType' || key === 'region' || key === 'country' || key === 'state') return 'w-36'
     return 'w-32'
   }
@@ -1011,7 +1012,11 @@ export function OpportunityFormPage() {
       patchDraft({
         newTenantRequirements: [
           ...currentDraft.newTenantRequirements,
-          createNewTenantRequirement(currentDraft.newTenantRequirements.length, currentDraft.country),
+          createNewTenantRequirement(
+            currentDraft.newTenantRequirements.length,
+            currentDraft.country,
+            currentDraft.dealPackage ?? 'Silver',
+          ),
         ],
       })
       return
@@ -1288,6 +1293,22 @@ export function OpportunityFormPage() {
       )
     }
 
+    if (field.key === 'dealPackage') {
+      return (
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+          <select
+            className={headerControlClassName(headerChanged('dealPackage'), true, headerMissing(field.key))}
+            value={currentDraft.dealPackage ?? 'Silver'}
+            onChange={(event) => patchDraft({ dealPackage: event.target.value as OpportunityDealPackage })}
+          >
+            <option value="Silver">Silver</option>
+            <option value="Gold">Gold</option>
+            <option value="Platinum">Platinum</option>
+          </select>
+        </FormField>
+      )
+    }
+
     if (field.key === 'warrantyRecordId') {
       const tenantIds = new Set(accountTenants.map((tenant) => tenant.id))
       const accountWarrantyRecords = warrantyRecords.filter((record) => tenantIds.has(record.tenantId))
@@ -1397,6 +1418,7 @@ export function OpportunityFormPage() {
     'timeZone',
   ]
   const commercialTermKeys: OpportunityHeaderField['key'][] = [
+    'dealPackage',
     'warrantyRecordId',
     'deliveryDate',
     'pocStartDate',

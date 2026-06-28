@@ -10,6 +10,7 @@ export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
 export type OpportunityStage = 'OPEN' | 'POC' | 'WON'
 export type OpportunityFinancialProfile = 'FREE' | 'PAID'
+export type OpportunityDealPackage = 'Silver' | 'Gold' | 'Platinum'
 export type RequirementType = 'A' | 'B' | 'C'
 export type RequirementDeployTarget = 'NEW_SYSTEM' | 'EXISTING_SID'
 export type YesNo = 'YES' | 'NO' | ''
@@ -195,6 +196,7 @@ export interface Opportunity {
   type: OpportunityType
   subType: OpportunitySubType
   financialProfile?: OpportunityFinancialProfile
+  dealPackage?: OpportunityDealPackage
   deliveryDate: string | null
   pocStartDate: string | null
   pocEndDate: string | null

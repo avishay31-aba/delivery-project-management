@@ -270,12 +270,12 @@ function OperationalStatusBadge({ status }: { status: string }) {
   const colorClass = normalized.includes('DELETED') || normalized.includes('INACTIVE')
     ? 'text-red-600'
     : normalized.includes('ACTIVE')
-      ? 'text-blue-800'
-      : 'fill-emerald-100 stroke-0 text-emerald-100'
+      ? 'text-emerald-500'
+      : 'fill-emerald-200 stroke-emerald-500 text-emerald-500'
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <Icon className={`h-4 w-4 ${colorClass}`} aria-hidden="true" />
+    <span className="inline-flex items-center gap-1.5 font-semibold">
+      <Icon className={`h-5 w-5 stroke-[3] ${colorClass}`} aria-hidden="true" />
       <span>{status || '-'}</span>
     </span>
   )
@@ -1800,10 +1800,15 @@ export function ProjectFormPage() {
                     'Time Group',
                     'Operational Status',
                     'Delivery',
-                    ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => field.label),
                   ].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
+                    </th>
+                  ))}
+                  {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
+                    <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                      <span>{field.label}</span>
+                      <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
                     </th>
                   ))}
                 </tr>
@@ -1849,7 +1854,7 @@ export function ProjectFormPage() {
                           <LinkId to={systemRoutePath(system)}>
                             {system.sid ?? system.machineId ?? system.id}
                           </LinkId>
-                          <RecordChangeBadge record={system} />
+                          <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                         </span>
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -1909,10 +1914,15 @@ export function ProjectFormPage() {
                     'Time Group',
                     'Operational Status',
                     'Environment',
-                    ...TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => field.label),
                   ].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
+                    </th>
+                  ))}
+                  {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
+                    <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                      <span>{field.label}</span>
+                      <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
                     </th>
                   ))}
                 </tr>
