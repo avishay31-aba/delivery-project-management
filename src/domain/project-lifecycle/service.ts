@@ -629,13 +629,36 @@ export function activeSystemLinksForProject(projectId: string, projectSystems: P
   return activeProjectSystemLinks(projectSystems).filter((link) => link.projectId === projectId)
 }
 
+function referencedTenantIdsForOpportunity(opportunity: Opportunity | undefined): Set<string> {
+  return new Set([
+    ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.tenantId),
+    ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.tenantId),
+  ].filter(Boolean))
+}
+
+function referencedSystemIdsForOpportunity(opportunity: Opportunity | undefined): Set<string> {
+  return new Set([
+    ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.systemId),
+    ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.systemId),
+  ].filter(Boolean))
+}
+
 export function linkedSystemsForProject(
   project: Project | undefined,
   systems: System[],
   activeSystemLinks: ProjectSystemLink[],
+  opportunity?: Opportunity,
+  tenants: Tenant[] = [],
 ): System[] {
   if (!project) return []
   const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
+  referencedSystemIdsForOpportunity(opportunity).forEach((systemId) => linkedSystemIds.add(systemId))
+  const referencedTenantIds = referencedTenantIdsForOpportunity(opportunity)
+  tenants.forEach((tenant) => {
+    if (!referencedTenantIds.has(tenant.id)) return
+    const systemId = tenant.hostedSystemId || tenant.systemId
+    if (systemId) linkedSystemIds.add(systemId)
+  })
   return systems.filter((system) => linkedSystemIds.has(system.id))
 }
 
@@ -644,6 +667,7 @@ export function linkedTenantsForProject(
   linkedSystems: System[],
   projectTenants: ProjectTenantLink[],
   tenants: Tenant[],
+  opportunity?: Opportunity,
 ): Tenant[] {
   if (!project) return []
   const linkedTenantIds = new Set(
@@ -651,6 +675,7 @@ export function linkedTenantsForProject(
       .filter((link) => link.projectId === project.id)
       .map((link) => link.tenantId),
   )
+  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
   linkedSystems.forEach((system) => {
     tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
   })

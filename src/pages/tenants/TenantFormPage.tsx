@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Ban, Check, ChevronDown, CircleCheck, LockKeyhole, Plus, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -80,6 +80,18 @@ type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementC
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
 type WarrantyDialogDraft = Pick<TenantWarranty, 'id' | 'relatedProjectId' | 'predecessor' | 'startDate' | 'endDate' | 'noWarranty' | 'remark'>
+
+const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
+  Operative: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
+  On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
+  Off: 'text-red-500',
+  'Access Blocked': 'text-amber-500',
+  'Access Blocked - Password Reset': 'text-amber-500',
+  'Service Blocked': 'text-orange-500',
+  Deleted: 'text-gray-500',
+  Cancelled: 'text-purple-500',
+  Canceled: 'text-purple-500',
+}
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
@@ -687,6 +699,30 @@ export function TenantFormPage() {
     setMessages([])
   }
 
+  function renderOperationalStatusOption(value: string) {
+    const Icon =
+      value === 'Operative' || value === 'On'
+        ? CircleCheck
+        : value === 'Off'
+          ? PowerOff
+          : value === 'Access Blocked' || value === 'Access Blocked - Password Reset'
+            ? LockKeyhole
+            : value === 'Service Blocked'
+              ? ShieldX
+              : value === 'Deleted'
+                ? Trash2
+                : value === 'Cancelled' || value === 'Canceled'
+                  ? Ban
+                  : ServerOff
+
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5">
+        <Icon className={['h-5 w-5 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
+        <span className="truncate">{value || 'Not set'}</span>
+      </span>
+    )
+  }
+
   function renderOperationalModeField() {
     const derivedMode = derivedTenantOperationalMode(activeSystem)
     const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
@@ -706,10 +742,7 @@ export function TenantFormPage() {
             aria-expanded={operationalStatusOpen}
             onClick={() => setOperationalStatusOpen((current) => !current)}
           >
-            <span className="inline-flex min-w-0 items-center gap-1.5">
-              <AlertStatusIcon variant={operationalStatusVariant(currentMode)} />
-              <span className="truncate">{selectedLabel || 'Not set'}</span>
-            </span>
+            {renderOperationalStatusOption(selectedLabel)}
             <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
           </button>
           {operationalStatusOpen ? (
@@ -724,8 +757,7 @@ export function TenantFormPage() {
                     setOperationalStatusOpen(false)
                   }}
                 >
-                  <AlertStatusIcon variant={operationalStatusVariant(option.label)} />
-                  <span className="truncate">{option.label || 'Not set'}</span>
+                  {renderOperationalStatusOption(option.label)}
                 </button>
               ))}
             </div>
@@ -736,13 +768,6 @@ export function TenantFormPage() {
         </span>
       </FormField>
     )
-  }
-
-  function operationalStatusVariant(value: string): 'success' | 'warning' | 'danger' | 'info' {
-    const normalized = value.toLocaleLowerCase()
-    if (normalized.includes('service')) return 'warning'
-    if (normalized.includes('blocked') || normalized.includes('off') || normalized.includes('deleted')) return 'danger'
-    return value ? 'success' : 'info'
   }
 
   function renderSystemStatus(value: string) {

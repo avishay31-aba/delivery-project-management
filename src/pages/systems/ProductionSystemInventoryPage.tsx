@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
@@ -9,6 +10,10 @@ export function ProductionSystemInventoryPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.productionSystemInventory)
+  const sortedSystems = useMemo(
+    () => [...systems].sort((first, second) => String(second.sid).localeCompare(String(first.sid), undefined, { numeric: true })),
+    [systems],
+  )
   const createSystem = useAppStore((state) => state.createProductionSystemInventoryItem)
   const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
 
@@ -21,7 +26,7 @@ export function ProductionSystemInventoryPage() {
       <DataDashboard
         title="Production System Inventory"
         dashboardScope="productionSystemInventory"
-        rows={systems}
+        rows={sortedSystems}
         columns={productionSystemInventoryColumns}
         toolbar={
           <button

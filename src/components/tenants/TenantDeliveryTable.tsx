@@ -109,6 +109,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
               'TID',
               'SID',
               'MID',
+              'PID',
               'Account Name',
               'Country',
               'Time Group',
@@ -148,6 +149,9 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {system?.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
+                </td>
+                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                  {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : '-'}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>

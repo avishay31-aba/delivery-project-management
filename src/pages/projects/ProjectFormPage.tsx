@@ -467,11 +467,11 @@ export function ProjectFormPage() {
     return activeSystemLinksForProject(currentDraft.id, projectSystems)
   }, [currentDraft, projectSystems])
   const linkedSystems = useMemo(() => {
-    return linkedSystemsForProject(currentDraft, systems, activeSystemLinks)
-  }, [activeSystemLinks, currentDraft, systems])
+    return linkedSystemsForProject(currentDraft, systems, activeSystemLinks, linkedOpportunity, tenants)
+  }, [activeSystemLinks, currentDraft, linkedOpportunity, systems, tenants])
   const linkedTenants = useMemo(() => {
-    return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants)
-  }, [currentDraft, linkedSystems, projectTenants, tenants])
+    return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants, linkedOpportunity)
+  }, [currentDraft, linkedOpportunity, linkedSystems, projectTenants, tenants])
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
   const missingFields = new Set<string>()
 

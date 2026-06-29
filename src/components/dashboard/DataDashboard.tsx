@@ -764,7 +764,7 @@ export function DataDashboard<T extends { id: string }>({
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
   const [isFreezeEnabled, setIsFreezeEnabled] = useState(false)
-  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set())
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set())
   const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
@@ -821,7 +821,7 @@ export function DataDashboard<T extends { id: string }>({
   }, [sourceColumnIds])
 
   useEffect(() => {
-    setExpandedGroupIds(new Set())
+    setCollapsedGroupIds(new Set())
   }, [grouping])
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
@@ -1319,21 +1319,39 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
     return column ? String(column.columnDef.header) : groupColumnId
   }
 
-  function groupSummaryRows(): Array<{ value: string; count: number }> {
+  function groupSummaryRows(): Array<{ value: string; count: number; additionalCounts: string }> {
     const groupColumnId = grouping[0]
     if (!groupColumnId) return []
-    const counts = new Map<string, number>()
+    const rowsByValue = new Map<string, Array<Row<T>>>()
     table.getFilteredRowModel().rows.forEach((row) => {
       const value = String(row.getValue(groupColumnId) ?? 'Not set') || 'Not set'
-      counts.set(value, (counts.get(value) ?? 0) + 1)
+      rowsByValue.set(value, [...(rowsByValue.get(value) ?? []), row])
     })
-    return Array.from(counts.entries())
-      .map(([value, count]) => ({ value, count }))
+
+    const countableColumns = table.getVisibleLeafColumns().filter((column) => {
+      if (column.id === ROW_INDICATOR_COLUMN_ID || column.id === groupColumnId) return false
+      const values = table.getFilteredRowModel().rows
+        .map((row) => row.getValue(column.id))
+        .filter((value) => value !== null && value !== undefined && value !== '')
+      return values.length > 0 && values.every((value) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))))
+    })
+
+    return Array.from(rowsByValue.entries())
+      .map(([value, groupedRows]) => ({
+        value,
+        count: groupedRows.length,
+        additionalCounts: countableColumns
+          .map((column) => {
+            const total = groupedRows.reduce((sum, row) => sum + Number(row.getValue(column.id) ?? 0), 0)
+            return `${String(column.columnDef.header)}: ${total}`
+          })
+          .join('; ') || '-',
+      }))
       .sort((first, second) => first.value.localeCompare(second.value))
   }
 
   function toggleGroup(rowId: string) {
-    setExpandedGroupIds((current) => {
+    setCollapsedGroupIds((current) => {
       const next = new Set(current)
       if (next.has(rowId)) {
         next.delete(rowId)
@@ -1347,7 +1365,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   function renderDashboardRows(rowsToRender: Array<Row<T>>): ReactNode[] {
     return rowsToRender.flatMap((row) => {
       if (row.getIsGrouped()) {
-        const isExpanded = expandedGroupIds.has(row.id)
+        const isExpanded = !collapsedGroupIds.has(row.id)
         return [
           <tr key={`${row.id}-group`} className="bg-sf-surface-alt">
             <td className="border-y border-sf-border px-3 py-2 text-sm font-semibold text-sf-text" colSpan={table.getVisibleLeafColumns().length}>
@@ -1739,13 +1757,26 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               <tfoot className="bg-sf-surface-alt">
                 <tr>
                   <td className="border-t border-sf-border px-3 py-2 text-sm font-semibold text-sf-text" colSpan={table.getVisibleLeafColumns().length}>
-                    <div className="flex flex-wrap gap-2">
-                      {groupSummaryRows().map((summary) => (
-                        <span key={summary.value} className="rounded border border-sf-border bg-white px-2 py-1">
-                          {groupSummaryLabel()}: {summary.value} = {summary.count}
-                        </span>
-                      ))}
-                    </div>
+                    <table className="w-auto border-collapse bg-white text-sm">
+                      <thead className="bg-sf-surface-alt text-left">
+                        <tr>
+                          <th className="border border-sf-border px-2 py-1">Group Category</th>
+                          <th className="border border-sf-border px-2 py-1">Value</th>
+                          <th className="border border-sf-border px-2 py-1 text-right">Item Count</th>
+                          <th className="border border-sf-border px-2 py-1">Additional Counts</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupSummaryRows().map((summary) => (
+                          <tr key={summary.value}>
+                            <td className="border border-sf-border px-2 py-1">{groupSummaryLabel()}</td>
+                            <td className="border border-sf-border px-2 py-1">{summary.value}</td>
+                            <td className="border border-sf-border px-2 py-1 text-right">{summary.count}</td>
+                            <td className="border border-sf-border px-2 py-1">{summary.additionalCounts}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </td>
                 </tr>
               </tfoot>
