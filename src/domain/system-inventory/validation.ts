@@ -9,11 +9,13 @@ export function validateReusedInternalMachineId(
   records: SystemInventoryRecord[],
 ): SystemInventoryValidationMessage[] {
   if (!('machineId' in record)) return []
+  if ('systemClass' in record) return []
   const machineId = textValue(record.machineId).trim()
   const duplicateMid = records.some(
     (candidate) =>
       candidate.id !== record.id &&
       'machineId' in candidate &&
+      !('systemClass' in candidate) &&
       textValue(candidate.machineId).trim() === machineId,
   )
 

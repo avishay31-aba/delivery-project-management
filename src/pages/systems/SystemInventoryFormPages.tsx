@@ -701,7 +701,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function hostedTenantsForDraft(): Tenant[] {
-    return hostedTenantsForSystem(activeRecord.id, tenants)
+    return hostedTenantsForSystem((allocatedSystemForTenantCreation() ?? activeRecord).id, tenants)
   }
 
   function applicationSummaryProduct(): string {
@@ -1077,7 +1077,7 @@ function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="w-full max-w-3xl rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
+        <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="add-tenant-title" className="text-lg font-semibold text-sf-text">Add tenant</h2>
@@ -1088,7 +1088,7 @@ function InventoryForm<T extends InventoryRecord>({
             </button>
           </div>
 
-          <div className="grid gap-4 p-4 lg:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 overflow-auto p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             {addTenantMessages.length > 0 ? (
               <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700 lg:col-span-2" role="alert">
                 {addTenantMessages.map((message) => (
@@ -1096,8 +1096,8 @@ function InventoryForm<T extends InventoryRecord>({
                 ))}
               </div>
             ) : null}
-            <FormField label="PID" controlWidthClassName="w-full min-w-0">
-              <select className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
+            <FormField label="PID" controlWidthClassName="w-full min-w-0 max-w-full">
+              <select className="h-9 w-full min-w-0 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={selectedProjectId} onChange={(event) => handleSelectedProjectChange(event.target.value)}>
                 {linkedProjects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.pid} - {project.opportunityName}
@@ -1106,9 +1106,9 @@ function InventoryForm<T extends InventoryRecord>({
               </select>
             </FormField>
 
-            <FormField label="Tenant Requirement ID" controlWidthClassName="w-full min-w-0">
+            <FormField label="Tenant Requirement ID" controlWidthClassName="w-full min-w-0 max-w-full">
               <select
-                className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm"
+                className="h-9 w-full min-w-0 max-w-full truncate rounded border border-sf-border px-2 py-1 text-sm"
                 value={selectedRequirementId}
                 disabled={linkedProjects.length === 0}
                 onChange={(event) => setSelectedRequirementId(event.target.value)}
