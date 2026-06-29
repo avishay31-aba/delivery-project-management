@@ -42,9 +42,7 @@ function projectRow(project: Project, context: ProjectDashboardColumnContext): P
 
 function projectStatusVariant(status: string) {
   if (status === 'DONE') return 'done'
-  if (status === 'IN_PROGRESS') return 'in_progress'
-  if (status === 'OPEN') return 'open'
-  return 'default'
+  return 'open'
 }
 
 function renderChips(values: string[]) {
@@ -85,7 +83,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       getValue: (project) => projectRow(project, context).statusLabel,
       editable: true,
       editKey: 'progressStatus',
-      options: ['OPEN', 'IN_PROGRESS', 'DONE'],
+      options: ['OPEN', 'DONE'],
       render: (project) => {
         const row = projectRow(project, context)
         return createElement(StatusBadge, { label: row.statusLabel, variant: projectStatusVariant(row.status) })

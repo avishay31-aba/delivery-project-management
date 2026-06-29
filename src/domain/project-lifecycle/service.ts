@@ -292,7 +292,6 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
 
 export function projectStatusLabel(status: string): string {
   if (status === 'DONE') return 'Done'
-  if (status === 'IN_PROGRESS') return 'In progress'
   return 'Open'
 }
 
@@ -496,6 +495,8 @@ export function projectHeaderFieldValue(
       return project.pocStartDate ?? context.linkedOpportunity?.pocStartDate ?? ''
     case 'pocEndDate':
       return project.pocEndDate ?? context.linkedOpportunity?.pocEndDate ?? ''
+    case 'financialProfile':
+      return context.linkedOpportunity?.financialProfile ?? projectFinancialProfile(project, context.linkedOpportunity)
     case 'warrantyServiceMonths':
       return textValue(context.linkedOpportunity?.warrantyServiceMonths)
     case 'currentMilestone':

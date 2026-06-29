@@ -16,8 +16,10 @@ export function RichTextEditor({
   minHeightClassName = 'min-h-20',
   toolbarMode = 'always',
 }: RichTextEditorProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<HTMLDivElement | null>(null)
   const selectionRangeRef = useRef<Range | null>(null)
+  const toolbarInteractionRef = useRef(false)
   const [focused, setFocused] = useState(false)
 
   useEffect(() => {
@@ -67,23 +69,32 @@ export function RichTextEditor({
   const showToolbar = toolbarMode === 'always' || focused
 
   return (
-    <div className={className}>
+    <div ref={rootRef} className={className}>
       <div
         className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
+        onMouseDown={() => {
+          toolbarInteractionRef.current = true
+          setFocused(true)
+        }}
+        onMouseUp={() => {
+          window.setTimeout(() => {
+            toolbarInteractionRef.current = false
+          }, 0)
+        }}
       >
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onClick={() => apply('bold')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onMouseDown={(event) => event.preventDefault()} onClick={() => apply('bold')}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onClick={() => apply('italic')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onMouseDown={(event) => event.preventDefault()} onClick={() => apply('italic')}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onClick={() => apply('underline')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onMouseDown={(event) => event.preventDefault()} onClick={() => apply('underline')}>
           <Underline className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onClick={() => apply('insertUnorderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onMouseDown={(event) => event.preventDefault()} onClick={() => apply('insertUnorderedList')}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onClick={() => apply('insertOrderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onMouseDown={(event) => event.preventDefault()} onClick={() => apply('insertOrderedList')}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <label className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" title="Text color">
@@ -111,7 +122,11 @@ export function RichTextEditor({
         }}
         onKeyUp={rememberSelection}
         onMouseUp={rememberSelection}
-        onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+        onBlur={() => window.setTimeout(() => {
+          if (toolbarInteractionRef.current) return
+          if (rootRef.current?.contains(document.activeElement)) return
+          setFocused(false)
+        }, 120)}
       />
     </div>
   )

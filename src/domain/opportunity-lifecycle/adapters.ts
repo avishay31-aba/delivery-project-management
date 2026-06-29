@@ -65,6 +65,12 @@ export function syncOpportunityProjectsFromOpportunity(
     const project = {
       ...existingProject,
       ...buildProjectPatch(projectSource),
+      ...(projectSource === 'POC'
+        ? {
+            pocStartDate: existingProject.pocStartDate !== undefined ? existingProject.pocStartDate : nextOpportunity.pocStartDate,
+            pocEndDate: existingProject.pocEndDate !== undefined ? existingProject.pocEndDate : nextOpportunity.pocEndDate,
+          }
+        : {}),
     }
     projects = projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate))
     projectChanges.push({ projectId: project.id, changeStatus: 'Updated' })
@@ -78,6 +84,12 @@ export function syncOpportunityProjectsFromOpportunity(
       id: `proj-${crypto.randomUUID()}`,
       pid: nextProjectId.id,
       ...buildProjectPatch(projectSource),
+      ...(projectSource === 'POC'
+        ? {
+            pocStartDate: nextOpportunity.pocStartDate,
+            pocEndDate: nextOpportunity.pocEndDate,
+          }
+        : {}),
       progressStatus: 'OPEN',
       documents: [],
       createdAt: context.now,

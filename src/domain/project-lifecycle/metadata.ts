@@ -27,6 +27,7 @@ export type ProjectHeaderFieldKey =
   | 'deliveryDate'
   | 'pocStartDate'
   | 'pocEndDate'
+  | 'financialProfile'
   | 'warrantyServiceMonths'
   | 'progressStatus'
   | 'currentMilestone'
@@ -95,8 +96,9 @@ const POC_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = [
   { key: 'mainType', label: 'Project Type', editable: false, source: '2. Header' },
   { key: 'subType', label: 'Project sub type', editable: false, source: '2. Header' },
   { key: 'deliveryDate', label: 'Delivery date', editable: true, inputType: 'date', source: '2. Header' },
-  { key: 'pocStartDate', label: 'Start Date', editable: false, source: '2. Header' },
-  { key: 'pocEndDate', label: 'End Date', editable: false, source: '2. Header' },
+  { key: 'pocStartDate', label: 'Start Date', editable: true, inputType: 'date', source: '2. Header' },
+  { key: 'pocEndDate', label: 'End Date', editable: true, inputType: 'date', source: '2. Header' },
+  { key: 'financialProfile', label: 'Financial Profile', editable: false, source: '2. Header' },
   { key: 'progressStatus', label: 'Project status', editable: false, source: '2. Header' },
   { key: 'currentMilestone', label: 'Current milestone', editable: false, source: '2. Header' },
   { key: 'projectAlerts', label: 'Project Alerts', editable: false, source: '2. Header' },

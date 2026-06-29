@@ -29,6 +29,8 @@ export function normalizeProjectLifecycleProject(project: Project): Project {
   return {
     ...normalizeMilestonePlanProject(project),
     projectSource: projectSourceFor(project),
+    pocStartDate: project.pocStartDate ?? null,
+    pocEndDate: project.pocEndDate ?? null,
   }
 }
 

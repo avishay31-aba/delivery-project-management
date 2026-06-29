@@ -73,6 +73,7 @@ import {
   warrantyRecordPatch,
   warrantyRecordsForTenant,
 } from '@/domain/warranty-collection'
+import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
@@ -879,7 +880,7 @@ export function OpportunityFormPage() {
     [draft, systems],
   )
   const accountTenants = useMemo(
-    () => (draft ? getAccountTenants(draft.accountId, tenants) : []),
+    () => (draft ? getAccountTenants(draft.accountId, tenants).filter((tenant) => tenantFormType(tenant) !== 'INTERNAL') : []),
     [draft, tenants],
   )
   const createdProjects = useMemo(

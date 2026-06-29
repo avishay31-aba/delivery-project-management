@@ -18,9 +18,7 @@ export function recordChangeState(
   const updatedAt = timestampMs(record.updatedAt)
   if (createdAt == null || updatedAt == null) return null
 
-  if (record.createdAt === record.updatedAt) {
-    return nowMs - createdAt <= CHANGE_BADGE_WINDOW_MS ? 'New' : null
-  }
+  if (nowMs - createdAt <= CHANGE_BADGE_WINDOW_MS) return 'New'
 
   return updatedAt > createdAt && nowMs - updatedAt <= CHANGE_BADGE_WINDOW_MS ? 'Updated' : null
 }

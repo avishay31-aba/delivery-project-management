@@ -656,7 +656,8 @@ export function ProjectFormPage() {
     const isMissing = missingFields.has(field.key)
     const value = headerFieldValue(projectDraft, field.key)
     const isManualProjectWithoutOpportunity = !linkedOpportunity && !projectDraft.opportunityId
-    const isEditable = field.editable || isManualProjectWithoutOpportunity || field.inputType === 'date'
+    const isProjectTypeField = field.key === 'mainType' || field.key === 'subType'
+    const isEditable = field.editable || (isManualProjectWithoutOpportunity && !isProjectTypeField)
     const label = (
       <>
         {field.label}

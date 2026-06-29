@@ -1319,34 +1319,53 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
     return column ? String(column.columnDef.header) : groupColumnId
   }
 
-  function groupSummaryRows(): Array<{ value: string; count: number; additionalCounts: string }> {
+  function splitSummaryValues(value: unknown): string[] {
+    if (Array.isArray(value)) return value.map(String).map((part) => part.trim()).filter(Boolean)
+    return String(value ?? '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+  }
+
+  function groupSummaryCountColumns(): Array<{ key: string; columnId: string; label: string; value: string }> {
     const groupColumnId = grouping[0]
     if (!groupColumnId) return []
+    return table.getVisibleLeafColumns()
+      .filter((column) => column.id !== ROW_INDICATOR_COLUMN_ID && column.id !== groupColumnId)
+      .flatMap((column) => {
+        const values = table.getFilteredRowModel().rows.flatMap((row) => splitSummaryValues(row.getValue(column.id)))
+        const uniqueValues = Array.from(new Set(values)).sort((first, second) => first.localeCompare(second))
+        if (uniqueValues.length === 0 || uniqueValues.length > 8) return []
+        return uniqueValues.map((value) => ({
+          key: `${column.id}:${value}`,
+          columnId: column.id,
+          label: `${String(column.columnDef.header)}: ${value}`,
+          value,
+        }))
+      })
+      .slice(0, 12)
+  }
+
+  function groupSummaryRows(): Array<{ value: string; count: number; counts: Record<string, number> }> {
+    const groupColumnId = grouping[0]
+    if (!groupColumnId) return []
+    const summaryColumns = groupSummaryCountColumns()
     const rowsByValue = new Map<string, Array<Row<T>>>()
     table.getFilteredRowModel().rows.forEach((row) => {
       const value = String(row.getValue(groupColumnId) ?? 'Not set') || 'Not set'
       rowsByValue.set(value, [...(rowsByValue.get(value) ?? []), row])
     })
 
-    const countableColumns = table.getVisibleLeafColumns().filter((column) => {
-      if (column.id === ROW_INDICATOR_COLUMN_ID || column.id === groupColumnId) return false
-      const values = table.getFilteredRowModel().rows
-        .map((row) => row.getValue(column.id))
-        .filter((value) => value !== null && value !== undefined && value !== '')
-      return values.length > 0 && values.every((value) => typeof value === 'number' || (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))))
-    })
-
     return Array.from(rowsByValue.entries())
-      .map(([value, groupedRows]) => ({
-        value,
-        count: groupedRows.length,
-        additionalCounts: countableColumns
-          .map((column) => {
-            const total = groupedRows.reduce((sum, row) => sum + Number(row.getValue(column.id) ?? 0), 0)
-            return `${String(column.columnDef.header)}: ${total}`
-          })
-          .join('; ') || '-',
-      }))
+      .map(([value, groupedRows]) => {
+        const counts: Record<string, number> = {}
+        summaryColumns.forEach((summaryColumn) => {
+          counts[summaryColumn.key] = groupedRows.filter((row) =>
+            splitSummaryValues(row.getValue(summaryColumn.columnId)).includes(summaryColumn.value),
+          ).length
+        })
+        return { value, count: groupedRows.length, counts }
+      })
       .sort((first, second) => first.value.localeCompare(second.value))
   }
 
@@ -1760,19 +1779,25 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                     <table className="w-auto border-collapse bg-white text-sm">
                       <thead className="bg-sf-surface-alt text-left">
                         <tr>
-                          <th className="border border-sf-border px-2 py-1">Group Category</th>
-                          <th className="border border-sf-border px-2 py-1">Value</th>
-                          <th className="border border-sf-border px-2 py-1 text-right">Item Count</th>
-                          <th className="border border-sf-border px-2 py-1">Additional Counts</th>
+                          <th className="border border-sf-border px-2 py-1">{groupSummaryLabel()}</th>
+                          <th className="border border-sf-border px-2 py-1 text-right">Count</th>
+                          {groupSummaryCountColumns().map((summaryColumn) => (
+                            <th key={summaryColumn.key} className="border border-sf-border px-2 py-1 text-right">
+                              {summaryColumn.label}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
                         {groupSummaryRows().map((summary) => (
                           <tr key={summary.value}>
-                            <td className="border border-sf-border px-2 py-1">{groupSummaryLabel()}</td>
                             <td className="border border-sf-border px-2 py-1">{summary.value}</td>
                             <td className="border border-sf-border px-2 py-1 text-right">{summary.count}</td>
-                            <td className="border border-sf-border px-2 py-1">{summary.additionalCounts}</td>
+                            {groupSummaryCountColumns().map((summaryColumn) => (
+                              <td key={summaryColumn.key} className="border border-sf-border px-2 py-1 text-right">
+                                {summary.counts[summaryColumn.key] ?? 0}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
