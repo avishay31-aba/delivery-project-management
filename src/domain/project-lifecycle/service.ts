@@ -1,5 +1,5 @@
 import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/milestone-plan'
-import { opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
+import { getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
@@ -564,8 +564,15 @@ export function completeProjectRequirementSections(
     }
   })
 
-  return fallbackSections
-    .map((section) => sectionsByKind.get(section.kind))
+  const opportunityOrderedKinds = opportunity ? getVisibleRequirementTypesForOpportunity(opportunity) : []
+  const sectionOrder = opportunityOrderedKinds.length > 0
+    ? opportunityOrderedKinds
+    : sections.length > 0
+      ? sections.map((section) => section.kind)
+      : fallbackSections.map((section) => section.kind)
+
+  return sectionOrder
+    .map((kind) => sectionsByKind.get(kind))
     .filter((section): section is ProjectRequirementSectionMetadata => Boolean(section))
 }
 
