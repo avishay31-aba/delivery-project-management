@@ -40,7 +40,10 @@ export function RichTextEditor({
 
   return (
     <div className={className}>
-      <div className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}>
+      <div
+        className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
+        onMouseDown={(event) => event.preventDefault()}
+      >
         <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onClick={() => apply('bold')}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>

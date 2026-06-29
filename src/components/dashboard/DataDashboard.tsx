@@ -12,6 +12,7 @@ import {
   type ColumnFiltersState,
   type ColumnOrderState,
   type GroupingState,
+  type Row,
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table'
@@ -1300,6 +1301,45 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
     return getRowClassName?.(row) || 'bg-white hover:bg-sf-surface-alt'
   }
 
+  function groupTitle(row: Row<T>): string {
+    const column = table.getAllLeafColumns().find((candidate) => candidate.id === row.groupingColumnId)
+    const categoryName = column ? String(column.columnDef.header) : row.groupingColumnId ?? 'Group'
+    return `${categoryName} - ${String(row.groupingValue ?? 'Not set')}, Count: ${row.subRows.length}`
+  }
+
+  function renderDashboardRows(rowsToRender: Array<Row<T>>): ReactNode[] {
+    return rowsToRender.flatMap((row) => {
+      if (row.getIsGrouped()) {
+        return [
+          <tr key={`${row.id}-group`} className="bg-sf-surface-alt">
+            <td className="border-y border-sf-border px-3 py-2 text-sm font-semibold text-sf-text" colSpan={table.getVisibleLeafColumns().length}>
+              {groupTitle(row)}
+            </td>
+          </tr>,
+          ...renderDashboardRows(row.subRows as Array<Row<T>>),
+        ]
+      }
+
+      return (
+        <tr
+          key={row.id}
+          className={joinClassNames(dashboardRowClassName(row.original))}
+          onClick={() => onRowClick?.(row.original)}
+        >
+          {row.getVisibleCells().map((cell, cellIndex) => (
+            <td
+              key={cell.id}
+              style={frozenColumnStyle(cellIndex)}
+              className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex))}
+            >
+              {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </td>
+          ))}
+        </tr>
+      )
+    })
+  }
+
   function exportCsv() {
     const visibleColumns = table.getVisibleLeafColumns()
     const header = visibleColumns.map((column) => column.columnDef.header as string).join(',')
@@ -1647,32 +1687,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               ))}
             </thead>
             <tbody className="divide-y divide-sf-border bg-white">
-              {table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={joinClassNames(dashboardRowClassName(row.original))}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell, cellIndex) => (
-                    <td
-                      key={cell.id}
-                      style={frozenColumnStyle(cellIndex)}
-                      className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex))}
-                    >
-                      {cell.getIsGrouped() ? (
-                        <>
-                          <button type="button" onClick={row.getToggleExpandedHandler()}>
-                            {row.getIsExpanded() ? '▾' : '▸'}
-                          </button>{' '}
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())} ({row.subRows.length})
-                        </>
-                      ) : cell.getIsPlaceholder() ? null : (
-                        flexRender(cell.column.columnDef.cell, cell.getContext())
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {renderDashboardRows(table.getRowModel().rows)}
             </tbody>
           </table>
         </div>

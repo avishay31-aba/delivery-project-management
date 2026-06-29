@@ -511,6 +511,8 @@ function RequirementGrid({
       }
       const availableSystems = sidSystems.filter((system) => !isSystemOptionDisabled(row.id, system.id))
       const alreadySelectedSystems = sidSystems.filter((system) => isSystemOptionDisabled(row.id, system.id))
+      const sameAccountSystems = availableSystems.filter((system) => system.accountId && system.accountId === draft.accountId)
+      const dealOwnerSystems = availableSystems.filter((system) => !system.accountId || system.accountId !== draft.accountId)
 
       return (
         <>
@@ -521,7 +523,22 @@ function RequirementGrid({
             disabled={sidSystems.length === 0}
           >
             <option value="">{sidSystems.length > 0 ? 'Select SID' : 'No eligible SIDs'}</option>
-            {availableSystems.map((system) => (
+            {sameAccountSystems.length > 0 ? (
+              <option value="" disabled>
+                ---------- Same Account ----------
+              </option>
+            ) : null}
+            {sameAccountSystems.map((system) => (
+              <option key={system.id} value={system.id}>
+                {existingSystemOptionLabel(system, draft)}
+              </option>
+            ))}
+            {dealOwnerSystems.length > 0 ? (
+              <option value="" disabled>
+                ---------- Deal Owner Related ----------
+              </option>
+            ) : null}
+            {dealOwnerSystems.map((system) => (
               <option key={system.id} value={system.id}>
                 {existingSystemOptionLabel(system, draft)}
               </option>
@@ -1196,16 +1213,13 @@ export function OpportunityFormPage() {
     window.requestAnimationFrame(() => window.scrollTo(scrollX, scrollY))
   }
 
-  function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
+  function executeSave(_options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
     setPendingPocSave(null)
     setPendingWonSave(null)
-    if (!options.stayOnPage) {
-      navigate('/opportunities')
-    }
   }
 
   function selectAllTenants(kind: 'B' | 'C') {

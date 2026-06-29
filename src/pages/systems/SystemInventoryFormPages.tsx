@@ -343,14 +343,12 @@ function InventoryForm<T extends InventoryRecord>({
   metadata,
   onSave,
   dashboardPath,
-  recordPath,
 }: {
   record: T | undefined
   records: T[]
   metadata: SystemInventoryMetadata
   onSave: (id: string, patch: Partial<T>) => void
   dashboardPath: string
-  recordPath: (record: T) => string
 }) {
   const navigate = useNavigate()
   const projects = useAppStore((state) => state.projects)
@@ -360,9 +358,7 @@ function InventoryForm<T extends InventoryRecord>({
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
-  const createTenant = useAppStore((state) => state.createTenant)
-  const updateTenant = useAppStore((state) => state.updateTenant)
-  const updateSystem = useAppStore((state) => state.updateSystem)
+  const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
   const {
     value: draft,
     setValue: setDraft,
@@ -380,7 +376,6 @@ function InventoryForm<T extends InventoryRecord>({
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
-  const [tenantAddedInSession, setTenantAddedInSession] = useState(false)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -508,7 +503,7 @@ function InventoryForm<T extends InventoryRecord>({
           .map((system) => system.sid as string)
       : []
 
-  function save(stayOnPage: boolean) {
+  function save(_stayOnPage: boolean) {
     const nextMessages = validate()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -519,12 +514,6 @@ function InventoryForm<T extends InventoryRecord>({
     onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
-    if (!stayOnPage && !tenantAddedInSession) {
-      navigate(dashboardPath)
-      return
-    }
-    setTenantAddedInSession(false)
-    navigate(recordPath(nextDraft), { replace: true })
   }
 
   function saveBlockedNavigation() {
@@ -825,37 +814,15 @@ function InventoryForm<T extends InventoryRecord>({
 
   function createTenantFromSelection() {
     if (!selectedProjectId || !selectedRequirementId) return
-    const selectedProject = projects.find((project) => project.id === selectedProjectId)
     const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
     if (selectedRequirementId === 'INTERNAL') {
-      const tenant = createTenant()
-      updateTenant(tenant.id, {
-        tenantName: `${tenant.tid} Internal`,
-        accountId: String(readRecordValue(systemForTenant, 'accountId') ?? ''),
-        systemId: systemForTenant.id,
-        hostedSystemId: systemForTenant.id,
-        hostingSid: String(readRecordValue(systemForTenant, 'sid') ?? ''),
-        deliveryPid: selectedProject?.pid ?? '',
-        tenantType: 'PENLINK_INTERNAL',
-        tenantFormType: 'INTERNAL',
-        accountName: 'Internal',
-        country: String(readRecordValue(systemForTenant, 'country') ?? ''),
-        timeGroup: String(readRecordValue(systemForTenant, 'timeGroup') ?? ''),
-        operationalStatus: '',
-        contractStatus: 'UNDER_CONTRACT',
-        hostedSystemHistory: [{ systemId: systemForTenant.id, startedAt: new Date().toISOString(), endedAt: null, reason: 'Created' }],
-        productType: String(readRecordValue(systemForTenant, 'productType') ?? ''),
-        hostingType: String(readRecordValue(systemForTenant, 'hostingType') ?? ''),
-        cloudPlatform: String(readRecordValue(systemForTenant, 'cloudPlatform') ?? ''),
-        users: null,
-      })
-      const currentTenantIds = (readRecordValue(systemForTenant, 'tenantIds') as string[] | undefined) ?? []
-      updateSystem(systemForTenant.id, { tenantIds: Array.from(new Set([...currentTenantIds, tenant.id])) })
-      setMessages([`Tenant ${tenant.tid} created.`])
-      setTenantAddedInSession(true)
-      setAddTenantOpen(false)
-      setSelectedProjectId('')
-      setSelectedRequirementId('')
+      const result = createInternalTenantForSystem(selectedProjectId, systemForTenant.id)
+      setMessages([result.message])
+      if (result.ok) {
+        setAddTenantOpen(false)
+        setSelectedProjectId('')
+        setSelectedRequirementId('')
+      }
       return
     }
     const selectedRequirement = newTenantRequirementsForProject(selectedProjectId).find(
@@ -874,7 +841,6 @@ function InventoryForm<T extends InventoryRecord>({
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     setMessages([result.message])
     if (result.ok) {
-      setTenantAddedInSession(true)
       setAddTenantOpen(false)
       setSelectedProjectId('')
       setSelectedRequirementId('')
@@ -1318,7 +1284,6 @@ export function ProductionSystemInventoryFormPage() {
         updateAllocatedRecord(id, patch as Partial<System>)
       }}
       dashboardPath="/systems/production-inventory"
-      recordPath={(system) => `/systems/production-inventory/${system.sid ?? ''}`}
     />
   )
 }
@@ -1346,7 +1311,6 @@ export function ReusedInternalSystemFormPage() {
         updateAllocatedRecord(id, patch as Partial<System>)
       }}
       dashboardPath="/systems/reused-internal"
-      recordPath={(system) => `/systems/reused-internal/${system.machineId}`}
     />
   )
 }

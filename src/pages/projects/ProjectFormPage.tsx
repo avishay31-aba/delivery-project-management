@@ -54,15 +54,9 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import {
-  APPLICATION_CONFIGURATION_FIELDS,
   type SharedFieldMetadata,
-  type ApplicationConfigurationFieldMetadata,
 } from '@/domain/application-configuration'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import {
-  hostingContextFromSource,
-  type HostingContext,
-} from '@/domain/hosting-context'
 import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
@@ -102,16 +96,34 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'region', label: 'Region' },
 ]
 
-const LINKED_SYSTEM_HOSTING_FIELDS: Array<{ key: keyof HostingContext; label: string }> = [
-  { key: 'hostingType', label: 'Hosting Type' },
-  { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'csp', label: 'CSP' },
-  { key: 'cloudRegion', label: 'Region' },
-  { key: 'url', label: 'URL' },
-  { key: 'performanceTier', label: 'Performance Tier' },
-  { key: 'vpnEnabled', label: 'VPN' },
-  { key: 'vpnType', label: 'VPN Type' },
-  { key: 'ipRestrictionEnabled', label: 'IP Restriction' },
+const LINKED_SYSTEM_PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
+  {
+    title: 'Access Details',
+    fields: [
+      { key: 'url', label: 'URL' },
+      { key: 'ipRestrictionEnabled', label: 'IP Restriction' },
+      { key: 'vpnEnabled', label: 'VPN' },
+      { key: 'vpnType', label: 'VPN Type' },
+    ],
+  },
+  {
+    title: 'Hosting',
+    fields: [
+      { key: 'hostingType', label: 'Hosting' },
+      { key: 'cloudPlatform', label: 'Cloud Platform' },
+      { key: 'csp', label: 'CSP' },
+      { key: 'cloudRegion', label: 'Cloud Region' },
+      { key: 'performanceTier', label: 'Performance Tier' },
+    ],
+  },
+  {
+    title: 'Identifiers',
+    fields: [
+      { key: 'statisticsId', label: 'Statistics ID' },
+      { key: 'authId', label: 'Auth ID' },
+      { key: 'rdmId', label: 'RDM ID' },
+    ],
+  },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -206,11 +218,6 @@ function formatReadOnlyDetailValue(value: unknown): string {
   return String(value)
 }
 
-function systemApplicationConfigurationValue(system: System, field: ApplicationConfigurationFieldMetadata): unknown {
-  if (field.configKey === 'product') return system.productType
-  return (system as unknown as Record<string, unknown>)[field.configKey]
-}
-
 function deliveryConfigurationValue(record: System | Tenant, field: SharedFieldMetadata): unknown {
   if (field.key === 'hostingType') {
     return 'hostingSnapshot' in record && record.hostingSnapshot
@@ -236,17 +243,6 @@ function deliveryConfigurationValue(record: System | Tenant, field: SharedFieldM
 
 function deliveryConfigurationDisplayValue(record: System | Tenant, field: SharedFieldMetadata): string {
   return formatReadOnlyDetailValue(deliveryConfigurationValue(record, field))
-}
-
-function detailGroups<T extends { group: string }>(fields: T[]): Array<{ group: string; fields: T[] }> {
-  return fields.reduce<Array<{ group: string; fields: T[] }>>((groups, field) => {
-    const existingGroup = groups.find((group) => group.group === field.group)
-    if (existingGroup) {
-      existingGroup.fields.push(field)
-      return groups
-    }
-    return [...groups, { group: field.group, fields: [field] }]
-  }, [])
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -628,7 +624,7 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
-  function saveProject(stayOnPage: boolean) {
+  function saveProject(_stayOnPage: boolean) {
     const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
@@ -637,7 +633,7 @@ export function ProjectFormPage() {
 
     updateProject(projectDraft.id, projectSavePatch(projectDraft))
     setSaveMessages(['Project saved.'])
-    if (!stayOnPage) navigate('/projects')
+    setSaveMenuOpen(false)
   }
 
   function revertProject() {
@@ -655,7 +651,7 @@ export function ProjectFormPage() {
     const isMissing = missingFields.has(field.key)
     const value = headerFieldValue(projectDraft, field.key)
     const isManualProjectWithoutOpportunity = !linkedOpportunity && !projectDraft.opportunityId
-    const isEditable = field.editable || isManualProjectWithoutOpportunity
+    const isEditable = field.editable || isManualProjectWithoutOpportunity || field.inputType === 'date'
     const label = (
       <>
         {field.label}
@@ -960,11 +956,13 @@ export function ProjectFormPage() {
     const label = milestoneDeadlineAlertLabel(alertStatus)
 
     return (
-      <span title={label}>
+      <span className="inline-flex items-center gap-1.5 font-semibold" title={label}>
         <AlertStatusIcon
           variant={alertStatus === 'OVERDUE' ? 'danger' : 'warning'}
           label={label}
+          className="h-5 w-5"
         />
+        <span className={alertStatus === 'OVERDUE' ? 'text-red-700' : 'text-amber-700'}>{label}</span>
       </span>
     )
   }
@@ -1665,7 +1663,7 @@ export function ProjectFormPage() {
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Select', 'ID', 'MID', 'Version', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region'].map((label) => (
+                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region', 'Version'].map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
@@ -1683,13 +1681,13 @@ export function ProjectFormPage() {
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.csp || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegion(candidate) || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
                       </tr>
                     ))}
                     {visibleAllocationCandidates.length === 0 ? (
@@ -1729,39 +1727,21 @@ export function ProjectFormPage() {
   }
 
   function renderLinkedSystemDetails(system: System) {
-    const hostingContext = hostingContextFromSource(system)
-    const configurationGroups = detailGroups(APPLICATION_CONFIGURATION_FIELDS)
-
     return (
       <div className="space-y-4 p-3">
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-sf-text">Hosting Context</h4>
-          <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {LINKED_SYSTEM_HOSTING_FIELDS.map((field) => (
-              <div key={field.key} className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1">
-                <dt className="text-xs font-semibold uppercase text-sf-text-muted">{field.label}</dt>
-                <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue(hostingContext[field.key])}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-sf-text">Application Configuration</h4>
-          {configurationGroups.map((group) => (
-            <div key={group.group} className="space-y-2">
-              <h5 className="text-xs font-semibold uppercase text-sf-text-muted">{group.group}</h5>
-              <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {group.fields.map((field) => (
-                  <div key={field.configKey} className="rounded border border-sf-border bg-white px-2 py-1">
-                    <dt className="text-xs font-medium text-sf-text-muted">{field.label}</dt>
-                    <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue(systemApplicationConfigurationValue(system, field))}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
-        </div>
+        {LINKED_SYSTEM_PLATFORM_DETAIL_GROUPS.map((group) => (
+          <div key={group.title} className="space-y-2">
+            <h4 className="text-sm font-semibold text-sf-text">{group.title}</h4>
+            <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {group.fields.map((field) => (
+                <div key={field.key} className="rounded border border-sf-border bg-white px-2 py-1">
+                  <dt className="text-xs font-medium text-sf-text-muted">{field.label}</dt>
+                  <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue((system as unknown as Record<string, unknown>)[field.key])}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
       </div>
     )
   }
@@ -1873,7 +1853,14 @@ export function ProjectFormPage() {
                           <LinkId to={systemRoutePath(system)}>
                             {system.sid ?? system.machineId ?? system.id}
                           </LinkId>
-                          {productMismatch(system) ? <AlertStatusIcon variant="warning" label="Product mismatch" /> : null}
+                          {productMismatch(system) ? (
+                            <span className="group relative inline-flex" title="Product mismatch">
+                              <AlertStatusIcon variant="warning" label="Product mismatch" />
+                              <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700 shadow group-hover:block">
+                                Product mismatch
+                              </span>
+                            </span>
+                          ) : null}
                           <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                         </span>
                       </td>
@@ -1944,6 +1931,7 @@ export function ProjectFormPage() {
                   {[
                     'TID',
                     'SID',
+                    'MID',
                     'Account Name',
                     'Country',
                     'Time Group',
@@ -1975,6 +1963,9 @@ export function ProjectFormPage() {
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         {system ? <LinkId to={systemRoutePath(system)}>{system.sid ?? system.machineId ?? ''}</LinkId> : null}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {system?.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>

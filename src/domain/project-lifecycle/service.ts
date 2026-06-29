@@ -499,7 +499,7 @@ export function projectHeaderFieldValue(
     case 'warrantyServiceMonths':
       return textValue(context.linkedOpportunity?.warrantyServiceMonths)
     case 'currentMilestone':
-      return context.linkedOpportunity?.currentMilestone ?? ''
+      return deriveProjectProgress(project).currentMilestone
     case 'projectAlerts':
       return context.linkedOpportunity?.projectAlerts?.join(', ') ?? ''
     case 'reportToDirect':

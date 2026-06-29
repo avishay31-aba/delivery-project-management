@@ -419,7 +419,7 @@ export function TenantFormPage() {
     setMessages([])
   }
 
-  function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
+  function saveTenant(_stayOnPage: boolean, onSuccess?: () => void) {
     const nextMessages = validateTenantConfiguration()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -434,7 +434,6 @@ export function TenantFormPage() {
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()
-    if (!stayOnPage) navigate('/tenants')
   }
 
   function revertTenant() {
@@ -689,10 +688,12 @@ export function TenantFormPage() {
 
     return (
       <FormField label="Operational Status" controlWidthClassName="w-72">
-        <div className="flex items-center gap-2">
-          {renderSystemStatus(currentMode)}
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
+            <AlertStatusIcon variant={operationalStatusVariant(currentMode)} />
+          </span>
           <select
-            className="h-8 min-w-0 flex-1 rounded border border-sf-border bg-white px-2 py-1 text-sm"
+            className="h-8 min-w-0 w-full rounded border border-sf-border bg-white py-1 pl-8 pr-2 text-sm"
             value={selectValue}
             onChange={(event) => updateTenantOperationalMode(event.target.value)}
           >
@@ -707,6 +708,13 @@ export function TenantFormPage() {
         </span>
       </FormField>
     )
+  }
+
+  function operationalStatusVariant(value: string): 'success' | 'warning' | 'danger' | 'info' {
+    const normalized = value.toLocaleLowerCase()
+    if (normalized.includes('service')) return 'warning'
+    if (normalized.includes('blocked') || normalized.includes('off') || normalized.includes('deleted')) return 'danger'
+    return value ? 'success' : 'info'
   }
 
   function renderSystemStatus(value: string) {

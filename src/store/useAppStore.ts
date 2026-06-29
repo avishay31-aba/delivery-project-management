@@ -20,6 +20,7 @@ import {
 } from '@/store/persistence'
 import {
   createProjectSystemLink,
+  createProjectTenantLink,
   deallocateProjectSystemLink,
   deallocateProjectTenantLink,
   unlinkProjectFromSystem,
@@ -135,6 +136,7 @@ interface AppStore extends AppDataState {
   deleteTenantFromSystem: (id: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
+  createInternalTenantForSystem: (projectId: string, systemId: string) => AllocationActionResult
   updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
   updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
@@ -326,6 +328,95 @@ export const useAppStore = create<AppStore>((set, get) => ({
           customerRef(resolved.source.account),
         ),
       }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
+  },
+
+  createInternalTenantForSystem: (projectId, systemId) => {
+    const state = get()
+    const project = state.projects.find((candidate) => candidate.id === projectId)
+    const system = state.systems.find((candidate) => candidate.id === systemId)
+    if (!project) return { ok: false, message: 'Project not found.' }
+    if (!system) return { ok: false, message: 'System not found.' }
+
+    const now = new Date().toISOString()
+    const { counters: idCounters, id: nextTid } = incrementCounter(state.idCounters, 'tid')
+    const tenant: AppDataState['tenants'][number] = {
+      id: `ten-${crypto.randomUUID()}`,
+      tid: nextTid,
+      tenantName: `${nextTid} Internal`,
+      accountId: system.accountId ?? '',
+      systemId: system.id,
+      hostedSystemId: system.id,
+      hostingSid: system.sid ?? '',
+      deliveryPid: project.pid,
+      tenantType: 'PENLINK_INTERNAL',
+      tenantFormType: 'INTERNAL',
+      accountName: 'Internal',
+      country: system.country ?? '',
+      timeGroup: system.timeGroup,
+      operationalStatus: '',
+      contractStatus: 'UNDER_CONTRACT',
+      hostedSystemHistory: [{ systemId: system.id, startedAt: now, endedAt: null, reason: 'Created' }],
+      productType: system.productType,
+      hostingType: system.hostingType,
+      cloudPlatform: system.cloudPlatform ?? '',
+      mapCenter: system.mapCenter ?? '',
+      licenses: null,
+      users: null,
+      concurrentSearches: null,
+      dailySearches: null,
+      monthlySearches: null,
+      concurrentAnalyses: null,
+      topicAnalyses: null,
+      dailyAnalyses: null,
+      monthlyAnalyses: null,
+      tangles: null,
+      tanglesGo: null,
+      webloc: null,
+      webeye: null,
+      ingest: null,
+      blockchain: '',
+      crossSystemFeatures: [],
+      apiEnabled: '',
+      apiDailyQty: null,
+      apiMonthlyQty: null,
+      aiFeatures: [],
+      additionalFeatures: [],
+      standardMonitors: null,
+      fullMonitors: null,
+      topicMonitors: null,
+      warrantyStatus: 'NOT_SET',
+      warrantyStartDate: null,
+      warrantyEndDate: null,
+      pocStartDate: null,
+      pocEndDate: null,
+      createdAt: now,
+      updatedAt: now,
+    }
+    const projectTenant = createProjectTenantLink(
+      project.id,
+      tenant.id,
+      system.id,
+      system.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM',
+      now,
+    )
+
+    set((current) => ({
+      idCounters,
+      tenants: [tenant, ...current.tenants],
+      systems: current.systems.map((candidate) =>
+        candidate.id === system.id
+          ? { ...candidate, tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), tenant.id])), updatedAt: now }
+          : candidate,
+      ),
+      projectSystems: current.projectSystems.map((link) =>
+        link.projectId === project.id && link.systemId === system.id && link.allocationStatus !== 'DEALLOCATED'
+          ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+          : link,
+      ),
+      projectTenants: [projectTenant, ...current.projectTenants],
     }))
     get().saveToStorage()
     return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
