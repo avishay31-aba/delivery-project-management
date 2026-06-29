@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
@@ -6,6 +6,8 @@ import { useAppStore } from '@/store/useAppStore'
 
 export function ProductionSystemInventoryPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.productionSystemInventory)
   const createSystem = useAppStore((state) => state.createProductionSystemInventoryItem)
   const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
@@ -27,7 +29,7 @@ export function ProductionSystemInventoryPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
               const system = createSystem()
-              navigate(`/systems/production-inventory/${system.sid}`)
+              navigate(`/systems/production-inventory/${system.sid}`, { state: { returnTo } })
             }}
           >
             + New Production System
@@ -39,7 +41,7 @@ export function ProductionSystemInventoryPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(`/systems/production-inventory/${row.sid}`)}
+        onRowClick={(row) => navigate(`/systems/production-inventory/${row.sid}`, { state: { returnTo } })}
       />
     </div>
   )

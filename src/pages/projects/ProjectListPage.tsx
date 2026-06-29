@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
@@ -8,6 +8,8 @@ import { projectListRowClassName } from '@/domain/project-lifecycle'
 
 export function ProjectListPage() {
 const navigate = useNavigate()
+const location = useLocation()
+const returnTo = `${location.pathname}${location.search}`
 const accounts = useAppStore((s) => s.accounts)
 const opportunities = useAppStore((s) => s.opportunities)
 const projects = useAppStore((s) => s.projects)
@@ -39,7 +41,7 @@ return (
         className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
         onClick={() => {
           const project = createProject()
-          navigate(`/projects/${project.pid}`)
+          navigate(`/projects/${project.pid}`, { state: { returnTo } })
         }}
       >
         + New Project
@@ -51,7 +53,7 @@ return (
       if (!column?.editKey) return
       updateProject(row.id, { [column.editKey]: value } as never)
     }}
-    onRowClick={(row) => navigate(`/projects/${row.pid}`)}
+    onRowClick={(row) => navigate(`/projects/${row.pid}`, { state: { returnTo } })}
   />
 </div>
 )

@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, CirclePlay, GripVertical, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
@@ -20,6 +20,7 @@ import type {
 import { PageHeader } from '@/components/record'
 import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
@@ -57,7 +58,6 @@ import {
   type SharedFieldMetadata,
 } from '@/domain/application-configuration'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -393,6 +393,7 @@ function RequirementSection({
 export function ProjectFormPage() {
   const { pid } = useParams<{ pid: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
@@ -624,7 +625,7 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
-  function saveProject(_stayOnPage: boolean) {
+  function saveProject(stayOnPage: boolean) {
     const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
@@ -634,6 +635,10 @@ export function ProjectFormPage() {
     updateProject(projectDraft.id, projectSavePatch(projectDraft))
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    if (!stayOnPage && returnTo) navigate(returnTo)
   }
 
   function revertProject() {
@@ -1791,8 +1796,8 @@ export function ProjectFormPage() {
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
                   {[
-                    'Details',
                     'Actions',
+                    'Details',
                     'SID',
                     'MID',
                     'PIDs',
@@ -1821,31 +1826,31 @@ export function ProjectFormPage() {
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
-                          aria-expanded={isExpanded}
-                          onClick={() => toggleLinkedSystemDetails(system.id)}
+                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                          onClick={() => navigate(systemRoutePath(system))}
                         >
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
-                          Details
+                          Edit
                         </button>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         {link ? (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                            className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                             onClick={() => deallocateSystem(link)}
                           >
                             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             Deallocate
                           </button>
                         ) : null}
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         <button
                           type="button"
-                          className="ml-1 inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-                          onClick={() => navigate(systemRoutePath(system))}
+                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
+                          aria-expanded={isExpanded}
+                          onClick={() => toggleLinkedSystemDetails(system.id)}
                         >
-                          Move
+                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
+                          Details
                         </button>
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -1924,65 +1929,11 @@ export function ProjectFormPage() {
         <div key={section.title} className="space-y-2">
           <h4 className="text-sm font-semibold text-sf-text">{section.title}</h4>
           {section.rows.length > 0 ? (
-          <div className="sf-scroll-x rounded border border-sf-border bg-white">
-            <table className="min-w-full border-collapse text-sm leading-tight">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  {[
-                    'TID',
-                    'SID',
-                    'MID',
-                    'Account Name',
-                    'Country',
-                    'Time Group',
-                    'Operational Status',
-                    'Environment',
-                  ].map((label) => (
-                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                      {label}
-                    </th>
-                  ))}
-                  {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-                    <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                      <span>{field.label}</span>
-                      <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {section.rows.map((tenant) => {
-                  const system = systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
-                  return (
-                    <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <span className="inline-flex items-center gap-2">
-                          <LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId>
-                          <RecordChangeBadge record={tenant} />
-                        </span>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        {system ? <LinkId to={systemRoutePath(system)}>{system.sid ?? system.machineId ?? ''}</LinkId> : null}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        {system?.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={effectiveTenantOperationalMode(tenant, system)} /></td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantType}</td>
-                      {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-                        <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {deliveryConfigurationDisplayValue(tenant, field)}
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TenantDeliveryTable
+            tenants={section.rows}
+            systems={systems}
+            emptyText={`No ${section.title.toLowerCase()} tenants are linked to this Project.`}
+          />
         ) : (
           <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
             No {section.title.toLowerCase()} tenants are linked to this Project.

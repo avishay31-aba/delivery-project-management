@@ -17,6 +17,7 @@ export function RichTextEditor({
   toolbarMode = 'always',
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const selectionRangeRef = useRef<Range | null>(null)
   const [focused, setFocused] = useState(false)
 
   useEffect(() => {
@@ -26,13 +27,40 @@ export function RichTextEditor({
     }
   }, [value])
 
+  function rememberSelection() {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+    if (!editor || !selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    if (editor.contains(range.commonAncestorContainer)) {
+      selectionRangeRef.current = range.cloneRange()
+    }
+  }
+
+  function restoreSelection() {
+    const editor = editorRef.current
+    editor?.focus()
+    const range = selectionRangeRef.current
+    const selection = window.getSelection()
+    if (!range || !selection) return
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
   function apply(command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList', value?: string) {
+    restoreSelection()
     document.execCommand(command, false, value)
+    rememberSelection()
     onChange(editorRef.current?.innerHTML ?? '')
   }
 
   function applyColor(command: 'foreColor' | 'hiliteColor', value: string) {
+    restoreSelection()
     document.execCommand(command, false, value)
+    if (command === 'hiliteColor') {
+      document.execCommand('backColor', false, value)
+    }
+    rememberSelection()
     onChange(editorRef.current?.innerHTML ?? '')
   }
 
@@ -74,8 +102,16 @@ export function RichTextEditor({
         contentEditable
         role="textbox"
         suppressContentEditableWarning
-        onInput={(event) => onChange(event.currentTarget.innerHTML)}
-        onFocus={() => setFocused(true)}
+        onInput={(event) => {
+          rememberSelection()
+          onChange(event.currentTarget.innerHTML)
+        }}
+        onFocus={() => {
+          setFocused(true)
+          rememberSelection()
+        }}
+        onKeyUp={rememberSelection}
+        onMouseUp={rememberSelection}
         onBlur={() => window.setTimeout(() => setFocused(false), 120)}
       />
     </div>

@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
+import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
@@ -220,6 +220,7 @@ function ReadonlyTable({ headers, rows, emptyText }: { headers: ReactNode[]; row
 export function TenantFormPage() {
   const { tid } = useParams<{ tid: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
@@ -253,6 +254,7 @@ export function TenantFormPage() {
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
+  const [operationalStatusOpen, setOperationalStatusOpen] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
   const navigationBlocker = useBlocker(isDirty)
 
@@ -419,7 +421,7 @@ export function TenantFormPage() {
     setMessages([])
   }
 
-  function saveTenant(_stayOnPage: boolean, onSuccess?: () => void) {
+  function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
     const nextMessages = validateTenantConfiguration()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -434,6 +436,10 @@ export function TenantFormPage() {
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    if (!stayOnPage && returnTo) navigate(returnTo)
   }
 
   function revertTenant() {
@@ -685,23 +691,45 @@ export function TenantFormPage() {
     const derivedMode = derivedTenantOperationalMode(activeSystem)
     const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
     const selectValue = isManualTenantOperationalMode(tenantDraft.operationalStatus) ? tenantDraft.operationalStatus : '__DERIVED__'
+    const selectedLabel = selectValue === '__DERIVED__' ? derivedMode : selectValue
+    const options = [
+      { value: '__DERIVED__', label: derivedMode },
+      ...TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => ({ value: mode, label: mode })),
+    ]
 
     return (
       <FormField label="Operational Status" controlWidthClassName="w-72">
         <div className="relative">
-          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-            <AlertStatusIcon variant={operationalStatusVariant(currentMode)} />
-          </span>
-          <select
-            className="h-8 min-w-0 w-full rounded border border-sf-border bg-white py-1 pl-8 pr-2 text-sm"
-            value={selectValue}
-            onChange={(event) => updateTenantOperationalMode(event.target.value)}
+          <button
+            type="button"
+            className="flex h-8 min-w-0 w-full items-center justify-between gap-2 rounded border border-sf-border bg-white px-2 py-1 text-left text-sm"
+            aria-expanded={operationalStatusOpen}
+            onClick={() => setOperationalStatusOpen((current) => !current)}
           >
-            <option value="__DERIVED__">{derivedMode}</option>
-            {TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => (
-              <option key={mode} value={mode}>{mode}</option>
-            ))}
-          </select>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <AlertStatusIcon variant={operationalStatusVariant(currentMode)} />
+              <span className="truncate">{selectedLabel || 'Not set'}</span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
+          </button>
+          {operationalStatusOpen ? (
+            <div className="absolute left-0 top-full z-20 mt-1 w-full rounded border border-sf-border bg-white py-1 text-sm shadow-lg">
+              {options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-sf-surface-alt"
+                  onClick={() => {
+                    updateTenantOperationalMode(option.value)
+                    setOperationalStatusOpen(false)
+                  }}
+                >
+                  <AlertStatusIcon variant={operationalStatusVariant(option.label)} />
+                  <span className="truncate">{option.label || 'Not set'}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <span className="block pt-1 text-xs text-sf-text-muted">
           {currentMode === derivedMode ? 'Derived from linked System' : 'Manual override'}

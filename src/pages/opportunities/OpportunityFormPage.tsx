@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import {
   PRODUCT_OPTIONS,
@@ -816,6 +816,7 @@ function RequirementGrid({
 export function OpportunityFormPage() {
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
   const salesManagers = useAppStore((state) => state.salesManagers)
@@ -1213,13 +1214,17 @@ export function OpportunityFormPage() {
     window.requestAnimationFrame(() => window.scrollTo(scrollX, scrollY))
   }
 
-  function executeSave(_options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
+  function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
     setPendingPocSave(null)
     setPendingWonSave(null)
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    if (!options.stayOnPage && returnTo) navigate(returnTo)
   }
 
   function selectAllTenants(kind: 'B' | 'C') {

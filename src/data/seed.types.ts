@@ -91,6 +91,8 @@ export interface Project {
   mainType: ProjectMainType
   subType: ProjectSubType
   deliveryDate: string | null
+  pocStartDate?: string | null
+  pocEndDate?: string | null
   progressStatus: ProgressStatus
   dealOwner: string
   opportunityName: string

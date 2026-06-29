@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
-import { useBlocker, useNavigate, useParams } from 'react-router-dom'
+import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Ban,
   ChevronDown,
@@ -22,7 +22,8 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { FormField, LinkId, PlaceholderCard } from '@/components/ui'
+import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
+import { FormField, PlaceholderCard } from '@/components/ui'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   HOSTING_OPTIONS,
@@ -32,7 +33,6 @@ import {
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
-  TENANT_REQUIREMENT_CONFIGURATION_FIELDS,
   type SharedFieldMetadata,
   type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
@@ -69,7 +69,6 @@ import {
   tenantCountForSystem,
   validateReusedInternalMachineId,
 } from '@/domain/system-inventory'
-import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
@@ -141,7 +140,6 @@ const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
 }
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_SUMMARY_FIELDS
-const TENANT_CONFIGURATION_FIELDS = TENANT_REQUIREMENT_CONFIGURATION_FIELDS
 const APPLICATION_FIELD_BY_KEY = new Map(APPLICATION_CONFIGURATION_SUMMARY_FIELDS.map((field) => [field.key, field]))
 const INTEGER_SUMMARY_KEYS = new Set([
   'licenses',
@@ -184,6 +182,12 @@ function normalizeProduct(value: unknown): string {
 
 function readRecordValue(record: InventoryRecord, key: string): unknown {
   return (record as unknown as Record<string, unknown>)[key]
+}
+
+function generatedSystemUrl(record: InventoryRecord): string {
+  if ('machineId' in record && record.machineId) return `https://${record.machineId}.example.internal`
+  if ('sid' in record && record.sid) return `https://${record.sid}.example.production`
+  return ''
 }
 
 function fieldClassName(isChanged: boolean, isInvalid = false): string {
@@ -351,6 +355,7 @@ function InventoryForm<T extends InventoryRecord>({
   dashboardPath: string
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
@@ -359,6 +364,8 @@ function InventoryForm<T extends InventoryRecord>({
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
+  const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
+  const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const {
     value: draft,
     setValue: setDraft,
@@ -411,7 +418,12 @@ function InventoryForm<T extends InventoryRecord>({
   function updateField(key: string, value: unknown) {
     setDraft((current) => {
       if (!current) return current
+      const previousUrl = textValue(readRecordValue(current, 'url'))
+      const previousGeneratedUrl = generatedSystemUrl(current)
       const next = { ...current, [key]: value }
+      if ((key === 'sid' || key === 'machineId') && (!previousUrl || previousUrl === previousGeneratedUrl)) {
+        ;(next as Record<string, unknown>).url = generatedSystemUrl(next)
+      }
       return { ...next, ...hostingContextPatchForFieldChange(key, value) } as T
     })
     setMessages([])
@@ -503,7 +515,7 @@ function InventoryForm<T extends InventoryRecord>({
           .map((system) => system.sid as string)
       : []
 
-  function save(_stayOnPage: boolean) {
+  function save(stayOnPage: boolean) {
     const nextMessages = validate()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -514,6 +526,10 @@ function InventoryForm<T extends InventoryRecord>({
     onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    if (!stayOnPage && returnTo) navigate(returnTo)
   }
 
   function saveBlockedNavigation() {
@@ -740,10 +756,6 @@ function InventoryForm<T extends InventoryRecord>({
     return Array.from(new Set(values)).join('; ') || '-'
   }
 
-  function tenantFieldValue(tenant: Tenant, field: SharedFieldMetadata): string {
-    return textValue(tenantConfigurationValue(tenant, field)) || '-'
-  }
-
   function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {
     const moduleKeys: Array<keyof NewTenantRequirement> = ['tangles', 'tanglesGo', 'webloc', 'webeye', 'ingest', 'blockchain']
     const moduleCount = moduleKeys.reduce((count, key) => {
@@ -847,60 +859,72 @@ function InventoryForm<T extends InventoryRecord>({
     }
   }
 
-  function renderTenantRows(hostedTenants: Tenant[]) {
-    return hostedTenants.map((tenant) => (
-      <tr key={tenant.id} className="hover:bg-sf-surface-alt">
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId></td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{tenant.accountName || '-'}</td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text">
-          {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : '-'}
-        </td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, activeRecord as System)} /></td>
-        {TENANT_CONFIGURATION_FIELDS.map((column) => (
-          <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-            {tenantFieldValue(tenant, column)}
-          </td>
-        ))}
-      </tr>
-    ))
+  function deleteHostedTenant(tenant: Tenant) {
+    if (!window.confirm(`Remove tenant ${tenant.tid} from this system?`)) return
+    deleteTenantFromSystem(tenant.id)
+    setMessages([`Tenant ${tenant.tid} removed from system.`])
+  }
+
+  function moveHostedTenant(tenant: Tenant) {
+    const destination = window.prompt('Move tenant to SID or MID')
+    if (!destination) return
+    const normalizedDestination = destination.trim().toLocaleLowerCase()
+    const destinationSystem = allocatedSystems.find((system) =>
+      [system.sid, system.machineId, system.id]
+        .filter(Boolean)
+        .map((value) => String(value).toLocaleLowerCase())
+        .includes(normalizedDestination),
+    )
+    if (!destinationSystem) {
+      setMessages([`Destination system "${destination}" was not found.`])
+      return
+    }
+    moveTenantToSystem(tenant.id, destinationSystem.id)
+    setMessages([`Tenant ${tenant.tid} moved to ${systemIdentity(destinationSystem)}.`])
+  }
+
+  function renderHostedTenantActions(tenant: Tenant) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        <button
+          type="button"
+          className="rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+          onClick={() => deleteHostedTenant(tenant)}
+        >
+          Delete
+        </button>
+        <button
+          type="button"
+          className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+          onClick={() => navigate(`/tenants/${tenant.tid}`)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+          onClick={() => moveHostedTenant(tenant)}
+        >
+          Move
+        </button>
+      </div>
+    )
   }
 
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft()
     const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
     const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
-    const tenantHeaders = ['TID', 'Customer / End User Name', 'Delivery PID', 'Operational Status']
-
     function renderHostedTenantSection(title: string, sectionTenants: Tenant[]) {
       return (
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">{title}</h3>
-          {sectionTenants.length > 0 ? (
-            <div className="sf-scroll-x rounded border border-sf-border bg-white">
-              <table className="min-w-full border-collapse text-sm leading-tight">
-                <thead className="bg-sf-surface-alt text-left">
-                  <tr>
-                    {tenantHeaders.map((label) => (
-                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                        {label}
-                      </th>
-                    ))}
-                    {TENANT_CONFIGURATION_FIELDS.map((column) => (
-                      <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                        <span>{column.label}</span>
-                        <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>{renderTenantRows(sectionTenants)}</tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-              No hosted tenants in this section.
-            </div>
-          )}
+          <TenantDeliveryTable
+            tenants={sectionTenants}
+            systems={allocatedSystems}
+            emptyText="No hosted tenants in this section."
+            actions={(tenant) => renderHostedTenantActions(tenant)}
+          />
         </section>
       )
     }

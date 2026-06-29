@@ -764,6 +764,7 @@ export function DataDashboard<T extends { id: string }>({
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
   const [isFreezeEnabled, setIsFreezeEnabled] = useState(false)
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set())
   const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
@@ -818,6 +819,10 @@ export function DataDashboard<T extends { id: string }>({
       return [...preservedColumnOrder, ...newColumnIds]
     })
   }, [sourceColumnIds])
+
+  useEffect(() => {
+    setExpandedGroupIds(new Set())
+  }, [grouping])
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () => [
@@ -1307,16 +1312,57 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
     return `${categoryName} - ${String(row.groupingValue ?? 'Not set')}, Count: ${row.subRows.length}`
   }
 
+  function groupSummaryLabel(): string {
+    const groupColumnId = grouping[0]
+    if (!groupColumnId) return 'Group'
+    const column = table.getAllLeafColumns().find((candidate) => candidate.id === groupColumnId)
+    return column ? String(column.columnDef.header) : groupColumnId
+  }
+
+  function groupSummaryRows(): Array<{ value: string; count: number }> {
+    const groupColumnId = grouping[0]
+    if (!groupColumnId) return []
+    const counts = new Map<string, number>()
+    table.getFilteredRowModel().rows.forEach((row) => {
+      const value = String(row.getValue(groupColumnId) ?? 'Not set') || 'Not set'
+      counts.set(value, (counts.get(value) ?? 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((first, second) => first.value.localeCompare(second.value))
+  }
+
+  function toggleGroup(rowId: string) {
+    setExpandedGroupIds((current) => {
+      const next = new Set(current)
+      if (next.has(rowId)) {
+        next.delete(rowId)
+      } else {
+        next.add(rowId)
+      }
+      return next
+    })
+  }
+
   function renderDashboardRows(rowsToRender: Array<Row<T>>): ReactNode[] {
     return rowsToRender.flatMap((row) => {
       if (row.getIsGrouped()) {
+        const isExpanded = expandedGroupIds.has(row.id)
         return [
           <tr key={`${row.id}-group`} className="bg-sf-surface-alt">
             <td className="border-y border-sf-border px-3 py-2 text-sm font-semibold text-sf-text" colSpan={table.getVisibleLeafColumns().length}>
-              {groupTitle(row)}
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-white"
+                aria-expanded={isExpanded}
+                onClick={() => toggleGroup(row.id)}
+              >
+                <span className="text-sf-text-muted" aria-hidden="true">{isExpanded ? '▾' : '▸'}</span>
+                <span>{groupTitle(row)}</span>
+              </button>
             </td>
           </tr>,
-          ...renderDashboardRows(row.subRows as Array<Row<T>>),
+          ...(isExpanded ? renderDashboardRows(row.subRows as Array<Row<T>>) : []),
         ]
       }
 
@@ -1689,6 +1735,21 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
             <tbody className="divide-y divide-sf-border bg-white">
               {renderDashboardRows(table.getRowModel().rows)}
             </tbody>
+            {grouping.length > 0 ? (
+              <tfoot className="bg-sf-surface-alt">
+                <tr>
+                  <td className="border-t border-sf-border px-3 py-2 text-sm font-semibold text-sf-text" colSpan={table.getVisibleLeafColumns().length}>
+                    <div className="flex flex-wrap gap-2">
+                      {groupSummaryRows().map((summary) => (
+                        <span key={summary.value} className="rounded border border-sf-border bg-white px-2 py-1">
+                          {groupSummaryLabel()}: {summary.value} = {summary.count}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
       </div>

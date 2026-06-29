@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
@@ -7,6 +7,8 @@ import { useAppStore } from '@/store/useAppStore'
 
 export function OpportunityListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
   const salesManagers = useAppStore((state) => state.salesManagers)
@@ -35,7 +37,7 @@ export function OpportunityListPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
               const opportunity = createOpportunity('DELIVERY', 'NEW')
-              navigate(`/opportunities/${opportunity.opportunityId}`)
+              navigate(`/opportunities/${opportunity.opportunityId}`, { state: { returnTo } })
             }}
           >
             + New Opportunity
@@ -49,7 +51,7 @@ export function OpportunityListPage() {
           if (!column?.editKey) return
           updateOpportunity(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(`/opportunities/${row.opportunityId}`)}
+        onRowClick={(row) => navigate(`/opportunities/${row.opportunityId}`, { state: { returnTo } })}
       />
     </div>
   )

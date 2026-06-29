@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
@@ -7,6 +7,8 @@ import { allocatedSystemsForActiveLinks, systemRoutePath } from '@/domain/system
 
 export function SystemListPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((s) => s.systems)
   const projects = useAppStore((s) => s.projects)
   const tenants = useAppStore((s) => s.tenants)
@@ -29,7 +31,7 @@ export function SystemListPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(systemRoutePath(row))}
+        onRowClick={(row) => navigate(systemRoutePath(row), { state: { returnTo } })}
       />
     </div>
   )

@@ -252,7 +252,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
   const projectAlerts = [
     ...health.healthAlerts,
-    !completed && isPastDate(opportunity?.pocStartDate) ? 'POC start date overdue' : null,
+    !completed && isPastDate(context.project.pocStartDate ?? opportunity?.pocStartDate) ? 'POC start date overdue' : null,
   ].filter((alert): alert is string => Boolean(alert))
 
   return {
@@ -266,8 +266,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     status: context.project.progressStatus,
     statusLabel: projectStatusLabel(context.project.progressStatus),
     deliveryDate: context.project.deliveryDate ?? '',
-    pocStartDate: opportunity?.pocStartDate ?? '',
-    pocEndDate: opportunity?.pocEndDate ?? '',
+    pocStartDate: context.project.pocStartDate ?? opportunity?.pocStartDate ?? '',
+    pocEndDate: context.project.pocEndDate ?? opportunity?.pocEndDate ?? '',
     type: context.project.mainType,
     hosting: configuration.hosting,
     product: configuration.product,
@@ -493,9 +493,9 @@ export function projectHeaderFieldValue(
     case 'timeGroup':
       return context.linkedOpportunity?.timeGroup ?? context.account?.timeGroup ?? ''
     case 'pocStartDate':
-      return context.linkedOpportunity?.pocStartDate ?? ''
+      return project.pocStartDate ?? context.linkedOpportunity?.pocStartDate ?? ''
     case 'pocEndDate':
-      return context.linkedOpportunity?.pocEndDate ?? ''
+      return project.pocEndDate ?? context.linkedOpportunity?.pocEndDate ?? ''
     case 'warrantyServiceMonths':
       return textValue(context.linkedOpportunity?.warrantyServiceMonths)
     case 'currentMilestone':
@@ -518,7 +518,7 @@ export function isProjectHeaderFieldChanged(
   key: ProjectHeaderFieldKey,
   context: ProjectLifecycleContext = {},
 ): boolean {
-  if (key === 'pocStartDate' || key === 'pocEndDate' || key === 'warrantyServiceMonths' || key === 'currentMilestone' || key === 'projectAlerts') {
+  if (key === 'warrantyServiceMonths' || key === 'currentMilestone' || key === 'projectAlerts') {
     return false
   }
   return JSON.stringify(projectHeaderFieldValue(persistedProject, key, context) ?? null) !==

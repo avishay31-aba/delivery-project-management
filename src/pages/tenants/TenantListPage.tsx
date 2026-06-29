@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
@@ -6,6 +6,8 @@ import { createTenantColumns } from '@/config/tenant-columns'
 
 export function TenantListPage() {
 const navigate = useNavigate()
+const location = useLocation()
+const returnTo = `${location.pathname}${location.search}`
 const tenants = useAppStore((s) => s.tenants)
 const systems = useAppStore((s) => s.systems)
 const updateTenant = useAppStore((s) => s.updateTenant)
@@ -27,7 +29,7 @@ return (
         className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
         onClick={() => {
           const tenant = createTenant()
-          navigate(`/tenants/${tenant.tid}`)
+          navigate(`/tenants/${tenant.tid}`, { state: { returnTo } })
         }}
       >
         + New Tenant
@@ -38,7 +40,7 @@ return (
       if (!column?.editKey) return
       updateTenant(row.id, { [column.editKey]: value } as never)
     }}
-    onRowClick={(row) => navigate(`/tenants/${row.tid}`)}
+    onRowClick={(row) => navigate(`/tenants/${row.tid}`, { state: { returnTo } })}
   />
 </div>
 )

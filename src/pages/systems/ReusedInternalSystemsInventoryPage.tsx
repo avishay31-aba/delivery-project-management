@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { reusedInternalSystemColumns } from '@/config/system-inventory-columns'
@@ -6,6 +6,8 @@ import { useAppStore } from '@/store/useAppStore'
 
 export function ReusedInternalSystemsInventoryPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.reusedInternalSystems)
   const createSystem = useAppStore((state) => state.createReusedInternalSystem)
   const updateSystem = useAppStore((state) => state.updateReusedInternalSystem)
@@ -27,7 +29,7 @@ export function ReusedInternalSystemsInventoryPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
               const system = createSystem()
-              navigate(`/systems/reused-internal/${system.machineId}`)
+              navigate(`/systems/reused-internal/${system.machineId}`, { state: { returnTo } })
             }}
           >
             + New Reused Internal System
@@ -39,7 +41,7 @@ export function ReusedInternalSystemsInventoryPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(`/systems/reused-internal/${row.machineId}`)}
+        onRowClick={(row) => navigate(`/systems/reused-internal/${row.machineId}`, { state: { returnTo } })}
       />
     </div>
   )
