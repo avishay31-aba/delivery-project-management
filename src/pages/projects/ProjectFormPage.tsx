@@ -86,7 +86,7 @@ import {
   updateTasksStatusInPlan,
 } from '@/domain/milestone-plan'
 
-type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'documents'
+type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systemsTenants' | 'projectSystems' | 'projectTenants' | 'documents'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
@@ -120,6 +120,8 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   milestones: false,
   tasks: false,
   systemsTenants: false,
+  projectSystems: false,
+  projectTenants: false,
   documents: false,
 }
 
@@ -162,6 +164,11 @@ function candidateStatus(candidate: AllocationCandidate): string {
 
 function candidateRegion(candidate: AllocationCandidate): string {
   return candidate.cloudRegion ?? ''
+}
+
+function candidateVersion(candidate: AllocationCandidate): string {
+  const value = (candidate as AllocationCandidate & { versionNumber?: string | number | null }).versionNumber
+  return value ? String(value) : ''
 }
 
 function candidateSortValue(candidate: AllocationCandidate, sortKey: AllocationCandidateSortKey): string {
@@ -1100,14 +1107,8 @@ export function ProjectFormPage() {
                           <GripVertical className="h-4 w-4" aria-hidden="true" />
                         </button>
                       </td>
-                      <td className="border border-sf-border px-1 py-1 text-sf-text">
-                        <input
-                          className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
-                          type="number"
-                          min={1}
-                          value={milestone.order}
-                          onChange={(event) => updateMilestoneOrder(milestone.id, Number(event.target.value) || milestone.order)}
-                        />
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-xs font-semibold text-sf-text-muted">
+                        {milestone.order}
                       </td>
                       <td className="max-w-80 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">
                         <button type="button" className="text-left font-medium text-sf-brand hover:underline" onClick={() => setSelectedMilestoneId(milestone.id)}>
@@ -1272,23 +1273,24 @@ export function ProjectFormPage() {
                           </button>
                         </td>
                         <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
-                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
-                          <input
-                            className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
-                            type="number"
-                            min={1}
-                            value={task.order}
-                            onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
-                          />
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-xs font-semibold text-sf-text-muted">
+                          {task.order}
                         </td>
                         <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                        <td className="min-w-72 max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">
-                          <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-16" />
+                        <td className="min-w-[36rem] max-w-[48rem] whitespace-normal border border-sf-border px-1 py-1 text-sf-text">
+                          <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-10" toolbarMode="focus" />
                         </td>
-                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.deadline || ''}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                          <input
+                            className="h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+                            type="date"
+                            value={task.deadline ?? ''}
+                            onChange={(event) => updateTask(task.id, { deadline: event.target.value || null })}
+                          />
+                        </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
                       </tr>
                     </Fragment>
@@ -1517,14 +1519,8 @@ export function ProjectFormPage() {
                         <GripVertical className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </td>
-                    <td className="whitespace-nowrap border border-sf-border px-1 py-1">
-                      <input
-                        className="h-7 w-11 rounded border border-sf-border px-1 py-1 text-center text-sm"
-                        type="number"
-                        min={1}
-                        value={task.order}
-                        onChange={(event) => updateTaskOrder(task.id, Number(event.target.value) || task.order)}
-                      />
+                    <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-xs font-semibold text-sf-text-muted">
+                      {task.order}
                     </td>
                     <td className="max-w-96 border border-sf-border px-1 py-1">
                       <input className="h-8 w-96 max-w-full rounded border border-sf-border px-2 py-1 text-sm" value={task.name} onChange={(event) => updateTask(task.id, { name: event.target.value })} />
@@ -1669,7 +1665,7 @@ export function ProjectFormPage() {
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region'].map((label) => (
+                      {['Select', 'ID', 'MID', 'Version', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region'].map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
@@ -1687,6 +1683,7 @@ export function ProjectFormPage() {
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
@@ -1697,7 +1694,7 @@ export function ProjectFormPage() {
                     ))}
                     {visibleAllocationCandidates.length === 0 ? (
                       <tr>
-                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={9}>
+                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={10}>
                           No systems match the current filter.
                         </td>
                       </tr>
@@ -1770,14 +1767,22 @@ export function ProjectFormPage() {
   }
 
   function renderSystemsTenantsSection() {
+    const requestedProducts = new Set(
+      [
+        ...(linkedOpportunity?.newTenantRequirements ?? []),
+        ...(linkedOpportunity?.changeRequestRequirements ?? []),
+        ...(linkedOpportunity?.standardRenewalRequirements ?? []),
+      ]
+        .map((requirement) => requirement.productType)
+        .filter((product): product is string => Boolean(product)),
+    )
+
+    function productMismatch(system: System): boolean {
+      return requestedProducts.size > 0 && Boolean(system.productType) && !requestedProducts.has(system.productType)
+    }
+
     return (
-      <CollapsibleSection
-        title="Systems and Tenants"
-        subtitle="Systems linked to this Project and their tenants. Tenant creation happens from the linked System Form."
-        collapsed={collapsedSections.systemsTenants}
-        onToggle={() => toggleSection('systemsTenants')}
-        className="space-y-3 p-3"
-      >
+      <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-sf-text-muted">
             Allocation creates Project to System links only. It does not create tenants.
@@ -1794,8 +1799,12 @@ export function ProjectFormPage() {
 
         {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
 
-        <div className="space-y-2">
-          <h3 className="text-base font-semibold text-sf-text">Systems</h3>
+        <CollapsibleSection
+          title="Systems"
+          collapsed={collapsedSections.projectSystems}
+          onToggle={() => toggleSection('projectSystems')}
+          className="space-y-2"
+        >
           {linkedSystems.length > 0 ? (
           <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="min-w-full border-collapse text-sm leading-tight">
@@ -1805,6 +1814,7 @@ export function ProjectFormPage() {
                     'Details',
                     'Actions',
                     'SID',
+                    'MID',
                     'PIDs',
                     'Time Group',
                     'Operational Status',
@@ -1863,8 +1873,12 @@ export function ProjectFormPage() {
                           <LinkId to={systemRoutePath(system)}>
                             {system.sid ?? system.machineId ?? system.id}
                           </LinkId>
+                          {productMismatch(system) ? <AlertStatusIcon variant="warning" label="Product mismatch" /> : null}
                           <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                         </span>
+                      </td>
+                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                        {system.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
                       </td>
                       <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                         {(system.linkedProjectIds?.length ? system.linkedProjectIds : [projectDraft.id]).map((projectId) => {
@@ -1887,7 +1901,7 @@ export function ProjectFormPage() {
                     </tr>,
                     isExpanded ? (
                       <tr key={`${system.id}-details`}>
-                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={7 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
+                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={8 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
                           {renderLinkedSystemDetails(system)}
                         </td>
                       </tr>
@@ -1902,10 +1916,14 @@ export function ProjectFormPage() {
             No systems are linked to this Project yet.
           </div>
         )}
-        </div>
+        </CollapsibleSection>
 
-        <div className="space-y-3">
-          <h3 className="text-base font-semibold text-sf-text">Tenants</h3>
+        <CollapsibleSection
+          title="Tenants"
+          collapsed={collapsedSections.projectTenants}
+          onToggle={() => toggleSection('projectTenants')}
+          className="space-y-3"
+        >
         {[
           {
             title: 'Under Contract',
@@ -1981,8 +1999,8 @@ export function ProjectFormPage() {
         )}
         </div>
         ))}
-        </div>
-      </CollapsibleSection>
+        </CollapsibleSection>
+      </div>
     )
   }
 

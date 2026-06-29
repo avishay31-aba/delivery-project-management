@@ -73,6 +73,7 @@ import {
   warrantyRecordPatch,
   warrantyRecordsForTenant,
 } from '@/domain/warranty-collection'
+import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -107,6 +108,12 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 function textValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
   return value == null ? '' : String(value)
+}
+
+function existingSystemOptionLabel(system: System, opportunity: Opportunity): string {
+  const relationship = system.accountId && system.accountId === opportunity.accountId ? 'Same Account' : 'Deal Owner Related'
+  const accountName = (system as System & { accountName?: string }).accountName
+  return `${system.sid ?? system.machineId ?? system.id} | Customer: ${accountName || system.accountId || 'Unknown'} | Product: ${system.productType || '-'} | ${relationship}`
 }
 
 function inputClassName(isChanged: boolean, extra = ''): string {
@@ -516,7 +523,7 @@ function RequirementGrid({
             <option value="">{sidSystems.length > 0 ? 'Select SID' : 'No eligible SIDs'}</option>
             {availableSystems.map((system) => (
               <option key={system.id} value={system.id}>
-                {system.sid} - {system.hostingType}
+                {existingSystemOptionLabel(system, draft)}
               </option>
             ))}
             {alreadySelectedSystems.length > 0 ? (
@@ -526,7 +533,7 @@ function RequirementGrid({
             ) : null}
             {alreadySelectedSystems.map((system) => (
               <option key={system.id} value={system.id} disabled>
-                {system.sid} - {system.hostingType} - Already selected
+                {existingSystemOptionLabel(system, draft)} | Already selected
               </option>
             ))}
           </select>
@@ -881,6 +888,19 @@ export function OpportunityFormPage() {
 
   const currentDraft = draft
   const currentSavedOpportunity = savedOpportunity
+
+  function opportunityProjectMilestoneSummary() {
+    const activeProject = createdProjects.find((project) => project.progressStatus !== 'DONE') ?? createdProjects[0]
+    if (!activeProject) return { current: '', next: '' }
+    const progress = deriveProjectProgress(activeProject)
+    const nextMilestone = orderedProjectMilestones(activeProject).find(
+      (milestone) => milestone.name !== progress.currentMilestone && projectMilestoneStatus(activeProject, milestone.id) !== 'DONE',
+    )
+    return {
+      current: progress.currentMilestone || '',
+      next: nextMilestone?.name ?? '',
+    }
+  }
 
   function patchDraft(patch: Partial<Opportunity>) {
     setDraft((current) => (current ? { ...current, ...patch } : current))
@@ -1441,8 +1461,8 @@ export function OpportunityFormPage() {
   }
 
   const headerFieldByKey = new Map(metadata.headerFields.map((field) => [field.key, field]))
-  const lineOneKeys: OpportunityHeaderField['key'][] = ['salesManagerId']
-  const lineTwoKeys: OpportunityHeaderField['key'][] = ['opportunityId', 'opportunityName', 'type', 'subType', 'dealPackage']
+  const lineOneKeys: OpportunityHeaderField['key'][] = ['salesManagerId', 'opportunityId', 'opportunityName']
+  const commercialLineOneKeys: OpportunityHeaderField['key'][] = ['type', 'subType', 'dealPackage']
   const locationFieldKeys: OpportunityHeaderField['key'][] = ['accountId', 'region', 'country', 'state', 'timeZone']
   const lineThreeKeys: OpportunityHeaderField['key'][] = [
     'accountId',
@@ -1460,7 +1480,7 @@ export function OpportunityFormPage() {
   ]
   const orderedHeaderKeys = new Set<OpportunityHeaderField['key']>([
     ...lineOneKeys,
-    ...lineTwoKeys,
+    ...commercialLineOneKeys,
     ...locationFieldKeys,
     ...commercialTermKeys,
   ])
@@ -1847,16 +1867,29 @@ export function OpportunityFormPage() {
 
           <div className="border-t border-sf-border" />
 
-          <div className="flex flex-wrap items-start gap-3">
-            {renderHeaderFields(lineTwoKeys)}
-            {renderStageField()}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Commercial Data</h3>
+            <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(commercialLineOneKeys)}</div>
+            <div className="flex flex-wrap items-start gap-3">{renderStageField()}</div>
+            <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(commercialTermKeys)}</div>
           </div>
 
           <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(lineThreeKeys)}</div>
 
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Commercial terms</h3>
-            <div className="flex flex-wrap items-start gap-3">{renderHeaderFields(commercialTermKeys)}</div>
+            <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Operational Data</h3>
+            <div className="flex flex-wrap items-start gap-3">
+              <FormField label="Current Milestone" controlWidthClassName="w-56">
+                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+                  {opportunityProjectMilestoneSummary().current || '-'}
+                </div>
+              </FormField>
+              <FormField label="Next Milestone" controlWidthClassName="w-56">
+                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+                  {opportunityProjectMilestoneSummary().next || '-'}
+                </div>
+              </FormField>
+            </div>
           </div>
 
           {operationalMetadataFields.length > 0 ? (

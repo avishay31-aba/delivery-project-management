@@ -34,7 +34,7 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
     ...tenant,
     contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
     hostedSystemHistory: history,
-    tenantFormType: tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
+    tenantFormType: tenant.tenantType === 'PENLINK_INTERNAL' ? 'INTERNAL' : tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
     hostedSystemId: tenant.hostedSystemId ?? tenant.systemId,
     hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
     configuration: applicationConfigurationFromTenant(tenant),
@@ -252,7 +252,7 @@ export function tenantDraftWithAttachedSystem(
     hostedSystemId: nextSystemId,
     hostingSid: nextSystem?.sid ?? '',
     deliveryPid: nextProject?.pid ?? '',
-    tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
+    tenantType: nextType === 'INTERNAL' ? 'PENLINK_INTERNAL' : nextType === 'POC' ? 'POC' : 'CUSTOMER',
     tenantFormType: nextType,
     productType: nextSystem?.productType ?? tenant.productType,
     hostedSystemHistory: nextSystemId

@@ -16,7 +16,7 @@ export const TENANT_MANUAL_OPERATIONAL_MODES: TenantOperationalMode[] = [
 ]
 
 export function tenantFormType(tenant: Tenant): TenantFormType {
-  return tenant.tenantFormType ?? (tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER')
+  return tenant.tenantFormType ?? (tenant.tenantType === 'PENLINK_INTERNAL' ? 'INTERNAL' : tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER')
 }
 
 export function tenantFormTypeForSystem(system: System): TenantFormType {

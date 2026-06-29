@@ -38,7 +38,7 @@ export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
 export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
 export type AllocationStatus = 'ALLOCATED' | 'DEALLOCATED'
 export type AllocationType = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
-export type TenantFormType = 'POC' | 'CUSTOMER'
+export type TenantFormType = 'POC' | 'CUSTOMER' | 'INTERNAL'
 
 export interface IdCounters {
   pid: number

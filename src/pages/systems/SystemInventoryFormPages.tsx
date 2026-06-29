@@ -69,6 +69,7 @@ import {
   tenantCountForSystem,
   validateReusedInternalMachineId,
 } from '@/domain/system-inventory'
+import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs'
@@ -359,6 +360,9 @@ function InventoryForm<T extends InventoryRecord>({
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
+  const createTenant = useAppStore((state) => state.createTenant)
+  const updateTenant = useAppStore((state) => state.updateTenant)
+  const updateSystem = useAppStore((state) => state.updateSystem)
   const {
     value: draft,
     setValue: setDraft,
@@ -497,6 +501,12 @@ function InventoryForm<T extends InventoryRecord>({
     lines.set(field.line, [...(lines.get(field.line) ?? []), field])
   })
   const headerLines = Array.from(lines.entries()).sort(([first], [second]) => first - second)
+  const currentTemporarySids =
+    metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
+      ? allocatedSystems
+          .filter((system) => system.machineId && system.machineId === readRecordValue(activeDraft, 'machineId') && system.sid)
+          .map((system) => system.sid as string)
+      : []
 
   function save(stayOnPage: boolean) {
     const nextMessages = validate()
@@ -803,22 +813,54 @@ function InventoryForm<T extends InventoryRecord>({
     const firstProjectId = linkedProjects[0]?.id ?? ''
     const firstRequirementId = firstProjectId ? firstAvailableRequirementId(firstProjectId) : ''
     setSelectedProjectId(firstProjectId)
-    setSelectedRequirementId(firstRequirementId)
+    setSelectedRequirementId(firstRequirementId || 'INTERNAL')
     setAddTenantOpen(true)
     setMessages([])
   }
 
   function handleSelectedProjectChange(projectId: string) {
     setSelectedProjectId(projectId)
-    setSelectedRequirementId(firstAvailableRequirementId(projectId))
+    setSelectedRequirementId(firstAvailableRequirementId(projectId) || 'INTERNAL')
   }
 
   function createTenantFromSelection() {
     if (!selectedProjectId || !selectedRequirementId) return
+    const selectedProject = projects.find((project) => project.id === selectedProjectId)
+    const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
+    if (selectedRequirementId === 'INTERNAL') {
+      const tenant = createTenant()
+      updateTenant(tenant.id, {
+        tenantName: `${tenant.tid} Internal`,
+        accountId: String(readRecordValue(systemForTenant, 'accountId') ?? ''),
+        systemId: systemForTenant.id,
+        hostedSystemId: systemForTenant.id,
+        hostingSid: String(readRecordValue(systemForTenant, 'sid') ?? ''),
+        deliveryPid: selectedProject?.pid ?? '',
+        tenantType: 'PENLINK_INTERNAL',
+        tenantFormType: 'INTERNAL',
+        accountName: 'Internal',
+        country: String(readRecordValue(systemForTenant, 'country') ?? ''),
+        timeGroup: String(readRecordValue(systemForTenant, 'timeGroup') ?? ''),
+        operationalStatus: '',
+        contractStatus: 'UNDER_CONTRACT',
+        hostedSystemHistory: [{ systemId: systemForTenant.id, startedAt: new Date().toISOString(), endedAt: null, reason: 'Created' }],
+        productType: String(readRecordValue(systemForTenant, 'productType') ?? ''),
+        hostingType: String(readRecordValue(systemForTenant, 'hostingType') ?? ''),
+        cloudPlatform: String(readRecordValue(systemForTenant, 'cloudPlatform') ?? ''),
+        users: null,
+      })
+      const currentTenantIds = (readRecordValue(systemForTenant, 'tenantIds') as string[] | undefined) ?? []
+      updateSystem(systemForTenant.id, { tenantIds: Array.from(new Set([...currentTenantIds, tenant.id])) })
+      setMessages([`Tenant ${tenant.tid} created.`])
+      setTenantAddedInSession(true)
+      setAddTenantOpen(false)
+      setSelectedProjectId('')
+      setSelectedRequirementId('')
+      return
+    }
     const selectedRequirement = newTenantRequirementsForProject(selectedProjectId).find(
       (requirement) => requirement.id === selectedRequirementId,
     )
-    const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
     const systemProduct = normalizeProduct(readRecordValue(systemForTenant, 'productType'))
     const requirementProduct = normalizeProduct(selectedRequirement?.productType)
     if (selectedRequirement && systemProduct && requirementProduct && systemProduct !== requirementProduct) {
@@ -847,7 +889,7 @@ function InventoryForm<T extends InventoryRecord>({
         <td className="border border-sf-border px-1.5 py-1 text-sf-text">
           {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : '-'}
         </td>
-        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={tenant.operationalStatus} /></td>
+        <td className="border border-sf-border px-1.5 py-1 text-sf-text"><OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, activeRecord as System)} /></td>
         {TENANT_CONFIGURATION_FIELDS.map((column) => (
           <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
             {tenantFieldValue(tenant, column)}
@@ -1102,10 +1144,10 @@ function InventoryForm<T extends InventoryRecord>({
               <select
                 className="h-9 w-full min-w-0 rounded border border-sf-border px-2 py-1 text-sm"
                 value={selectedRequirementId}
-                disabled={selectedRequirements.length === 0}
+                disabled={linkedProjects.length === 0}
                 onChange={(event) => setSelectedRequirementId(event.target.value)}
               >
-                {selectedRequirements.length === 0 ? <option value="">No new tenant requirements</option> : null}
+                <option value="INTERNAL">Internal</option>
                 {selectedRequirements.map((requirement) => (
                   <option
                     key={requirement.id}
@@ -1178,6 +1220,15 @@ function InventoryForm<T extends InventoryRecord>({
               {fields.map(renderHeaderField)}
             </div>
           ))}
+          {metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL ? (
+            <div className="flex flex-wrap items-start gap-3">
+              <FormField label="Current SID" controlWidthClassName="w-56">
+                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+                  {currentTemporarySids.length > 0 ? currentTemporarySids.join(', ') : '-'}
+                </div>
+              </FormField>
+            </div>
+          ) : null}
         </div>
       </CollapsibleSection>
 

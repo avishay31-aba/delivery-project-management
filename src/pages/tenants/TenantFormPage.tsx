@@ -398,7 +398,7 @@ export function TenantFormPage() {
       current
         ? {
             ...current,
-            tenantType: nextType === 'POC' ? 'POC' : 'CUSTOMER',
+            tenantType: nextType === 'INTERNAL' ? 'PENLINK_INTERNAL' : nextType === 'POC' ? 'POC' : 'CUSTOMER',
             tenantFormType: nextType,
           }
         : current,
@@ -744,6 +744,7 @@ export function TenantFormPage() {
         >
           <option value="POC">POC</option>
           <option value="CUSTOMER">Customer</option>
+          <option value="INTERNAL">Internal</option>
         </select>
       </FormField>
     )
