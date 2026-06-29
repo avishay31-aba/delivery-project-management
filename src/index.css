@@ -70,4 +70,23 @@
   .sf-form-content-scroll::-webkit-scrollbar-thumb:hover {
     background: #64748b;
   }
+
+  .rich-text-editor ul,
+  .rich-text-content ul {
+    list-style: disc;
+    margin: 0.25rem 0 0.25rem 1.25rem;
+    padding-left: 1rem;
+  }
+
+  .rich-text-editor ol,
+  .rich-text-content ol {
+    list-style: decimal;
+    margin: 0.25rem 0 0.25rem 1.25rem;
+    padding-left: 1rem;
+  }
+
+  .rich-text-editor li,
+  .rich-text-content li {
+    margin: 0.125rem 0;
+  }
 }
