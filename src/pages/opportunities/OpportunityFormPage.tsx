@@ -37,6 +37,7 @@ import type {
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
 import { FormField, PlaceholderCard } from '@/components/ui'
+import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
@@ -751,7 +752,7 @@ function RequirementGrid({
                     {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
                   </span>
                   {column.key !== 'existingSystemId' ? (
-                    <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
+                    <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span>
                   ) : null}
                   {column.requiredWhen && column.key !== 'existingSystemId' ? (
                     <span className="block max-w-40 whitespace-normal text-xs font-normal leading-tight text-red-700">

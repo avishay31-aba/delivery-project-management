@@ -644,6 +644,19 @@ function referencedSystemIdsForOpportunity(opportunity: Opportunity | undefined)
   ].filter(Boolean))
 }
 
+export function systemProductMismatchForProject(system: System, opportunity: Opportunity | undefined): boolean {
+  const requestedProducts = new Set(
+    [
+      ...(opportunity?.newTenantRequirements ?? []),
+      ...(opportunity?.changeRequestRequirements ?? []),
+      ...(opportunity?.standardRenewalRequirements ?? []),
+    ]
+      .map((requirement) => requirement.productType)
+      .filter((product): product is string => Boolean(product)),
+  )
+  return requestedProducts.size > 0 && Boolean(system.productType) && !requestedProducts.has(system.productType)
+}
+
 export function linkedSystemsForProject(
   project: Project | undefined,
   systems: System[],

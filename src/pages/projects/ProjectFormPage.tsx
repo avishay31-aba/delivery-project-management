@@ -18,9 +18,11 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, FormField, LinkId, PlaceholderCard, ProgressBar, RecordChangeBadge, RichTextContent, RichTextEditor } from '@/components/ui'
+import { AlertStatusIcon, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
+import { SystemDeliveryTable } from '@/components/systems'
+import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
@@ -52,12 +54,9 @@ import {
   projectPatchFromOpportunitySelection,
   projectSavePatch,
   projectStatusLabel,
+  systemProductMismatchForProject,
   validateProjectSave,
 } from '@/domain/project-lifecycle'
-import {
-  type SharedFieldMetadata,
-} from '@/domain/application-configuration'
-import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -94,36 +93,6 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
   { key: 'region', label: 'Region' },
-]
-
-const LINKED_SYSTEM_PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
-  {
-    title: 'Access Details',
-    fields: [
-      { key: 'url', label: 'URL' },
-      { key: 'ipRestrictionEnabled', label: 'IP Restriction' },
-      { key: 'vpnEnabled', label: 'VPN' },
-      { key: 'vpnType', label: 'VPN Type' },
-    ],
-  },
-  {
-    title: 'Hosting',
-    fields: [
-      { key: 'hostingType', label: 'Hosting' },
-      { key: 'cloudPlatform', label: 'Cloud Platform' },
-      { key: 'csp', label: 'CSP' },
-      { key: 'cloudRegion', label: 'Cloud Region' },
-      { key: 'performanceTier', label: 'Performance Tier' },
-    ],
-  },
-  {
-    title: 'Identifiers',
-    fields: [
-      { key: 'statisticsId', label: 'Statistics ID' },
-      { key: 'authId', label: 'Auth ID' },
-      { key: 'rdmId', label: 'RDM ID' },
-    ],
-  },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -210,39 +179,6 @@ function allocationStatusClassName(result: AllocationActionResult | null): strin
   return result.ok
     ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
     : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
-}
-
-function formatReadOnlyDetailValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ') || '-'
-  if (value === null || value === undefined || value === '') return '-'
-  return String(value)
-}
-
-function deliveryConfigurationValue(record: System | Tenant, field: SharedFieldMetadata): unknown {
-  if (field.key === 'hostingType') {
-    return 'hostingSnapshot' in record && record.hostingSnapshot
-      ? record.hostingSnapshot.hostingType
-      : record.hostingType
-  }
-  if (field.key === 'cloudPlatform') {
-    return 'hostingSnapshot' in record && record.hostingSnapshot
-      ? record.hostingSnapshot.platform
-      : record.cloudPlatform
-  }
-  if (field.key === 'productType') {
-    return 'configuration' in record && record.configuration?.product
-      ? record.configuration.product
-      : record.productType
-  }
-  if ('configuration' in record && record.configuration) {
-    const configurationValue = (record.configuration as unknown as Record<string, unknown>)[field.key]
-    if (configurationValue !== undefined) return configurationValue
-  }
-  return (record as unknown as Record<string, unknown>)[field.key]
-}
-
-function deliveryConfigurationDisplayValue(record: System | Tenant, field: SharedFieldMetadata): string {
-  return formatReadOnlyDetailValue(deliveryConfigurationValue(record, field))
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -358,7 +294,7 @@ function RequirementSection({
                       {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
                       {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
                     </span>
-                    {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span> : null}
+                    {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span> : null}
                     {column.requiredWhen && column.key !== 'existingSystemId' ? (
                       <span className="block max-w-40 whitespace-normal text-xs font-normal leading-tight text-red-700">
                         {column.requiredWhen}
@@ -1732,41 +1668,7 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderLinkedSystemDetails(system: System) {
-    return (
-      <div className="space-y-4 p-3">
-        {LINKED_SYSTEM_PLATFORM_DETAIL_GROUPS.map((group) => (
-          <div key={group.title} className="space-y-2">
-            <h4 className="text-sm font-semibold text-sf-text">{group.title}</h4>
-            <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {group.fields.map((field) => (
-                <div key={field.key} className="rounded border border-sf-border bg-white px-2 py-1">
-                  <dt className="text-xs font-medium text-sf-text-muted">{field.label}</dt>
-                  <dd className="text-sm text-sf-text">{formatReadOnlyDetailValue((system as unknown as Record<string, unknown>)[field.key])}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   function renderSystemsTenantsSection() {
-    const requestedProducts = new Set(
-      [
-        ...(linkedOpportunity?.newTenantRequirements ?? []),
-        ...(linkedOpportunity?.changeRequestRequirements ?? []),
-        ...(linkedOpportunity?.standardRenewalRequirements ?? []),
-      ]
-        .map((requirement) => requirement.productType)
-        .filter((product): product is string => Boolean(product)),
-    )
-
-    function productMismatch(system: System): boolean {
-      return requestedProducts.size > 0 && Boolean(system.productType) && !requestedProducts.has(system.productType)
-    }
-
     return (
       <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1791,124 +1693,40 @@ export function ProjectFormPage() {
           onToggle={() => toggleSection('projectSystems')}
           className="space-y-2"
         >
-          {linkedSystems.length > 0 ? (
-          <div className="sf-scroll-x rounded border border-sf-border bg-white">
-            <table className="min-w-full border-collapse text-sm leading-tight">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  {[
-                    'Actions',
-                    'Details',
-                    'SID',
-                    'MID',
-                    'PIDs',
-                    'Time Group',
-                    'Operational Status',
-                    'Delivery',
-                  ].map((label) => (
-                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                      {label}
-                    </th>
-                  ))}
-                  {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-                    <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                      <span>{field.label}</span>
-                      <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {linkedSystems.map((system) => {
-                  const link = activeSystemLinkBySystemId.get(system.id)
-                  const isExpanded = expandedLinkedSystemIds.includes(system.id)
-                  return [
-                    <tr key={system.id} className="hover:bg-sf-surface-alt">
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-                          onClick={() => navigate(systemRoutePath(system))}
-                        >
-                          Edit
-                        </button>
-                        {link ? (
-                          <button
-                            type="button"
-                            className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                            onClick={() => deallocateSystem(link)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            Deallocate
-                          </button>
-                        ) : null}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs hover:bg-sf-surface-alt"
-                          aria-expanded={isExpanded}
-                          onClick={() => toggleLinkedSystemDetails(system.id)}
-                        >
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />}
-                          Details
-                        </button>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        <span className="inline-flex items-center gap-2">
-                          <LinkId to={systemRoutePath(system)}>
-                            {system.sid ?? system.machineId ?? system.id}
-                          </LinkId>
-                          {productMismatch(system) ? (
-                            <span className="group relative inline-flex" title="Product mismatch">
-                              <AlertStatusIcon variant="warning" label="Product mismatch" />
-                              <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700 shadow group-hover:block">
-                                Product mismatch
-                              </span>
-                            </span>
-                          ) : null}
-                          <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
-                        </span>
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        {system.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                        {(system.linkedProjectIds?.length ? system.linkedProjectIds : [projectDraft.id]).map((projectId) => {
-                          const linkedProject = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
-                          return linkedProject ? (
-                            <span key={projectId} className="mr-2 inline-block">
-                              <LinkId to={`/projects/${linkedProject.pid}`}>{linkedProject.pid}</LinkId>
-                            </span>
-                          ) : null
-                        })}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text"><OperationalStatusBadge status={system.operationalStatus} /></td>
-                      <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                      {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-                        <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                          {deliveryConfigurationDisplayValue(system, field)}
-                        </td>
-                      ))}
-                    </tr>,
-                    isExpanded ? (
-                      <tr key={`${system.id}-details`}>
-                        <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={8 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
-                          {renderLinkedSystemDetails(system)}
-                        </td>
-                      </tr>
-                    ) : null,
-                  ]
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-            No systems are linked to this Project yet.
-          </div>
-        )}
+          <SystemDeliveryTable
+            systems={linkedSystems}
+            projects={projects}
+            fallbackProjectId={projectDraft.id}
+            emptyText="No systems are linked to this Project yet."
+            expandedSystemIds={expandedLinkedSystemIds}
+            onToggleDetails={toggleLinkedSystemDetails}
+            renderOperationalStatus={(status) => <OperationalStatusBadge status={status} />}
+            productMismatch={(system) => systemProductMismatchForProject(system, linkedOpportunity)}
+            actions={(system) => {
+              const link = activeSystemLinkBySystemId.get(system.id)
+              return (
+                <>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                    onClick={() => navigate(systemRoutePath(system))}
+                  >
+                    Edit
+                  </button>
+                  {link ? (
+                    <button
+                      type="button"
+                      className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                      onClick={() => deallocateSystem(link)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      Deallocate
+                    </button>
+                  ) : null}
+                </>
+              )
+            }}
+          />
         </CollapsibleSection>
 
         <CollapsibleSection

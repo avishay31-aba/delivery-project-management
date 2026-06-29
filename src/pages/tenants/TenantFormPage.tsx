@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { AlertStatusIcon, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
+import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
@@ -1057,7 +1058,7 @@ export function TenantFormPage() {
               {CONFIGURATION_FIELDS.map((field) => (
                 <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
                   <span>{field.label}</span>
-                  <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
+                  <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
                 </th>
               ))}
             </tr>
@@ -1221,7 +1222,7 @@ export function TenantFormPage() {
             ...CONFIGURATION_FIELDS.map((field) => (
               <span key={field.key}>
                 <span>{field.label}</span>
-                <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
+                <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
               </span>
             )),
           ]}

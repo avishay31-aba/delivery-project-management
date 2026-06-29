@@ -5,7 +5,7 @@ import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-require
 import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 import { systemRoutePath } from '@/domain/system-inventory'
 import { LinkId, RecordChangeBadge } from '@/components/ui'
-import type { SharedFieldMetadata } from '@/domain/application-configuration'
+import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 
 const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
   On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
@@ -16,43 +16,6 @@ const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
   Deleted: 'text-gray-500',
   Canceled: 'text-purple-500',
   Cancelled: 'text-purple-500',
-}
-
-function textValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ')
-  return value == null ? '' : String(value)
-}
-
-function formatReadOnlyValue(value: unknown): string {
-  const formatted = textValue(value)
-  return formatted || '-'
-}
-
-function deliveryConfigurationValue(record: System | Tenant, field: SharedFieldMetadata): unknown {
-  if (field.key === 'hostingType') {
-    return 'hostingSnapshot' in record && record.hostingSnapshot
-      ? record.hostingSnapshot.hostingType
-      : record.hostingType
-  }
-  if (field.key === 'cloudPlatform') {
-    return 'hostingSnapshot' in record && record.hostingSnapshot
-      ? record.hostingSnapshot.platform
-      : record.cloudPlatform
-  }
-  if (field.key === 'productType') {
-    return 'configuration' in record && record.configuration?.product
-      ? record.configuration.product
-      : record.productType
-  }
-  if ('configuration' in record && record.configuration) {
-    const configurationValue = (record.configuration as unknown as Record<string, unknown>)[field.key]
-    if (configurationValue !== undefined) return configurationValue
-  }
-  return (record as unknown as Record<string, unknown>)[field.key]
-}
-
-function deliveryConfigurationDisplayValue(record: System | Tenant, field: SharedFieldMetadata): string {
-  return formatReadOnlyValue(deliveryConfigurationValue(record, field))
 }
 
 function OperationalStatusBadge({ value }: { value: string }) {
@@ -120,12 +83,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 {label}
               </th>
             ))}
-            {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-              <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                <span>{field.label}</span>
-                <span className="block text-xs font-normal text-sf-text-muted">{field.group}</span>
-              </th>
-            ))}
+            <ConfigurationColumnHeaders fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
           </tr>
         </thead>
         <tbody>
@@ -160,11 +118,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
-                {TENANT_REQUIREMENT_CONFIGURATION_FIELDS.map((field) => (
-                  <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                    {deliveryConfigurationDisplayValue(tenant, field)}
-                  </td>
-                ))}
+                <ConfigurationValueCells record={tenant as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
               </tr>
             )
           })}

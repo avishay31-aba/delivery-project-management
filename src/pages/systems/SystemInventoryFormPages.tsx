@@ -24,6 +24,7 @@ import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { FormField, PlaceholderCard } from '@/components/ui'
+import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
   HOSTING_OPTIONS,
@@ -958,7 +959,7 @@ function InventoryForm<T extends InventoryRecord>({
                   {APPLICATION_SUMMARY_FIELDS.map((column) => (
                     <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
                       <span>{column.label}</span>
-                      <span className="block text-xs font-normal text-sf-text-muted">{column.group}</span>
+                      <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span>
                     </th>
                   ))}
                 </tr>
