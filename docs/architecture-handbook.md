@@ -138,6 +138,134 @@ Product Readiness Review findings should be classified as one of:
 - Performance Improvement
 - Product Recommendation
 
+## Navigation Specification
+
+This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.
+
+The ERP navigation hierarchy is:
+
+```text
+Console
+  -> Workspace
+    -> Tab
+      -> Section
+        -> Card
+          -> Table
+```
+
+### Navigation Definitions
+
+#### Console
+
+A Console represents a major business capability grouping.
+
+Examples:
+
+- Sales Console
+- Delivery Console
+- Admin Console
+
+#### Workspace
+
+A Workspace represents one Business Object. Each Business Object owns exactly one Workspace.
+
+Examples:
+
+- Customer Workspace
+- Opportunity Workspace
+- Project Workspace
+- Systems Workspace
+- Tenant Workspace
+- Warranty Workspace
+
+#### Tab
+
+Tabs represent different views, perspectives, or functional areas of the same Business Object.
+
+Tabs do not represent Business Objects. Tabs do not own business logic.
+
+Example:
+
+Systems Workspace may have tabs such as:
+
+- Production
+- Allocated
+- Reused
+
+These are views of the Systems Business Object. They are not separate Workspaces.
+
+#### Section, Card, And Table
+
+Sections organize a Workspace or Tab into focused areas. Cards summarize focused information. Tables present collections, relationships, or operational rows.
+
+Sections, Cards, and Tables do not own business rules. They render facts and actions owned by Business Objects, Core Services, or Shared Components.
+
+### Navigation Rules
+
+The left navigation sidebar should expose only:
+
+- Consoles
+- Workspaces
+
+The sidebar should generally be limited to two navigation levels.
+
+Third-level navigation items should be avoided unless they represent separate Business Objects with independent ownership.
+
+Views, subsets, filters, operational modes, inventories, or perspectives of the same Business Object should be implemented as Workspace Tabs.
+
+Routes may remain stable for compatibility, but visible navigation should follow Console -> Workspace ownership.
+
+### Current Navigation Review
+
+The current ERP navigation already follows the three-console model:
+
+| Current Item | Current Location | Recommendation | Justification |
+| --- | --- | --- | --- |
+| Customers | Sales Console | Keep as Workspace | Customer / Account is a Sales-owned Business Object with its own Workspace. |
+| Opportunities | Sales Console | Keep as Workspace | Opportunity is a Sales-owned Business Object with its own Workspace. |
+| Projects | Delivery Console | Keep as Workspace | Project is a Delivery-owned Business Object and operational delivery center. |
+| Systems Workspace | Delivery Console | Keep as Workspace | Systems is a Delivery-owned Business Object. |
+| Allocated Systems | Delivery Console -> Systems Workspace | Convert to Workspace Tab | Allocated Systems is a view of the Systems Business Object, not a separate Business Object. |
+| Production Inventory | Delivery Console -> Systems Workspace | Convert to Workspace Tab | Production Inventory is an inventory perspective of Systems, not a separate Business Object. |
+| Reused Internal Systems | Delivery Console -> Systems Workspace | Convert to Workspace Tab | Reused Internal Systems is an operational subset of Systems, not a separate Business Object. |
+| Tenants | Delivery Console | Keep as Workspace | Tenant is a Delivery-owned Business Object with independent lifecycle and identity. |
+| Warranty Workspace | Delivery Console | Keep as Workspace | Warranty is a Delivery-owned Business Object with independent lifecycle and chain rules. |
+| Renewal Work Queue | Delivery Console | Keep as Workspace for Version 1.0 | It is an operational workspace over Warranty/Renewal execution. It may later become a Warranty Workspace tab if the product consolidates operational queues. |
+| Requirement Coverage | Delivery Console | Keep as Workspace for Version 1.0 | It exposes delivery traceability across opportunity requirements, projects, systems, and tenants. It may later become a Delivery Alerts/Traceability workspace depending on product direction. |
+| Activity / Audit Log | Admin Console | Keep as Workspace | Audit/activity review is an Admin-owned operational governance workspace. |
+
+### Recommended Future Navigation Structure
+
+Recommended visible navigation should remain:
+
+```text
+Sales Console
+  Customers
+  Opportunities
+
+Delivery Console
+  Projects
+  Systems Workspace
+  Tenants
+  Warranty Workspace
+  Renewal Work Queue
+  Requirement Coverage
+
+Admin Console
+  Activity / Audit Log
+```
+
+Within Systems Workspace, the current third-level items should become tabs:
+
+```text
+Systems Workspace
+  Allocated
+  Production
+  Reused
+```
+
+The existing routes may continue to support deep links and backward compatibility, but the visible sidebar should avoid exposing Systems subsets as third-level navigation items.
+
 ## Architecture Handbook Updates
 
 Architecture documentation is a first-class deliverable.
