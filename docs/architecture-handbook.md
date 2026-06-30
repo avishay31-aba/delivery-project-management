@@ -100,16 +100,21 @@ Console
 
 ## Product Development Methodology
 
-ERP Version 1.0 has three parallel artifacts:
+ERP Version 1.0 follows this frozen product-engineering methodology:
 
-1. ERP Product
-   - The implementation itself.
-2. ERP Architecture Handbook
-   - Architectural decisions, ownership principles, reusable patterns, and product engineering rules.
-3. ERP Product Roadmap
-   - Milestones, releases, sequencing, and planning.
+```text
+Architecture Handbook
+  -> Enterprise Capability Model (ECM)
+  -> Business Object Model (BOM)
+  -> Business Object Specification (BOS)
+  -> Product Design Specification (PDS)
+  -> Implementation
+  -> Product Readiness Review (PRR)
+```
 
-Every significant implementation should be evaluated against all three artifacts.
+Do not add new methodology artifact types unless explicitly approved.
+
+The Architecture Handbook defines governing principles. The ECM defines business capabilities. The BOM defines the ERP business domain map. BOS documents define object ownership and rules. PDS documents define workspace/page design. Implementation must conform to the approved PDS. PRR identifies readiness findings without expanding implementation scope.
 
 ## Future Implementation Process
 
