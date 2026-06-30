@@ -69,11 +69,9 @@ export interface ProjectFormMetadata {
 
 export const PROJECT_TABS: ProjectFormTab[] = [
   'overview',
-  'requirements',
   'milestones',
   'tasks',
-  'systems',
-  'tenants',
+  'systemsTenants',
   'documents',
   'activity',
 ]
@@ -228,7 +226,7 @@ export function projectTabLabel(tab: ProjectFormTab): string {
     requirements: 'Requirements',
     systems: 'Systems',
     tenants: 'Tenants',
-    systemsTenants: 'Systems and Tenants',
+    systemsTenants: 'Systems / Tenants',
     engagement: 'Engagement Circle',
     milestones: 'Milestones',
     tasks: 'Tasks',

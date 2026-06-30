@@ -1857,7 +1857,18 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderSystemsTab() {
+  function renderSystemsTenantsSection() {
+    const tenantSections = [
+      {
+        title: 'Under Contract',
+        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus !== 'OUT_OF_CONTRACT' && tenant.contractStatus !== 'OUT_OF_CONTRACT'),
+      },
+      {
+        title: 'Out of Contract',
+        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus === 'OUT_OF_CONTRACT' || tenant.contractStatus === 'OUT_OF_CONTRACT'),
+      },
+    ]
+
     return (
       <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1883,14 +1894,6 @@ export function ProjectFormPage() {
           onToggle={() => toggleSection('systems')}
           className="space-y-2"
         >
-          {projectSystemSummary ? (
-            <div className="grid gap-3 md:grid-cols-4">
-              {summaryCard('Linked Systems', projectSystemSummary.linkedSystems)}
-              {summaryCard('Production Systems', projectSystemSummary.productionSystems)}
-              {summaryCard('Reused/Internal Systems', projectSystemSummary.reusedInternalSystems)}
-              {summaryCard('Allocation Status', projectSystemSummary.missingSystemAllocation ? 'Missing' : 'Linked')}
-            </div>
-          ) : null}
           <SystemDeliveryTable
             systems={linkedSystems}
             projects={projects}
@@ -1929,24 +1932,7 @@ export function ProjectFormPage() {
             }}
           />
         </CollapsibleSection>
-      </div>
-    )
-  }
 
-  function renderTenantsTab() {
-    const tenantSections = [
-      {
-        title: 'Under Contract',
-        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus !== 'OUT_OF_CONTRACT' && tenant.contractStatus !== 'OUT_OF_CONTRACT'),
-      },
-      {
-        title: 'Out of Contract',
-        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus === 'OUT_OF_CONTRACT' || tenant.contractStatus === 'OUT_OF_CONTRACT'),
-      },
-    ]
-
-    return (
-      <div className="space-y-3 p-3">
         <CollapsibleSection
           title="Tenants"
           subtitle="Project tenant context. Tenant facts remain owned by TenantOperations and warranty facts remain owned by WarrantyCollection."
@@ -1954,14 +1940,6 @@ export function ProjectFormPage() {
           onToggle={() => toggleSection('tenants')}
           className="space-y-3"
         >
-          {projectTenantSummary ? (
-            <div className="grid gap-3 md:grid-cols-4">
-              {summaryCard('Linked Tenants', projectTenantSummary.linkedTenants)}
-              {summaryCard('Customer Tenants', projectTenantSummary.customerTenants)}
-              {summaryCard('POC Tenants', projectTenantSummary.pocTenants)}
-              {summaryCard('Tenant Status', projectTenantSummary.missingTenantCreation ? 'Missing' : 'Linked')}
-            </div>
-          ) : null}
           {tenantSections.map((section) => (
             <div key={section.title} className="space-y-2">
               <h4 className="text-sm font-semibold text-sf-text">{section.title}</h4>
@@ -2023,6 +2001,8 @@ export function ProjectFormPage() {
         </div>
       </CollapsibleSection>
 
+      <div className="mt-4 space-y-4">{renderRequirementsSection()}</div>
+
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
         <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
           {visibleTabs.map((tab) => (
@@ -2044,19 +2024,15 @@ export function ProjectFormPage() {
         <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
           {activeTab === 'overview'
             ? renderOverviewTab()
-            : activeTab === 'requirements'
-              ? renderRequirementsSection()
-              : activeTab === 'milestones'
-                ? renderMilestonesTab()
-                : activeTab === 'tasks'
-                  ? renderTasksTab()
-                  : activeTab === 'systems'
-                    ? renderSystemsTab()
-                    : activeTab === 'tenants'
-                      ? renderTenantsTab()
-                      : activeTab === 'activity'
-                        ? renderActivityTab()
-                        : renderDocumentsTab()}
+            : activeTab === 'milestones'
+              ? renderMilestonesTab()
+              : activeTab === 'tasks'
+                ? renderTasksTab()
+                : activeTab === 'systemsTenants'
+                  ? renderSystemsTenantsSection()
+                  : activeTab === 'activity'
+                    ? renderActivityTab()
+                    : renderDocumentsTab()}
         </div>
       </div>
       </div>

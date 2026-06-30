@@ -103,28 +103,25 @@ Delivery Console
   -> Project Workspace
     -> Header
     -> Toolbar
+    -> Delivery Instructions / Project Requirements
+      -> Requirement Coverage Summary
+      -> Requirement Coverage Table
+      -> Read-only Opportunity Requirement Grids
     -> Tabs
       -> Overview
         -> Delivery Health Section
         -> Needs Attention Section
         -> Planning Summary Section
         -> Execution Summary Section
-      -> Requirements
-        -> Requirement Coverage Summary
-        -> Requirement Coverage Table
-        -> Read-only Opportunity Requirement Grids
       -> Milestones
         -> Milestone Table
         -> Milestone Detail/Edit Dialogs
       -> Tasks
         -> Task Table
         -> Task Bulk Actions
-      -> Systems
-        -> Systems Summary
+      -> Systems / Tenants
         -> Systems Table
         -> Allocation Dialog
-      -> Tenants
-        -> Tenants Summary
         -> Under Contract Tenants
         -> Out of Contract Tenants
       -> Documents
@@ -133,7 +130,7 @@ Delivery Console
         -> Activity Timeline
 ```
 
-No third-level sidebar navigation should be introduced. Systems and Tenants are independent Project Workspace tabs because they are separate Delivery Business Objects coordinated by Project Workspace.
+No third-level sidebar navigation should be introduced. Systems and Tenants remain separate Delivery Business Objects, but Project Workspace displays them together in one Systems / Tenants tab because Delivery Specialists need one combined delivery picture for the project.
 
 ## 6. Header Design
 
@@ -223,9 +220,8 @@ Workflow clarifications:
 
 - Project Dashboard is the operational entry point for Delivery Specialists.
 - Requirements drive delivery execution.
-- Systems tab manages allocation context.
+- Systems / Tenants tab manages allocation context and delivered runtime context together.
 - System Workspace owns the Application Configuration Summary used for physical/system configuration.
-- Tenants tab manages delivered runtime context.
 - Warranty follow-up happens after tenant delivery context exists.
 - Tasks are continuously updated throughout delivery.
 - Project coordinates this workflow but does not own System, Tenant, Warranty, or Requirement Coverage business rules.
@@ -241,7 +237,7 @@ Recommended V1 sections:
 - Current Milestone
 - Last Completed Milestone
 - Task Summary
-- Requirement Coverage
+- Delivery Instructions / Project Requirements
 - Systems
 - Tenants
 - Milestones
@@ -268,20 +264,6 @@ Overview cards should be read-model driven:
 - Missing Tenant
 - Deadline Risk
 
-Systems tab cards:
-
-- Linked Systems
-- Production Systems
-- Reused/Internal Systems
-- Allocation Status
-
-Tenants tab cards:
-
-- Linked Tenants
-- Customer Tenants
-- POC Tenants
-- Tenant Status
-
 Cards must consume owning-domain values and not recalculate them.
 
 ## 11. Tabs
@@ -289,22 +271,18 @@ Cards must consume owning-domain values and not recalculate them.
 V1 tabs:
 
 1. Overview
-2. Requirements
-3. Milestones
-4. Tasks
-5. Systems
-6. Tenants
-7. Documents
-8. Activity
+2. Milestones
+3. Tasks
+4. Systems / Tenants
+5. Documents
+6. Activity
 
 Tab ownership:
 
 - Overview: Project read model composition
-- Requirements: RequirementCoverage read-only context plus Opportunity requirement intent context
 - Milestones: MilestonePlan execution
 - Tasks: MilestonePlan execution
-- Systems: Allocation/System context
-- Tenants: Tenant/Warranty context
+- Systems / Tenants: Allocation/System context plus Tenant/Warranty context
 - Documents: DocumentCollection
 - Activity: ActivityLog
 
