@@ -70,6 +70,17 @@ export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[
 export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<System>[] {
   return [
     { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? '' },
+    {
+      id: 'pid',
+      label: 'PID',
+      getValue: (row) =>
+        joinUniqueValues(
+          (row.linkedProjectIds ?? [])
+            .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
+            .filter(Boolean),
+          '; ',
+        ),
+    },
     { id: 'machineId', label: 'MID', getValue: (row) => row.machineId ?? '' },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
