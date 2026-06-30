@@ -285,6 +285,69 @@ Always preserve:
 - Shared Components own shared UI behavior.
 - Pages compose objects and components only.
 
+## Approved Business Forms Are Product Assets
+
+Approved business forms represent proven operational workflows and are considered product assets, not implementation artifacts.
+
+Unless explicitly requested by the Product Owner, architectural work must not redesign, reorganize, simplify, modernize, or otherwise alter the visual structure, workflow, field placement, table layout, interaction patterns, or information density of approved business forms.
+
+The purpose of the ERP architecture is to improve:
+
+- Maintainability
+- Clear Business Object ownership
+- Dependency management
+- Consistency
+- Shared Services
+- Shared Components
+- Navigation
+- Extensibility
+- Long-term product evolution
+
+while preserving the proven operational user experience.
+
+Business Object ownership, Core Services, Shared Components, and internal architecture are implementation concerns.
+
+They should improve the product without requiring experienced users to relearn proven workflows.
+
+### Operational Workflow Principle
+
+When there is a conflict between architectural purity and an established, efficient operational workflow, preserve the operational workflow.
+
+The architecture must support the workflow, not force the workflow to mirror the architecture.
+
+### Workspace Composition Principle
+
+Business Object ownership determines where business rules live.
+
+Workspace and form composition determine how users perform their work.
+
+A Workspace or Form may compose multiple Business Objects when doing so improves the operational workflow, provided ownership boundaries remain intact.
+
+Therefore:
+
+- Project Form may display Systems and Tenants together.
+- Customer Form may display Opportunities and Projects.
+- System Form may display hosted Tenants.
+
+This composition does not transfer Business Object ownership.
+
+### UI Preservation Principle
+
+The existing approved business forms are the product baseline.
+
+Future architectural work should be largely invisible to end users.
+
+Users should benefit from:
+
+- Better consistency
+- Better navigation
+- Better performance
+- Better maintainability
+
+without unnecessary visual redesign or workflow changes.
+
+This principle becomes part of the permanent Architecture Handbook and applies to all future implementations unless explicitly overridden by the Product Owner.
+
 ## Implementation Completion Checklist
 
 Before considering a task complete, verify:
