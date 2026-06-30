@@ -25,7 +25,7 @@ export function ActivityLogDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Activity Log" subtitle="Read-only operational activity across customers, projects, systems, tenants, and allocations" />
+      <PageHeader title="Activity / Audit Log" subtitle="Read-only operational activity across customers, projects, systems, tenants, and allocations" />
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
         {kpiCard('Total Events', summary.totalEvents)}
@@ -40,7 +40,7 @@ export function ActivityLogDashboardPage() {
       </section>
 
       <DataDashboard
-        title="Activity Log"
+        title="Activity / Audit Log"
         dashboardScope="activityLog"
         rows={rows}
         columns={columns}

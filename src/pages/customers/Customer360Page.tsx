@@ -329,7 +329,7 @@ export function Customer360Page() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={customerDisplayName(account)} subtitle="Customer 360 workspace" />
+      <PageHeader title={customerDisplayName(account)} subtitle="Customer Workspace" />
 
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         {readOnlyValue('Account ID', account.accountCode)}

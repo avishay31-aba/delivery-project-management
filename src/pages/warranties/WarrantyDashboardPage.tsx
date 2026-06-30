@@ -69,7 +69,7 @@ export function WarrantyDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Warranty Dashboard" subtitle="Operational warranty work queue" />
+      <PageHeader title="Warranty Workspace" subtitle="Operational warranty work queue" />
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {KPI_LABELS.map((item) => (
@@ -81,7 +81,7 @@ export function WarrantyDashboardPage() {
       </section>
 
       <DataDashboard
-        title="Warranty work queue"
+        title="Warranty Workspace"
         dashboardScope="warranties"
         rows={rows}
         columns={columns}
