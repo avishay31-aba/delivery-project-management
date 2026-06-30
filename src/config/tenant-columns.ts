@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { CountryFlag, LinkId } from '@/components/ui'
+import { BusinessIdLink, CountryFlag } from '@/components/ui'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
@@ -30,7 +30,7 @@ function tenantRuntimeColumn(
 
 export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[] {
   return [
-    { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(LinkId, { to: `/tenants/${row.tid}` }, row.tid) },
+    { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tid }, row.tid) },
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
     { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
     { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
@@ -40,7 +40,7 @@ export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[
       id: 'deliveryPid',
       label: 'Delivery PID',
       getValue: (row) => row.deliveryPid ?? '',
-      render: (row) => row.deliveryPid ? createElement(LinkId, { to: `/projects/${row.deliveryPid}` }, row.deliveryPid) : '',
+      render: (row) => row.deliveryPid ? createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: row.deliveryPid }, row.deliveryPid) : '',
     },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },

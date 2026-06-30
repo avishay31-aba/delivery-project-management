@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react'
 import {
   PRODUCT_OPTIONS,
@@ -36,7 +36,7 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { FormField, PlaceholderCard } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -76,6 +76,7 @@ import {
 } from '@/domain/warranty-collection'
 import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
+import { projectReference } from '@/domain/business-reference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -1992,9 +1993,9 @@ export function OpportunityFormPage() {
                         >
                           <td className="border border-sf-border px-2 py-1 text-sm">{renderProjectChangeBadge(projectChangeStatus(project.id))}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
-                            <Link className="font-medium text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                            <BusinessObjectLink reference={projectReference(project)} className="font-medium">
                               {project.pid}
-                            </Link>
+                            </BusinessObjectLink>
                           </td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.mainType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.subType}</td>
@@ -2002,9 +2003,9 @@ export function OpportunityFormPage() {
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.createdAt}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.updatedAt}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
-                            <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>
+                            <BusinessObjectLink reference={projectReference(project)}>
                               Open project
-                            </Link>
+                            </BusinessObjectLink>
                           </td>
                         </tr>
                       ))}

@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, LinkId, ProgressBar, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, ProgressBar, StatusBadge } from '@/components/ui'
 import type {
   Account,
   Opportunity,
@@ -15,6 +15,7 @@ import {
   projectDeliveryDashboardReadModel,
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
+import { projectReference } from '@/domain/business-reference'
 
 interface ProjectDashboardColumnContext {
   opportunities: Opportunity[]
@@ -71,7 +72,7 @@ function splitDashboardValues(value: string): string[] {
 
 export function createProjectListColumns(context: ProjectDashboardColumnContext): DashboardColumn<Project>[] {
   return [
-    { id: 'pid', label: 'PID', getValue: (project) => projectRow(project, context).pid, render: (project) => createElement(LinkId, { to: `/projects/${project.pid}` }, project.pid) },
+    { id: 'pid', label: 'PID', getValue: (project) => projectRow(project, context).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
     { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project, context).projectName, editable: true, editKey: 'opportunityName' },
     { id: 'endUser', label: 'End User', getValue: (project) => projectRow(project, context).endUser },
     { id: 'payingCustomer', label: 'Paying Customer', getValue: (project) => projectRow(project, context).payingCustomer },

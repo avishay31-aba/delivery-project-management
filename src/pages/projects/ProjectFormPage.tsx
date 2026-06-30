@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, CirclePlay, GripVertical, Link2, Plus, Square, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { SystemDeliveryTable } from '@/components/systems'
@@ -39,6 +39,7 @@ import {
   linkedOpportunityForProject,
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
+import { opportunityReference } from '@/domain/business-reference'
 import {
   activeSystemLinkMapBySystemId,
   activeSystemLinksForProject,
@@ -1837,9 +1838,9 @@ export function ProjectFormPage() {
           <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(8, 15).map(renderHeaderField)}</div>
           <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(15).map(renderHeaderField)}</div>
           {linkedOpportunity ? (
-            <Link className="text-sm font-medium text-sf-brand hover:underline" to={`/opportunities/${linkedOpportunity.opportunityId}`}>
+            <BusinessObjectLink reference={opportunityReference(linkedOpportunity)} className="text-sm">
               Open linked Opportunity
-            </Link>
+            </BusinessObjectLink>
           ) : null}
         </div>
       </CollapsibleSection>

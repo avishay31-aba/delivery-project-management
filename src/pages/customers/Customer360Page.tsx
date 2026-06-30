@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import { PlaceholderCard } from '@/components/ui'
+import { BusinessIdLink, BusinessObjectLink, PlaceholderCard } from '@/components/ui'
 import type { Tenant } from '@/data/seed.types'
 import {
   customerAccount360ReadModel,
@@ -15,7 +15,13 @@ import {
 import { formatDocumentSize } from '@/domain/document-collection'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
-import { systemIdentity, systemRoutePath } from '@/domain/system-inventory'
+import {
+  opportunityReference,
+  projectReference,
+  systemBusinessId,
+  systemReference,
+  tenantReference,
+} from '@/domain/business-reference'
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
@@ -80,10 +86,6 @@ function readOnlyTable(headers: string[], rows: ReactNode[][], emptyText: string
   )
 }
 
-function objectLink(to: string, label: string) {
-  return label ? <Link className="text-sf-brand hover:underline" to={to}>{label}</Link> : ''
-}
-
 export function Customer360Page() {
   const { accountCode = '' } = useParams()
   const accounts = useAppStore((state) => state.accounts)
@@ -111,7 +113,7 @@ export function Customer360Page() {
         tenantNameForTenant: (tenant: Tenant) => tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim(),
         sidForTenant: (tenant: Tenant) => {
           const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
-          return system ? systemIdentity(system) : ''
+          return system ? systemBusinessId(system) : ''
         },
         productForTenant: (tenant: Tenant) => {
           const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
@@ -191,7 +193,7 @@ export function Customer360Page() {
       return readOnlyTable(
         ['Opportunity ID', 'Name', 'Stage', 'Type', 'Subtype', 'Delivery Date'],
         customer.opportunities.map((opportunity) => [
-          objectLink(`/opportunities/${opportunity.opportunityId}`, opportunity.opportunityId),
+          <BusinessObjectLink reference={opportunityReference(opportunity)}>{opportunity.opportunityId}</BusinessObjectLink>,
           opportunity.opportunityName,
           opportunity.stage,
           opportunity.type,
@@ -208,7 +210,7 @@ export function Customer360Page() {
         customer.projects.map((project) => {
           const health = projectHealthByProjectId.get(project.id)
           return [
-            objectLink(`/projects/${project.pid}`, project.pid),
+            <BusinessObjectLink reference={projectReference(project)}>{project.pid}</BusinessObjectLink>,
             project.opportunityName,
             project.mainType,
             project.subType,
@@ -232,7 +234,7 @@ export function Customer360Page() {
       return readOnlyTable(
         ['SID', 'Product', 'Hosting Type', 'Cloud Platform', 'CSP', 'Region', 'Status'],
         customer.systems.map((system) => [
-          objectLink(systemRoutePath(system), systemIdentity(system)),
+          <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? system.id}</BusinessObjectLink>,
           system.productType,
           system.hostingType,
           system.cloudPlatform ?? '',
@@ -248,7 +250,7 @@ export function Customer360Page() {
       return readOnlyTable(
         ['TID', 'Tenant Name', 'SID', 'Product', 'Operational Status', 'Country'],
         customer.tenants.map((tenant) => [
-          objectLink(`/tenants/${tenant.tid}`, tenant.tid),
+          <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>,
           tenant.tenantName ?? '',
           tenant.hostingSid ?? '',
           tenant.productType,
@@ -264,7 +266,7 @@ export function Customer360Page() {
         ['Warranty ID', 'Tenant TID', 'Tenant Name', 'SID', 'Related Project ID', 'Project Name', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
         customer.warrantyRows.map((row) => [
           row.warrantyId,
-          objectLink(`/tenants/${row.tenantTid}`, row.tenantTid),
+          <BusinessIdLink objectType="TENANT" businessId={row.tenantTid}>{row.tenantTid}</BusinessIdLink>,
           row.tenantName,
           row.sid,
           row.relatedProjectId,
@@ -284,13 +286,13 @@ export function Customer360Page() {
         ['Requirement ID', 'Opportunity ID', 'Requirement Grid', 'Product', 'Hosting', 'PID', 'SID/MID', 'TID', 'Coverage Status', 'Missing Step', 'Alerts'],
         customer.requirementCoverageRows.map((row) => [
           row.requirementId,
-          objectLink(`/opportunities/${row.opportunityId}`, row.opportunityId),
+          <BusinessIdLink objectType="OPPORTUNITY" businessId={row.opportunityId}>{row.opportunityId}</BusinessIdLink>,
           row.requirementGrid,
           row.product,
           row.hostingType,
-          row.pid ? objectLink(`/projects/${row.pid}`, row.pid) : '',
+          row.pid ? <BusinessIdLink objectType="PROJECT" businessId={row.pid}>{row.pid}</BusinessIdLink> : '',
           row.sid || row.mid,
-          row.tid ? objectLink(`/tenants/${row.tid}`, row.tid) : '',
+          row.tid ? <BusinessIdLink objectType="TENANT" businessId={row.tid}>{row.tid}</BusinessIdLink> : '',
           row.coverageStatusLabel,
           row.missingStepLabel,
           row.coverageAlerts.join('; '),

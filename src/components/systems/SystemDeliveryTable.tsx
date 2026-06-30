@@ -2,9 +2,9 @@ import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project, System } from '@/data/seed.types'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
-import { AlertStatusIcon, ClampedTableCellContent, LinkId, RecordChangeBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, ClampedTableCellContent, RecordChangeBadge } from '@/components/ui'
+import { projectReference, systemReference } from '@/domain/business-reference'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import { systemRoutePath } from '@/domain/system-inventory'
 
 const PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
   {
@@ -143,14 +143,14 @@ export function SystemDeliveryTable({
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-2">
-                    <LinkId to={systemRoutePath(system)}>
+                    <BusinessObjectLink reference={systemReference(system)}>
                       {system.sid ?? system.machineId ?? system.id}
-                    </LinkId>
+                    </BusinessObjectLink>
                     <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                   </span>
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
+                  {system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <ClampedTableCellContent title={projectLabels.join(', ')}>
@@ -158,7 +158,7 @@ export function SystemDeliveryTable({
                       const project = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
                       return project ? (
                         <span key={projectId} className="mr-2 inline-block">
-                          <LinkId to={`/projects/${project.pid}`}>{project.pid}</LinkId>
+                          <BusinessObjectLink reference={projectReference(project)}>{project.pid}</BusinessObjectLink>
                         </span>
                       ) : null
                     })}

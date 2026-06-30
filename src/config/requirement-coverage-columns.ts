@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, LinkId, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, StatusBadge } from '@/components/ui'
 import type { RequirementCoverageRow, RequirementCoverageStatus } from '@/domain/requirement-coverage'
 
 function text(value: string | number | null | undefined): string | number {
@@ -31,7 +31,7 @@ export function createRequirementCoverageColumns(): DashboardColumn<RequirementC
       id: 'opportunityId',
       label: 'Opportunity ID',
       getValue: (row) => row.opportunityId,
-      render: (row) => row.opportunityId ? createElement(LinkId, { to: `/opportunities/${row.opportunityId}` }, row.opportunityId) : '',
+      render: (row) => row.opportunityId ? createElement(BusinessIdLink, { objectType: 'OPPORTUNITY', businessId: row.opportunityId }, row.opportunityId) : '',
     },
     { id: 'opportunityName', label: 'Opportunity Name', getValue: (row) => row.opportunityName },
     { id: 'customerName', label: 'Customer', getValue: (row) => row.customerName },
@@ -46,14 +46,14 @@ export function createRequirementCoverageColumns(): DashboardColumn<RequirementC
       id: 'pid',
       label: 'PID',
       getValue: (row) => row.pid,
-      render: (row) => row.pid ? createElement(LinkId, { to: `/projects/${row.pid}` }, row.pid) : '',
+      render: (row) => row.pid ? createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: row.pid }, row.pid) : '',
     },
     { id: 'systemIdentity', label: 'SID / MID', getValue: systemIdentity },
     {
       id: 'tid',
       label: 'TID',
       getValue: (row) => row.tid,
-      render: (row) => row.tid ? createElement(LinkId, { to: `/tenants/${row.tid}` }, row.tid) : '',
+      render: (row) => row.tid ? createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tid }, row.tid) : '',
     },
     {
       id: 'coverageStatus',

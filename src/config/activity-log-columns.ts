@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, LinkId, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, StatusBadge } from '@/components/ui'
 import {
   ACTIVITY_EVENT_CATEGORY_LABELS,
   ACTIVITY_EVENT_SEVERITY_LABELS,
@@ -9,7 +9,11 @@ import {
   type ActivityEventSeverity,
   type ActivityObjectRef,
 } from '@/domain/activity-log'
-import { routePathForBusinessReference } from '@/domain/business-reference'
+import {
+  routePathForBusinessReference,
+  type BusinessObjectReference,
+  type BusinessObjectType,
+} from '@/domain/business-reference'
 
 export interface ActivityDashboardRow {
   id: string
@@ -52,13 +56,34 @@ function firstRef(event: ActivityEvent, objectType: string): ActivityObjectRef |
   return refsForEvent(event).find((ref) => ref.objectType === objectType) ?? null
 }
 
+function objectTypeForActivityRef(ref: ActivityObjectRef): BusinessObjectType {
+  if (ref.objectType === 'CUSTOMER') return 'ACCOUNT'
+  if (ref.objectType === 'PROJECT') return 'PROJECT'
+  if (ref.objectType === 'TENANT') return 'TENANT'
+  if (ref.objectType === 'SYSTEM') return 'SYSTEM'
+  if (ref.objectType === 'OPPORTUNITY') return 'OPPORTUNITY'
+  if (ref.objectType === 'WARRANTY') return 'WARRANTY'
+  if (ref.objectType === 'DOCUMENT') return 'DOCUMENT'
+  return 'REQUIREMENT'
+}
+
+function businessReferenceForActivityRef(ref: ActivityObjectRef): BusinessObjectReference {
+  const objectType = objectTypeForActivityRef(ref)
+  return {
+    objectType,
+    internalId: ref.id || null,
+    businessId: ref.businessId,
+    displayLabel: labelForRef(ref),
+    routePath: ref.routePath ?? routePathForBusinessReference(ref.objectType, ref.businessId),
+    isMissing: false,
+    isStale: false,
+  }
+}
+
 function renderRef(ref: ActivityObjectRef | null) {
   const label = labelForRef(ref)
   if (!ref || !label) return ''
-  if (ref.routePath) return createElement(LinkId, { to: ref.routePath }, label)
-  const routePath = routePathForBusinessReference(ref.objectType, ref.businessId)
-  if (routePath) return createElement(LinkId, { to: routePath }, label)
-  return label
+  return createElement(BusinessObjectLink, { reference: businessReferenceForActivityRef(ref) }, label)
 }
 
 function severityBadgeVariant(severity: ActivityEventSeverity) {

@@ -3,8 +3,8 @@ import { Ban, CircleCheck, LockKeyhole, PowerOff, ServerOff, ShieldX, Trash2 } f
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
-import { systemRoutePath } from '@/domain/system-inventory'
-import { LinkId, RecordChangeBadge } from '@/components/ui'
+import { systemReference, tenantReference } from '@/domain/business-reference'
+import { BusinessIdLink, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 
 const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
@@ -98,18 +98,18 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 ) : null}
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-2">
-                    <LinkId to={`/tenants/${tenant.tid}`}>{tenant.tid}</LinkId>
+                    <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
                     <RecordChangeBadge record={tenant} />
                   </span>
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system ? <LinkId to={systemRoutePath(system)}>{system.sid ?? system.machineId ?? ''}</LinkId> : null}
+                  {system ? <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? ''}</BusinessObjectLink> : null}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system?.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
+                  {system?.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {tenant.deliveryPid ? <LinkId to={`/projects/${tenant.deliveryPid}`}>{tenant.deliveryPid}</LinkId> : '-'}
+                  {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-'}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>

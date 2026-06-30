@@ -1,11 +1,11 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Ban, Check, ChevronDown, CircleCheck, LockKeyhole, Plus, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
-import { AlertStatusIcon, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
@@ -73,7 +73,7 @@ import {
   TENANT_REMARK_TYPES,
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
-import { systemRoutePath } from '@/domain/system-inventory'
+import { projectReference, systemReference } from '@/domain/business-reference'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -850,8 +850,8 @@ export function TenantFormPage() {
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Project Type', project?.mainType ?? '')}
           {renderHeaderField('Project Name', project?.opportunityName ?? '')}
-          {renderHeaderField('Delivery PID', project ? <Link className="text-sf-brand hover:underline" to={`/projects/${project.pid}`}>{project.pid}</Link> : '')}
-          {renderHeaderField('SID', activeSystem ? <Link className="text-sf-brand hover:underline" to={systemRoutePath(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</Link> : hosting.sid)}
+          {renderHeaderField('Delivery PID', project ? <BusinessObjectLink reference={projectReference(project)}>{project.pid}</BusinessObjectLink> : '')}
+          {renderHeaderField('SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
           {formType === 'POC'
             ? renderHeaderField('POC Start Date', tenantDraft.pocStartDate ?? opportunity?.pocStartDate ?? '')

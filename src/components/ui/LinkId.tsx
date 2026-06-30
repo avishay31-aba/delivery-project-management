@@ -6,13 +6,15 @@ interface LinkIdProps {
   to: string
   children?: ReactNode
   className?: string
+  title?: string
 }
 
 /** Salesforce-style record ID link (PID / SID / TID). */
-export function LinkId({ to, children, className }: LinkIdProps) {
+export function LinkId({ to, children, className, title }: LinkIdProps) {
   return (
     <Link
       to={to}
+      title={title}
       className={cn(
         'font-semibold text-sf-brand hover:text-sf-brand-dark hover:underline',
         className,

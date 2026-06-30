@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { LinkId, StatusBadge } from '@/components/ui'
+import { BusinessIdLink, StatusBadge } from '@/components/ui'
 import type { RenewalCandidateRow } from '@/domain/warranty-collection'
 
 function text(value: string | number | null | undefined): string | number {
@@ -21,7 +21,7 @@ export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
       id: 'tenantTid',
       label: 'Tenant TID',
       getValue: (row) => row.tenantTid,
-      render: (row) => createElement(LinkId, { to: `/tenants/${row.tenantTid}` }, row.tenantTid),
+      render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tenantTid }, row.tenantTid),
     },
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName },
     { id: 'sid', label: 'SID', getValue: (row) => row.sid },

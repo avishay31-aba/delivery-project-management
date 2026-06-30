@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { Check } from 'lucide-react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, LinkId } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink } from '@/components/ui'
 import type { WarrantyDashboardRow } from '@/domain/warranty-collection'
 
 function text(value: string | number | null | undefined): string | number | null {
@@ -24,7 +24,7 @@ export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[]
       id: 'tenantTid',
       label: 'Tenant TID',
       getValue: (row) => row.tenantTid,
-      render: (row) => createElement(LinkId, { to: `/tenants/${row.tenantTid}` }, row.tenantTid),
+      render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tenantTid }, row.tenantTid),
     },
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName },
     { id: 'sid', label: 'SID', getValue: (row) => row.sid },
