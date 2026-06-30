@@ -68,7 +68,6 @@ export interface ProjectFormMetadata {
 }
 
 export const PROJECT_TABS: ProjectFormTab[] = [
-  'overview',
   'milestones',
   'tasks',
   'systemsTenants',

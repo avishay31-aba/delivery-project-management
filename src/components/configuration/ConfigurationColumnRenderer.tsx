@@ -5,7 +5,6 @@ import {
   applicationConfigurationFieldOrder,
   applicationConfigurationRecordValue,
 } from '@/domain/application-configuration'
-import { ClampedTableCellContent } from '@/components/ui'
 
 export function formatConfigurationCellValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ') || '-'
@@ -57,7 +56,7 @@ export function ConfigurationValueCells({
   return (
     <>
       {createConfigurationColumnsFromMetadata(fields).map((field) => (
-        <td key={field.key} className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+        <td key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
           <ConfigurationValueCell record={record} field={field} />
         </td>
       ))}
@@ -74,9 +73,5 @@ function ConfigurationValueCell({
 }) {
   const value = configurationCellValue(record, field)
 
-  return (
-    <ClampedTableCellContent title={value}>
-      {value}
-    </ClampedTableCellContent>
-  )
+  return <span title={value}>{value}</span>
 }

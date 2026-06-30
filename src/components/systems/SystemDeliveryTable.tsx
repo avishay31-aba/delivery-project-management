@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project, System } from '@/data/seed.types'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
-import { AlertStatusIcon, BusinessObjectLink, ClampedTableCellContent, RecordChangeBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { projectReference, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
@@ -154,8 +154,8 @@ export function SystemDeliveryTable({
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  <ClampedTableCellContent title={projectLabels.join(', ')}>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text" title={projectLabels.join('; ')}>
+                  <span>
                     {projectIds.map((projectId) => {
                       const project = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
                       return project ? (
@@ -164,7 +164,7 @@ export function SystemDeliveryTable({
                         </span>
                       ) : null
                     })}
-                  </ClampedTableCellContent>
+                  </span>
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(system.operationalStatus)}</td>
