@@ -14,6 +14,8 @@ It captures the infrastructure identity, hosting model, deployment topology, ope
 
 System is the infrastructure object that Projects allocate and Tenants run inside.
 
+During delivery execution, the allocated System is configured according to its own System-owned Application Configuration Summary.
+
 ## 3. Business Ownership
 
 System is Delivery-owned.
@@ -68,6 +70,8 @@ System owns:
 - System-level documents/activity context where supported
 
 System does not own Customer, Opportunity, Project, Tenant, Warranty, or Requirement Coverage business rules.
+
+Application Configuration Summary remains System-owned regardless of which Project allocates the System or which Tenant consumes the configured runtime result. Project references it. Tenant consumes the result.
 
 ## 8. Fields Owned
 
@@ -218,6 +222,7 @@ No new lifecycle states are introduced by this BOS.
 - System may host many Tenants.
 - System may participate in many Projects over its lifetime.
 - Application Configuration Summary belongs to System.
+- System is configured according to its own Application Configuration Summary.
 - SystemInventory owns system identity, configuration, operational state, and readiness facts.
 - AllocationContext owns project-system relationship semantics.
 - TenantOperations owns tenant lifecycle and tenant operational facts.

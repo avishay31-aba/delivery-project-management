@@ -12,6 +12,8 @@ Project is the central orchestration Business Object of the Delivery Capability.
 
 Project may originate from Opportunity intent, but once created it belongs to Delivery execution.
 
+Project Dashboard is the primary operational entry point for Delivery Specialists. Delivery Specialists use the Project Dashboard to identify open projects, review progress, prioritize POC and Sales delivery work, and open the Project Workspace for execution.
+
 ## 3. Business Ownership
 
 Project is Delivery-owned.
@@ -63,6 +65,7 @@ Project owns:
 - Project-to-system allocation orchestration
 - Project-to-tenant delivery context
 - Delivery progress
+- Delivery workflow coordination from requirements through allocation, tenant delivery, warranty follow-up, and task execution
 
 Project does not own System, Tenant, Warranty, Customer, Opportunity, or Requirement Coverage business rules.
 
@@ -226,7 +229,10 @@ Project lifecycle must not infer unapproved states or introduce new workflow sta
 
 - Project is Delivery-owned.
 - Project owns delivery execution and delivery lifecycle.
+- Project Requirements define delivery intent.
+- Project coordinates the approved delivery workflow from requirement review through System allocation, Tenant creation, Warranty follow-up, and ongoing Task execution.
 - Project may coordinate Systems, Tenants, Milestones, Tasks, Requirement Coverage context, Warranty context, Documents, and Activity.
+- Project does not own Application Configuration Summary.
 - Project must not duplicate SystemInventory rules.
 - Project must not duplicate TenantOperations rules.
 - Project must not duplicate WarrantyCollection rules.

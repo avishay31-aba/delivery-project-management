@@ -201,6 +201,35 @@ Navigation behavior:
 
 Tabs represent views of Project, not sidebar workspaces.
 
+## Delivery Specialist Daily Workflow
+
+The approved Delivery Specialist daily workflow is:
+
+```text
+Project Dashboard
+  -> Prioritize Projects
+  -> Open Project
+  -> Review Requirements
+  -> Allocate System
+  -> Open System Workspace
+  -> Configure the allocated System according to the System-owned Application Configuration Summary
+  -> Return to Project
+  -> Create / Update Tenant
+  -> Update Warranty
+  -> Continue updating Project Tasks until delivery completion
+```
+
+Workflow clarifications:
+
+- Project Dashboard is the operational entry point for Delivery Specialists.
+- Requirements drive delivery execution.
+- Systems tab manages allocation context.
+- System Workspace owns the Application Configuration Summary used for physical/system configuration.
+- Tenants tab manages delivered runtime context.
+- Warranty follow-up happens after tenant delivery context exists.
+- Tasks are continuously updated throughout delivery.
+- Project coordinates this workflow but does not own System, Tenant, Warranty, or Requirement Coverage business rules.
+
 ## 9. Sections
 
 Recommended V1 sections:
