@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronRight, Plus, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
   PRODUCT_OPTIONS,
   HOSTING_OPTIONS,
@@ -36,7 +36,7 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, StatusBadge } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -45,7 +45,6 @@ import {
   getAccountTenants,
   getOpportunityExistingSidSystems,
   resolveTenantSid,
-  validateOpportunity,
 } from '@/utils/opportunity-validation'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import { applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
@@ -66,6 +65,7 @@ import {
   shouldConfirmOpportunityTypeChange,
   shouldConfirmPocProjectSync,
   shouldConfirmWonTransition,
+  validateOpportunity,
   validateOpportunityTransition,
 } from '@/domain/opportunity-lifecycle'
 import {
@@ -76,7 +76,8 @@ import {
 } from '@/domain/warranty-collection'
 import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
-import { projectReference } from '@/domain/business-reference'
+import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
+import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus, statusBadgePresentation } from '@/domain/status-presentation'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -201,25 +202,19 @@ function tenantOptionText(tenant: Tenant, accountTenants: Tenant[], sidSystems: 
     .join(' | ')
 }
 
+function opportunityActionBadgeVariant(action: ExistingActionValue): 'default' | 'open' | 'in_progress' | 'done' | 'warning' | 'error' {
+  if (action === 'Not selected') return 'default'
+  if (action === 'New tenant') return 'done'
+  if (action === 'Downsell change' || action === 'Renewal + downsell') return 'warning'
+  return 'in_progress'
+}
+
 function changeActionLabel(opportunity: Opportunity): 'Upsell change' | 'Downsell change' {
   return opportunity.subType === 'DOWN_SELL' ? 'Downsell change' : 'Upsell change'
 }
 
 function combinedRenewalActionLabel(opportunity: Opportunity): 'Renewal + upsell' | 'Renewal + downsell' {
   return opportunity.subType === 'DOWN_SELL' ? 'Renewal + downsell' : 'Renewal + upsell'
-}
-
-function actionBadgeClassName(action: ExistingActionValue): string {
-  const classes: Record<ExistingActionValue, string> = {
-    'Not selected': 'border-sf-border bg-white text-sf-text-muted',
-    'New tenant': 'border-green-200 bg-green-50 text-green-700',
-    'Upsell change': 'border-blue-200 bg-blue-50 text-blue-700',
-    'Downsell change': 'border-orange-200 bg-orange-50 text-orange-700',
-    'Standard renewal': 'border-purple-200 bg-purple-50 text-purple-700',
-    'Renewal + upsell': 'border-teal-200 bg-teal-50 text-teal-700',
-    'Renewal + downsell': 'border-amber-200 bg-amber-50 text-amber-700',
-  }
-  return `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${classes[action]}`
 }
 
 function CollapsibleSection({
@@ -892,6 +887,12 @@ export function OpportunityFormPage() {
         : [],
     [draft, projects, savedOpportunity?.opportunityId],
   )
+  const validationMessages = useMemo(
+    () => (draft ? validateOpportunity(draft, { accounts, systems, tenants }) : []),
+    [accounts, draft, systems, tenants],
+  )
+  const validationErrors = validationMessages.filter((message) => message.level === 'error')
+  const validationWarnings = validationMessages.filter((message) => message.level === 'warning')
   const countryOptions = useMemo(
     () => Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort(),
     [accounts],
@@ -1516,7 +1517,13 @@ export function OpportunityFormPage() {
   }
 
   function renderActionBadge(action: ExistingActionValue) {
-    return <span className={actionBadgeClassName(action)}>{action}</span>
+    const variant = opportunityActionBadgeVariant(action)
+    const presentation = statusBadgePresentation(variant)
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${presentation.badgeClassName}`}>
+        {action}
+      </span>
+    )
   }
 
   function projectChangeStatus(projectId: string): ProjectLifecycleChange['changeStatus'] | null {
@@ -1526,20 +1533,7 @@ export function OpportunityFormPage() {
 
   function renderProjectChangeBadge(changeStatus: ProjectLifecycleChange['changeStatus'] | null) {
     if (!changeStatus) return null
-
-    const isNew = changeStatus === 'New'
-    const Icon = isNew ? Plus : RefreshCw
-    return (
-      <span
-        className={[
-          'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
-          isNew ? 'border-green-200 bg-green-50 text-green-700' : 'border-indigo-200 bg-indigo-50 text-indigo-700',
-        ].join(' ')}
-      >
-        <Icon className="h-3 w-3" aria-hidden="true" />
-        {changeStatus}
-      </span>
-    )
+    return <StatusBadge label={changeStatus} variant={changeStatus === 'New' ? 'done' : 'in_progress'} />
   }
 
   function renderExistingTenantsAndSystemsSection() {
@@ -1572,15 +1566,29 @@ export function OpportunityFormPage() {
             <tbody>
               {accountTenants.map((tenant) => {
                 const action = tenantAction(tenant.id)
+                const tenantSid = resolveTenantSid(tenant.id, tenants, systems)
                 return (
                   <tr key={`tenant-${tenant.id}`}>
                     <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
-                    <td className="border border-sf-border px-2 py-1">{tenant.tid}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
+                    </td>
                     <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
-                    <td className="border border-sf-border px-2 py-1">{resolveTenantSid(tenant.id, tenants, systems)}</td>
-                    <td className="border border-sf-border px-2 py-1">{tenant.deliveryPid ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      {tenantSid ? <BusinessIdLink objectType="SYSTEM" businessId={tenantSid}>{tenantSid}</BusinessIdLink> : ''}
+                    </td>
+                    <td className="border border-sf-border px-2 py-1">
+                      {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : ''}
+                    </td>
                     <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
-                    <td className="border border-sf-border px-2 py-1">{tenant.warrantyStatus}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      {tenant.warrantyStatus ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <AlertStatusIcon variant={alertVariantForWarrantyStatus(tenant.warrantyStatus)} label={tenant.warrantyStatus} />
+                          {tenant.warrantyStatus}
+                        </span>
+                      ) : ''}
+                    </td>
                     <td className="border border-sf-border px-2 py-1">{tenant.warrantyEndDate ?? ''}</td>
                   </tr>
                 )
@@ -1592,8 +1600,12 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
                     <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1" />
-                    <td className="border border-sf-border px-2 py-1">{system.sid ?? ''}</td>
-                    <td className="border border-sf-border px-2 py-1">{system.deliveryPid ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">
+                      <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? system.id}</BusinessObjectLink>
+                    </td>
+                    <td className="border border-sf-border px-2 py-1">
+                      {system.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={system.deliveryPid}>{system.deliveryPid}</BusinessIdLink> : ''}
+                    </td>
                     <td className="border border-sf-border px-2 py-1">
                       {[system.productType, system.hostingType, system.cloudPlatform].filter(Boolean).join(' | ')}
                     </td>
@@ -1697,13 +1709,26 @@ export function OpportunityFormPage() {
   return (
     <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       <PageHeader
-        title={`Opportunity ${currentDraft.opportunityId}`}
-        subtitle={`${metadata.sourceSheet} - ${visibleRequirementTypes.join('+') || 'No'} visible requirement grids`}
+        title="Opportunity Workspace"
+        subtitle={`${currentDraft.opportunityId} - ${currentDraft.opportunityName || 'Unnamed opportunity'} - ${metadata.sourceSheet} - ${visibleRequirementTypes.join('+') || 'No'} visible requirement grids`}
+        actions={
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold text-sf-text hover:bg-sf-surface-alt"
+            onClick={() => navigate('/opportunities')}
+          >
+            Back to Opportunities
+          </button>
+        }
       />
 
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 border border-sf-border bg-white p-3 shadow-sm">
-        <div className="text-sm text-sf-text-muted">
-          {isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-sf-text-muted">
+          <span>{isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}</span>
+          <StatusBadge
+            label={validationErrors.length > 0 ? 'Needs attention' : validationWarnings.length > 0 ? 'Warnings' : 'Ready'}
+            variant={validationErrors.length > 0 ? 'error' : validationWarnings.length > 0 ? 'warning' : 'done'}
+          />
         </div>
         <div className="flex gap-2">
           <button
@@ -1759,6 +1784,19 @@ export function OpportunityFormPage() {
       </div>
 
       <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
+      {validationMessages.length > 0 ? (
+        <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-semibold">Opportunity validation</p>
+          <ul className="mt-1 list-inside list-disc">
+            {validationMessages.map((message) => (
+              <li key={`${message.level}:${message.message}`}>
+                <span className="font-semibold capitalize">{message.level}</span>: {message.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {saveMessages.length > 0 ? (
         <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <p className="font-semibold">Save blocked</p>
@@ -1874,13 +1912,18 @@ export function OpportunityFormPage() {
       ) : null}
 
       <CollapsibleSection
-        title="Opportunity header"
-        subtitle="Excel section 2 metadata with Opportunity naming and Project status excluded."
+        title="Commercial Profile"
+        subtitle="Sales-owned opportunity identity, lifecycle, commercial terms, and delivery intent."
         collapsed={collapsedSections.opportunityHeader}
         onToggle={() => toggleSection('opportunityHeader')}
         headerActions={
           <span className="rounded-full border border-sf-border px-2 py-0.5 text-sm text-sf-text-muted">
-            Account/End User: {account?.accountName ?? 'Not set'}
+            Account/End User:{' '}
+            {account ? (
+              <BusinessObjectLink reference={accountReference(account)}>{account.accountName}</BusinessObjectLink>
+            ) : (
+              'Not set'
+            )}
           </span>
         }
       >
@@ -1940,7 +1983,7 @@ export function OpportunityFormPage() {
             aria-selected={activeDetailTab === 'requirements'}
             onClick={() => switchDetailTab('requirements')}
           >
-            Tenant Requirements
+            Requirements
           </button>
           <button
             type="button"
@@ -1953,19 +1996,19 @@ export function OpportunityFormPage() {
             aria-selected={activeDetailTab === 'project'}
             onClick={() => switchDetailTab('project')}
           >
-            Created Project
+            Related Projects
           </button>
         </div>
 
         <div className="min-h-[60vh]">
         {activeDetailTab === 'requirements' ? (
-          <div className="space-y-4 p-3" role="tabpanel" aria-label="Tenant Requirements">
+          <div className="space-y-4 p-3" role="tabpanel" aria-label="Requirements">
             {visibleRequirementTypes.map((kind) => renderRequirementGrid(kind))}
           </div>
         ) : (
-          <div className="space-y-2 p-3" role="tabpanel" aria-label="Created Project">
+          <div className="space-y-2 p-3" role="tabpanel" aria-label="Related Projects">
             <CollapsibleSection
-              title="Created Project"
+              title="Related Projects"
               collapsed={collapsedSections.createdProject}
               onToggle={() => toggleSection('createdProject')}
               className="space-y-2"
@@ -1999,7 +2042,12 @@ export function OpportunityFormPage() {
                           </td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.mainType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.subType}</td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{project.progressStatus}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">
+                            <StatusBadge
+                              label={project.progressStatus === 'DONE' ? 'Done' : 'Open'}
+                              variant={badgeVariantForProjectStatus(project.progressStatus)}
+                            />
+                          </td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.createdAt}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.updatedAt}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
@@ -2014,7 +2062,7 @@ export function OpportunityFormPage() {
                 </div>
               ) : (
                 <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-                  No project created yet.
+                  No related projects yet.
                 </div>
               )}
             </CollapsibleSection>
