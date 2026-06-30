@@ -13,9 +13,13 @@ import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
   const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProjectLifecycleProject) : seedState.projects.map(normalizeProjectLifecycleProject)
-  const opportunities = Array.isArray(state.opportunities)
-    ? state.opportunities.map((opportunity) => normalizeOpportunityLifecycleOpportunity(opportunity, projects))
-    : seedState.opportunities.map((opportunity) => normalizeOpportunityLifecycleOpportunity(opportunity, projects))
+  const sourceOpportunities = Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities
+  const usedOpportunityIds = sourceOpportunities.map((opportunity) => opportunity.opportunityId)
+  const opportunities = sourceOpportunities.map((opportunity) => {
+    const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, projects, usedOpportunityIds)
+    usedOpportunityIds.push(normalized.opportunityId)
+    return normalized
+  })
   const normalizedState = {
     ...state,
     salesManagers: Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers,

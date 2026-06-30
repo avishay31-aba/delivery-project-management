@@ -6,6 +6,7 @@ import type {
   OpportunityType,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
+import { generateBusinessId } from '@/domain/business-identity'
 import {
   createActivityEvent,
   type ActivityObjectRefInput,
@@ -466,7 +467,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const opportunity: AppDataState['opportunities'][number] = {
       id: `opp-${crypto.randomUUID()}`,
-      opportunityId: `SF-OPP-${new Date().getFullYear()}-DRAFT`,
+      opportunityId: generateBusinessId('opportunity', state.opportunities.map((opportunity) => opportunity.opportunityId)),
       opportunityName: 'New opportunity',
       stage: 'OPEN',
       accountId: defaultAccount?.id ?? '',

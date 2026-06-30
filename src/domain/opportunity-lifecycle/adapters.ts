@@ -1,4 +1,5 @@
 import { incrementCounter } from '@/data/id-generator'
+import { ensureBusinessId } from '@/domain/business-identity'
 import { normalizeOpportunityEngagementCircles } from '@/domain/engagement-circle'
 import {
   activePocProjectForOpportunity,
@@ -132,8 +133,15 @@ function linkedOpportunityProjectSource(project: Project): 'POC' | 'FINAL' {
   return project.projectSource === 'POC' ? 'POC' : 'FINAL'
 }
 
-export function normalizeOpportunityLifecycleOpportunity(opportunity: Opportunity, projects: Project[]): Opportunity {
-  const linkedProjects = projects.filter((project) => project.opportunityId === opportunity.opportunityId)
+export function normalizeOpportunityLifecycleOpportunity(
+  opportunity: Opportunity,
+  projects: Project[],
+  existingOpportunityIds: Array<string | null | undefined> = [],
+): Opportunity {
+  const opportunityId = ensureBusinessId('opportunity', opportunity.opportunityId, existingOpportunityIds)
+  const linkedProjects = projects.filter(
+    (project) => project.opportunityId === opportunity.opportunityId || project.opportunityId === opportunityId,
+  )
   const pocProjectIds = Array.from(
     new Set([
       ...(Array.isArray(opportunity.pocProjectIds) ? opportunity.pocProjectIds : []),
@@ -149,6 +157,7 @@ export function normalizeOpportunityLifecycleOpportunity(opportunity: Opportunit
 
   return {
     ...opportunity,
+    opportunityId,
     stage: opportunity.stage === 'WON' ? 'WON' : opportunity.stage === 'POC' ? 'POC' : 'OPEN',
     engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
     pocProjectIds,

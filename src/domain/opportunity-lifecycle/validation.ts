@@ -31,7 +31,7 @@ export function validateOpportunityHeader(opportunity: Opportunity, context: Opp
   const metadata = getOpportunityMetadataForOpportunity(opportunity)
   const visibleHeaderKeys = new Set(metadata.headerFields.map((field) => field.key))
   const messages: ValidationMessage[] = [
-    ...requiredText(opportunity.opportunityId, 'Salesforce Opportunity ID'),
+    ...requiredText(opportunity.opportunityId, 'Opportunity ID'),
     ...requiredText(opportunity.opportunityName, 'Opportunity name'),
     ...requiredText(opportunity.accountId, 'Account'),
     ...requiredText(opportunity.salesManagerId, 'Sales Manager / Deal Owner'),

@@ -1008,7 +1008,7 @@ export function OpportunityFormPage() {
 
   function headerMissing(fieldKey: OpportunityHeaderField['key'] | 'stage'): boolean {
     const labels: Partial<Record<OpportunityHeaderField['key'] | 'stage', string[]>> = {
-      opportunityId: ['Salesforce Opportunity ID is required.'],
+      opportunityId: ['Opportunity ID is required.'],
       opportunityName: ['Opportunity name is required.'],
       accountId: ['Account is required.'],
       salesManagerId: ['Sales Manager / Deal Owner is required.'],

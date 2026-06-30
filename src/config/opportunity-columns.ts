@@ -15,7 +15,7 @@ export function createOpportunityColumns(
     salesManagers.find((salesManager) => salesManager.id === salesManagerId)?.name ?? salesManagerId
 
   return [
-    { id: 'opportunityId', label: 'Opportunity ID', getValue: (row) => row.opportunityId, editKey: 'opportunityId' },
+    { id: 'opportunityId', label: 'Opportunity ID', getValue: (row) => row.opportunityId },
     { id: 'opportunityName', label: 'Opportunity Name', getValue: (row) => row.opportunityName, editKey: 'opportunityName' },
     { id: 'stage', label: 'Stage', getValue: (row) => row.stage, editKey: 'stage' },
     { id: 'account', label: 'Account', getValue: (row) => accountName(row.accountId) },

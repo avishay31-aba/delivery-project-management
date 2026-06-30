@@ -21,7 +21,7 @@ const opportunityFields: ObjectFieldDefinition[] = [
     label: 'Opportunity (name and ID)',
     type: 'text',
     section: 'header',
-    editable: true,
+    editable: false,
     source: { ...opportunityLifecycleSource, fieldKey: 'opportunityId' },
     validationSource: opportunityValidationSource,
   },

@@ -55,7 +55,7 @@ const COMMON_HEADER_FIELDS: OpportunityHeaderField[] = [
   { key: 'type', label: 'Opportunity Type', editable: true, source: '2. Header yellow cells' },
   { key: 'subType', label: 'Opportunity sub type', editable: true, source: '2. Header yellow cells' },
   { key: 'dealPackage', label: 'Deal Package', editable: true, source: '2. Header yellow cells' },
-  { key: 'opportunityId', label: 'Opportunity (name and ID)', editable: true, source: '2. Header yellow cells' },
+  { key: 'opportunityId', label: 'Opportunity (name and ID)', editable: false, source: '2. Header yellow cells' },
   { key: 'accountId', label: 'Account (end user)', editable: true, source: '2. Header yellow cells' },
   { key: 'region', label: 'Region', editable: false, source: '2. Header yellow cells' },
   { key: 'country', label: 'Country', editable: false, source: '2. Header yellow cells' },
