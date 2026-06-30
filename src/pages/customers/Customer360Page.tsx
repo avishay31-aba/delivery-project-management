@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import { BusinessIdLink, BusinessObjectLink, PlaceholderCard } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, PlaceholderCard, ProgressBar, StatusBadge } from '@/components/ui'
 import type { Tenant } from '@/data/seed.types'
 import {
   customerAccount360ReadModel,
@@ -16,12 +16,23 @@ import { formatDocumentSize } from '@/domain/document-collection'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
 import {
+  accountReference,
   opportunityReference,
   projectReference,
   systemBusinessId,
   systemReference,
   tenantReference,
 } from '@/domain/business-reference'
+import {
+  alertVariantForDeadlineRiskStatus,
+  alertVariantForProjectHealthStatus,
+  alertVariantForRequirementCoverageStatus,
+  alertVariantForWarrantyStatus,
+  badgeVariantForProjectHealthStatus,
+  badgeVariantForProjectStatus,
+  badgeVariantForRequirementCoverageStatus,
+  operationalStatusPresentation,
+} from '@/domain/status-presentation'
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
@@ -42,6 +53,15 @@ const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
 ]
 
 function readOnlyValue(label: string, value: string) {
+  return (
+    <div className="rounded border border-sf-border bg-white p-3">
+      <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
+      <div className="mt-1 text-sm font-medium text-sf-text">{value || '-'}</div>
+    </div>
+  )
+}
+
+function readOnlyNode(label: string, value: ReactNode) {
   return (
     <div className="rounded border border-sf-border bg-white p-3">
       <div className="text-xs font-semibold uppercase text-sf-text-muted">{label}</div>
@@ -86,8 +106,26 @@ function readOnlyTable(headers: string[], rows: ReactNode[][], emptyText: string
   )
 }
 
+function operationalStatus(value: string | null | undefined) {
+  const presentation = operationalStatusPresentation(value)
+  const Icon = presentation.icon
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+      <Icon className={`h-4 w-4 shrink-0 ${presentation.iconClassName}`} aria-hidden />
+      {presentation.label}
+    </span>
+  )
+}
+
+function alertList(alerts: string[]) {
+  if (alerts.length === 0) return ''
+  const value = alerts.join('; ')
+  return <ClampedTableCellContent title={value}>{value}</ClampedTableCellContent>
+}
+
 export function Customer360Page() {
   const { accountCode = '' } = useParams()
+  const navigate = useNavigate()
   const accounts = useAppStore((state) => state.accounts)
   const opportunities = useAppStore((state) => state.opportunities)
   const projects = useAppStore((state) => state.projects)
@@ -168,6 +206,7 @@ export function Customer360Page() {
   const openProjects = customerOpenProjects(customer.projects)
   const projectHealthByProjectId = new Map(customer.projectHealthRows.map((row) => [row.projectId, row]))
   const customerActivityEvents = activityEventsForCustomer(activityEvents, account.id)
+  const customerReference = accountReference(account)
 
   function renderTabContent() {
     if (activeTab === 'overview') {
@@ -214,16 +253,26 @@ export function Customer360Page() {
             project.opportunityName,
             project.mainType,
             project.subType,
-            project.progressStatus,
-            health?.healthLabel ?? '',
+            <StatusBadge label={project.progressStatus === 'DONE' ? 'Done' : 'Open'} variant={badgeVariantForProjectStatus(project.progressStatus)} />,
+            health ? (
+              <span className="inline-flex items-center gap-1.5">
+                <AlertStatusIcon variant={alertVariantForProjectHealthStatus(health.healthStatus)} label={health.healthLabel} />
+                <StatusBadge label={health.healthLabel} variant={badgeVariantForProjectHealthStatus(health.healthStatus)} />
+              </span>
+            ) : '',
             project.deliveryDate ?? '',
             health?.deliveryDateStatusLabel ?? '',
-            health ? `${health.completionPercent}%` : customerProjectProgress(project),
+            health ? <ProgressBar value={health.completionPercent} /> : customerProjectProgress(project),
             health?.currentMilestone ?? '',
-            health?.deadlineRiskLabel ?? '',
+            health?.deadlineRiskLabel ? (
+              <span className="inline-flex items-center gap-1.5">
+                <AlertStatusIcon variant={alertVariantForDeadlineRiskStatus(health.deadlineRiskStatus)} label={health.deadlineRiskLabel} />
+                {health.deadlineRiskLabel}
+              </span>
+            ) : '',
             health?.nextDeadline ?? '',
             health?.overdueTaskCount ?? 0,
-            health?.healthAlerts.join('; ') ?? '',
+            alertList(health?.healthAlerts ?? []),
           ]
         }),
         'No projects found for this customer.',
@@ -240,7 +289,7 @@ export function Customer360Page() {
           system.cloudPlatform ?? '',
           system.csp ?? '',
           system.cloudRegion ?? system.region ?? '',
-          system.operationalStatus,
+          operationalStatus(system.operationalStatus),
         ]),
         'No systems found for this customer.',
       )
@@ -252,9 +301,9 @@ export function Customer360Page() {
         customer.tenants.map((tenant) => [
           <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>,
           tenant.tenantName ?? '',
-          tenant.hostingSid ?? '',
+          tenant.hostingSid ? <BusinessIdLink objectType="SYSTEM" businessId={tenant.hostingSid}>{tenant.hostingSid}</BusinessIdLink> : '',
           tenant.productType,
-          tenant.operationalStatus,
+          operationalStatus(tenant.operationalStatus),
           tenant.country,
         ]),
         'No tenants found for this customer.',
@@ -268,12 +317,15 @@ export function Customer360Page() {
           row.warrantyId,
           <BusinessIdLink objectType="TENANT" businessId={row.tenantTid}>{row.tenantTid}</BusinessIdLink>,
           row.tenantName,
-          row.sid,
-          row.relatedProjectId,
+          row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '',
+          row.relatedProjectId ? <BusinessIdLink objectType="PROJECT" businessId={row.relatedProjectId}>{row.relatedProjectId}</BusinessIdLink> : '',
           row.projectName,
           row.endDate ?? '',
           row.daysToExpiration ?? '',
-          row.warrantyStatusLabel,
+          <span className="inline-flex items-center gap-1.5">
+            <AlertStatusIcon variant={alertVariantForWarrantyStatus(row.warrantyStatus, row.tenantHeaderStatus)} label={row.warrantyStatusLabel} />
+            {row.warrantyStatusLabel}
+          </span>,
           row.tenantHeaderStatusLabel,
           row.alerts,
         ]),
@@ -291,11 +343,14 @@ export function Customer360Page() {
           row.product,
           row.hostingType,
           row.pid ? <BusinessIdLink objectType="PROJECT" businessId={row.pid}>{row.pid}</BusinessIdLink> : '',
-          row.sid || row.mid,
+          row.sid || row.mid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid || row.mid}>{row.sid || row.mid}</BusinessIdLink> : '',
           row.tid ? <BusinessIdLink objectType="TENANT" businessId={row.tid}>{row.tid}</BusinessIdLink> : '',
-          row.coverageStatusLabel,
+          <span className="inline-flex items-center gap-1.5">
+            <AlertStatusIcon variant={alertVariantForRequirementCoverageStatus(row.coverageStatus)} label={row.coverageStatusLabel} />
+            <StatusBadge label={row.coverageStatusLabel} variant={badgeVariantForRequirementCoverageStatus(row.coverageStatus)} />
+          </span>,
           row.missingStepLabel,
-          row.coverageAlerts.join('; '),
+          alertList(row.coverageAlerts),
         ]),
         'No requirement coverage rows found for this customer.',
       )
@@ -329,13 +384,27 @@ export function Customer360Page() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={customerDisplayName(account)} subtitle="Customer Workspace" />
+      <PageHeader
+        title={customerDisplayName(account)}
+        subtitle="Customer Workspace"
+        actions={
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold text-sf-text hover:bg-sf-surface-alt"
+            onClick={() => navigate('/customers')}
+          >
+            Back to Customers
+          </button>
+        }
+      />
 
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {readOnlyValue('Account ID', account.accountCode)}
+        {readOnlyNode('Account ID', <BusinessObjectLink reference={customerReference}>{account.accountCode}</BusinessObjectLink>)}
+        {readOnlyValue('Customer Name', customerDisplayName(account))}
         {readOnlyValue('Account Manager', customer.accountManager)}
         {readOnlyValue('Region', account.region)}
         {readOnlyValue('Country', account.country)}
+        {readOnlyValue('State', account.state ?? '')}
         {readOnlyValue('Customer Type', customerTypeLabel(account))}
       </section>
 

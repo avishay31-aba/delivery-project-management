@@ -129,6 +129,26 @@ export function badgeVariantForProjectStatus(status: string): StatusBadgeVariant
   return 'open'
 }
 
+export function badgeVariantForProjectHealthStatus(status: string): StatusBadgeVariant {
+  if (status === 'COMPLETED') return 'done'
+  if (status === 'AT_RISK' || status === 'BLOCKED') return 'error'
+  if (status === 'WARNING') return 'warning'
+  return 'open'
+}
+
+export function alertVariantForProjectHealthStatus(status: string): AlertPresentationVariant {
+  if (status === 'AT_RISK' || status === 'BLOCKED') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  if (status === 'COMPLETED' || status === 'HEALTHY') return 'success'
+  return 'info'
+}
+
+export function alertVariantForDeadlineRiskStatus(status: string): AlertPresentationVariant {
+  if (status === 'OVERDUE') return 'danger'
+  if (status === 'WARNING') return 'warning'
+  return 'info'
+}
+
 export function badgeVariantForRequirementCoverageStatus(status: string): StatusBadgeVariant {
   if (status === 'COVERED') return 'done'
   if (status === 'UNCOVERED' || status === 'BLOCKED') return 'error'
