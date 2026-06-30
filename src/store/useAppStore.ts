@@ -14,6 +14,14 @@ import {
   type ActivityEvent,
 } from '@/domain/activity-log'
 import {
+  accountReference,
+  activityObjectRefFromBusinessReference,
+  projectReference,
+  systemBusinessId,
+  systemReference,
+  tenantReference,
+} from '@/domain/business-reference'
+import {
   createInitialState,
   loadPersistedState,
   persistState,
@@ -70,52 +78,39 @@ function appendActivityEvent(
   ]
 }
 
-function objectRef(
-  objectType: string,
-  id: string,
-  businessId: string,
-  displayLabel = businessId,
-  routePath?: string,
-): ActivityObjectRefInput {
-  return {
-    objectType,
-    id,
-    businessId,
-    displayLabel,
-    ...(routePath ? { routePath } : {}),
-  }
-}
-
 function projectRef(project: AppDataState['projects'][number]): ActivityObjectRefInput {
-  return objectRef('PROJECT', project.id, project.pid, project.pid, `/projects/${project.pid}`)
+  return activityObjectRefFromBusinessReference(projectReference(project))
 }
 
 function tenantRef(tenant: AppDataState['tenants'][number]): ActivityObjectRefInput {
-  return objectRef('TENANT', tenant.id, tenant.tid, tenant.tid, `/tenants/${tenant.tid}`)
-}
-
-function systemBusinessId(system: AppDataState['systems'][number] | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]): string {
-  if ('sid' in system && system.sid) return system.sid
-  if ('machineId' in system && system.machineId) return system.machineId
-  return system.id
+  return activityObjectRefFromBusinessReference(tenantReference(tenant))
 }
 
 function systemRef(system: AppDataState['systems'][number] | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]): ActivityObjectRefInput {
-  const businessId = systemBusinessId(system)
-  return objectRef('SYSTEM', system.id, businessId, businessId)
+  return activityObjectRefFromBusinessReference(systemReference(system))
 }
 
 function allocationRef(allocation: AppDataState['projectSystems'][number]): ActivityObjectRefInput {
-  return objectRef('ALLOCATION', allocation.id, allocation.id, allocation.id)
+  return {
+    objectType: 'ALLOCATION',
+    id: allocation.id,
+    businessId: allocation.id,
+    displayLabel: allocation.id,
+  }
 }
 
 function customerRef(account: AppDataState['accounts'][number] | undefined): ActivityObjectRefInput | null {
   if (!account) return null
-  return objectRef('CUSTOMER', account.id, account.accountCode, account.accountName, `/customers/${account.accountCode}`)
+  return activityObjectRefFromBusinessReference(accountReference(account))
 }
 
 function requirementRef(requirementId: string): ActivityObjectRefInput {
-  return objectRef('REQUIREMENT', requirementId, requirementId, requirementId)
+  return {
+    objectType: 'REQUIREMENT',
+    id: requirementId,
+    businessId: requirementId,
+    displayLabel: requirementId,
+  }
 }
 
 function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {

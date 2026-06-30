@@ -9,6 +9,7 @@ import {
   type ActivityEventSeverity,
   type ActivityObjectRef,
 } from '@/domain/activity-log'
+import { routePathForBusinessReference } from '@/domain/business-reference'
 
 export interface ActivityDashboardRow {
   id: string
@@ -55,9 +56,8 @@ function renderRef(ref: ActivityObjectRef | null) {
   const label = labelForRef(ref)
   if (!ref || !label) return ''
   if (ref.routePath) return createElement(LinkId, { to: ref.routePath }, label)
-  if (ref.objectType === 'CUSTOMER' && ref.businessId) return createElement(LinkId, { to: `/customers/${ref.businessId}` }, label)
-  if (ref.objectType === 'PROJECT' && ref.businessId) return createElement(LinkId, { to: `/projects/${ref.businessId}` }, label)
-  if (ref.objectType === 'TENANT' && ref.businessId) return createElement(LinkId, { to: `/tenants/${ref.businessId}` }, label)
+  const routePath = routePathForBusinessReference(ref.objectType, ref.businessId)
+  if (routePath) return createElement(LinkId, { to: routePath }, label)
   return label
 }
 
