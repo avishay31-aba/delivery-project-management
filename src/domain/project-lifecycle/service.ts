@@ -1,6 +1,7 @@
 import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/milestone-plan'
 import { getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -55,19 +56,6 @@ const EMPTY_REQUIREMENT_COVERAGE_SUMMARY = {
   missingSystem: 0,
   missingTenant: 0,
 }
-
-const MODULE_FIELD_LABELS: Array<[string, string]> = [
-  ['tangles', 'Tangles'],
-  ['tanglesGo', 'Tangles Go'],
-  ['webloc', 'Webloc'],
-  ['webeye', 'Webeye'],
-  ['ingest', 'Ingest'],
-  ['blockchain', 'Blockchain'],
-  ['apiEnabled', 'API'],
-  ['crossSystemFeatures', 'Additional Sources'],
-  ['aiFeatures', 'AI'],
-  ['additionalFeatures', 'Additional Features'],
-]
 
 type DashboardSourceRecord = Record<string, unknown>
 
@@ -128,23 +116,6 @@ function firstAvailableJoinedValue(sources: Array<Record<string, unknown>[]>, ke
   return ''
 }
 
-function enabledModuleLabels(records: Array<Record<string, unknown>>): string[] {
-  const labels: string[] = []
-  records.forEach((record) => {
-    MODULE_FIELD_LABELS.forEach(([field, label]) => {
-      const value = record[field]
-      if (Array.isArray(value) && value.length > 0) {
-        labels.push(...value.map(String).filter(Boolean))
-      } else if (typeof value === 'number' && value > 0) {
-        labels.push(label)
-      } else if (typeof value === 'string' && value && value !== 'NO') {
-        labels.push(label)
-      }
-    })
-  })
-  return Array.from(new Set(labels))
-}
-
 function projectConfigurationSummary(context: ProjectDeliveryDashboardContext, opportunity: Opportunity | undefined) {
   const sources = projectConfigurationSources(context, opportunity)
   const sourcePriority = [
@@ -153,11 +124,13 @@ function projectConfigurationSummary(context: ProjectDeliveryDashboardContext, o
     sources.requirements as unknown as DashboardSourceRecord[],
   ]
   const allRecords = sourcePriority.flat()
+  const moduleFeatureSummary = formatConfigurationSummaryForRecords(allRecords)
 
   return {
     hosting: firstAvailableJoinedValue(sourcePriority, ['hostingType']),
     product: firstAvailableJoinedValue(sourcePriority, ['productType', 'product']),
-    modules: enabledModuleLabels(allRecords),
+    modules: moduleFeatureSummary.visibleTokens,
+    modulesTooltip: moduleFeatureSummary.tooltip,
     licenses: firstAvailableJoinedValue(sourcePriority, ['licenses']),
     users: firstAvailableJoinedValue(sourcePriority, ['users']),
   }
@@ -272,6 +245,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     hosting: configuration.hosting,
     product: configuration.product,
     modules: configuration.modules,
+    modulesTooltip: configuration.modulesTooltip,
     licenses: configuration.licenses,
     users: configuration.users,
     projectAlerts,

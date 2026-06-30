@@ -36,7 +36,7 @@ import {
   type SavedDashboardViewState,
 } from '@/store/dashboardViews'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
-import { AlertStatusIcon, RecordChangeBadge, recordChangeState } from '@/components/ui'
+import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 
 export interface DashboardColumn<T> {
@@ -881,7 +881,13 @@ export function DataDashboard<T extends { id: string }>({
             )
           }
 
-          return (column.render?.(row.original) ?? raw) || '—'
+          const renderedValue = column.render?.(row.original) ?? raw
+
+          return (
+            <ClampedTableCellContent title={raw}>
+              {renderedValue || '-'}
+            </ClampedTableCellContent>
+          )
         },
       })),
     ],

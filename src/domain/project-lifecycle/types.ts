@@ -126,6 +126,7 @@ export interface ProjectDeliveryDashboardReadModel {
   hosting: string
   product: string
   modules: string[]
+  modulesTooltip: string
   licenses: string
   users: string
   projectAlerts: string[]

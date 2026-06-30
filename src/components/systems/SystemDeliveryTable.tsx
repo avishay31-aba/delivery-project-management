@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { Project, System } from '@/data/seed.types'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
-import { AlertStatusIcon, LinkId, RecordChangeBadge } from '@/components/ui'
+import { AlertStatusIcon, ClampedTableCellContent, LinkId, RecordChangeBadge } from '@/components/ui'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import { systemRoutePath } from '@/domain/system-inventory'
 
@@ -120,6 +120,9 @@ export function SystemDeliveryTable({
           {systems.map((system) => {
             const isExpanded = expandedSystemIds.includes(system.id)
             const projectIds = system.linkedProjectIds?.length ? system.linkedProjectIds : fallbackProjectId ? [fallbackProjectId] : []
+            const projectLabels = projectIds
+              .map((projectId) => projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)?.pid)
+              .filter((pid): pid is string => Boolean(pid))
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -150,14 +153,16 @@ export function SystemDeliveryTable({
                   {system.machineId ? <LinkId to={systemRoutePath(system)}>{system.machineId}</LinkId> : ''}
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {projectIds.map((projectId) => {
-                    const project = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
-                    return project ? (
-                      <span key={projectId} className="mr-2 inline-block">
-                        <LinkId to={`/projects/${project.pid}`}>{project.pid}</LinkId>
-                      </span>
-                    ) : null
-                  })}
+                  <ClampedTableCellContent title={projectLabels.join(', ')}>
+                    {projectIds.map((projectId) => {
+                      const project = projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)
+                      return project ? (
+                        <span key={projectId} className="mr-2 inline-block">
+                          <LinkId to={`/projects/${project.pid}`}>{project.pid}</LinkId>
+                        </span>
+                      ) : null
+                    })}
+                  </ClampedTableCellContent>
                 </td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(system.operationalStatus)}</td>

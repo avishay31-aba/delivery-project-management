@@ -89,4 +89,16 @@
   .rich-text-content li {
     margin: 0.125rem 0;
   }
+
+  .sf-clamped-table-cell {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25rem;
+  }
 }

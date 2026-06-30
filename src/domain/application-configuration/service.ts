@@ -62,6 +62,71 @@ export function applicationConfigurationRecordValue(record: Record<string, unkno
   return record[field.key]
 }
 
+type ConfigurationSummaryField = [field: string, label: string]
+
+const CONFIGURATION_MODULE_FIELDS: ConfigurationSummaryField[] = [
+  ['tangles', 'Tangles'],
+  ['tanglesGo', 'Tangles Go'],
+  ['webloc', 'WebLOC'],
+  ['webeye', 'WebEye'],
+  ['ingest', 'Ingest'],
+  ['blockchain', 'Blockchain'],
+  ['apiEnabled', 'API'],
+]
+
+const CONFIGURATION_ADDITIONAL_FEATURE_FIELDS: ConfigurationSummaryField[] = [
+  ['crossSystemFeatures', 'Additional Sources'],
+  ['additionalFeatures', 'Additional Features'],
+]
+
+function uniqueEnabledConfigurationLabels(records: Array<Record<string, unknown>>, fields: ConfigurationSummaryField[]): string[] {
+  const labels: string[] = []
+  records.forEach((record) => {
+    fields.forEach(([field, label]) => {
+      const value = record[field]
+      if (Array.isArray(value) && value.length > 0) {
+        labels.push(...value.map(String).filter(Boolean))
+      } else if (typeof value === 'number' && value > 0) {
+        labels.push(label)
+      } else if (typeof value === 'string' && value && value !== 'NO') {
+        labels.push(label)
+      }
+    })
+  })
+  return Array.from(new Set(labels))
+}
+
+export interface ConfigurationSummaryFormatterResult {
+  modules: string[]
+  ai: string[]
+  additionalFeatures: string[]
+  visibleTokens: string[]
+  tooltip: string
+}
+
+export function formatConfigurationSummaryForRecords(records: Array<Record<string, unknown>>): ConfigurationSummaryFormatterResult {
+  const modules = uniqueEnabledConfigurationLabels(records, CONFIGURATION_MODULE_FIELDS)
+  const ai = uniqueEnabledConfigurationLabels(records, [['aiFeatures', 'AI']])
+  const additionalFeatures = uniqueEnabledConfigurationLabels(records, CONFIGURATION_ADDITIONAL_FEATURE_FIELDS)
+  const visibleTokens = [
+    ...modules,
+    ai.length > 0 ? 'AI' : '',
+    additionalFeatures.length > 0 ? 'AF' : '',
+  ].filter(Boolean)
+
+  return {
+    modules,
+    ai,
+    additionalFeatures,
+    visibleTokens,
+    tooltip: [
+      `Modules: ${modules.join(', ') || '-'}`,
+      `AI: ${ai.join(', ') || '-'}`,
+      `Additional Features: ${additionalFeatures.join(', ') || '-'}`,
+    ].join('\n'),
+  }
+}
+
 export function numericOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }

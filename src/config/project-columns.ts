@@ -45,13 +45,13 @@ function projectStatusVariant(status: string) {
   return 'open'
 }
 
-function renderChips(values: string[]) {
+function renderChips(values: string[], title?: string) {
   const visibleValues = values.filter(Boolean)
   if (visibleValues.length === 0) return ''
 
   return createElement(
     'span',
-    { className: 'inline-flex max-w-80 flex-wrap gap-1' },
+    { className: 'inline-flex max-w-80 flex-wrap gap-1', title },
     visibleValues.map((value) =>
       createElement(
         'span',
@@ -102,9 +102,12 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
     },
     {
       id: 'modules',
-      label: 'Modules',
+      label: 'Modules & Features',
       getValue: (project) => projectRow(project, context).modules.join('; '),
-      render: (project) => renderChips(projectRow(project, context).modules),
+      render: (project) => {
+        const row = projectRow(project, context)
+        return renderChips(row.modules, row.modulesTooltip)
+      },
     },
     { id: 'licenses', label: 'Licenses', getValue: (project) => projectRow(project, context).licenses },
     { id: 'users', label: 'Users', getValue: (project) => projectRow(project, context).users },
