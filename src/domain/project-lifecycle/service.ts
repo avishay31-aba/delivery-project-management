@@ -672,7 +672,9 @@ export function linkedTenantsForProject(
   )
   referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
   linkedSystems.forEach((system) => {
-    tenants.filter((tenant) => tenant.systemId === system.id).forEach((tenant) => linkedTenantIds.add(tenant.id))
+    tenants
+      .filter((tenant) => tenant.systemId === system.id || tenant.hostedSystemId === system.id)
+      .forEach((tenant) => linkedTenantIds.add(tenant.id))
   })
   return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
 }

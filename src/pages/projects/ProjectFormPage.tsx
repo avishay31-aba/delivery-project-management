@@ -360,7 +360,7 @@ export function ProjectFormPage() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
-  const [selectedAllocationId, setSelectedAllocationId] = useState('')
+  const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([])
   const [allocationCandidateSearch, setAllocationCandidateSearch] = useState('')
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
   const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -475,14 +475,8 @@ export function ProjectFormPage() {
 
   function openAllocationDialog() {
     const initialMode = permittedAllocationModes[0]
-    const initialCandidates =
-      initialMode === 'PRODUCTION'
-        ? availableProductionCandidates(productionSystemInventory)
-        : initialMode === 'REUSED_INTERNAL'
-          ? availableReusedInternalCandidates(reusedInternalSystems)
-          : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
     setAllocationMode(initialMode)
-    setSelectedAllocationId(initialCandidates[0]?.id ?? '')
+    setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
     setAllocationCandidateSortKey('id')
     setAllocationCandidateSortDirection('asc')
@@ -491,36 +485,58 @@ export function ProjectFormPage() {
   }
 
   function changeAllocationMode(mode: AllocationMode) {
-    const nextCandidates =
-      mode === 'PRODUCTION'
-        ? availableProductionCandidates(productionSystemInventory)
-        : mode === 'REUSED_INTERNAL'
-          ? availableReusedInternalCandidates(reusedInternalSystems)
-          : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
     setAllocationMode(mode)
-    setSelectedAllocationId(nextCandidates[0]?.id ?? '')
+    setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
     setAllocationResult(null)
   }
 
   function confirmAllocation() {
-    if (!selectedAllocationId) {
-      setAllocationResult({ ok: false, message: 'Select a system before allocating.' })
+    if (selectedAllocationIds.length === 0) {
+      setAllocationResult({ ok: false, message: 'Select at least one system before allocating.' })
       return
     }
 
-    const result =
+    const results = selectedAllocationIds.map((candidateId) =>
       selectedMode === 'PRODUCTION'
-        ? allocateProductionSystemToProject(projectDraft.id, selectedAllocationId)
+        ? allocateProductionSystemToProject(projectDraft.id, candidateId)
         : selectedMode === 'REUSED_INTERNAL'
-          ? allocateReusedInternalSystemToProject(projectDraft.id, selectedAllocationId)
-          : linkExistingSystemToProject(projectDraft.id, selectedAllocationId)
+          ? allocateReusedInternalSystemToProject(projectDraft.id, candidateId)
+          : linkExistingSystemToProject(projectDraft.id, candidateId),
+    )
+    const failedResults = results.filter((result) => !result.ok)
+    const successCount = results.length - failedResults.length
+    const result =
+      failedResults.length > 0
+        ? {
+            ok: false,
+            message: [
+              successCount > 0 ? `${successCount} system${successCount === 1 ? '' : 's'} allocated.` : null,
+              ...failedResults.map((failed) => failed.message),
+            ].filter(Boolean).join(' '),
+          }
+        : {
+            ok: true,
+            message: `${successCount} system${successCount === 1 ? '' : 's'} allocated.`,
+          }
 
     setAllocationResult(result)
     if (result.ok) {
       setIsAllocationDialogOpen(false)
-      setSelectedAllocationId('')
+      setSelectedAllocationIds([])
     }
+  }
+
+  function toggleAllocationCandidate(candidateId: string, selected: boolean) {
+    setSelectedAllocationIds((current) => {
+      const next = new Set(current)
+      if (selected) {
+        next.add(candidateId)
+      } else {
+        next.delete(candidateId)
+      }
+      return Array.from(next)
+    })
   }
 
   function deallocateSystem(link: ProjectSystemLink) {
@@ -982,7 +998,7 @@ export function ProjectFormPage() {
           </button>
         </div>
         {milestones.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
@@ -1201,15 +1217,15 @@ export function ProjectFormPage() {
                             <GripVertical className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </td>
-                        <td className="max-w-48 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
+                        <td className="min-w-72 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-xs font-semibold text-sf-text-muted">
                           {task.order}
                         </td>
-                        <td className="max-w-96 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                        <td className="min-w-96 whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                        <td className="min-w-[36rem] max-w-[48rem] whitespace-normal border border-sf-border px-1 py-1 text-sf-text">
+                        <td className="w-80 min-w-80 max-w-96 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">
                           <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-10" toolbarMode="focus" />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
@@ -1622,10 +1638,9 @@ export function ProjectFormPage() {
                       <tr key={candidate.id} className="hover:bg-sf-surface-alt">
                         <td className="border border-sf-border px-1.5 py-1">
                           <input
-                            type="radio"
-                            name="project-system-allocation-candidate"
-                            checked={selectedAllocationId === candidate.id}
-                            onChange={() => setSelectedAllocationId(candidate.id)}
+                            type="checkbox"
+                            checked={selectedAllocationIds.includes(candidate.id)}
+                            onChange={(event) => toggleAllocationCandidate(candidate.id, event.target.checked)}
                           />
                         </td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
@@ -1664,7 +1679,7 @@ export function ProjectFormPage() {
             <button
               type="button"
               className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!selectedAllocationId}
+              disabled={selectedAllocationIds.length === 0}
               onClick={confirmAllocation}
             >
               Confirm

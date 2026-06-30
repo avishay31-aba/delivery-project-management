@@ -88,7 +88,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-'}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">

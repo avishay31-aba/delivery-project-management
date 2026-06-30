@@ -236,11 +236,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
         return {
           ...tenant,
           systemId: '',
+          hostedSystemId: '',
+          hostingSid: '',
           operationalStatus: 'Deleted',
           hostedSystemHistory: deletedTenantHostedSystemHistory(tenant, now),
           updatedAt: now,
         }
       }),
+      systems: state.systems.map((candidate) =>
+        tenant && (candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
+          ? {
+              ...candidate,
+              tenantIds: (candidate.tenantIds ?? []).filter((tenantId) => tenantId !== id),
+              updatedAt: now,
+            }
+          : candidate,
+      ),
+      projectSystems: state.projectSystems.map((link) =>
+        tenant && (link.systemId === tenant.systemId || link.systemId === tenant.hostedSystemId) && link.allocationStatus !== 'DEALLOCATED'
+          ? { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => tenantId !== id) }
+          : link,
+      ),
+      projectTenants: state.projectTenants.map((link) =>
+        tenant && link.tenantId === id && (link.systemId === tenant.systemId || link.systemId === tenant.hostedSystemId) && link.allocationStatus !== 'DEALLOCATED'
+          ? deallocateProjectTenantLink(link, now)
+          : link,
+      ),
       activityEvents: tenant
         ? appendActivityEvent(state.activityEvents, now, {
             category: 'TENANT',

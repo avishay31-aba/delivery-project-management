@@ -77,7 +77,7 @@ import {
 import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
-import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus, statusBadgePresentation } from '@/domain/status-presentation'
+import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -202,11 +202,17 @@ function tenantOptionText(tenant: Tenant, accountTenants: Tenant[], sidSystems: 
     .join(' | ')
 }
 
-function opportunityActionBadgeVariant(action: ExistingActionValue): 'default' | 'open' | 'in_progress' | 'done' | 'warning' | 'error' {
-  if (action === 'Not selected') return 'default'
-  if (action === 'New tenant') return 'done'
-  if (action === 'Downsell change' || action === 'Renewal + downsell') return 'warning'
-  return 'in_progress'
+function opportunityActionBadgeClassName(action: ExistingActionValue): string {
+  const classes: Record<ExistingActionValue, string> = {
+    'Not selected': 'border-gray-300 bg-gray-100 text-gray-700',
+    'New tenant': 'border-emerald-300 bg-emerald-100 text-emerald-800',
+    'Upsell change': 'border-blue-300 bg-blue-100 text-blue-800',
+    'Downsell change': 'border-orange-300 bg-orange-100 text-orange-800',
+    'Standard renewal': 'border-violet-300 bg-violet-100 text-violet-800',
+    'Renewal + upsell': 'border-cyan-300 bg-cyan-100 text-cyan-800',
+    'Renewal + downsell': 'border-amber-300 bg-amber-100 text-amber-900',
+  }
+  return classes[action]
 }
 
 function changeActionLabel(opportunity: Opportunity): 'Upsell change' | 'Downsell change' {
@@ -1517,10 +1523,8 @@ export function OpportunityFormPage() {
   }
 
   function renderActionBadge(action: ExistingActionValue) {
-    const variant = opportunityActionBadgeVariant(action)
-    const presentation = statusBadgePresentation(variant)
     return (
-      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${presentation.badgeClassName}`}>
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${opportunityActionBadgeClassName(action)}`}>
         {action}
       </span>
     )
