@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, ChevronRight, CirclePlay, GripVertical, Link2, Plus, Square, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectTabLabel,
@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { SystemDeliveryTable } from '@/components/systems'
@@ -39,6 +39,14 @@ import {
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
 import { opportunityReference, systemReference } from '@/domain/business-reference'
+import {
+  alertPresentationForDeadline,
+  errorMessageClassName,
+  operationalStatusPresentation,
+  projectStatusPresentation,
+  successMessageClassName,
+  taskStatusPresentation,
+} from '@/domain/status-presentation'
 import {
   activeSystemLinkMapBySystemId,
   activeSystemLinksForProject,
@@ -176,60 +184,40 @@ function candidateSearchText(candidate: AllocationCandidate): string {
 
 function allocationStatusClassName(result: AllocationActionResult | null): string {
   if (!result) return ''
-  return result.ok
-    ? 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'
-    : 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700'
+  return result.ok ? successMessageClassName() : errorMessageClassName()
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
-  const isDone = status === 'DONE'
-  const isInProgress = status === 'IN_PROGRESS'
+  const presentation = projectStatusPresentation(status)
+  const Icon = presentation.icon
   if (large) {
-    if (isDone) return <Check className="h-8 w-8 stroke-[3.5] text-blue-800" aria-label={`Project status: ${projectStatusLabel(status)}`} />
-    if (isInProgress) return <CirclePlay className="h-8 w-8 text-amber-500" aria-label={`Project status: ${projectStatusLabel(status)}`} />
-    return <Square className="h-5 w-7 fill-emerald-100 stroke-0 text-emerald-100" aria-label={`Project status: ${projectStatusLabel(status)}`} />
+    return <Icon className={['h-8 w-8 stroke-[3.5]', presentation.iconClassName].join(' ')} aria-label={presentation.tooltip} />
   }
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sf-text">
-      {isDone ? (
-        <Check className="h-4 w-4 stroke-[3] text-blue-800" aria-hidden="true" />
-      ) : isInProgress ? (
-        <CirclePlay className="h-4 w-4 text-amber-500" aria-hidden="true" />
-      ) : (
-        <Square className="h-3 w-4 fill-emerald-100 stroke-0 text-emerald-100" aria-hidden="true" />
-      )}
+      <Icon className={['h-4 w-4 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
       <span>{projectStatusLabel(status)}</span>
     </span>
   )
 }
 
 function OperationalStatusBadge({ status }: { status: string }) {
-  const normalized = status.toUpperCase()
-  const isBlocked = normalized.includes('BLOCKED')
-  const isDeleted = normalized.includes('DELETED') || normalized.includes('CANCELLED') || normalized.includes('CANCELED') || normalized.includes('INACTIVE')
-  const isOn = normalized.includes('ACTIVE') || normalized.includes('ON')
-  const Icon = isDeleted || isBlocked ? X : isOn ? Check : Square
-  const colorClass = isDeleted || isBlocked
-    ? 'text-red-600'
-    : isOn
-      ? 'text-emerald-500'
-      : 'fill-emerald-200 stroke-emerald-500 text-emerald-500'
+  const presentation = operationalStatusPresentation(status)
+  const Icon = presentation.icon
 
   return (
     <span className="inline-flex items-center gap-1.5 font-semibold">
-      <Icon className={`h-5 w-5 stroke-[3] ${colorClass}`} aria-hidden="true" />
-      <span>{status || '-'}</span>
+      <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
+      <span>{presentation.label}</span>
     </span>
   )
 }
 
 function TaskStatusIcon({ status }: { status: 'OPEN' | 'DONE' }) {
-  if (status === 'DONE') {
-    return <Check className="h-8 w-8 stroke-[3.5] text-blue-800" aria-label="Task status: Done" />
-  }
-
-  return <Square className="h-5 w-7 fill-emerald-100 stroke-0 text-emerald-100" aria-label="Task status: Open" />
+  const presentation = taskStatusPresentation(status)
+  const Icon = presentation.icon
+  return <Icon className={['h-8 w-8 stroke-[3.5]', presentation.iconClassName].join(' ')} aria-label={presentation.tooltip} />
 }
 
 function CollapsibleSection({
@@ -896,15 +884,13 @@ export function ProjectFormPage() {
     const alertStatus = milestoneDeadlineAlertStatus(deadline, status as NonNullable<Project['milestones']>[number]['status'])
     if (alertStatus === 'NONE') return null
     const label = milestoneDeadlineAlertLabel(alertStatus)
+    const presentation = alertPresentationForDeadline(alertStatus)
+    const Icon = presentation.icon
 
     return (
       <span className="inline-flex items-center gap-1.5 font-semibold" title={label}>
-        <AlertStatusIcon
-          variant={alertStatus === 'OVERDUE' ? 'danger' : 'warning'}
-          label={label}
-          className="h-5 w-5"
-        />
-        <span className={alertStatus === 'OVERDUE' ? 'text-red-700' : 'text-amber-700'}>{label}</span>
+        <Icon className={['h-5 w-5 stroke-[2.5]', presentation.iconClassName].join(' ')} aria-label={label} />
+        <span className={presentation.iconClassName}>{label}</span>
       </span>
     )
   }

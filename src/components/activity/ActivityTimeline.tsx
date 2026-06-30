@@ -2,19 +2,17 @@ import { useMemo, useState } from 'react'
 import type { ActivityEvent, ActivityEventCategory, ActivityObjectRef } from '@/domain/activity-log'
 import { ACTIVITY_EVENT_CATEGORY_LABELS, ACTIVITY_EVENT_CATEGORIES } from '@/domain/activity-log'
 import { AlertStatusIcon, StatusBadge, type AlertStatusIconVariant } from '@/components/ui'
+import {
+  alertVariantForActivitySeverity,
+  badgeVariantForActivitySeverity,
+} from '@/domain/status-presentation'
 
 function severityVariant(severity: ActivityEvent['severity']): AlertStatusIconVariant {
-  if (severity === 'DANGER') return 'danger'
-  if (severity === 'WARNING') return 'warning'
-  if (severity === 'SUCCESS') return 'success'
-  return 'info'
+  return alertVariantForActivitySeverity(severity)
 }
 
 function badgeVariant(severity: ActivityEvent['severity']) {
-  if (severity === 'DANGER') return 'error'
-  if (severity === 'WARNING') return 'warning'
-  if (severity === 'SUCCESS') return 'done'
-  return 'default'
+  return badgeVariantForActivitySeverity(severity)
 }
 
 function objectLabel(ref: ActivityObjectRef): string {

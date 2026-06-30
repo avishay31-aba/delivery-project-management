@@ -1,24 +1,14 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { AlertStatusIcon, BusinessIdLink, StatusBadge } from '@/components/ui'
-import type { RequirementCoverageRow, RequirementCoverageStatus } from '@/domain/requirement-coverage'
+import type { RequirementCoverageRow } from '@/domain/requirement-coverage'
+import {
+  alertVariantForRequirementCoverageStatus,
+  badgeVariantForRequirementCoverageStatus,
+} from '@/domain/status-presentation'
 
 function text(value: string | number | null | undefined): string | number {
   return value ?? ''
-}
-
-function statusVariant(status: RequirementCoverageStatus) {
-  if (status === 'COVERED') return 'done'
-  if (status === 'UNCOVERED' || status === 'BLOCKED') return 'error'
-  if (status === 'PARTIALLY_COVERED') return 'warning'
-  return 'default'
-}
-
-function alertVariant(status: RequirementCoverageStatus) {
-  if (status === 'UNCOVERED' || status === 'BLOCKED') return 'danger'
-  if (status === 'PARTIALLY_COVERED') return 'warning'
-  if (status === 'COVERED') return 'success'
-  return 'info'
 }
 
 function systemIdentity(row: RequirementCoverageRow): string {
@@ -59,7 +49,7 @@ export function createRequirementCoverageColumns(): DashboardColumn<RequirementC
       id: 'coverageStatus',
       label: 'Coverage Status',
       getValue: (row) => row.coverageStatusLabel,
-      render: (row) => createElement(StatusBadge, { label: row.coverageStatusLabel, variant: statusVariant(row.coverageStatus) }),
+      render: (row) => createElement(StatusBadge, { label: row.coverageStatusLabel, variant: badgeVariantForRequirementCoverageStatus(row.coverageStatus) }),
     },
     { id: 'missingStep', label: 'Missing Step', getValue: (row) => row.missingStepLabel },
     {
@@ -71,7 +61,7 @@ export function createRequirementCoverageColumns(): DashboardColumn<RequirementC
           ? createElement(
               'span',
               { className: 'inline-flex items-center gap-1.5' },
-              createElement(AlertStatusIcon, { variant: alertVariant(row.coverageStatus), label: row.coverageAlerts.join('; ') }),
+              createElement(AlertStatusIcon, { variant: alertVariantForRequirementCoverageStatus(row.coverageStatus), label: row.coverageAlerts.join('; ') }),
               row.coverageAlerts.join('; '),
             )
           : '',

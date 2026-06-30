@@ -3,16 +3,10 @@ import { Check } from 'lucide-react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { AlertStatusIcon, BusinessIdLink } from '@/components/ui'
 import type { WarrantyDashboardRow } from '@/domain/warranty-collection'
+import { alertVariantForWarrantyStatus } from '@/domain/status-presentation'
 
 function text(value: string | number | null | undefined): string | number | null {
   return value ?? ''
-}
-
-function alertVariant(row: WarrantyDashboardRow): 'danger' | 'warning' | 'info' | 'success' {
-  if (row.warrantyStatus === 'EXPIRED' || row.tenantHeaderStatus === 'OUT_OF_CONTRACT') return 'danger'
-  if (row.warrantyStatus === 'PENDING' || row.warrantyStatus === 'NO_WARRANTY') return 'warning'
-  if (row.warrantyStatus === 'VALID' || row.tenantHeaderStatus === 'UNDER_CONTRACT') return 'success'
-  return 'info'
 }
 
 export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[] {
@@ -48,7 +42,7 @@ export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[]
       id: 'alerts',
       label: 'Alerts',
       getValue: (row) => row.alerts,
-      render: (row) => row.alerts ? createElement('span', { className: 'inline-flex items-center gap-1' }, createElement(AlertStatusIcon, { variant: alertVariant(row) }), row.alerts) : '',
+      render: (row) => row.alerts ? createElement('span', { className: 'inline-flex items-center gap-1' }, createElement(AlertStatusIcon, { variant: alertVariantForWarrantyStatus(row.warrantyStatus, row.tenantHeaderStatus) }), row.alerts) : '',
     },
     { id: 'predecessorCount', label: 'Predecessor Count', getValue: (row) => row.predecessorCount },
     { id: 'successorCount', label: 'Successor Count', getValue: (row) => row.successorCount },

@@ -14,6 +14,10 @@ import {
   type BusinessObjectReference,
   type BusinessObjectType,
 } from '@/domain/business-reference'
+import {
+  alertVariantForActivitySeverity,
+  badgeVariantForActivitySeverity,
+} from '@/domain/status-presentation'
 
 export interface ActivityDashboardRow {
   id: string
@@ -86,20 +90,6 @@ function renderRef(ref: ActivityObjectRef | null) {
   return createElement(BusinessObjectLink, { reference: businessReferenceForActivityRef(ref) }, label)
 }
 
-function severityBadgeVariant(severity: ActivityEventSeverity) {
-  if (severity === 'DANGER') return 'error'
-  if (severity === 'WARNING') return 'warning'
-  if (severity === 'SUCCESS') return 'done'
-  return 'default'
-}
-
-function severityIconVariant(severity: ActivityEventSeverity) {
-  if (severity === 'DANGER') return 'danger'
-  if (severity === 'WARNING') return 'warning'
-  if (severity === 'SUCCESS') return 'success'
-  return 'info'
-}
-
 export function activityDashboardRows(events: ActivityEvent[]): ActivityDashboardRow[] {
   return events.map((event) => {
     const customer = firstRef(event, 'CUSTOMER')
@@ -150,8 +140,8 @@ export function createActivityLogColumns(): DashboardColumn<ActivityDashboardRow
         createElement(
           'span',
           { className: 'inline-flex items-center gap-1.5' },
-          createElement(AlertStatusIcon, { variant: severityIconVariant(row.severity), label: row.severityLabel }),
-          createElement(StatusBadge, { label: row.severityLabel, variant: severityBadgeVariant(row.severity) }),
+          createElement(AlertStatusIcon, { variant: alertVariantForActivitySeverity(row.severity), label: row.severityLabel }),
+          createElement(StatusBadge, { label: row.severityLabel, variant: badgeVariantForActivitySeverity(row.severity) }),
         ),
     },
     { id: 'category', label: 'Category', getValue: (row) => row.categoryLabel },

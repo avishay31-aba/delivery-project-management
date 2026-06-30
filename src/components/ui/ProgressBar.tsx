@@ -1,4 +1,5 @@
 import { cn } from '@/utils/cn'
+import { progressPresentation } from '@/domain/status-presentation'
 
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0
@@ -17,12 +18,12 @@ export function ProgressBar({
   barClassName?: string
 }) {
   const percent = clampPercent(value)
-  const fillClassName = percent >= 100 ? 'bg-blue-900' : 'bg-amber-500'
+  const presentation = progressPresentation(percent)
 
   return (
     <div className={cn('min-w-24', className)}>
-      <div className={cn('h-4 overflow-hidden rounded-full bg-sf-surface-alt', barClassName)}>
-        <div className={cn('h-full', fillClassName)} style={{ width: `${percent}%` }} />
+      <div className={cn(presentation.heightClassName, presentation.trackClassName, barClassName)}>
+        <div className={cn('h-full', presentation.fillClassName)} style={{ width: `${percent}%` }} />
       </div>
       {showPercent ? <span className="mt-1 block text-center text-xs text-sf-text-muted">{percent}%</span> : null}
     </div>

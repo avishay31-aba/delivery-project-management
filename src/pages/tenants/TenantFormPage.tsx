@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Ban, Check, ChevronDown, CircleCheck, LockKeyhole, Plus, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -74,6 +74,7 @@ import {
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
 import { projectReference, systemReference } from '@/domain/business-reference'
+import { operationalStatusPresentation } from '@/domain/status-presentation'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -81,18 +82,6 @@ type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementC
 type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
 type WarrantyDialogDraft = Pick<TenantWarranty, 'id' | 'relatedProjectId' | 'predecessor' | 'startDate' | 'endDate' | 'noWarranty' | 'remark'>
-
-const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
-  Operative: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
-  On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
-  Off: 'text-red-500',
-  'Access Blocked': 'text-amber-500',
-  'Access Blocked - Password Reset': 'text-amber-500',
-  'Service Blocked': 'text-orange-500',
-  Deleted: 'text-gray-500',
-  Cancelled: 'text-purple-500',
-  Canceled: 'text-purple-500',
-}
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
@@ -701,25 +690,13 @@ export function TenantFormPage() {
   }
 
   function renderOperationalStatusOption(value: string) {
-    const Icon =
-      value === 'Operative' || value === 'On'
-        ? CircleCheck
-        : value === 'Off'
-          ? PowerOff
-          : value === 'Access Blocked' || value === 'Access Blocked - Password Reset'
-            ? LockKeyhole
-            : value === 'Service Blocked'
-              ? ShieldX
-              : value === 'Deleted'
-                ? Trash2
-                : value === 'Cancelled' || value === 'Canceled'
-                  ? Ban
-                  : ServerOff
+    const presentation = operationalStatusPresentation(value)
+    const Icon = presentation.icon
 
     return (
       <span className="inline-flex min-w-0 items-center gap-1.5">
-        <Icon className={['h-5 w-5 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
-        <span className="truncate">{value || 'Not set'}</span>
+        <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
+        <span className="truncate">{presentation.label}</span>
       </span>
     )
   }

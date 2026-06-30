@@ -2,15 +2,10 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, StatusBadge } from '@/components/ui'
 import type { RenewalCandidateRow } from '@/domain/warranty-collection'
+import { badgeVariantForRenewalCategory } from '@/domain/status-presentation'
 
 function text(value: string | number | null | undefined): string | number {
   return value ?? ''
-}
-
-function categoryVariant(row: RenewalCandidateRow) {
-  if (row.renewalCategory === 'EXPIRED' || row.renewalCategory === 'OUT_OF_CONTRACT') return 'error'
-  if (row.renewalCategory === 'NO_WARRANTY') return 'warning'
-  return 'default'
 }
 
 export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
@@ -36,7 +31,7 @@ export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
       id: 'renewalCategory',
       label: 'Renewal Category',
       getValue: (row) => row.renewalCategoryLabel,
-      render: (row) => createElement(StatusBadge, { label: row.renewalCategoryLabel, variant: categoryVariant(row) }),
+      render: (row) => createElement(StatusBadge, { label: row.renewalCategoryLabel, variant: badgeVariantForRenewalCategory(row.renewalCategory) }),
     },
     { id: 'accountManager', label: 'Account Manager', getValue: (row) => row.accountManager },
   ]

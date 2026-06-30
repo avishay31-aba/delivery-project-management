@@ -1,4 +1,5 @@
 import { cn } from '@/utils/cn'
+import { recordChangePresentation } from '@/domain/status-presentation'
 
 type RecordChangeState = 'New' | 'Updated'
 
@@ -37,14 +38,13 @@ export function RecordChangeBadge({
   const state = recordChangeState(record)
   if (!state) return placeholder ? <span className="block min-w-14" aria-hidden="true" /> : null
   const label = labels?.[state] ?? state
+  const presentation = recordChangePresentation(state)
 
   return (
     <span
       className={cn(
         'inline-flex min-w-14 items-center justify-center rounded-full border px-2 py-0.5 text-xs font-semibold',
-        state === 'New'
-          ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
-          : 'border-amber-300 bg-amber-100 text-amber-900',
+        presentation.badgeClassName,
         className,
       )}
       title={label}

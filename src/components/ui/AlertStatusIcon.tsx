@@ -1,15 +1,7 @@
-import { AlertTriangle, CheckCircle2, Info, OctagonAlert } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { alertStatusPresentation, type AlertPresentationVariant } from '@/domain/status-presentation'
 
-export type AlertStatusIconVariant = 'danger' | 'warning' | 'info' | 'success'
-
-const variantConfig: Record<AlertStatusIconVariant, { icon: LucideIcon; className: string; label: string }> = {
-  danger: { icon: OctagonAlert, className: 'text-red-700', label: 'Danger' },
-  warning: { icon: AlertTriangle, className: 'text-amber-600', label: 'Warning' },
-  info: { icon: Info, className: 'text-sf-brand', label: 'Information' },
-  success: { icon: CheckCircle2, className: 'text-sf-success', label: 'Success' },
-}
+export type AlertStatusIconVariant = AlertPresentationVariant
 
 export function AlertStatusIcon({
   variant,
@@ -20,13 +12,13 @@ export function AlertStatusIcon({
   label?: string
   className?: string
 }) {
-  const config = variantConfig[variant]
-  const Icon = config.icon
+  const presentation = alertStatusPresentation(variant)
+  const Icon = presentation.icon
 
   return (
     <Icon
-      className={cn('h-4 w-4 shrink-0 stroke-[2.5]', config.className, className)}
-      aria-label={label ?? config.label}
+      className={cn('h-4 w-4 shrink-0 stroke-[2.5]', presentation.iconClassName, className)}
+      aria-label={label ?? presentation.tooltip}
     />
   )
 }

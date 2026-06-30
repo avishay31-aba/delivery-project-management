@@ -4,6 +4,7 @@ import type { Project, System } from '@/data/seed.types'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 import { AlertStatusIcon, BusinessObjectLink, ClampedTableCellContent, RecordChangeBadge } from '@/components/ui'
 import { projectReference, systemReference } from '@/domain/business-reference'
+import { productMismatchPresentation } from '@/domain/status-presentation'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 
 const PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
@@ -119,6 +120,7 @@ export function SystemDeliveryTable({
         <tbody>
           {systems.map((system) => {
             const isExpanded = expandedSystemIds.includes(system.id)
+            const mismatchPresentation = productMismatchPresentation()
             const projectIds = system.linkedProjectIds?.length ? system.linkedProjectIds : fallbackProjectId ? [fallbackProjectId] : []
             const projectLabels = projectIds
               .map((projectId) => projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)?.pid)
@@ -169,10 +171,10 @@ export function SystemDeliveryTable({
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
                 <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {productMismatch?.(system) ? (
-                    <span className="group relative inline-flex" title="Product mismatch">
-                      <AlertStatusIcon variant="warning" label="Product mismatch" />
+                    <span className="group relative inline-flex" title={mismatchPresentation.tooltip}>
+                      <AlertStatusIcon variant="warning" label={mismatchPresentation.label} />
                       <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700 shadow group-hover:block">
-                        Product mismatch
+                        {mismatchPresentation.label}
                       </span>
                     </span>
                   ) : null}

@@ -1,23 +1,16 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  Ban,
   ChevronDown,
   ChevronRight,
-  CircleCheck,
   Crosshair,
   Database,
   DoorOpen,
   Globe2,
   Grid3X3,
-  LockKeyhole,
   Network,
   Plus,
-  PowerOff,
-  ServerOff,
-  ShieldX,
   Sparkles,
-  Trash2,
   X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
@@ -55,6 +48,7 @@ import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
 import { tenantReference } from '@/domain/business-reference'
+import { operationalStatusPresentation } from '@/domain/status-presentation'
 import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
@@ -130,15 +124,6 @@ function ProductLogoIcon({ product }: { product: string }) {
 
   if (!Icon) return null
   return <Icon className={['h-9 w-9', PRODUCT_LOGO_COLORS[product] ?? 'text-slate-500'].join(' ')} aria-label={`${product} logo`} />
-}
-
-const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
-  On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
-  Off: 'text-red-500',
-  'Access blocked': 'text-amber-500',
-  'Service blocked': 'text-orange-500',
-  Deleted: 'text-gray-500',
-  Canceled: 'text-purple-500',
 }
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_SUMMARY_FIELDS
@@ -252,47 +237,23 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
 }
 
 function OperationalStatusBadge({ value }: { value: string }) {
-  const Icon =
-    value === 'On'
-      ? CircleCheck
-      : value === 'Off'
-        ? PowerOff
-        : value === 'Access blocked'
-          ? LockKeyhole
-          : value === 'Service blocked'
-            ? ShieldX
-            : value === 'Deleted'
-              ? Trash2
-              : value === 'Canceled'
-                ? Ban
-                : ServerOff
+  const presentation = operationalStatusPresentation(value)
+  const Icon = presentation.icon
 
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <Icon className={['h-5 w-5 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
-      {value || 'Not set'}
+      <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
+      {presentation.label}
     </span>
   )
 }
 
 function LargeStatusIcon({ status }: { status: string }) {
-  const Icon =
-    status === 'On'
-      ? CircleCheck
-      : status === 'Off'
-        ? PowerOff
-        : status === 'Access blocked'
-          ? LockKeyhole
-          : status === 'Service blocked'
-            ? ShieldX
-            : status === 'Deleted'
-              ? Trash2
-              : status === 'Canceled'
-                ? Ban
-                : ServerOff
+  const presentation = operationalStatusPresentation(status)
+  const Icon = presentation.icon
 
   return (
-    <Icon className={['h-9 w-9 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[status] ?? 'text-slate-400'].join(' ')} aria-label={`Operational status: ${status || 'Not set'}`} />
+    <Icon className={['h-9 w-9 stroke-[3]', presentation.iconClassName].join(' ')} aria-label={presentation.tooltip} />
   )
 }
 

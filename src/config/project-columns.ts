@@ -16,6 +16,7 @@ import {
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
+import { badgeVariantForProjectStatus } from '@/domain/status-presentation'
 
 interface ProjectDashboardColumnContext {
   opportunities: Opportunity[]
@@ -39,11 +40,6 @@ const EMPTY_PROJECT_DASHBOARD_CONTEXT: ProjectDashboardColumnContext = {
 
 function projectRow(project: Project, context: ProjectDashboardColumnContext): ProjectDeliveryDashboardReadModel {
   return projectDeliveryDashboardReadModel({ project, ...context })
-}
-
-function projectStatusVariant(status: string) {
-  if (status === 'DONE') return 'done'
-  return 'open'
 }
 
 function renderChips(values: string[], title?: string) {
@@ -87,7 +83,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       options: ['OPEN', 'DONE'],
       render: (project) => {
         const row = projectRow(project, context)
-        return createElement(StatusBadge, { label: row.statusLabel, variant: projectStatusVariant(row.status) })
+        return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })
       },
     },
     { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project, context).deliveryDate, editable: true, editKey: 'deliveryDate' },

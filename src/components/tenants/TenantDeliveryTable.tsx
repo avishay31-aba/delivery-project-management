@@ -1,43 +1,20 @@
 import type { ReactNode } from 'react'
-import { Ban, CircleCheck, LockKeyhole, PowerOff, ServerOff, ShieldX, Trash2 } from 'lucide-react'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
+import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { BusinessIdLink, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 
-const OPERATIONAL_STATUS_ICON_STYLES: Record<string, string> = {
-  On: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
-  Operative: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]',
-  Off: 'text-red-500',
-  'Access blocked': 'text-amber-500',
-  'Service blocked': 'text-orange-500',
-  Deleted: 'text-gray-500',
-  Canceled: 'text-purple-500',
-  Cancelled: 'text-purple-500',
-}
-
 function OperationalStatusBadge({ value }: { value: string }) {
-  const Icon =
-    value === 'On' || value === 'Operative'
-      ? CircleCheck
-      : value === 'Off'
-        ? PowerOff
-        : value === 'Access blocked'
-          ? LockKeyhole
-          : value === 'Service blocked'
-            ? ShieldX
-            : value === 'Deleted'
-              ? Trash2
-              : value === 'Canceled' || value === 'Cancelled'
-                ? Ban
-                : ServerOff
+  const presentation = operationalStatusPresentation(value)
+  const Icon = presentation.icon
 
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <Icon className={['h-5 w-5 stroke-[3]', OPERATIONAL_STATUS_ICON_STYLES[value] ?? 'text-slate-400'].join(' ')} aria-hidden="true" />
-      {value || 'Not set'}
+      <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
+      {presentation.label}
     </span>
   )
 }
