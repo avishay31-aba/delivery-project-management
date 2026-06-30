@@ -97,3 +97,82 @@ Console
   -> Workspace
     -> Business Object
 ```
+
+## Product Development Methodology
+
+ERP Version 1.0 has three parallel artifacts:
+
+1. ERP Product
+   - The implementation itself.
+2. ERP Architecture Handbook
+   - Architectural decisions, ownership principles, reusable patterns, and product engineering rules.
+3. ERP Product Roadmap
+   - Milestones, releases, sequencing, and planning.
+
+Every significant implementation should be evaluated against all three artifacts.
+
+## Future Implementation Process
+
+For every future implementation request:
+
+1. Review the requested feature from a product perspective.
+2. Implement only the requested functionality.
+3. Perform a Product Readiness Review.
+
+Implementation must stay inside the approved scope. Do not redesign the product, introduce unrelated architecture, or change business behavior unless explicitly requested.
+
+Additional findings discovered during review are reported separately and are not implemented unless explicitly approved.
+
+Product Readiness Review findings should be classified as one of:
+
+- Bug
+- UX Improvement
+- OO Refactoring
+- Shared Component Candidate
+- Domain Ownership Issue
+- Performance Improvement
+- Product Recommendation
+
+## Architecture Handbook Updates
+
+Architecture documentation is a first-class deliverable.
+
+Whenever implementation introduces a new architectural principle, shared component, domain ownership clarification, reusable pattern, or cross-cutting product rule, evaluate whether it belongs in this handbook.
+
+If it does, update the handbook as part of the same work.
+
+## Business Principles
+
+Always preserve:
+
+- Single ownership.
+- One source of truth.
+- Business Objects own business rules.
+- Core Services own shared infrastructure.
+- Shared Components own shared UI behavior.
+- Pages compose objects and components only.
+
+## Implementation Completion Checklist
+
+Before considering a task complete, verify:
+
+- Functional correctness.
+- Object ownership.
+- OO consistency.
+- Shared component reuse.
+- Metadata consistency.
+- UI consistency.
+- Navigation consistency.
+- Product readiness.
+
+## Commercial Product Mindset
+
+The ERP should be treated as a commercial product.
+
+Product engineering should look beyond the requested feature, but implementation must remain limited to the requested scope. Everything else should be reported separately as recommendations.
+
+The Version 1.0 objective is to finish a commercially releasable Delivery ERP.
+
+The Version 1.0 objective is not to build the future configurable ERP platform.
+
+Version 2.0 may introduce configurable ERP platform capabilities after Version 1.0 is complete.
