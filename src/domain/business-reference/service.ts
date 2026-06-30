@@ -101,8 +101,8 @@ export function systemReference(
   system: System | ProductionSystemInventoryItem | ReusedInternalSystem,
   lookup: Partial<BusinessReferenceLookup> = {},
 ): BusinessObjectReference {
-  const businessId = systemBusinessId(system)
   const objectType = systemObjectType(system)
+  const businessId = systemBusinessIdForObjectType(system, objectType)
   return {
     objectType,
     internalId: system.id,
@@ -191,8 +191,16 @@ export function systemBusinessId(system: System | ProductionSystemInventoryItem 
   return system.id
 }
 
+function systemBusinessIdForObjectType(
+  system: System | ProductionSystemInventoryItem | ReusedInternalSystem,
+  objectType: BusinessObjectType,
+): string {
+  if (objectType === 'INTERNAL_REUSED_SYSTEM' && 'machineId' in system && system.machineId) return system.machineId
+  if (objectType === 'PRODUCTION_SYSTEM' && 'sid' in system && system.sid) return system.sid
+  return systemBusinessId(system)
+}
+
 function systemObjectType(system: System | ProductionSystemInventoryItem | ReusedInternalSystem): BusinessObjectType {
-  if ('systemClass' in system) return 'SYSTEM'
   if ('source' in system && system.source === 'Production' && 'sid' in system && system.sid) return 'PRODUCTION_SYSTEM'
   if ('source' in system && system.source === 'Reused Internal Systems' && 'machineId' in system && system.machineId) return 'INTERNAL_REUSED_SYSTEM'
   if ('machineId' in system && system.machineId && (!('sid' in system) || !system.sid)) return 'INTERNAL_REUSED_SYSTEM'
