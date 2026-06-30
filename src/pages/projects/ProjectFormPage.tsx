@@ -1138,7 +1138,7 @@ export function ProjectFormPage() {
           </div>
         </div>
         {tasks.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-sf-border bg-white">
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
@@ -1217,15 +1217,15 @@ export function ProjectFormPage() {
                             <GripVertical className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </td>
-                        <td className="min-w-72 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone?.name ?? ''}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-xs font-semibold text-sf-text-muted">
                           {task.order}
                         </td>
-                        <td className="min-w-96 whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{task.name}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.department}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{task.resource}</td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderTaskStatusSelect(task)}</td>
-                        <td className="w-80 min-w-80 max-w-96 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">
+                        <td className="w-64 min-w-64 max-w-72 whitespace-normal border border-sf-border px-1 py-1 text-sf-text">
                           <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-10" toolbarMode="focus" />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">

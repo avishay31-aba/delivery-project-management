@@ -848,6 +848,7 @@ export function OpportunityFormPage() {
     isEqual: valuesEqual,
   })
   const [saveMessages, setSaveMessages] = useState<string[]>([])
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false)
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
   const [projectChanges, setProjectChanges] = useState<ProjectLifecycleChange[]>([])
@@ -859,6 +860,7 @@ export function OpportunityFormPage() {
   useEffect(() => {
     resetDraft(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null)
     setSaveMessages([])
+    setHasAttemptedSave(false)
   }, [resetDraft, savedOpportunity])
 
   useEffect(() => {
@@ -1204,6 +1206,7 @@ export function OpportunityFormPage() {
   function discardChanges() {
     resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
+    setHasAttemptedSave(false)
   }
 
   function cancelChanges() {
@@ -1274,6 +1277,7 @@ export function OpportunityFormPage() {
 
   function saveChanges(options: PendingSave = {}) {
     setIsSaveMenuOpen(false)
+    setHasAttemptedSave(true)
     const messages = validateOpportunity(currentDraft, { accounts, systems, tenants })
       .filter((message) => message.level === 'error')
       .map((message) => message.message)
@@ -1730,8 +1734,8 @@ export function OpportunityFormPage() {
         <div className="flex flex-wrap items-center gap-2 text-sm text-sf-text-muted">
           <span>{isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}</span>
           <StatusBadge
-            label={validationErrors.length > 0 ? 'Needs attention' : validationWarnings.length > 0 ? 'Warnings' : 'Ready'}
-            variant={validationErrors.length > 0 ? 'error' : validationWarnings.length > 0 ? 'warning' : 'done'}
+            label={hasAttemptedSave && validationErrors.length > 0 ? 'Needs attention' : hasAttemptedSave && validationWarnings.length > 0 ? 'Warnings' : 'Ready'}
+            variant={hasAttemptedSave && validationErrors.length > 0 ? 'error' : hasAttemptedSave && validationWarnings.length > 0 ? 'warning' : 'done'}
           />
         </div>
         <div className="flex gap-2">
@@ -1788,7 +1792,7 @@ export function OpportunityFormPage() {
       </div>
 
       <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
-      {validationMessages.length > 0 ? (
+      {hasAttemptedSave && validationMessages.length > 0 ? (
         <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p className="font-semibold">Opportunity validation</p>
           <ul className="mt-1 list-inside list-disc">
