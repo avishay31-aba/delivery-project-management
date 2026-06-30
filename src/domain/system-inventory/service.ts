@@ -1,5 +1,5 @@
 import { timeGroupForCountry } from '@/config/time-groups'
-import type { Project, ProjectSystemLink, System, SystemInventoryRecord, Tenant } from './types'
+import type { Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import {
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_SOURCE_PRODUCTION,
@@ -96,4 +96,58 @@ export function systemRoutePath(record: SystemInventoryRecord): string {
     return `/systems/reused-internal/${record.machineId}`
   }
   return `/systems/production-inventory/${'sid' in record ? record.sid ?? '' : ''}`
+}
+
+export interface ReusedInternalPurposeHistoryRow {
+  id: string
+  pid: string
+  projectName: string
+  purpose: string
+  status: string
+  allocatedAt: string
+  deallocatedAt: string
+}
+
+export function reusedInternalPurposeHistory(
+  record: ReusedInternalSystem | System,
+  projects: Project[],
+  projectSystems: ProjectSystemLink[],
+): ReusedInternalPurposeHistoryRow[] {
+  const machineId = 'machineId' in record ? record.machineId : null
+  if (!machineId) return []
+
+  const rows: ReusedInternalPurposeHistoryRow[] = projectSystems
+    .filter((link) => link.sourceMachineId === machineId)
+    .map((link) => {
+      const project = projects.find((candidate) => candidate.id === link.projectId)
+      return {
+        id: link.id,
+        pid: project?.pid ?? link.projectId,
+        projectName: project?.opportunityName ?? '',
+        purpose: 'purpose' in record ? record.purpose : project?.mainType ?? '',
+        status: link.allocationStatus ?? 'ALLOCATED',
+        allocatedAt: link.allocatedAt,
+        deallocatedAt: link.deallocatedAt ?? '',
+      }
+    })
+
+  const knownProjectIds = new Set(rows.map((row) => row.pid))
+  if ('currentProjectIds' in record) {
+    record.currentProjectIds.forEach((projectId) => {
+      const project = projects.find((candidate) => candidate.id === projectId)
+      const pid = project?.pid ?? projectId
+      if (knownProjectIds.has(pid)) return
+      rows.push({
+        id: `${machineId}-${projectId}`,
+        pid,
+        projectName: project?.opportunityName ?? '',
+        purpose: record.purpose,
+        status: record.status,
+        allocatedAt: record.occupationStartDate ?? '',
+        deallocatedAt: record.occupationEndDate ?? '',
+      })
+    })
+  }
+
+  return rows.sort((first, second) => second.allocatedAt.localeCompare(first.allocatedAt))
 }

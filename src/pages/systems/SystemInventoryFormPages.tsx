@@ -16,7 +16,7 @@ import {
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { FormField, PlaceholderCard } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import {
@@ -47,7 +47,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
-import { tenantReference } from '@/domain/business-reference'
+import { projectReference, tenantReference } from '@/domain/business-reference'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import {
   hostingContextPatchForFieldChange,
@@ -58,6 +58,7 @@ import {
   hostedTenantsForSystem,
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
+  reusedInternalPurposeHistory,
   SYSTEM_SOURCE_REUSED_INTERNAL,
   systemIdentity,
   systemTimeGroup,
@@ -67,13 +68,14 @@ import {
 } from '@/domain/system-inventory'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
-type InventorySectionId = 'header' | 'configuration' | 'tabs'
+type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
 type InfrastructureInnerTab = 'environment' | 'infrastructure'
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   header: false,
   configuration: false,
   tabs: false,
+  purposeHistory: false,
 }
 
 const ENVIRONMENT_FIELDS = [
@@ -1142,6 +1144,57 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderPurposeHistorySection() {
+    if (metadata.source !== SYSTEM_SOURCE_REUSED_INTERNAL) return null
+    const rows = reusedInternalPurposeHistory(activeRecord as ReusedInternalSystem | System, projects, projectSystems)
+
+    return (
+      <CollapsibleSection
+        title="Purpose history"
+        subtitle="Historical project usage for this reused internal system."
+        collapsed={collapsedSections.purposeHistory}
+        onToggle={() => toggleSection('purposeHistory')}
+      >
+        {rows.length > 0 ? (
+          <div className="sf-scroll-x rounded border border-sf-border bg-white">
+            <table className="min-w-full border-collapse text-sm leading-tight">
+              <thead className="bg-sf-surface-alt text-left">
+                <tr>
+                  {['PID', 'Project Name', 'Purpose', 'Status', 'Start', 'End'].map((label) => (
+                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const project = projects.find((candidate) => candidate.pid === row.pid)
+                  return (
+                    <tr key={row.id} className="hover:bg-sf-surface-alt">
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        {project ? <BusinessObjectLink reference={projectReference(project)}>{row.pid}</BusinessObjectLink> : row.pid}
+                      </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectName}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.purpose}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.status}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.allocatedAt}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.deallocatedAt || '-'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+            No project purpose history has been recorded for this reused internal system.
+          </div>
+        )}
+      </CollapsibleSection>
+    )
+  }
+
   return (
     <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
       <PageHeader
@@ -1223,6 +1276,7 @@ function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       </CollapsibleSection>
+      {renderPurposeHistorySection()}
       </div>
 
       {navigationBlocker.state === 'blocked' ? (
