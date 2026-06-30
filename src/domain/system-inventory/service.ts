@@ -88,7 +88,7 @@ export function allocatedSystemsForActiveLinks(systems: System[], projectSystems
       .filter((link) => link.allocationStatus !== 'DEALLOCATED')
       .map((link) => link.systemId),
   )
-  return systems.filter((system) => Boolean(system.sid) && (allocatedSystemIds.has(system.id) || system.sid))
+  return systems.filter((system) => allocatedSystemIds.has(system.id))
 }
 
 export function systemRoutePath(record: SystemInventoryRecord): string {
