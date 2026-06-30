@@ -4,6 +4,7 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
+import { systemReference } from '@/domain/business-reference'
 
 export function ProductionSystemInventoryPage() {
   const navigate = useNavigate()
@@ -34,7 +35,8 @@ export function ProductionSystemInventoryPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
               const system = createSystem()
-              navigate(`/systems/production-inventory/${system.sid}`, { state: { returnTo } })
+              const routePath = systemReference(system).routePath
+              if (routePath) navigate(routePath, { state: { returnTo } })
             }}
           >
             + New Production System
@@ -46,7 +48,10 @@ export function ProductionSystemInventoryPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(`/systems/production-inventory/${row.sid}`, { state: { returnTo } })}
+        onRowClick={(row) => {
+          const routePath = systemReference(row).routePath
+          if (routePath) navigate(routePath, { state: { returnTo } })
+        }}
       />
     </div>
   )

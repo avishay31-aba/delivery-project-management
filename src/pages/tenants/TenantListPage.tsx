@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createTenantColumns } from '@/config/tenant-columns'
+import { tenantReference } from '@/domain/business-reference'
 
 export function TenantListPage() {
 const navigate = useNavigate()
@@ -29,7 +30,8 @@ return (
         className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
         onClick={() => {
           const tenant = createTenant()
-          navigate(`/tenants/${tenant.tid}`, { state: { returnTo } })
+          const routePath = tenantReference(tenant).routePath
+          if (routePath) navigate(routePath, { state: { returnTo } })
         }}
       >
         + New Tenant
@@ -40,7 +42,10 @@ return (
       if (!column?.editKey) return
       updateTenant(row.id, { [column.editKey]: value } as never)
     }}
-    onRowClick={(row) => navigate(`/tenants/${row.tid}`, { state: { returnTo } })}
+    onRowClick={(row) => {
+      const routePath = tenantReference(row).routePath
+      if (routePath) navigate(routePath, { state: { returnTo } })
+    }}
   />
 </div>
 )

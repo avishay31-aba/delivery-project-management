@@ -54,6 +54,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
+import { tenantReference } from '@/domain/business-reference'
 import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
@@ -897,7 +898,10 @@ function InventoryForm<T extends InventoryRecord>({
         <button
           type="button"
           className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-          onClick={() => navigate(`/tenants/${tenant.tid}`)}
+          onClick={() => {
+            const routePath = tenantReference(tenant).routePath
+            if (routePath) navigate(routePath)
+          }}
         >
           Edit
         </button>

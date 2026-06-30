@@ -15,6 +15,7 @@ import {
   warrantyDashboardSummary,
   type WarrantyDashboardSummary,
 } from '@/domain/warranty-collection'
+import { routePathForBusinessReference } from '@/domain/business-reference'
 import { useAppStore } from '@/store/useAppStore'
 
 const KPI_LABELS: Array<{ key: keyof WarrantyDashboardSummary; label: string }> = [
@@ -85,7 +86,10 @@ export function WarrantyDashboardPage() {
         rows={rows}
         columns={columns}
         enableInlineEditing={false}
-        onRowClick={(row) => navigate(`/tenants/${row.tenantTid}`)}
+        onRowClick={(row) => {
+          const routePath = routePathForBusinessReference('TENANT', row.tenantTid)
+          if (routePath) navigate(routePath)
+        }}
       />
     </div>
   )

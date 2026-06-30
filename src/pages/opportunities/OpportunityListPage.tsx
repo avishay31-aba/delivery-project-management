@@ -4,6 +4,7 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
 import { useAppStore } from '@/store/useAppStore'
+import { opportunityReference } from '@/domain/business-reference'
 
 export function OpportunityListPage() {
   const navigate = useNavigate()
@@ -37,7 +38,8 @@ export function OpportunityListPage() {
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
               const opportunity = createOpportunity('DELIVERY', 'NEW')
-              navigate(`/opportunities/${opportunity.opportunityId}`, { state: { returnTo } })
+              const routePath = opportunityReference(opportunity).routePath
+              if (routePath) navigate(routePath, { state: { returnTo } })
             }}
           >
             + New Opportunity
@@ -51,7 +53,10 @@ export function OpportunityListPage() {
           if (!column?.editKey) return
           updateOpportunity(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(`/opportunities/${row.opportunityId}`, { state: { returnTo } })}
+        onRowClick={(row) => {
+          const routePath = opportunityReference(row).routePath
+          if (routePath) navigate(routePath, { state: { returnTo } })
+        }}
       />
     </div>
   )

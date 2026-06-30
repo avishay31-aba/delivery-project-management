@@ -5,6 +5,7 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createProjectListColumns } from '@/config/project-columns'
 import { projectListRowClassName } from '@/domain/project-lifecycle'
+import { projectReference } from '@/domain/business-reference'
 
 export function ProjectListPage() {
 const navigate = useNavigate()
@@ -41,7 +42,8 @@ return (
         className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
         onClick={() => {
           const project = createProject()
-          navigate(`/projects/${project.pid}`, { state: { returnTo } })
+          const routePath = projectReference(project).routePath
+          if (routePath) navigate(routePath, { state: { returnTo } })
         }}
       >
         + New Project
@@ -53,7 +55,10 @@ return (
       if (!column?.editKey) return
       updateProject(row.id, { [column.editKey]: value } as never)
     }}
-    onRowClick={(row) => navigate(`/projects/${row.pid}`, { state: { returnTo } })}
+    onRowClick={(row) => {
+      const routePath = projectReference(row).routePath
+      if (routePath) navigate(routePath, { state: { returnTo } })
+    }}
   />
 </div>
 )

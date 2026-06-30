@@ -34,12 +34,11 @@ import {
   type AllocationActionResult,
   type AllocationMode,
 } from '@/domain/allocation-context'
-import { systemRoutePath } from '@/domain/system-inventory'
 import {
   linkedOpportunityForProject,
   projectTypeForOpportunity,
 } from '@/domain/opportunity-lifecycle'
-import { opportunityReference } from '@/domain/business-reference'
+import { opportunityReference, systemReference } from '@/domain/business-reference'
 import {
   activeSystemLinkMapBySystemId,
   activeSystemLinksForProject,
@@ -1710,7 +1709,10 @@ export function ProjectFormPage() {
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-                    onClick={() => navigate(systemRoutePath(system))}
+                    onClick={() => {
+                      const routePath = systemReference(system).routePath
+                      if (routePath) navigate(routePath)
+                    }}
                   >
                     Edit
                   </button>

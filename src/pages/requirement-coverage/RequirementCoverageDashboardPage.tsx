@@ -8,6 +8,7 @@ import {
   requirementCoverageSummary,
   type RequirementCoverageSummary,
 } from '@/domain/requirement-coverage'
+import { routePathForBusinessReference } from '@/domain/business-reference'
 import { useAppStore } from '@/store/useAppStore'
 
 const KPI_LABELS: Array<{ key: keyof RequirementCoverageSummary; label: string }> = [
@@ -70,8 +71,10 @@ export function RequirementCoverageDashboardPage() {
         columns={columns}
         enableInlineEditing={false}
         onRowClick={(row) => {
-          if (row.pid) navigate(`/projects/${row.pid}`)
-          else if (row.opportunityId) navigate(`/opportunities/${row.opportunityId}`)
+          const routePath =
+            routePathForBusinessReference('PROJECT', row.pid) ??
+            routePathForBusinessReference('OPPORTUNITY', row.opportunityId)
+          if (routePath) navigate(routePath)
         }}
       />
     </div>

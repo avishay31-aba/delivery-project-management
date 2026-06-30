@@ -3,6 +3,7 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createCustomerColumns } from '@/config/customer-columns'
 import { useAppStore } from '@/store/useAppStore'
+import { accountReference } from '@/domain/business-reference'
 
 export function CustomerListPage() {
   const navigate = useNavigate()
@@ -24,7 +25,10 @@ export function CustomerListPage() {
         rows={accounts}
         columns={columns}
         enableInlineEditing={false}
-        onRowClick={(row) => navigate(`/customers/${row.accountCode}`)}
+        onRowClick={(row) => {
+          const routePath = accountReference(row).routePath
+          if (routePath) navigate(routePath)
+        }}
         onEdit={(row, columnId, value) => {
           const column = columns.find((candidate) => candidate.id === columnId)
           if (!column?.editKey) return

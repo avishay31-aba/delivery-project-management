@@ -193,6 +193,7 @@ export function systemBusinessId(system: System | ProductionSystemInventoryItem 
 
 function systemObjectType(system: System | ProductionSystemInventoryItem | ReusedInternalSystem): BusinessObjectType {
   if ('source' in system && system.source === 'Production' && 'sid' in system && system.sid) return 'PRODUCTION_SYSTEM'
+  if ('source' in system && system.source === 'Reused Internal Systems' && 'machineId' in system && system.machineId) return 'INTERNAL_REUSED_SYSTEM'
   if ('machineId' in system && system.machineId && (!('sid' in system) || !system.sid)) return 'INTERNAL_REUSED_SYSTEM'
   return 'SYSTEM'
 }

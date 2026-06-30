@@ -3,7 +3,8 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
-import { allocatedSystemsForActiveLinks, systemRoutePath } from '@/domain/system-inventory'
+import { allocatedSystemsForActiveLinks } from '@/domain/system-inventory'
+import { systemReference } from '@/domain/business-reference'
 
 export function SystemListPage() {
   const navigate = useNavigate()
@@ -31,7 +32,10 @@ export function SystemListPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => navigate(systemRoutePath(row), { state: { returnTo } })}
+        onRowClick={(row) => {
+          const routePath = systemReference(row).routePath
+          if (routePath) navigate(routePath, { state: { returnTo } })
+        }}
       />
     </div>
   )
