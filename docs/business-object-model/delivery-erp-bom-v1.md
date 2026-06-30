@@ -22,7 +22,7 @@ The BOM is the authoritative business-domain map for the ERP. BOS documents defi
 | Opportunity | Sales | OpportunityLifecycle | Commercial lifecycle and delivery intent | Implemented | V1 |
 | Requirement | Sales origin, Delivery fulfillment | TenantRequirement | Requirement identity, metadata, and intent rows | Implemented | V1 |
 | Requirement Coverage | Delivery | RequirementCoverage | Fulfillment status of requirements | Implemented | V1 |
-| Project | Delivery | ProjectLifecycle | Delivery execution workspace | Implemented | V1 |
+| Project | Delivery | ProjectLifecycle | Central Delivery orchestration object for delivery execution | Implemented | V1 |
 | Milestone | Delivery | MilestonePlan | Delivery milestone execution | Implemented | V1 |
 | Task | Delivery | MilestonePlan | Delivery task execution | Implemented | V1 |
 | System | Delivery | SystemInventory | Allocated operational system | Implemented | V1 |
@@ -105,7 +105,7 @@ Admin
   -> Future users/roles/privileges
 ```
 
-Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects.
+Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects. Project is the central Delivery orchestration Business Object: it owns delivery execution and composes delivery context, while consuming facts from MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection.
 
 ## 3. Relationship Matrix
 
@@ -115,7 +115,7 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Opportunity | Customer N:1 | Requirements 1:N, Project intent 1:N | Customer, Sales Manager, existing Systems/Tenants | Projects, RequirementCoverage |
 | Requirement | Opportunity N:1 | RequirementCoverage 1:1/N | Product/config metadata, Tenant/System refs | Project, Tenant, RequirementCoverage |
 | Requirement Coverage | Requirement N:1 | None | Opportunity, Project, System, Tenant | Customer Workspace, Project Workspace, Dashboard |
-| Project | Opportunity N:1, Customer N:1 derived | Milestones 1:N, Tasks through milestones, Allocations 1:N | Customer, Opportunity, Systems, Tenants | Customer, RequirementCoverage, Activity |
+| Project | Opportunity N:1, Customer N:1 derived | Milestones 1:N, Tasks through milestones, Allocations 1:N | Customer, Opportunity, Systems, Tenants, RequirementCoverage, Warranty context | Customer, RequirementCoverage, Activity |
 | Milestone | Project N:1 | Tasks 1:N | Project | Project health |
 | Task | Milestone N:1 | None | Project/Milestone | Project health |
 | System | Project N:N through Allocation | Tenants 1:N | Customer, Product/config metadata | Project, Tenant, Customer |
@@ -139,7 +139,7 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Opportunity | Sales | Sales | OpportunityLifecycle | Opportunity Workspace | Sales-authorized users | Delivery, Admin |
 | Requirement | Sales intent / Delivery fulfillment | Sales origin | TenantRequirement | Opportunity Workspace | Opportunity Workspace | Project, Coverage |
 | Requirement Coverage | Delivery | Delivery | RequirementCoverage | Requirement Coverage | Domain/read model only | Sales, Customer |
-| Project | Delivery | Delivery | ProjectLifecycle | Project Workspace | Delivery | Sales, Admin |
+| Project | Delivery | Delivery | ProjectLifecycle | Project Workspace | Delivery execution; consumes MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection facts | Sales, Admin |
 | Milestone | Delivery | Delivery | MilestonePlan | Project Workspace | Delivery | Sales via read-only |
 | Task | Delivery | Delivery | MilestonePlan | Project Workspace | Delivery | Sales via read-only |
 | System | Delivery | Delivery | SystemInventory | Systems Workspace | Delivery | Sales, Admin |
@@ -188,6 +188,8 @@ Project/System/Tenant/Allocation transactions
 
 Customer must exist before Opportunity. Opportunity may trigger Project creation/update. Project execution begins in Delivery. Warranty belongs to Tenant. Requirement Coverage is derived/read-model behavior, not a manually created workflow object. Activity Events are emitted by transaction boundaries, not pages.
 
+Operational renewal belongs to Delivery through Warranty / Renewal Work Queue. Project may display renewal project context, but WarrantyCollection owns warranty chain/status and Renewal Work Queue owns renewal readiness visibility.
+
 ## 6. Navigation Model
 
 All business-object navigation uses Business Reference Resolver. Visible business IDs use shared Business Object Links. Routes remain stable. Cross-console navigation is allowed but does not transfer ownership.
@@ -231,11 +233,11 @@ Customer owns customer identity, commercial account profile, and customer aggreg
 
 Opportunity owns commercial lifecycle, delivery intent, requirement definitions, and Project creation/update intent. It does not own Project execution, Requirement Coverage, Allocation, Tenant creation execution, or Warranty.
 
-Project owns Delivery execution, Delivery health, milestone/task context, and Delivery workspace composition. It does not own Customer master, Opportunity lifecycle, Warranty status, or Requirement Coverage status.
+Project owns Delivery execution, Delivery health, milestone/task context, and Delivery workspace composition. It consumes facts from MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection. It does not own Customer master, Opportunity lifecycle, System logic, Tenant logic, Warranty status, or Requirement Coverage status.
 
-System owns system identity/configuration/operational facts. It does not own Tenant warranty, Project health, or Customer commercial data.
+System owns system identity/configuration/operational facts. Systems are Delivery-owned supporting Business Objects, not separate role-owned objects. System does not own Tenant warranty, Project health, or Customer commercial data.
 
-Tenant owns tenant identity/lifecycle facts and tenant operational mode/status context. It does not own Warranty chain/status, System state, or Project health.
+Tenant owns tenant identity/lifecycle facts and tenant operational mode/status context. Tenants are Delivery-owned supporting Business Objects, not separate role-owned objects. Tenant does not own Warranty chain/status, System state, or Project health.
 
 Warranty owns warranty chain, warranty status, tenant warranty header status, and renewal candidate facts. It does not own Opportunity commercial renewal or Project execution.
 
