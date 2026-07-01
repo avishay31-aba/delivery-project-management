@@ -90,6 +90,22 @@ export function projectMilestoneTaskProgress(project: MilestonePlan, milestoneId
   return Math.round((tasks.filter((task) => task.status === 'DONE').length / tasks.length) * 100)
 }
 
+export function isPocReleaseComplete(project: Project): boolean {
+  if (project.mainType !== 'POC') return false
+  const endOfPocMilestone = (project.milestones ?? []).find(
+    (milestone) => milestone.name.trim().toLowerCase() === 'end of poc',
+  )
+  if (!endOfPocMilestone) return false
+
+  const tasks = project.tasks ?? []
+  if (tasks.length === 0) return false
+
+  const endOfPocTasks = tasks.filter((task) => task.milestoneId === endOfPocMilestone.id)
+  if (endOfPocTasks.length === 0) return false
+
+  return endOfPocTasks.every((task) => task.status === 'DONE') && tasks.every((task) => task.status === 'DONE')
+}
+
 function dateOnlyTimestamp(value: string): number | null {
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return null

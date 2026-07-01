@@ -54,13 +54,14 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
-import { createStandaloneProject } from '@/domain/project-lifecycle'
+import { createStandaloneProject, projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import {
   deletedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
   resolveTenantCreationSource,
   tenantCreationDraftFromSource,
 } from '@/domain/tenant-operations'
+import { isPocReleaseComplete } from '@/domain/milestone-plan'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
 
@@ -115,6 +116,16 @@ function requirementRef(requirementId: string): ActivityObjectRefInput {
 
 function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {
   return refs.filter((ref): ref is ActivityObjectRefInput => Boolean(ref))
+}
+
+function projectAssignmentLocation(state: AppDataState, project: AppDataState['projects'][number]) {
+  const linkedOpportunity = state.opportunities.find((opportunity) => opportunity.id === project.opportunityId)
+  const account = state.accounts.find((candidate) => candidate.accountName === project.accountName)
+  const context = { linkedOpportunity, account }
+  return {
+    region: projectHeaderFieldValue(project, 'region', context),
+    timeGroup: projectHeaderFieldValue(project, 'timeGroup', context),
+  }
 }
 
 interface AppStore extends AppDataState {
@@ -199,11 +210,41 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   updateProject: (id, patch) => {
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p,
-      ),
-    }))
+    const now = new Date().toISOString()
+    set((state) => {
+      let updatedProject: AppDataState['projects'][number] | undefined
+      const projects = state.projects.map((project) => {
+        if (project.id !== id) return project
+        updatedProject = { ...project, ...patch, updatedAt: now }
+        return updatedProject
+      })
+      const sourceMachineIds =
+        updatedProject && isPocReleaseComplete(updatedProject)
+          ? new Set(
+              state.projectSystems
+                .filter(
+                  (link) =>
+                    link.projectId === id &&
+                    link.allocationStatus !== 'DEALLOCATED' &&
+                    link.allocationType === 'REUSED_INTERNAL' &&
+                    link.sourceMachineId,
+                )
+                .map((link) => link.sourceMachineId as string),
+            )
+          : new Set<string>()
+
+      return {
+        projects,
+        reusedInternalSystems:
+          sourceMachineIds.size > 0
+            ? state.reusedInternalSystems.map((system) =>
+                sourceMachineIds.has(system.machineId) && system.currentProjectIds.includes(id)
+                  ? releaseReusedInternalSystem(system, id, now)
+                  : system,
+              )
+            : state.reusedInternalSystems,
+      }
+    })
     get().saveToStorage()
   },
 
@@ -716,7 +757,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const tenantIds: string[] = []
 
-    const allocatedSystem = systemFromProductionInventoryAllocation(productionSystem, projectId, tenantIds, now)
+    const allocatedSystem = systemFromProductionInventoryAllocation(
+      productionSystem,
+      project.id,
+      projectAssignmentLocation(state, project),
+      tenantIds,
+      now,
+    )
     const allocation = createProjectSystemLink(
       projectId,
       allocatedSystem.id,
@@ -758,7 +805,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const allocatedSystem = systemFromReusedInternalAllocation(
       reusedSystem,
-      projectId,
+      project.id,
+      projectAssignmentLocation(state, project),
       allocatedSystemId,
       nextSystemId.id,
       project.pid,

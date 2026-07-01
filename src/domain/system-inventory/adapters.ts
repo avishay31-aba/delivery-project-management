@@ -72,11 +72,12 @@ export function occupyReusedInternalSystem(system: ReusedInternalSystem, project
 }
 
 export function releaseReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+  const currentProjectIds = system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId)
   return {
     ...system,
-    status: REUSED_INTERNAL_STATUS_AVAILABLE,
-    currentProjectIds: system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId),
-    occupationEndDate: updatedAt,
+    status: currentProjectIds.length === 0 ? REUSED_INTERNAL_STATUS_AVAILABLE : system.status,
+    currentProjectIds,
+    occupationEndDate: currentProjectIds.length === 0 ? updatedAt : system.occupationEndDate ?? null,
     updatedAt,
   }
 }
@@ -139,9 +140,15 @@ export function createStandaloneSystem(sid: string, now: string): System {
   }
 }
 
+export interface SystemAllocationAssignmentLocation {
+  region?: string
+  timeGroup?: string
+}
+
 export function systemFromProductionInventoryAllocation(
   productionSystem: ProductionSystemInventoryItem,
   projectId: string,
+  assignmentLocation: SystemAllocationAssignmentLocation,
   tenantIds: string[],
   updatedAt: string,
 ): System {
@@ -154,6 +161,8 @@ export function systemFromProductionInventoryAllocation(
     availability: SYSTEM_AVAILABILITY_OCCUPIED,
     linkedProjectIds: [projectId],
     tenantIds,
+    region: assignmentLocation.region || productionSystem.region || '',
+    timeGroup: assignmentLocation.timeGroup || productionSystem.timeGroup || '',
     createdAt: productionSystem.createdAt,
     updatedAt,
   }
@@ -162,6 +171,7 @@ export function systemFromProductionInventoryAllocation(
 export function systemFromReusedInternalAllocation(
   reusedSystem: ReusedInternalSystem,
   projectId: string,
+  assignmentLocation: SystemAllocationAssignmentLocation,
   systemId: string,
   sid: string,
   deliveryPid: string,
@@ -187,10 +197,10 @@ export function systemFromReusedInternalAllocation(
     productType: reusedSystem.productType,
     ...hostingContextFromSource(reusedSystem),
     mapCenter: reusedSystem.mapCenter,
-    region: reusedSystem.usedInRegion,
+    region: assignmentLocation.region || assignmentLocation.timeGroup || reusedSystem.usedInRegion || '',
     country: '',
     state: '',
-    timeGroup: reusedSystem.timeGroup,
+    timeGroup: assignmentLocation.timeGroup || reusedSystem.timeGroup,
     timeGroupAlert: reusedSystem.timeGroupAlert,
     operationalStatus: reusedSystem.operationalStatus,
     documents: reusedSystem.documents ?? [],
