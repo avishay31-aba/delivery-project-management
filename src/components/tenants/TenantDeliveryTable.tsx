@@ -37,7 +37,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
 
   return (
     <div className="sf-scroll-x rounded border border-sf-border bg-white">
-      <table className="min-w-full border-collapse text-sm leading-tight">
+      <table className="w-max min-w-full border-collapse text-sm leading-tight">
         <thead className="bg-sf-surface-alt text-left">
           <tr>
             {actions ? (
@@ -69,32 +69,32 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
             return (
               <tr key={tenant.id} className="hover:bg-sf-surface-alt">
                 {actions ? (
-                  <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                     {actions(tenant, system)}
                   </td>
                 ) : null}
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-2">
                     <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
                     <RecordChangeBadge record={tenant} />
                   </span>
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {system ? <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? ''}</BusinessObjectLink> : null}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {system?.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-'}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
                 <ConfigurationValueCells record={tenant as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
               </tr>
             )

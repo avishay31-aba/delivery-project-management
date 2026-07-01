@@ -17,7 +17,7 @@ export function TabPanel({ tabs, activeTab, onTabChange, children }: TabPanelPro
   return (
     <div className="sf-card overflow-hidden">
       <div
-        className="flex border-b border-sf-border bg-sf-surface-alt"
+        className="sticky top-0 z-20 flex border-b border-sf-border bg-sf-surface-alt"
         role="tablist"
       >
         {tabs.map((tab) => (

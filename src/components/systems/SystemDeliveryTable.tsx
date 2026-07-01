@@ -96,7 +96,7 @@ export function SystemDeliveryTable({
 
   return (
     <div className="sf-scroll-x rounded border border-sf-border bg-white">
-      <table className="min-w-full border-collapse text-sm leading-tight">
+      <table className="w-max min-w-full border-collapse text-sm leading-tight">
         <thead className="bg-sf-surface-alt text-left">
           <tr>
             {[
@@ -106,6 +106,7 @@ export function SystemDeliveryTable({
               'MID',
               'PIDs',
               'Time Group',
+              'Used In Region',
               'Operational Status',
               'Delivery',
               'Product Mismatch',
@@ -127,10 +128,10 @@ export function SystemDeliveryTable({
               .filter((pid): pid is string => Boolean(pid))
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {actions?.(system)}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {onToggleDetails ? (
                     <button
                       type="button"
@@ -143,7 +144,7 @@ export function SystemDeliveryTable({
                     </button>
                   ) : null}
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-2">
                     <BusinessObjectLink reference={systemReference(system)}>
                       {system.sid ?? system.machineId ?? system.id}
@@ -151,7 +152,7 @@ export function SystemDeliveryTable({
                     <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                   </span>
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text" title={projectLabels.join('; ')}>
@@ -166,10 +167,11 @@ export function SystemDeliveryTable({
                     })}
                   </span>
                 </td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(system.operationalStatus)}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
-                <td className="border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.region ?? system.timeGroup}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(system.operationalStatus)}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {productMismatch?.(system) ? (
                     <span className="group relative inline-flex" title={mismatchPresentation.tooltip}>
                       <AlertStatusIcon variant="warning" label={mismatchPresentation.label} />
@@ -183,7 +185,7 @@ export function SystemDeliveryTable({
               </tr>,
               isExpanded ? (
                 <tr key={`${system.id}-details`}>
-                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={9 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
+                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
                     {renderSystemDetails(system)}
                   </td>
                 </tr>

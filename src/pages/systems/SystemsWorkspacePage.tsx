@@ -21,7 +21,7 @@ export function SystemsWorkspacePage() {
 
   return (
     <div className="space-y-4">
-      <div className="border-b border-sf-border">
+      <div className="sticky top-0 z-30 border-b border-sf-border bg-sf-surface">
         <nav className="flex flex-wrap gap-2" aria-label="Systems Workspace views">
           {SYSTEMS_WORKSPACE_TABS.map((tab) => (
             <NavLink
