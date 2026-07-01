@@ -1,5 +1,5 @@
 import { timeGroupForCountry } from '@/config/time-groups'
-import type { Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
+import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import {
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_SOURCE_PRODUCTION,
@@ -83,12 +83,32 @@ export function systemTimeGroupAlert(record: SystemInventoryRecord, tenants: Ten
 }
 
 export function allocatedSystemsForActiveLinks(systems: System[], projectSystems: ProjectSystemLink[]): System[] {
+  return allocatedSystemDashboardRows(systems, projectSystems)
+}
+
+export function allocatedSystemDashboardRows(
+  systems: System[],
+  projectSystems: ProjectSystemLink[],
+): AllocatedSystemDashboardRow[] {
   const allocatedSystemIds = new Set(
     projectSystems
       .filter((link) => link.allocationStatus !== 'DEALLOCATED')
       .map((link) => link.systemId),
   )
-  return systems.filter((system) => allocatedSystemIds.has(system.id))
+  return systems
+    .filter((system) => allocatedSystemIds.has(system.id))
+    .map((system) => {
+      const links = projectSystems.filter((link) => link.systemId === system.id && link.allocationStatus !== 'DEALLOCATED')
+      return {
+        ...system,
+        linkedProjectIds: Array.from(new Set(links.map((link) => link.projectId))),
+        allocationIds: links.map((link) => link.id),
+        allocationProjectIds: Array.from(new Set(links.map((link) => link.projectId))),
+        allocationTypes: Array.from(new Set(links.map((link) => link.allocationType ?? 'EXISTING_SYSTEM'))),
+        allocatedAt: links.map((link) => link.allocatedAt).sort()[0] ?? '',
+        allocationStatus: links.some((link) => link.allocationStatus === 'ALLOCATED') ? 'ALLOCATED' : links[0]?.allocationStatus ?? '',
+      }
+    })
 }
 
 export function systemRoutePath(record: SystemInventoryRecord): string {

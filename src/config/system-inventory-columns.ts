@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
+import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, Tenant } from '@/data/seed.types'
+import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
 import { REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 import {
   joinUniqueValues,
@@ -67,7 +68,7 @@ export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
 ]
 
-export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<System>[] {
+export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<AllocatedSystemDashboardRow>[] {
   return [
     { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? '' },
     {
@@ -75,7 +76,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       label: 'PID',
       getValue: (row) =>
         joinUniqueValues(
-          (row.linkedProjectIds ?? [])
+          row.allocationProjectIds
             .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
             .filter(Boolean),
           '; ',
@@ -84,12 +85,15 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'machineId', label: 'MID', getValue: (row) => row.machineId ?? '' },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
+    { id: 'allocationType', label: 'Allocation Type', getValue: (row) => row.allocationTypes.join('; ') },
+    { id: 'allocationStatus', label: 'Allocation Status', getValue: (row) => row.allocationStatus },
+    { id: 'allocatedAt', label: 'Allocated At', getValue: (row) => row.allocatedAt },
     {
       id: 'projects',
       label: 'Linked Projects',
       getValue: (row) =>
         joinUniqueValues(
-          (row.linkedProjectIds ?? [])
+          row.allocationProjectIds
             .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
             .filter(Boolean),
           '; ',
@@ -103,9 +107,9 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'tenants',
       label: 'Hosted Tenants',
-      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.tid)),
+      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id || tenant.hostedSystemId === row.id).map((tenant) => tenant.tid)),
     },
-    systemUrlColumn<System>({ replaceable: true }),
+    systemUrlColumn<AllocatedSystemDashboardRow>({ replaceable: true }),
     { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },

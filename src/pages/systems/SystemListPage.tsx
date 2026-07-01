@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
-import { allocatedSystemsForActiveLinks } from '@/domain/system-inventory'
+import { allocatedSystemDashboardRows } from '@/domain/system-inventory'
 import { systemReference } from '@/domain/business-reference'
 
 export function SystemListPage() {
@@ -15,7 +15,7 @@ export function SystemListPage() {
   const tenants = useAppStore((s) => s.tenants)
   const projectSystems = useAppStore((s) => s.projectSystems)
   const updateSystem = useAppStore((s) => s.updateSystem)
-  const allocatedSystems = allocatedSystemsForActiveLinks(systems, projectSystems)
+  const allocatedSystems = allocatedSystemDashboardRows(systems, projectSystems)
   const systemListColumns = createAllocatedSystemColumns(projects, tenants)
 
   return (

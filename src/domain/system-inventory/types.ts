@@ -18,6 +18,14 @@ export type ProductionInventoryRecord = ProductionSystemInventoryItem
 export type ReusedInternalInventoryRecord = ReusedInternalSystem
 export type SystemIdentityKind = 'SID' | 'MID'
 
+export type AllocatedSystemDashboardRow = System & {
+  allocationIds: string[]
+  allocationProjectIds: string[]
+  allocationTypes: string[]
+  allocatedAt: string
+  allocationStatus: string
+}
+
 export interface SystemInventoryValidationMessage {
   field?: string
   message: string
