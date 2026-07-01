@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, History, RefreshCcw, Server, ServerCog, ShieldCheck, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -45,28 +45,9 @@ export const consoleNavigation: NavConsoleGroup[] = [
       },
       {
         label: 'Systems Workspace',
+        path: '/systems',
         icon: Server,
         description: 'System operations and inventory',
-        children: [
-          {
-            label: 'Allocated Systems',
-            path: '/systems',
-            icon: Server,
-            description: 'Allocated systems dashboard',
-          },
-          {
-            label: 'Production Inventory',
-            path: '/systems/production-inventory',
-            icon: ServerCog,
-            description: 'Available production systems',
-          },
-          {
-            label: 'Reused Internal Systems',
-            path: '/systems/reused-internal',
-            icon: ServerCog,
-            description: 'POC, demo, training, and support machines',
-          },
-        ],
       },
       {
         label: 'Tenants',
