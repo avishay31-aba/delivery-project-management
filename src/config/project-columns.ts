@@ -38,10 +38,6 @@ const EMPTY_PROJECT_DASHBOARD_CONTEXT: ProjectDashboardColumnContext = {
   projectTenants: [],
 }
 
-function projectRow(project: Project, context: ProjectDashboardColumnContext): ProjectDeliveryDashboardReadModel {
-  return projectDeliveryDashboardReadModel({ project, ...context })
-}
-
 function renderChips(values: string[], title?: string) {
   const visibleValues = values.filter(Boolean)
   if (visibleValues.length === 0) return ''
@@ -67,53 +63,62 @@ function splitDashboardValues(value: string): string[] {
 }
 
 export function createProjectListColumns(context: ProjectDashboardColumnContext): DashboardColumn<Project>[] {
+  const projectRowCache = new WeakMap<Project, ProjectDeliveryDashboardReadModel>()
+  const projectRow = (project: Project): ProjectDeliveryDashboardReadModel => {
+    const cachedRow = projectRowCache.get(project)
+    if (cachedRow) return cachedRow
+    const row = projectDeliveryDashboardReadModel({ project, ...context })
+    projectRowCache.set(project, row)
+    return row
+  }
+
   return [
-    { id: 'pid', label: 'PID', getValue: (project) => projectRow(project, context).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
-    { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project, context).projectName, editable: true, editKey: 'opportunityName' },
-    { id: 'endUser', label: 'End User', getValue: (project) => projectRow(project, context).endUser },
-    { id: 'payingCustomer', label: 'Paying Customer', getValue: (project) => projectRow(project, context).payingCustomer },
-    { id: 'region', label: 'Region', getValue: (project) => projectRow(project, context).region },
-    { id: 'country', label: 'Country', getValue: (project) => projectRow(project, context).country },
+    { id: 'pid', label: 'PID', getValue: (project) => projectRow(project).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
+    { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project).projectName, editable: true, editKey: 'opportunityName' },
+    { id: 'endUser', label: 'End User', getValue: (project) => projectRow(project).endUser },
+    { id: 'payingCustomer', label: 'Paying Customer', getValue: (project) => projectRow(project).payingCustomer },
+    { id: 'region', label: 'Region', getValue: (project) => projectRow(project).region },
+    { id: 'country', label: 'Country', getValue: (project) => projectRow(project).country },
     {
       id: 'status',
       label: 'Status',
-      getValue: (project) => projectRow(project, context).statusLabel,
+      getValue: (project) => projectRow(project).statusLabel,
       editable: true,
       editKey: 'progressStatus',
       options: ['OPEN', 'DONE'],
       render: (project) => {
-        const row = projectRow(project, context)
+        const row = projectRow(project)
         return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })
       },
     },
-    { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project, context).deliveryDate, editable: true, editKey: 'deliveryDate' },
-    { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project, context).pocStartDate },
-    { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project, context).pocEndDate },
-    { id: 'type', label: 'Type', getValue: (project) => projectRow(project, context).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
-    { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project, context).hosting },
+    { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project).deliveryDate, editable: true, editKey: 'deliveryDate' },
+    { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project).pocStartDate },
+    { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project).pocEndDate },
+    { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
+    { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project).hosting },
     {
       id: 'product',
       label: 'Product',
-      getValue: (project) => projectRow(project, context).product,
-      render: (project) => renderChips(splitDashboardValues(projectRow(project, context).product)),
+      getValue: (project) => projectRow(project).product,
+      render: (project) => renderChips(splitDashboardValues(projectRow(project).product)),
     },
     {
       id: 'modules',
       label: 'Modules & Features',
-      getValue: (project) => projectRow(project, context).modules.join('; '),
+      getValue: (project) => projectRow(project).modules.join('; '),
       render: (project) => {
-        const row = projectRow(project, context)
+        const row = projectRow(project)
         return renderChips(row.modules, row.modulesTooltip)
       },
     },
-    { id: 'licenses', label: 'Licenses', getValue: (project) => projectRow(project, context).licenses },
-    { id: 'users', label: 'Users', getValue: (project) => projectRow(project, context).users },
+    { id: 'licenses', label: 'Licenses', getValue: (project) => projectRow(project).licenses },
+    { id: 'users', label: 'Users', getValue: (project) => projectRow(project).users },
     {
       id: 'projectAlerts',
       label: 'Project Alerts',
-      getValue: (project) => projectRow(project, context).projectAlerts.join('; '),
+      getValue: (project) => projectRow(project).projectAlerts.join('; '),
       render: (project) => {
-        const row = projectRow(project, context)
+        const row = projectRow(project)
         if (row.projectAlerts.length === 0) return ''
         return createElement(
           'span',
@@ -126,13 +131,13 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
     {
       id: 'milestonesCompletion',
       label: 'Milestone Completion',
-      getValue: (project) => projectRow(project, context).milestoneCompletion,
-      render: (project) => createElement(ProgressBar, { value: projectRow(project, context).milestoneCompletionPercent, className: 'min-w-32' }),
+      getValue: (project) => projectRow(project).milestoneCompletion,
+      render: (project) => createElement(ProgressBar, { value: projectRow(project).milestoneCompletionPercent, className: 'min-w-32' }),
     },
-    { id: 'lastMilestone', label: 'Last Milestone', getValue: (project) => projectRow(project, context).lastMilestone },
-    { id: 'currentMilestone', label: 'Current Milestone', getValue: (project) => projectRow(project, context).currentMilestone },
-    { id: 'financialProfile', label: 'Financial Profile', getValue: (project) => projectRow(project, context).financialProfile },
-    { id: 'owner', label: 'Owner', getValue: (project) => projectRow(project, context).owner, editable: true, editKey: 'dealOwner' },
+    { id: 'lastMilestone', label: 'Last Milestone', getValue: (project) => projectRow(project).lastMilestone },
+    { id: 'currentMilestone', label: 'Current Milestone', getValue: (project) => projectRow(project).currentMilestone },
+    { id: 'financialProfile', label: 'Financial Profile', getValue: (project) => projectRow(project).financialProfile },
+    { id: 'owner', label: 'Owner', getValue: (project) => projectRow(project).owner, editable: true, editKey: 'dealOwner' },
   ]
 }
 

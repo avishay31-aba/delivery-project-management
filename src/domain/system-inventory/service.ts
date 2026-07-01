@@ -90,15 +90,19 @@ export function allocatedSystemDashboardRows(
   systems: System[],
   projectSystems: ProjectSystemLink[],
 ): AllocatedSystemDashboardRow[] {
-  const allocatedSystemIds = new Set(
-    projectSystems
-      .filter((link) => link.allocationStatus !== 'DEALLOCATED')
-      .map((link) => link.systemId),
-  )
+  const activeLinksBySystemId = new Map<string, ProjectSystemLink[]>()
+  projectSystems
+    .filter((link) => link.allocationStatus !== 'DEALLOCATED')
+    .forEach((link) => {
+      const links = activeLinksBySystemId.get(link.systemId) ?? []
+      links.push(link)
+      activeLinksBySystemId.set(link.systemId, links)
+    })
+
   return systems
-    .filter((system) => allocatedSystemIds.has(system.id))
+    .filter((system) => activeLinksBySystemId.has(system.id))
     .map((system) => {
-      const links = projectSystems.filter((link) => link.systemId === system.id && link.allocationStatus !== 'DEALLOCATED')
+      const links = activeLinksBySystemId.get(system.id) ?? []
       return {
         ...system,
         linkedProjectIds: Array.from(new Set(links.map((link) => link.projectId))),

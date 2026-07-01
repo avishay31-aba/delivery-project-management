@@ -911,6 +911,13 @@ export function DataDashboard<T extends { id: string }>({
   })
 
   useLayoutEffect(() => {
+    if (!isFreezeEnabled) {
+      setFrozenColumnOffsets((currentOffsets) =>
+        currentOffsets.every((offset) => offset === 0) ? currentOffsets : [0, 0, 0],
+      )
+      return
+    }
+
     const container = tableContainerRef.current
     if (!container) return
 
