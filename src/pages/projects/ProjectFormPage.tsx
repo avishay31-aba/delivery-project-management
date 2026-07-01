@@ -1007,6 +1007,20 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function updateMilestoneTasksCompletion(milestoneId: string, completed: boolean) {
+    setDraft((current) => {
+      if (!current) return current
+      const taskIds = (current.tasks ?? [])
+        .filter((task) => task.milestoneId === milestoneId)
+        .map((task) => task.id)
+      return taskIds.reduce(
+        (nextProject, taskId) => updateTaskInPlan(nextProject, taskId, { status: completed ? 'DONE' : 'OPEN' }),
+        current,
+      )
+    })
+    setSaveMessages([])
+  }
+
   function renderMilestonesTab() {
     const sectionId: CollapsibleSectionId = 'milestones'
     const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
@@ -1147,13 +1161,30 @@ export function ProjectFormPage() {
                 {tasks.map((task, index) => {
                   const milestone = milestonesById.get(task.milestoneId)
                   const startsMilestoneGroup = index === 0 || tasks[index - 1]?.milestoneId !== task.milestoneId
+                  const milestoneTasks = startsMilestoneGroup
+                    ? tasks.filter((candidate) => candidate.milestoneId === task.milestoneId)
+                    : []
+                  const allMilestoneTasksDone = milestoneTasks.length > 0 && milestoneTasks.every((candidate) => candidate.status === 'DONE')
+                  const someMilestoneTasksDone = milestoneTasks.some((candidate) => candidate.status === 'DONE')
+                  const isMilestonePartial = someMilestoneTasksDone && !allMilestoneTasksDone
 
                   return (
                     <Fragment key={task.id}>
                       {startsMilestoneGroup ? (
                         <tr className="border-t-2 border-sf-border bg-sf-surface-alt/70">
                           <td colSpan={11} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
-                            {milestone?.name ?? 'Unassigned milestone'}
+                            <label className="inline-flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={allMilestoneTasksDone}
+                                ref={(element) => {
+                                  if (element) element.indeterminate = isMilestonePartial
+                                }}
+                                onChange={(event) => updateMilestoneTasksCompletion(task.milestoneId, event.target.checked)}
+                                aria-label={`Mark all tasks in ${milestone?.name ?? 'unassigned milestone'} ${allMilestoneTasksDone ? 'open' : 'done'}`}
+                              />
+                              {milestone?.name ?? 'Unassigned milestone'}
+                            </label>
                           </td>
                         </tr>
                       ) : null}
