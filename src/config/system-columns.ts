@@ -22,6 +22,7 @@ export function createSystemColumns(
     },
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
+    { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '' },
     { id: 'product', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
     { id: 'region', label: 'Region', getValue: (row) => row.region ?? row.timeGroup },
     { id: 'country', label: 'Country', getValue: (row) => row.country ?? '' },

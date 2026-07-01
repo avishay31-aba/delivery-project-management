@@ -85,6 +85,16 @@ import {
 type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents' | 'activity'
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
+type AllocationCandidateFilterKey =
+  | 'source'
+  | 'product'
+  | 'hostingType'
+  | 'cloudPlatform'
+  | 'cloudRegion'
+  | 'country'
+  | 'operationalStatus'
+  | 'availability'
+type AllocationCandidateFilters = Record<AllocationCandidateFilterKey, string>
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
 
 const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey; label: string }> = [
@@ -96,6 +106,28 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
   { key: 'region', label: 'Region' },
+]
+
+const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
+  source: '',
+  product: '',
+  hostingType: '',
+  cloudPlatform: '',
+  cloudRegion: '',
+  country: '',
+  operationalStatus: '',
+  availability: '',
+}
+
+const ALLOCATION_CANDIDATE_FILTER_OPTIONS: Array<{ key: AllocationCandidateFilterKey; label: string }> = [
+  { key: 'source', label: 'System Type' },
+  { key: 'product', label: 'Product' },
+  { key: 'hostingType', label: 'Hosting' },
+  { key: 'cloudPlatform', label: 'Cloud Platform' },
+  { key: 'cloudRegion', label: 'Cloud Region' },
+  { key: 'country', label: 'Country' },
+  { key: 'operationalStatus', label: 'Operational Status' },
+  { key: 'availability', label: 'Availability' },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -150,9 +182,29 @@ function candidateRegion(candidate: AllocationCandidate): string {
   return candidate.cloudRegion ?? ''
 }
 
+function candidateAvailability(candidate: AllocationCandidate): string {
+  if ('availability' in candidate && candidate.availability) return candidate.availability
+  if ('allocationStatus' in candidate && candidate.allocationStatus) return String(candidate.allocationStatus)
+  return ''
+}
+
 function candidateVersion(candidate: AllocationCandidate): string {
   const value = (candidate as AllocationCandidate & { versionNumber?: string | number | null }).versionNumber
   return value ? String(value) : ''
+}
+
+function candidateFilterValue(candidate: AllocationCandidate, filterKey: AllocationCandidateFilterKey): string {
+  const values: Record<AllocationCandidateFilterKey, string> = {
+    source: candidateSource(candidate),
+    product: candidate.productType,
+    hostingType: candidate.hostingType,
+    cloudPlatform: candidate.cloudPlatform ?? '',
+    cloudRegion: candidate.cloudRegion ?? '',
+    country: 'country' in candidate ? candidate.country ?? '' : '',
+    operationalStatus: candidateStatus(candidate),
+    availability: candidateAvailability(candidate),
+  }
+  return values[filterKey]
 }
 
 function candidateSortValue(candidate: AllocationCandidate, sortKey: AllocationCandidateSortKey): string {
@@ -180,6 +232,18 @@ function candidateSearchText(candidate: AllocationCandidate): string {
 function allocationStatusClassName(result: AllocationActionResult | null): string {
   if (!result) return ''
   return result.ok ? successMessageClassName() : errorMessageClassName()
+}
+
+function candidateFilterOptions(candidates: AllocationCandidate[], filterKey: AllocationCandidateFilterKey): string[] {
+  return Array.from(new Set(candidates.map((candidate) => candidateFilterValue(candidate, filterKey)).filter(Boolean)))
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+}
+
+function candidateMatchesStructuredFilters(candidate: AllocationCandidate, filters: AllocationCandidateFilters): boolean {
+  return ALLOCATION_CANDIDATE_FILTER_OPTIONS.every((filter) => {
+    const filterValue = filters[filter.key]
+    return filterValue ? candidateFilterValue(candidate, filter.key) === filterValue : true
+  })
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -358,6 +422,7 @@ export function ProjectFormPage() {
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([])
   const [allocationCandidateSearch, setAllocationCandidateSearch] = useState('')
+  const [allocationCandidateFilters, setAllocationCandidateFilters] = useState<AllocationCandidateFilters>(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
   const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
   const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
@@ -443,10 +508,21 @@ export function ProjectFormPage() {
         ? availableReusedInternalCandidates(reusedInternalSystems)
         : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
   const trimmedAllocationCandidateSearch = allocationCandidateSearch.trim().toLowerCase()
+  const allocationCandidateFilterValues = useMemo(
+    () =>
+      Object.fromEntries(
+        ALLOCATION_CANDIDATE_FILTER_OPTIONS.map((filter) => [
+          filter.key,
+          candidateFilterOptions(availableAllocationCandidates, filter.key),
+        ]),
+      ) as Record<AllocationCandidateFilterKey, string[]>,
+    [availableAllocationCandidates],
+  )
   const visibleAllocationCandidates = [...availableAllocationCandidates]
     .filter((candidate) =>
       trimmedAllocationCandidateSearch ? candidateSearchText(candidate).includes(trimmedAllocationCandidateSearch) : true,
     )
+    .filter((candidate) => candidateMatchesStructuredFilters(candidate, allocationCandidateFilters))
     .sort((firstCandidate, secondCandidate) => {
       const direction = allocationCandidateSortDirection === 'asc' ? 1 : -1
       return candidateSortValue(firstCandidate, allocationCandidateSortKey).localeCompare(
@@ -469,6 +545,7 @@ export function ProjectFormPage() {
     setAllocationMode(initialMode)
     setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
+    setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
     setAllocationCandidateSortKey('id')
     setAllocationCandidateSortDirection('asc')
     setAllocationResult(null)
@@ -479,6 +556,7 @@ export function ProjectFormPage() {
     setAllocationMode(mode)
     setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
+    setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
     setAllocationResult(null)
   }
 
@@ -1494,12 +1572,47 @@ export function ProjectFormPage() {
                   >
                     {allocationCandidateSortDirection === 'asc' ? 'Ascending' : 'Descending'}
                   </button>
+                  {ALLOCATION_CANDIDATE_FILTER_OPTIONS.map((filter) => {
+                    const options = allocationCandidateFilterValues[filter.key]
+                    if (options.length === 0) return null
+                    return (
+                      <label key={filter.key} className="block text-sm font-medium text-sf-text">
+                        {filter.label}
+                        <select
+                          className="mt-1 h-8 max-w-44 rounded border border-sf-border px-2 text-sm"
+                          value={allocationCandidateFilters[filter.key]}
+                          onChange={(event) =>
+                            setAllocationCandidateFilters((current) => ({
+                              ...current,
+                              [filter.key]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">All</option>
+                          {options.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )
+                  })}
+                  {Object.values(allocationCandidateFilters).some(Boolean) ? (
+                    <button
+                      type="button"
+                      className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
+                      onClick={() => setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)}
+                    >
+                      Clear filters
+                    </button>
+                  ) : null}
                 </div>
                 <div className="sf-scroll-x rounded border border-sf-border bg-white">
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'CSP', 'Region', 'Version'].map((label) => (
+                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'Cloud Region', 'CSP', 'Country', 'Availability', 'Version'].map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
@@ -1520,14 +1633,16 @@ export function ProjectFormPage() {
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.csp || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegion(candidate) || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.csp || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? candidate.country || '-' : '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateAvailability(candidate) || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
                       </tr>
                     ))}
                     {visibleAllocationCandidates.length === 0 ? (
                       <tr>
-                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={10}>
+                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={12}>
                           No systems match the current filter.
                         </td>
                       </tr>
