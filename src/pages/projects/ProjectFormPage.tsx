@@ -87,6 +87,7 @@ type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem 
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
 type AllocationCandidateFilterKey =
   | 'source'
+  | 'regionTimeGroup'
   | 'product'
   | 'hostingType'
   | 'cloudPlatform'
@@ -105,11 +106,12 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'product', label: 'Product' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
-  { key: 'region', label: 'Region' },
+  { key: 'region', label: 'Region / Time Group' },
 ]
 
 const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
   source: '',
+  regionTimeGroup: '',
   product: '',
   hostingType: '',
   cloudPlatform: '',
@@ -121,11 +123,12 @@ const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
 
 const ALLOCATION_CANDIDATE_FILTER_OPTIONS: Array<{ key: AllocationCandidateFilterKey; label: string }> = [
   { key: 'source', label: 'System Type' },
-  { key: 'product', label: 'Product' },
-  { key: 'hostingType', label: 'Hosting' },
-  { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'cloudRegion', label: 'Cloud Region' },
+  { key: 'regionTimeGroup', label: 'Region / Time Group' },
   { key: 'country', label: 'Country' },
+  { key: 'cloudRegion', label: 'Cloud Region' },
+  { key: 'hostingType', label: 'Hosting' },
+  { key: 'product', label: 'Product' },
+  { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'operationalStatus', label: 'Operational Status' },
   { key: 'availability', label: 'Availability' },
 ]
@@ -178,7 +181,14 @@ function candidateStatus(candidate: AllocationCandidate): string {
   return 'status' in candidate ? candidate.status : candidate.operationalStatus
 }
 
-function candidateRegion(candidate: AllocationCandidate): string {
+function candidateRegionTimeGroup(candidate: AllocationCandidate): string {
+  if ('usedInRegion' in candidate && candidate.usedInRegion) return candidate.usedInRegion
+  if ('region' in candidate && candidate.region) return candidate.region
+  if ('timeGroup' in candidate && candidate.timeGroup) return candidate.timeGroup
+  return ''
+}
+
+function candidateCloudRegion(candidate: AllocationCandidate): string {
   return candidate.cloudRegion ?? ''
 }
 
@@ -196,10 +206,11 @@ function candidateVersion(candidate: AllocationCandidate): string {
 function candidateFilterValue(candidate: AllocationCandidate, filterKey: AllocationCandidateFilterKey): string {
   const values: Record<AllocationCandidateFilterKey, string> = {
     source: candidateSource(candidate),
+    regionTimeGroup: candidateRegionTimeGroup(candidate),
     product: candidate.productType,
     hostingType: candidate.hostingType,
     cloudPlatform: candidate.cloudPlatform ?? '',
-    cloudRegion: candidate.cloudRegion ?? '',
+    cloudRegion: candidateCloudRegion(candidate),
     country: 'country' in candidate ? candidate.country ?? '' : '',
     operationalStatus: candidateStatus(candidate),
     availability: candidateAvailability(candidate),
@@ -216,7 +227,7 @@ function candidateSortValue(candidate: AllocationCandidate, sortKey: AllocationC
     product: candidate.productType,
     cloudPlatform: candidate.cloudPlatform ?? '',
     csp: candidate.csp ?? '',
-    region: candidateRegion(candidate),
+    region: candidateRegionTimeGroup(candidate),
   }
   return values[sortKey]
 }
@@ -1503,6 +1514,21 @@ export function ProjectFormPage() {
 
   function renderAllocationDialog() {
     if (!isAllocationDialogOpen) return null
+    const isReusedInternalAllocationMode = selectedMode === 'REUSED_INTERNAL'
+    const allocationCandidateHeaders = [
+      'Select',
+      ...(isReusedInternalAllocationMode ? ['MID'] : ['ID', 'MID']),
+      'Source',
+      'Status',
+      'Region / Time Group',
+      'Country',
+      'Product',
+      'Hosting',
+      'Cloud Platform',
+      'Cloud Region',
+      'Availability',
+      'Version',
+    ]
 
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
@@ -1612,7 +1638,7 @@ export function ProjectFormPage() {
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>
-                      {['Select', 'ID', 'MID', 'Source', 'Status', 'Product', 'Cloud Platform', 'Cloud Region', 'CSP', 'Country', 'Availability', 'Version'].map((label) => (
+                      {allocationCandidateHeaders.map((label) => (
                         <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                       ))}
                     </tr>
@@ -1627,22 +1653,29 @@ export function ProjectFormPage() {
                             onChange={(event) => toggleAllocationCandidate(candidate.id, event.target.checked)}
                           />
                         </td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
+                        {isReusedInternalAllocationMode ? (
+                          <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate) || candidatePrimaryId(candidate)}</td>
+                        ) : (
+                          <>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
+                          </>
+                        )}
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegionTimeGroup(candidate) || '-'}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? candidate.country || '-' : '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.hostingType || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegion(candidate) || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.csp || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? candidate.country || '-' : '-'}</td>
+                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateCloudRegion(candidate) || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateAvailability(candidate) || '-'}</td>
                         <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
                       </tr>
                     ))}
                     {visibleAllocationCandidates.length === 0 ? (
                       <tr>
-                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={12}>
+                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={allocationCandidateHeaders.length}>
                           No systems match the current filter.
                         </td>
                       </tr>
