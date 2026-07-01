@@ -86,15 +86,9 @@ type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 't
 type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
 type AllocationCandidateFilterKey =
-  | 'source'
-  | 'regionTimeGroup'
-  | 'product'
   | 'hostingType'
   | 'cloudPlatform'
-  | 'cloudRegion'
-  | 'country'
-  | 'operationalStatus'
-  | 'availability'
+  | 'regionTimeGroup'
 type AllocationCandidateFilters = Record<AllocationCandidateFilterKey, string>
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
 
@@ -110,27 +104,15 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
 ]
 
 const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
-  source: '',
   regionTimeGroup: '',
-  product: '',
   hostingType: '',
   cloudPlatform: '',
-  cloudRegion: '',
-  country: '',
-  operationalStatus: '',
-  availability: '',
 }
 
 const ALLOCATION_CANDIDATE_FILTER_OPTIONS: Array<{ key: AllocationCandidateFilterKey; label: string }> = [
-  { key: 'source', label: 'System Type' },
-  { key: 'regionTimeGroup', label: 'Region / Time Group' },
-  { key: 'country', label: 'Country' },
-  { key: 'cloudRegion', label: 'Cloud Region' },
   { key: 'hostingType', label: 'Hosting' },
-  { key: 'product', label: 'Product' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'operationalStatus', label: 'Operational Status' },
-  { key: 'availability', label: 'Availability' },
+  { key: 'regionTimeGroup', label: 'Region / Time Group' },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -205,15 +187,9 @@ function candidateVersion(candidate: AllocationCandidate): string {
 
 function candidateFilterValue(candidate: AllocationCandidate, filterKey: AllocationCandidateFilterKey): string {
   const values: Record<AllocationCandidateFilterKey, string> = {
-    source: candidateSource(candidate),
-    regionTimeGroup: candidateRegionTimeGroup(candidate),
-    product: candidate.productType,
     hostingType: candidate.hostingType,
     cloudPlatform: candidate.cloudPlatform ?? '',
-    cloudRegion: candidateCloudRegion(candidate),
-    country: 'country' in candidate ? candidate.country ?? '' : '',
-    operationalStatus: candidateStatus(candidate),
-    availability: candidateAvailability(candidate),
+    regionTimeGroup: candidateRegionTimeGroup(candidate),
   }
   return values[filterKey]
 }
