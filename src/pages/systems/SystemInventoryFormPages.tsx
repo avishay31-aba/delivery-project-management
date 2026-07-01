@@ -65,6 +65,7 @@ import {
   systemTimeGroupAlert,
   tenantCountForSystem,
   validateReusedInternalMachineId,
+  validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
@@ -454,6 +455,11 @@ function InventoryForm<T extends InventoryRecord>({
         nextMessages.push(message.message)
       })
     }
+
+    validateSystemInventoryRequiredFields(activeDraft).forEach((message) => {
+      if (message.field) invalidFields.add(message.field)
+      nextMessages.push(message.message)
+    })
 
     validateHostingContext(activeDraft).forEach((message) => {
       if (message.field) invalidFields.add(message.field)

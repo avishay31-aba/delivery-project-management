@@ -318,7 +318,7 @@ function RequirementSection({
       </div>
       {rows.length > 0 ? (
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-sm leading-tight">
+          <table className="w-max min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
                 {section.columns.map((column) => (
@@ -330,7 +330,7 @@ function RequirementSection({
                     </span>
                     {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span> : null}
                     {column.requiredWhen && column.key !== 'existingSystemId' ? (
-                      <span className="block max-w-40 whitespace-normal text-xs font-normal leading-tight text-red-700">
+                      <span className="block whitespace-nowrap text-xs font-normal leading-tight text-red-700">
                         {column.requiredWhen}
                       </span>
                     ) : null}
@@ -342,7 +342,7 @@ function RequirementSection({
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-sf-surface-alt">
                   {section.columns.map((column) => (
-                    <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
+                    <td key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
                       {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
                     </td>
                   ))}

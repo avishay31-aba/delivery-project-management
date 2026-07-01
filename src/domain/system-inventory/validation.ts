@@ -23,3 +23,19 @@ export function validateReusedInternalMachineId(
   if (duplicateMid) return [{ field: 'machineId', message: 'MID must be unique.' }]
   return []
 }
+
+export function validateSystemInventoryRequiredFields(
+  record: SystemInventoryRecord,
+): SystemInventoryValidationMessage[] {
+  const messages: SystemInventoryValidationMessage[] = []
+
+  if ('cognitoRegion' in record && !textValue(record.cognitoRegion).trim()) {
+    messages.push({ field: 'cognitoRegion', message: 'Cognito Region is required.' })
+  }
+
+  if ('usedInRegion' in record && !textValue(record.usedInRegion).trim()) {
+    messages.push({ field: 'usedInRegion', message: 'Used In Region is required.' })
+  }
+
+  return messages
+}
