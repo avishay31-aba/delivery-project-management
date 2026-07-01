@@ -1863,7 +1863,7 @@ export function ProjectFormPage() {
       <div className="mt-4 space-y-4">{renderRequirementsSection()}</div>
 
       <div className="mt-4 rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
+        <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface">
           {visibleTabs.map((tab) => (
             <button
               key={tab}

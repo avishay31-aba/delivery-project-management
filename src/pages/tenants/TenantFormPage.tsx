@@ -1467,7 +1467,7 @@ export function TenantFormPage() {
       {renderHeader()}
       {renderWarrantyDialog()}
       <section className="rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface">
+        <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface">
           {TENANT_TABS.map((tab) => (
             <button
               key={tab.id}

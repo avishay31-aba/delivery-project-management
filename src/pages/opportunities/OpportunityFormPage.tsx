@@ -139,6 +139,59 @@ function rowValue(row: RequirementRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key]
 }
 
+function sameStringSet(actual: unknown, expected: string[]): boolean {
+  if (!Array.isArray(actual)) return expected.length === 0
+  const actualValues = actual.map(String).sort()
+  const expectedValues = [...expected].sort()
+  return actualValues.length === expectedValues.length && actualValues.every((value, index) => value === expectedValues[index])
+}
+
+function displayedDealPackageForRequirement(row: RequirementRow): OpportunityDealPackage | '' {
+  if (
+    row.users === 25 &&
+    row.licenses === 25 &&
+    row.concurrentSearches === 50 &&
+    row.concurrentAnalyses === 25 &&
+    row.standardMonitors === 40 &&
+    row.tangles === 25 &&
+    row.tanglesGo === 25 &&
+    row.webloc === 25 &&
+    row.webeye === 25 &&
+    row.ingest === 25 &&
+    sameStringSet(row.aiFeatures, AI_OPTIONS) &&
+    sameStringSet(row.additionalFeatures, ADDITIONAL_FEATURE_OPTIONS)
+  ) {
+    return 'Platinum'
+  }
+
+  if (
+    row.users === 10 &&
+    row.licenses === 10 &&
+    row.concurrentSearches === 20 &&
+    row.concurrentAnalyses === 10 &&
+    row.standardMonitors === 20 &&
+    row.tangles === 10 &&
+    row.webloc === 10 &&
+    sameStringSet(row.aiFeatures, ['OCR', 'Landmark', 'Face Detection']) &&
+    sameStringSet(row.additionalFeatures, ['Post Translation', 'Advanced Search'])
+  ) {
+    return 'Gold'
+  }
+
+  if (
+    row.users === 5 &&
+    row.licenses === 5 &&
+    row.concurrentSearches === 10 &&
+    row.concurrentAnalyses === 5 &&
+    row.standardMonitors === 10 &&
+    row.tangles === 5
+  ) {
+    return 'Silver'
+  }
+
+  return ''
+}
+
 function moduleQuantityLabel(key: string): string | null {
   const labels: Record<string, string> = {
     tangles: 'Tangles',
@@ -780,15 +833,14 @@ function RequirementGrid({
                     {kind === 'A' && onChangePackage ? (
                       <select
                         className="h-6 rounded border border-sf-border bg-white px-1 text-[11px]"
-                        value=""
+                        value={displayedDealPackageForRequirement(row)}
                         aria-label={`Change package for ${row.requirementId}`}
                         onChange={(event) => {
                           if (!event.target.value) return
                           onChangePackage(row.id, event.target.value as OpportunityDealPackage)
-                          event.currentTarget.value = ''
                         }}
                       >
-                        <option value="">Change Package</option>
+                        <option value="">Select Package</option>
                         <option value="Silver">Silver</option>
                         <option value="Gold">Gold</option>
                         <option value="Platinum">Platinum</option>
@@ -1979,7 +2031,7 @@ export function OpportunityFormPage() {
       {renderExistingTenantsAndSystemsSection()}
 
       <section className="sf-card overflow-hidden">
-        <div className="sticky top-0 z-30 flex border-b border-sf-border bg-sf-surface-alt">
+        <div className="sticky top-0 z-10 flex border-b border-sf-border bg-sf-surface-alt">
           <button
             type="button"
             className={[

@@ -8,7 +8,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
-    <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-sf-border bg-sf-surface px-1 pb-4 pt-1">
+    <div className="relative z-20 mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-sf-border bg-sf-surface px-1 pb-4 pt-1">
       <div>
         <h1 className="text-xl font-semibold text-sf-text">{title}</h1>
         {subtitle && (

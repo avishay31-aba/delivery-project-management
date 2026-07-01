@@ -1254,7 +1254,7 @@ function InventoryForm<T extends InventoryRecord>({
         onToggle={() => toggleSection('tabs')}
       >
         <div className="overflow-hidden rounded border border-sf-border bg-sf-surface">
-          <div className="sticky top-0 z-30 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
+          <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
             {metadata.tabs.map((tab) => (
               <button
                 key={tab.id}
