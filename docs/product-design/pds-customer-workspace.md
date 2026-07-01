@@ -32,7 +32,7 @@ Delivery-owned facts shown in this workspace must remain read-only and sourced f
 
 The Customer Workspace owns customer identity display, customer commercial profile, account manager display, customer type display, customer relationship summary, aggregated read-only customer portfolio view, navigation to related workspaces, customer-level document visibility if supported, and customer-level activity timeline.
 
-It does not own Project health calculation, Warranty status calculation, Requirement Coverage calculation, System or Tenant operational status, Opportunity lifecycle rules, Document behavior, or Activity event generation.
+It does not own Project health calculation, Warranty status calculation, RequirementCoverage validation/read-model calculation, System or Tenant operational status, Opportunity lifecycle rules, Document behavior, or Activity event generation.
 
 ## 4. Objects Referenced
 
@@ -48,7 +48,7 @@ Delivery-owned read-only references:
 - System
 - Tenant
 - Warranty
-- Requirement Coverage
+- RequirementCoverage validation output
 - Document
 - Activity Event
 
@@ -221,7 +221,7 @@ Reference rules:
 - CustomerAccount does not recalculate requirement coverage.
 - WarrantyCollection owns warranty facts/status.
 - ProjectLifecycle owns project health/deadline facts.
-- RequirementCoverage owns coverage status/missing steps.
+- RequirementCoverage owns coverage status, missing-step derivation, and coverage alerts as validation/read-model output only.
 - SystemInventory owns system identity/status.
 - TenantOperations owns tenant identity/status.
 - OpportunityLifecycle owns opportunity lifecycle.

@@ -13,7 +13,7 @@ It gives Delivery Managers and Delivery Specialists one place to manage:
 - Tasks
 - Allocated systems
 - Delivered tenants
-- Requirement coverage context
+- Requirement coverage validation output
 - Documents
 - Activity
 
@@ -42,7 +42,7 @@ Ownership rules:
 - SystemInventory owns system facts and operational status.
 - TenantOperations owns tenant facts and operational status.
 - WarrantyCollection owns warranty facts and warranty status.
-- RequirementCoverage owns requirement coverage status and missing steps.
+- RequirementCoverage owns requirement coverage status, missing-step derivation, and coverage alerts as validation/read-model output only.
 - CustomerAccount owns customer facts and aggregation.
 - OpportunityLifecycle owns opportunity facts and commercial lifecycle.
 
@@ -60,7 +60,7 @@ It should:
 - Coordinate supported system allocation/deallocation workflows.
 - Display systems in Project context.
 - Display tenants in Project context.
-- Display Requirement Coverage read-only.
+- Display RequirementCoverage validation output read-only.
 - Display Warranty context read-only where relevant.
 - Display Project documents where supported.
 - Display Project activity where supported.
@@ -86,7 +86,7 @@ Referenced objects:
 - Customer / Account
 - Opportunity
 - Requirement definitions
-- Requirement Coverage
+- RequirementCoverage validation output
 - Milestones
 - Tasks
 - Systems
@@ -104,8 +104,8 @@ Delivery Console
     -> Header
     -> Toolbar
     -> Delivery Instructions / Project Requirements
-      -> Requirement Coverage Summary
-      -> Requirement Coverage Table
+      -> RequirementCoverage Validation Summary
+      -> RequirementCoverage Validation Table
       -> Read-only Opportunity Requirement Grids
     -> Tabs
       -> Overview
@@ -224,7 +224,7 @@ Workflow clarifications:
 - System Workspace owns the Application Configuration Summary used for physical/system configuration.
 - Warranty follow-up happens after tenant delivery context exists.
 - Tasks are continuously updated throughout delivery.
-- Project coordinates this workflow but does not own System, Tenant, Warranty, or Requirement Coverage business rules.
+- Project coordinates this workflow but does not own System, Tenant, Warranty, or RequirementCoverage validation/read-model rules.
 
 ## 9. Sections
 
@@ -259,7 +259,7 @@ Overview cards should be read-model driven:
 - Overdue Milestones
 - Systems Allocated
 - Tenants Allocated
-- Requirement Coverage
+- RequirementCoverage validation output
 - Missing System
 - Missing Tenant
 - Deadline Risk
@@ -304,7 +304,7 @@ Read-only fields:
 - PID
 - Customer
 - Opportunity
-- Requirement coverage status
+- Requirement coverage validation status
 - System operational status
 - Tenant operational status
 - Warranty status
@@ -321,13 +321,13 @@ Milestone/task fields:
 - Progress
 - First/current/last derivations where applicable
 
-## 13. Related Business Objects
+## 13. Related Business Objects And Read Models
 
-Project Workspace should expose related objects as links/context:
+Project Workspace should expose related objects and read-model output as links/context:
 
 - Customer: read-only Sales-owned context
 - Opportunity: read-only Sales-owned context
-- Requirement Coverage: read-only Delivery traceability
+- RequirementCoverage validation output: read-only Delivery validation/read-model output, not a Business Object
 - Systems: Delivery-owned supporting objects
 - Tenants: Delivery-owned supporting objects
 - Warranty: Delivery-owned warranty context
@@ -339,7 +339,7 @@ Project Workspace should expose related objects as links/context:
 - Project owns delivery execution.
 - Project owns delivery status and health through ProjectLifecycle.
 - Milestone/task execution belongs to MilestonePlan.
-- Requirement Coverage must not be recalculated in Project page.
+- RequirementCoverage validation output must not be recalculated in Project page.
 - Warranty status must not be recalculated in Project page.
 - System/Tenant status must not be recalculated in Project page.
 - Customer and Opportunity are read-only context.
@@ -417,7 +417,7 @@ Project Workspace may display:
 - System operational status from SystemInventory
 - Tenant operational status from TenantOperations
 - Warranty status from WarrantyCollection
-- Requirement coverage status from RequirementCoverage
+- Requirement coverage status from RequirementCoverage validation output
 - Activity severity from ActivityLog
 
 No page-owned icons/colors/badges.

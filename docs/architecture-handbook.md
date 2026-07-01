@@ -70,7 +70,7 @@ Primary workspaces:
 - Tenant Workspace
 - Warranty Workspace
 
-Operational workspaces include Renewal Work Queue, Requirement Coverage, Delivery Dashboard, and Delivery Alerts.
+Operational surfaces include Renewal Work Queue, Requirement Coverage, Delivery Dashboard, and Delivery Alerts. Requirement Coverage is a validation/read-model surface, not a Business Object Workspace.
 
 Systems and Tenants belong here as delivery-managed operational business objects.
 
@@ -231,7 +231,7 @@ The current ERP navigation already follows the three-console model:
 | Tenants | Delivery Console | Keep as Workspace | Tenant is a Delivery-owned Business Object with independent lifecycle and identity. |
 | Warranty Workspace | Delivery Console | Keep as Workspace | Warranty is a Delivery-owned Business Object with independent lifecycle and chain rules. |
 | Renewal Work Queue | Delivery Console | Keep as Workspace for Version 1.0 | It is an operational workspace over Warranty/Renewal execution. It may later become a Warranty Workspace tab if the product consolidates operational queues. |
-| Requirement Coverage | Delivery Console | Keep as Workspace for Version 1.0 | It exposes delivery traceability across opportunity requirements, projects, systems, and tenants. It may later become a Delivery Alerts/Traceability workspace depending on product direction. |
+| Requirement Coverage | Delivery Console | Keep as dashboard/read-model surface for Version 1.0 | It exposes validation and traceability across opportunity requirements, projects, systems, and tenants. It is not a Business Object Workspace because it owns no editable lifecycle or master data. It may later become a Delivery Alerts/Traceability surface depending on product direction. |
 | Activity / Audit Log | Admin Console | Keep as Workspace | Audit/activity review is an Admin-owned operational governance workspace. |
 
 ### Recommended Future Navigation Structure
@@ -249,7 +249,7 @@ Delivery Console
   Tenants
   Warranty Workspace
   Renewal Work Queue
-  Requirement Coverage
+  Requirement Coverage (validation/read-model surface)
 
 Admin Console
   Activity / Audit Log

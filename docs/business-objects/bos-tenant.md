@@ -20,7 +20,7 @@ Tenant is Delivery-owned.
 
 Delivery Manager and Delivery Specialist own tenant operational lifecycle and tenant execution context.
 
-Tenant is not owned by Sales, Customer, Opportunity, Project, System, Warranty, or Requirement Coverage.
+Tenant is not owned by Sales, Customer, Opportunity, Project, System, Warranty, or RequirementCoverage validation/read-model capability.
 
 ## 4. Primary Capability
 
@@ -31,7 +31,7 @@ Supporting capabilities referenced:
 - Delivery Capability -> Infrastructure & Resource Management
 - Delivery Capability -> Project Delivery Management
 - Delivery Capability -> Warranty Management
-- Delivery Capability -> Requirement Coverage
+- Delivery Capability -> Requirement Fulfillment Tracking / RequirementCoverage read models
 - Administration Capability -> Activity / Audit
 
 ## 5. Console Ownership
@@ -66,7 +66,7 @@ Tenant owns:
 - Tenant documents/activity context where supported
 - Tenant warranty header context display, sourced from WarrantyCollection
 
-Tenant does not own System infrastructure configuration, System Application Configuration Summary, Project delivery execution, Customer commercial identity, Opportunity commercial lifecycle, Warranty chain/status rules, or Requirement Coverage rules.
+Tenant does not own System infrastructure configuration, System Application Configuration Summary, Project delivery execution, Customer commercial identity, Opportunity commercial lifecycle, Warranty chain/status rules, or RequirementCoverage validation/read-model rules.
 
 Tenant never owns Application Configuration Summary. Tenant consumes the configured runtime result from the System that hosts it.
 
@@ -163,7 +163,7 @@ Warranty fields:
 - Warranty start/end dates
 - No warranty / renewal context
 
-Requirement Coverage fields:
+RequirementCoverage read-model output:
 
 - Coverage status
 - Missing step
@@ -191,12 +191,12 @@ Document fields:
 - Tenant may be linked to one or more Projects through delivery/project tenant context.
 - Project may create or link Tenant context, but does not own Tenant lifecycle.
 - Tenant may originate from an Opportunity requirement.
-- Tenant may satisfy Requirement Coverage through source requirement linkage and system/project context.
+- Tenant may satisfy RequirementCoverage validation output through source requirement linkage and system/project context.
 - Tenant belongs to or is associated with one Customer / Account.
 - Tenant may have many Warranty records through WarrantyCollection.
 - Tenant may have Documents.
 - Tenant may have Activity Events.
-- Tenant may appear in Tenant Workspace, Project Workspace, Systems Workspace, Warranty Workspace, Requirement Coverage, Customer Workspace, Activity / Audit Log, and future Delivery Alerts.
+- Tenant may appear in Tenant Workspace, Project Workspace, Systems Workspace, Warranty Workspace, Requirement Coverage validation surfaces, Customer Workspace, Activity / Audit Log, and future Delivery Alerts.
 
 ## 11. Lifecycle
 
@@ -234,14 +234,14 @@ No new lifecycle states are introduced by this BOS.
 - Tenant never owns Application Configuration Summary.
 - Project may create/link tenant context, but Project does not own Tenant lifecycle.
 - Warranty status belongs to WarrantyCollection.
-- Requirement Coverage belongs to RequirementCoverage.
+- RequirementCoverage validation output belongs to RequirementCoverage.
 - Customer commercial identity belongs to CustomerAccount.
 - Opportunity commercial lifecycle belongs to OpportunityLifecycle.
 - Tenant may store tenant-specific configuration context only where it represents delivered tenant runtime context, not System infrastructure configuration.
 - Tenant must not duplicate System infrastructure rules.
 - Tenant must not duplicate Warranty rules.
 - Tenant must not duplicate Project execution rules.
-- Tenant must not duplicate Requirement Coverage rules.
+- Tenant must not duplicate RequirementCoverage validation/read-model rules.
 
 ## 13. Validation Rules
 
@@ -295,11 +295,11 @@ Tenant may trigger or coordinate:
 - System hosting update: executed through TenantOperations/SystemInventory transaction boundary.
 - Project tenant link update: executed through TenantOperations/AllocationContext where applicable.
 - Warranty read model refresh/display: executed by WarrantyCollection.
-- Requirement Coverage updates: derived by RequirementCoverage.
+- RequirementCoverage validation output: derived by RequirementCoverage.
 - Activity event creation: emitted by approved store transaction boundaries, not page code.
 - Document actions: executed by DocumentCollection.
 
-Tenant must not directly execute Project lifecycle, System configuration changes, Warranty chain behavior, Opportunity lifecycle, or Requirement Coverage business calculations.
+Tenant must not directly execute Project lifecycle, System configuration changes, Warranty chain behavior, Opportunity lifecycle, or RequirementCoverage validation calculations.
 
 ## 16. Statuses Owned
 
@@ -321,7 +321,7 @@ Tenant Workspace may display, read-only from owning domains:
 - System operational status from SystemInventory.
 - Project delivery status from ProjectLifecycle.
 - Warranty row/header status from WarrantyCollection.
-- Requirement Coverage status from RequirementCoverage.
+- Requirement coverage status from RequirementCoverage validation output.
 - Customer/account display from CustomerAccount.
 - Opportunity/requirement context from OpportunityLifecycle/TenantRequirement.
 - Activity severity/category from ActivityLog.
@@ -438,7 +438,7 @@ Tenant page code must not emit events directly.
 - Application Configuration Summary remains System-owned.
 - Tenant never owns Application Configuration Summary.
 - Warranty status belongs to WarrantyCollection.
-- Requirement Coverage belongs to RequirementCoverage.
+- RequirementCoverage validation output belongs to RequirementCoverage.
 - Project may create/link tenant context but does not own Tenant lifecycle.
 - Customer and Opportunity remain referenced context only.
 - Business object navigation uses Business Reference Resolver/shared links.
@@ -458,7 +458,7 @@ Tenant does not own:
 - Opportunity commercial lifecycle.
 - Requirement definition ownership.
 - Warranty chain/status rules.
-- Requirement Coverage status/missing-step rules.
+- RequirementCoverage status/missing-step read-model rules.
 - Activity event taxonomy.
 - Document behavior beyond tenant context.
 - Dashboard saved view lifecycle.

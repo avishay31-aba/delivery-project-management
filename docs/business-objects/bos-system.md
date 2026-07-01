@@ -32,7 +32,7 @@ Supporting capabilities referenced:
 
 - Delivery Capability -> Project Delivery Management
 - Delivery Capability -> Tenant Operations
-- Delivery Capability -> Requirement Coverage
+- Delivery Capability -> Requirement Fulfillment Tracking / RequirementCoverage read models
 - Administration Capability -> Activity / Audit
 - Administration Capability -> Metadata / Picklists, where applicable
 
@@ -69,7 +69,7 @@ System owns:
 - System-level region/location
 - System-level documents/activity context where supported
 
-System does not own Customer, Opportunity, Project, Tenant, Warranty, or Requirement Coverage business rules.
+System does not own Customer, Opportunity, Project, Tenant, Warranty, or RequirementCoverage validation/read-model rules.
 
 Application Configuration Summary remains System-owned regardless of which Project allocates the System or which Tenant consumes the configured runtime result. Project references it. Tenant consumes the result.
 
@@ -155,7 +155,7 @@ Opportunity fields:
 - Opportunity ID
 - Requirement intent where shown as context
 
-Requirement Coverage fields:
+RequirementCoverage read-model output:
 
 - Coverage status
 - Missing step
@@ -185,11 +185,11 @@ Document fields:
 - Project may allocate many Systems.
 - System may host many Tenants.
 - Tenant belongs to or is hosted on a System.
-- System may satisfy Requirement Coverage through Project allocation and Tenant hosting.
+- System may satisfy RequirementCoverage validation output through Project allocation and Tenant hosting.
 - System may be associated with Customer context through hosted Tenants, allocated Projects, or account-owned inventory context.
 - System may have Documents.
 - System may have Activity Events.
-- System may appear in Systems Workspace, Project Workspace, Tenant Workspace, Requirement Coverage, Customer Workspace, Activity / Audit Log, and future Delivery Alerts.
+- System may appear in Systems Workspace, Project Workspace, Tenant Workspace, Requirement Coverage validation surfaces, Customer Workspace, Activity / Audit Log, and future Delivery Alerts.
 
 ## 11. Lifecycle
 
@@ -226,7 +226,7 @@ No new lifecycle states are introduced by this BOS.
 - SystemInventory owns system identity, configuration, operational state, and readiness facts.
 - AllocationContext owns project-system relationship semantics.
 - TenantOperations owns tenant lifecycle and tenant operational facts.
-- RequirementCoverage owns coverage status and missing steps.
+- RequirementCoverage owns coverage status, missing-step derivation, and coverage alerts as validation/read-model output only.
 - WarrantyCollection owns warranty status through tenants.
 - System must not duplicate Tenant business rules.
 - System must not duplicate Project business rules.
@@ -288,12 +288,12 @@ System may trigger or coordinate:
 - Project allocation/deallocation: executed by AllocationContext and Project transaction boundaries.
 - Tenant creation from System context: executed by TenantOperations/store transaction boundary.
 - Tenant move/delete from system: executed by TenantOperations/SystemInventory transaction boundary.
-- Requirement Coverage updates: derived by RequirementCoverage.
+- RequirementCoverage validation output: derived by RequirementCoverage.
 - Warranty display through tenants: derived by WarrantyCollection.
 - Activity event creation: emitted by approved store transaction boundaries, not page code.
 - Document actions: executed by DocumentCollection.
 
-System must not directly execute Project delivery lifecycle, Opportunity lifecycle, Warranty chain behavior, or Requirement Coverage business calculations.
+System must not directly execute Project delivery lifecycle, Opportunity lifecycle, Warranty chain behavior, or RequirementCoverage validation calculations.
 
 ## 16. Statuses Owned
 
@@ -314,7 +314,7 @@ Systems Workspace may display, read-only from owning domains:
 - Project delivery status from ProjectLifecycle.
 - Tenant operational status from TenantOperations.
 - Warranty status/header status from WarrantyCollection through hosted tenants.
-- Requirement Coverage status from RequirementCoverage.
+- Requirement coverage status from RequirementCoverage validation output.
 - Activity severity/category from ActivityLog.
 - Document metadata/status from DocumentCollection where present.
 
@@ -432,7 +432,7 @@ System page code must not emit events directly.
 - System operational status is owned by SystemInventory.
 - Tenant operational status is owned by TenantOperations.
 - Warranty status is owned by WarrantyCollection.
-- Requirement Coverage status is owned by RequirementCoverage.
+- Requirement coverage status is owned by RequirementCoverage as read-model validation output.
 - Business object navigation uses Business Reference Resolver/shared links.
 - System Workspace renders owning-domain facts; it does not create page-local business calculations.
 
@@ -448,7 +448,7 @@ System does not own:
 - Tenant lifecycle.
 - Tenant operational override behavior.
 - Warranty chain/status.
-- Requirement Coverage status/missing-step rules.
+- RequirementCoverage status/missing-step read-model rules.
 - Activity event taxonomy.
 - Document behavior beyond system context.
 - Dashboard saved view lifecycle.

@@ -98,7 +98,7 @@ Shared Platform Capability is not a user console. It provides infrastructure con
 | Sales Reporting / Pipeline | Provide pipeline and commercial reporting | Sales | Sales Console | Opportunity reporting models | Missing | Future V1 / V2 |
 | Sales Alerts | Surface commercial alerts | Sales | Sales Console | Sales alert read models | Missing | Future |
 | Project Delivery Management | Own delivery project execution | Delivery | Delivery Console | Project | Implemented | V1 |
-| Requirement Fulfillment Tracking | Track requirement coverage and missing delivery steps | Delivery | Delivery Console | Requirement Coverage | Implemented | V1 |
+| Requirement Fulfillment Tracking | Track requirement coverage and missing delivery steps | Delivery | Delivery Console | Requirement coverage read models and validation output | Implemented | V1 |
 | Allocation Management | Link systems to projects and delivery needs | Delivery | Delivery Console | Allocation, ProjectSystemLink | Implemented | V1 |
 | Systems Management | Manage allocated systems and inventory pools | Delivery | Delivery Console | System, Production Inventory, Reused Internal System | Implemented | V1 |
 | Tenant Management | Manage delivered customer tenants | Delivery | Delivery Console | Tenant, ProjectTenantLink | Implemented | V1 |
@@ -131,14 +131,14 @@ Shared Platform Capability is not a user console. It provides infrastructure con
 
 | Capability | Owns | References |
 | --- | --- | --- |
-| Customer Management | Customer / Account | Opportunity, Project, System, Tenant, Warranty, Requirement Coverage, Document, Activity |
+| Customer Management | Customer / Account | Opportunity, Project, System, Tenant, Warranty, requirement coverage read models, Document, Activity |
 | Opportunity Management | Opportunity | Customer, Project, System, Tenant |
 | Commercial Requirement Capture | Requirement definitions | Customer, Opportunity, Product/config metadata, existing Systems/Tenants |
 | POC Commercial Management | Opportunity POC fields and intent | Project, Reused Internal Systems |
 | Commercial Renewal Management | Renewal opportunity | Warranty, Tenant, Project as context |
 | Deal Package Management | Deal package context | Opportunity, Requirement |
-| Project Delivery Management | Project | Customer, Opportunity, System, Tenant, Requirement Coverage, Activity |
-| Requirement Fulfillment Tracking | Requirement Coverage | Requirement, Opportunity, Project, System, Tenant |
+| Project Delivery Management | Project | Customer, Opportunity, System, Tenant, requirement coverage read models, Activity |
+| Requirement Fulfillment Tracking | Requirement coverage read models and validation output | Requirement definitions, Opportunity, Project, System, Tenant |
 | Allocation Management | Allocation / ProjectSystemLink | Project, System |
 | Systems Management | System, Production Inventory, Reused Internal System | Project, Tenant, Customer |
 | Tenant Management | Tenant, ProjectTenantLink | Project, System, Customer, Requirement |
@@ -166,7 +166,7 @@ Ownership rule: if a capability references an object, it may display it but may 
 
 Sales creates and maintains customer and opportunity context. Opportunity Management defines commercial intent, while Commercial Requirement Capture defines requirements. Opportunity may trigger approved Project creation/update.
 
-Delivery receives project and requirement intent, executes Projects, manages Allocations, Systems, Tenants, Warranties, Milestones, Tasks, Requirement Coverage, and Operational Renewal readiness.
+Delivery receives project and requirement intent, executes Projects, manages Allocations, Systems, Tenants, Warranties, Milestones, Tasks, requirement coverage validation output, and Operational Renewal readiness.
 
 Administration governs Activity/Audit, metadata, dashboard views, picklists, templates, and future users/roles/privileges.
 
@@ -174,7 +174,7 @@ Shared Platform capabilities supply identity, reference resolution, status prese
 
 ## 6. Capability Boundaries
 
-Sales owns Customer commercial relationship, Opportunity lifecycle, Commercial Renewal opportunity, Requirement intent capture, POC commercial profile, and Deal Package context. Sales does not own Project execution, System operations, Tenant operations, Warranty status, Requirement Coverage status, Allocation, or Milestone/Task execution.
+Sales owns Customer commercial relationship, Opportunity lifecycle, Commercial Renewal opportunity, Requirement intent capture, POC commercial profile, and Deal Package context. Sales does not own Project execution, System operations, Tenant operations, Warranty status, requirement coverage validation output, Allocation, or Milestone/Task execution.
 
 Delivery owns Project execution, Systems, Tenants, Allocations, Warranty chain/status, Operational Renewal Work Queue, Requirement Fulfillment Tracking, Milestones, Tasks, delivery documents, and delivery activity context. Delivery does not own Customer master data, Opportunity commercial lifecycle, commercial renewal deal, or Sales pipeline.
 
@@ -266,7 +266,7 @@ Do not redesign V1 around these capabilities.
 | Missing Capability | Delivery Dashboard is missing as a consolidated command center. | Valuable for Delivery Manager persona. |
 | Missing Capability | Sales Pipeline/Sales Dashboard is missing. | Needed for complete Sales Console maturity. |
 | Overlap Risk | Renewal exists in both Sales and Delivery. | Keep Commercial Renewal under Opportunity; Operational Renewal under Warranty/Renewal Work Queue. |
-| Overlap Risk | Requirements originate in Sales but fulfillment is Delivery. | Keep Requirement definitions and Requirement Coverage separate. |
+| Overlap Risk | Requirements originate in Sales but fulfillment validation is Delivery-owned. | Keep Opportunity-owned requirement definitions separate from RequirementCoverage read-model validation output. |
 | Overlap Risk | Customer aggregates Delivery data. | Preserve CustomerAccount as aggregator only. |
 | Risk | Admin capability is underdeveloped compared to Sales/Delivery. | Do not block product completion, but plan Admin hardening. |
 | Risk | Documents are parent-context only, not a full document capability. | Accept for V1 unless document workflows become central. |

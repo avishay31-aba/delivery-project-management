@@ -67,7 +67,7 @@ Tenant fields include TID, tenant name, and existing tenant context.
 
 Warranty context for renewal-related opportunity may be displayed read-only.
 
-Requirement Coverage status may be displayed read-only later.
+RequirementCoverage validation output may be displayed read-only later.
 
 ## 8. Relationships To Other Objects
 
@@ -135,7 +135,7 @@ Execution ownership:
 - Project execution belongs to Delivery Console.
 - Allocation/tenant/warranty actions are not Opportunity-owned.
 
-Opportunity must not directly execute allocation, tenant creation, warranty editing, milestone/task completion, or Requirement Coverage status generation.
+Opportunity must not directly execute allocation, tenant creation, warranty editing, milestone/task completion, or RequirementCoverage validation output generation.
 
 ## 14. Statuses Owned By This Object
 
@@ -146,11 +146,11 @@ Opportunity owns:
 - Opportunity type/subtype display state.
 - POC financial profile display state.
 
-Opportunity does not own Project status, Project health, System operational status, Tenant operational status, Warranty status, or Requirement Coverage status.
+Opportunity does not own Project status, Project health, System operational status, Tenant operational status, Warranty status, or RequirementCoverage validation output.
 
 ## 15. Statuses Displayed From Other Objects
 
-If displayed, Opportunity Workspace may show Project status from ProjectLifecycle, System operational status from SystemInventory, Tenant operational status from TenantOperations, Warranty status from WarrantyCollection, and Requirement Coverage status from RequirementCoverage.
+If displayed, Opportunity Workspace may show Project status from ProjectLifecycle, System operational status from SystemInventory, Tenant operational status from TenantOperations, Warranty status from WarrantyCollection, and requirement coverage validation output from RequirementCoverage.
 
 These must be read-only and sourced from owning domains.
 
@@ -231,15 +231,15 @@ Audit must preserve commercial-to-delivery handoff traceability.
 - POC is a Stage, not a main Opportunity Type.
 - Opportunity Type is Delivery or Renewal.
 - Opportunity defines delivery intent but not delivery execution.
-- Requirement definitions may originate in Opportunity.
-- Requirement Coverage status is not owned by Opportunity.
+- Requirement definitions originate in Opportunity/TenantRequirement.
+- RequirementCoverage is read-model validation output only and is not owned by Opportunity.
 - Projects, Systems, Tenants, Warranties remain Delivery-owned.
 - Page code must not own Opportunity business rules.
 - Project creation/update happens through approved domain/store behavior.
 
 ## 23. Explicit Non-Ownership Boundaries
 
-Opportunity does not own Project execution, Project health, Allocation execution, System operational state, Tenant operational state, Warranty state, Requirement Coverage, Milestone/task execution, Renewal execution work queue, or Delivery alerts.
+Opportunity does not own Project execution, Project health, Allocation execution, System operational state, Tenant operational state, Warranty state, RequirementCoverage validation output, Milestone/task execution, Renewal execution work queue, or Delivery alerts.
 
 Opportunity may reference these only as read-only context or trigger approved handoff actions.
 

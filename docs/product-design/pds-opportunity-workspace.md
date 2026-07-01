@@ -36,7 +36,7 @@ Opportunity is Sales-owned. Opportunity may define delivery intent, but it does 
 
 The Opportunity Workspace owns Opportunity identity, commercial lifecycle stage, type/subtype, POC financial profile, commercial dates, customer/account linkage, sales manager/deal owner display, requirement definition and intent capture, deal package context, Opportunity validation state, Project creation/update decision triggers already supported, read-only visibility into linked/created projects, and read-only visibility into relevant existing systems/tenants.
 
-It does not own Project execution, Project health, System operational status, Tenant operational status, Warranty status, Requirement Coverage status, Allocation execution, Milestone/task execution, or Renewal Work Queue state.
+It does not own Project execution, Project health, System operational status, Tenant operational status, Warranty status, RequirementCoverage validation output, Allocation execution, Milestone/task execution, or Renewal Work Queue state.
 
 ## 4. Objects Referenced
 
@@ -54,7 +54,7 @@ Delivery-owned references:
 - System
 - Tenant
 - Warranty, if visible through related tenants/projects
-- Requirement Coverage rows, read-only if later surfaced
+- RequirementCoverage validation output, read-only if later surfaced
 - Activity Events
 
 ## 5. Complete Page Hierarchy
@@ -138,7 +138,7 @@ Recommended cards:
 - Created Project count
 - Latest Project, if already available
 
-Cards must not calculate Project health, Warranty status, Tenant status, System status, or Requirement Coverage status.
+Cards must not calculate Project health, Warranty status, Tenant status, System status, or RequirementCoverage validation output.
 
 ## 11. Tabs
 
@@ -189,7 +189,7 @@ Existing customer context fields include Tenant TID, System SID/MID, Product, Ho
 
 ## 13. Related Business Objects
 
-Opportunity Workspace references Customer / Account, Project(s), System(s), Tenant(s), Requirement definitions, Requirement Coverage rows future/read-only, Documents if attached, and Activity Events if available.
+Opportunity Workspace references Customer / Account, Project(s), System(s), Tenant(s), Requirement definitions, RequirementCoverage validation output future/read-only, Documents if attached, and Activity Events if available.
 
 Reference rules:
 
@@ -206,7 +206,7 @@ TenantRequirement owns requirement identity, requirement metadata, requirement g
 
 ProjectLifecycle owns Project creation/update structure and Project execution object.
 
-RequirementCoverage owns coverage status, missing step, coverage alerts, and linked fulfillment status.
+RequirementCoverage owns coverage status, missing-step derivation, coverage alerts, and linked fulfillment status as validation/read-model output only.
 
 The page owns rendering, local draft UI state, dialog presentation, and calls to approved store/domain actions.
 
@@ -292,7 +292,7 @@ Do not implement page-specific filtering/sorting logic outside approved metadata
 
 ## 22. Future Extension Points
 
-V1-safe future extension points include Opportunity Activity tab, Opportunity Documents tab, commercial notes using Shared Rich Text Editor, Sales Alerts integration, Pipeline dashboard integration, Deal package workspace, Opportunity validation summary improvements, commercial approval workflow, Customer follow-up actions, privilege-based action visibility, better handoff summary to Project Workspace, and read-only Requirement Coverage preview.
+V1-safe future extension points include Opportunity Activity tab, Opportunity Documents tab, commercial notes using Shared Rich Text Editor, Sales Alerts integration, Pipeline dashboard integration, Deal package workspace, Opportunity validation summary improvements, commercial approval workflow, Customer follow-up actions, privilege-based action visibility, better handoff summary to Project Workspace, and read-only RequirementCoverage validation preview.
 
 Each extension must preserve ownership boundaries.
 

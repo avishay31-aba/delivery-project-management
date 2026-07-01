@@ -30,7 +30,7 @@ Supporting capabilities referenced:
 - Delivery Capability -> Systems Management
 - Delivery Capability -> Tenant Operations
 - Delivery Capability -> Warranty Management
-- Delivery Capability -> Requirement Coverage
+- Delivery Capability -> Requirement Fulfillment Tracking / RequirementCoverage read models
 - Administration Capability -> Activity / Audit
 
 ## 5. Console Ownership
@@ -67,7 +67,7 @@ Project owns:
 - Delivery progress
 - Delivery workflow coordination from requirements through allocation, tenant delivery, warranty follow-up, and task execution
 
-Project does not own System, Tenant, Warranty, Customer, Opportunity, or Requirement Coverage business rules.
+Project does not own System, Tenant, Warranty, Customer, Opportunity, or Requirement Coverage validation rules.
 
 ## 8. Fields Owned
 
@@ -143,7 +143,7 @@ Requirement fields:
 - Product/configuration intent
 - Hosting/configuration intent
 
-Requirement Coverage fields:
+Requirement Coverage read-model output:
 
 - Coverage status
 - Missing step
@@ -200,11 +200,11 @@ Document fields:
 - Milestone has many Tasks.
 - Project may have many allocated Systems through AllocationContext.
 - Project may have many linked/delivered Tenants through TenantOperations and project/tenant links.
-- Project may reference Requirement Coverage rows derived from Opportunity requirements and Delivery fulfillment.
+- Project may reference RequirementCoverage validation rows derived from Opportunity requirements and Delivery fulfillment facts.
 - Project may display Warranty context through linked Tenants, but WarrantyCollection owns warranty behavior.
 - Project may have Documents.
 - Project may have Activity Events.
-- Project may be referenced from Customer Workspace, Opportunity Workspace, Requirement Coverage, Warranty, Renewal Work Queue, Systems Workspace, Tenant Workspace, and Activity / Audit Log.
+- Project may be referenced from Customer Workspace, Opportunity Workspace, Requirement Coverage validation surfaces, Warranty, Renewal Work Queue, Systems Workspace, Tenant Workspace, and Activity / Audit Log.
 
 ## 11. Lifecycle
 
@@ -231,12 +231,12 @@ Project lifecycle must not infer unapproved states or introduce new workflow sta
 - Project owns delivery execution and delivery lifecycle.
 - Project Requirements define delivery intent.
 - Project coordinates the approved delivery workflow from requirement review through System allocation, Tenant creation, Warranty follow-up, and ongoing Task execution.
-- Project may coordinate Systems, Tenants, Milestones, Tasks, Requirement Coverage context, Warranty context, Documents, and Activity.
+- Project may coordinate Systems, Tenants, Milestones, Tasks, RequirementCoverage validation context, Warranty context, Documents, and Activity.
 - Project does not own Application Configuration Summary.
 - Project must not duplicate SystemInventory rules.
 - Project must not duplicate TenantOperations rules.
 - Project must not duplicate WarrantyCollection rules.
-- Project must not duplicate RequirementCoverage rules.
+- Project must not duplicate RequirementCoverage validation/read-model rules.
 - Project must not duplicate CustomerAccount rules.
 - Project must not duplicate OpportunityLifecycle rules.
 - Project health is owned by ProjectLifecycle.
@@ -245,7 +245,7 @@ Project lifecycle must not infer unapproved states or introduce new workflow sta
 - System facts are owned by SystemInventory.
 - Tenant facts are owned by TenantOperations.
 - Warranty facts are owned by WarrantyCollection.
-- Requirement coverage facts are owned by RequirementCoverage.
+- Requirement coverage status, missing-step derivation, and coverage alerts are owned by RequirementCoverage as validation/read-model output only.
 - CustomerAccount aggregates only and does not own Project execution.
 - Opportunity may trigger Project creation/update through approved store/domain behavior, but does not own execution.
 
@@ -298,7 +298,7 @@ Project-owned actions include:
 - View project alerts.
 - View linked systems.
 - View linked tenants.
-- View requirement coverage context.
+- View requirement coverage validation output.
 - View documents.
 - View activity.
 
@@ -313,7 +313,7 @@ Project may trigger or coordinate:
 - Link existing system: executed by AllocationContext/SystemInventory.
 - Tenant creation from requirement: executed by TenantOperations and store transaction boundary.
 - Tenant movement/deletion from system: executed by TenantOperations/SystemInventory transaction boundary.
-- Requirement coverage recalculation: executed by RequirementCoverage selectors/read models.
+- Requirement coverage validation output: derived by RequirementCoverage selectors/read models.
 - Warranty context display: executed by WarrantyCollection read models.
 - Activity event creation: executed by approved store transaction boundaries, not Project page code.
 - Document actions: executed by DocumentCollection.
@@ -331,7 +331,7 @@ ProjectLifecycle owns:
 - Delivery date status.
 - Deadline risk integration at project health level, using MilestonePlan facts.
 - Missing allocation health indicators, using AllocationContext facts.
-- Missing tenant health indicators, using TenantOperations/RequirementCoverage summaries where approved.
+- Missing tenant health indicators, using TenantOperations facts and RequirementCoverage validation summaries where approved.
 
 MilestonePlan owns:
 
@@ -349,7 +349,7 @@ Project Workspace may display, read-only from owning domains:
 - System operational status from SystemInventory.
 - Tenant operational status from TenantOperations.
 - Warranty row/header status from WarrantyCollection.
-- Requirement Coverage status from RequirementCoverage.
+- Requirement coverage status from RequirementCoverage validation output.
 - Activity severity/category from ActivityLog.
 - Document metadata/status from DocumentCollection where present.
 
@@ -467,7 +467,7 @@ Project page code must not emit events directly.
 - Project may coordinate System/Tenant/Warranty context but does not own their rules.
 - Project health is derived by ProjectLifecycle.
 - Milestone/task progress is owned by MilestonePlan.
-- Requirement Coverage status is owned by RequirementCoverage.
+- Requirement coverage status is owned by RequirementCoverage as read-model validation output.
 - Allocation semantics are owned by AllocationContext.
 - Business object navigation uses Business Reference Resolver/shared links.
 - Project Workspace renders owning-domain facts; it does not create page-local business calculations.
@@ -484,7 +484,7 @@ Project does not own:
 - Tenant operational state.
 - Tenant lifecycle rules.
 - Warranty chains or warranty status.
-- Requirement Coverage status/missing-step rules.
+- RequirementCoverage status/missing-step read-model rules.
 - Activity event taxonomy.
 - Document behavior beyond project context.
 - Dashboard saved view lifecycle.
@@ -507,7 +507,7 @@ V1 includes:
 - Milestone/task ordering, deadlines, comments, progress, and status.
 - Systems/Tenants operational context.
 - Allocation/deallocation behavior already supported.
-- Requirement Coverage context.
+- RequirementCoverage validation output.
 - Documents where already supported.
 - Activity timeline where already supported.
 - Shared reference links and shared status presentation.

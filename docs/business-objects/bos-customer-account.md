@@ -18,7 +18,7 @@ Customer / Account represents the commercial relationship with an end customer o
 
 It is the Sales-owned master object used to organize opportunities, commercial ownership, account context, and read-only operational visibility.
 
-Customer is the commercial anchor for Opportunities, Projects, Systems, Tenants, Warranties, Requirement Coverage, Documents, and Activity.
+Customer is the commercial anchor for Opportunities, Projects, Systems, Tenants, Warranties, RequirementCoverage validation output, Documents, and Activity.
 
 ## 5. Data Ownership
 
@@ -57,7 +57,7 @@ Tenant fields include TID, tenant name, product, environment, operational status
 
 Warranty fields include Warranty ID, status, tenant header warranty status, expiration, and renewal candidate status.
 
-Requirement Coverage fields include Requirement ID, coverage status, missing step, and alerts.
+RequirementCoverage read-model output includes Requirement ID, coverage status, missing step, and alerts.
 
 Document fields include file name, source object, and file metadata.
 
@@ -70,7 +70,7 @@ Activity fields include event summary, category, severity, and occurred at.
 - Customer to Systems: derived through account ownership, tenant hosting, and project relationships.
 - Customer to Tenants: 1:N.
 - Customer to Warranties: derived through customer tenants.
-- Customer to Requirement Coverage: derived through customer opportunities/projects.
+- Customer to RequirementCoverage validation output: derived through customer opportunities/projects.
 - Customer to Documents: aggregated from related projects, systems, tenants, and future customer documents.
 - Customer to Activity Events: customer may be primary or related object.
 
@@ -95,7 +95,7 @@ Do not invent lifecycle states such as Active, Dormant, Churned, Strategic, or B
 - CustomerAccount must not calculate Delivery-owned status.
 - CustomerAccount may compose WarrantyCollection summaries, but WarrantyCollection owns warranty status logic.
 - CustomerAccount may aggregate ProjectLifecycle health summaries, but ProjectLifecycle owns health logic.
-- CustomerAccount may aggregate RequirementCoverage summaries, but RequirementCoverage owns coverage logic.
+- CustomerAccount may aggregate RequirementCoverage summaries, but RequirementCoverage owns coverage validation/read-model logic.
 - CustomerAccount may aggregate Tenant/System facts, but TenantOperations/SystemInventory own those facts.
 
 ## 11. Validation Rules
@@ -143,7 +143,7 @@ Future statuses require explicit approval.
 - System operational status from SystemInventory.
 - Tenant operational status from TenantOperations.
 - Warranty status from WarrantyCollection.
-- Requirement coverage status from RequirementCoverage.
+- Requirement coverage status from RequirementCoverage validation output.
 - Activity severity from ActivityLog.
 
 CustomerAccount may aggregate counts but must not derive the underlying statuses.

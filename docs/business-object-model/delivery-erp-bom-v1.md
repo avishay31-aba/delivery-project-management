@@ -21,7 +21,6 @@ The BOM is the authoritative business-domain map for the ERP. BOS documents defi
 | Customer / Account | Sales | CustomerAccount | Commercial customer identity and portfolio aggregation | Implemented | V1 |
 | Opportunity | Sales | OpportunityLifecycle | Commercial lifecycle and delivery intent | Implemented | V1 |
 | Requirement | Sales origin, Delivery fulfillment | TenantRequirement | Requirement identity, metadata, and intent rows | Implemented | V1 |
-| Requirement Coverage | Delivery | RequirementCoverage | Fulfillment status of requirements | Implemented | V1 |
 | Project | Delivery | ProjectLifecycle | Central Delivery orchestration object for delivery execution | Implemented | V1 |
 | Milestone | Delivery | MilestonePlan | Delivery milestone execution | Implemented | V1 |
 | Task | Delivery | MilestonePlan | Delivery task execution | Implemented | V1 |
@@ -44,7 +43,17 @@ The BOM is the authoritative business-domain map for the ERP. BOS documents defi
 | Product / Package Definition | Admin | Future domain | Commercial/product master data | Missing | V2 |
 | Metadata Object | Admin | ObjectRegistry | ERP object metadata | Implemented as core metadata | V1 core, V2 expanded |
 
-## 2. Business Object Hierarchy
+## 2. Read-Model / Validation Capabilities
+
+These capabilities are not Business Objects. They do not own independent lifecycle, user-created identity, editable workflow, or master data. They validate, aggregate, or present facts owned by Business Objects and domains.
+
+| Capability | Owning Console | Owning Domain | Responsibility | Current Status | Planned Version |
+| --- | --- | --- | --- | --- | --- |
+| Requirement Coverage | Delivery | RequirementCoverage | Delivery-owned validation/read-model capability that evaluates Opportunity-owned requirement definitions against Delivery fulfillment facts from ProjectLifecycle, AllocationContext, SystemInventory, and TenantOperations | Implemented | V1 |
+
+Requirement Coverage owns coverage status, missing-step derivation, and coverage alerts as read-model outputs only. It does not own requirement definitions, Project execution, System allocation, Tenant creation, or any editable workflow.
+
+## 3. Business Object Hierarchy
 
 ```text
 Customer / Account
@@ -69,7 +78,7 @@ Customer / Account
        -> Warranties
        -> Documents
        -> Activity
-  -> Requirement Coverage
+  -> Requirement Coverage validation output
   -> Customer Documents / aggregated documents
   -> Customer Activity
 
@@ -83,7 +92,7 @@ Project
   -> Tasks
   -> Allocated Systems
   -> Linked Tenants
-  -> Requirement Coverage context
+  -> Requirement Coverage validation output
   -> Documents
   -> Activity
 
@@ -105,17 +114,16 @@ Admin
   -> Future users/roles/privileges
 ```
 
-Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects. Project is the central Delivery orchestration Business Object: it owns delivery execution and composes delivery context, while consuming facts from MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection. System is the reusable Delivery Resource of the ERP: it owns infrastructure configuration, Application Configuration Summary, and operational readiness independently of current Project allocation.
+Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects. Project is the central Delivery orchestration Business Object: it owns delivery execution and composes delivery context, while consuming facts from MilestonePlan, AllocationContext, RequirementCoverage read models, SystemInventory, TenantOperations, and WarrantyCollection. System is the reusable Delivery Resource of the ERP: it owns infrastructure configuration, Application Configuration Summary, and operational readiness independently of current Project allocation.
 
-## 3. Relationship Matrix
+## 4. Relationship Matrix
 
 | Object | Parent Objects | Child Objects | Referenced Objects | Referencing Objects |
 | --- | --- | --- | --- | --- |
 | Customer | None | Opportunities 1:N | Sales Manager 1:1 | Opportunities, Projects, Systems, Tenants |
-| Opportunity | Customer N:1 | Requirements 1:N, Project intent 1:N | Customer, Sales Manager, existing Systems/Tenants | Projects, RequirementCoverage |
-| Requirement | Opportunity N:1 | RequirementCoverage 1:1/N | Product/config metadata, Tenant/System refs | Project, Tenant, RequirementCoverage |
-| Requirement Coverage | Requirement N:1 | None | Opportunity, Project, System, Tenant | Customer Workspace, Project Workspace, Dashboard |
-| Project | Opportunity N:1, Customer N:1 derived | Milestones 1:N, Tasks through milestones, Allocations 1:N | Customer, Opportunity, Systems, Tenants, RequirementCoverage, Warranty context | Customer, RequirementCoverage, Activity |
+| Opportunity | Customer N:1 | Requirements 1:N, Project intent 1:N | Customer, Sales Manager, existing Systems/Tenants | Projects, RequirementCoverage read models |
+| Requirement | Opportunity N:1 | RequirementCoverage validation output | Product/config metadata, Tenant/System refs | Project, Tenant, RequirementCoverage read models |
+| Project | Opportunity N:1, Customer N:1 derived | Milestones 1:N, Tasks through milestones, Allocations 1:N | Customer, Opportunity, Systems, Tenants, RequirementCoverage read models, Warranty context | Customer, Activity |
 | Milestone | Project N:1 | Tasks 1:N | Project | Project health |
 | Task | Milestone N:1 | None | Project/Milestone | Project health |
 | System | Project N:N through Allocation | Tenants 1:N | Customer, Product/config metadata | Project, Tenant, Customer |
@@ -131,15 +139,14 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Role | Admin | Privileges N:N | Users, Privileges | Future permissions |
 | Privilege | Admin | None | Role | Future permissions |
 
-## 4. Ownership Matrix
+## 5. Ownership Matrix
 
 | Object | Business Owner | Console Owner | Domain Owner | Workspace Owner | May Modify | May Reference Only |
 | --- | --- | --- | --- | --- | --- | --- |
 | Customer | Sales | Sales | CustomerAccount | Customer Workspace | Sales-authorized users | Delivery, Admin |
 | Opportunity | Sales | Sales | OpportunityLifecycle | Opportunity Workspace | Sales-authorized users | Delivery, Admin |
 | Requirement | Sales intent / Delivery fulfillment | Sales origin | TenantRequirement | Opportunity Workspace | Opportunity Workspace | Project, Coverage |
-| Requirement Coverage | Delivery | Delivery | RequirementCoverage | Requirement Coverage | Domain/read model only | Sales, Customer |
-| Project | Delivery | Delivery | ProjectLifecycle | Project Workspace | Delivery execution; consumes MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection facts | Sales, Admin |
+| Project | Delivery | Delivery | ProjectLifecycle | Project Workspace | Delivery execution; consumes MilestonePlan, AllocationContext, RequirementCoverage read-model output, SystemInventory, TenantOperations, and WarrantyCollection facts | Sales, Admin |
 | Milestone | Delivery | Delivery | MilestonePlan | Project Workspace | Delivery | Sales via read-only |
 | Task | Delivery | Delivery | MilestonePlan | Project Workspace | Delivery | Sales via read-only |
 | System | Delivery | Delivery | SystemInventory | Systems Workspace | Delivery infrastructure configuration, Application Configuration Summary, and operational readiness | Sales, Admin |
@@ -152,7 +159,7 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Picklist | Admin | Admin | Config/storage | Future Admin Workspace | Admin | All object forms |
 | Templates | Admin | Admin | Config/MilestonePlan | Future Admin Workspace | Admin | Project Workspace |
 
-## 5. Lifecycle Dependencies
+## 6. Lifecycle Dependencies
 
 ```text
 Customer
@@ -179,18 +186,18 @@ Warranty
   -> Operational Renewal Work Queue
 
 Requirement
-  -> Requirement Coverage
+  -> Requirement Coverage validation output
   -> Project/System/Tenant fulfillment references
 
 Project/System/Tenant/Allocation transactions
   -> Activity Events
 ```
 
-Customer must exist before Opportunity. Opportunity may trigger Project creation/update. Project execution begins in Delivery. Project allocates Systems through AllocationContext and does not own System configuration. Tenant executes inside System, but Tenant lifecycle remains owned by TenantOperations. Warranty belongs to Tenant. Requirement Coverage is derived/read-model behavior, not a manually created workflow object. Activity Events are emitted by transaction boundaries, not pages.
+Customer must exist before Opportunity. Opportunity may trigger Project creation/update. Project execution begins in Delivery. Project allocates Systems through AllocationContext and does not own System configuration. Tenant executes inside System, but Tenant lifecycle remains owned by TenantOperations. Warranty belongs to Tenant. Requirement Coverage is a Delivery-owned validation/read-model capability, not a Business Object or manually created workflow object. Activity Events are emitted by transaction boundaries, not pages.
 
 Operational renewal belongs to Delivery through Warranty / Renewal Work Queue. Project may display renewal project context, but WarrantyCollection owns warranty chain/status and Renewal Work Queue owns renewal readiness visibility.
 
-## 6. Navigation Model
+## 7. Navigation Model
 
 All business-object navigation uses Business Reference Resolver. Visible business IDs use shared Business Object Links. Routes remain stable. Cross-console navigation is allowed but does not transfer ownership.
 
@@ -198,16 +205,16 @@ All business-object navigation uses Business Reference Resolver. Visible busines
 | --- | --- |
 | Customer Workspace | Opportunities, Projects, Systems, Tenants, Warranty context, Documents, Activity |
 | Opportunity Workspace | Customer, related Projects, existing Systems/Tenants |
-| Project Workspace | Opportunity, Customer, Systems, Tenants, Requirement Coverage, Documents, Activity |
+| Project Workspace | Opportunity, Customer, Systems, Tenants, Requirement Coverage validation output, Documents, Activity |
 | Systems Workspace | Projects, Tenants, Customer context |
 | Tenant Workspace | System, Project, Warranty, Customer context |
 | Warranty Workspace | Tenant, Project, Customer |
-| Requirement Coverage | Opportunity, Project, System, Tenant |
+| Requirement Coverage validation surface | Opportunity, Project, System, Tenant |
 | Activity / Audit Log | Primary and related object routes |
 
 Deep links should use business IDs where available. Missing/stale references must display safely.
 
-## 7. Event Flow
+## 8. Event Flow
 
 | Object | Typical Emitted Events | Typical Consumed Events |
 | --- | --- | --- |
@@ -227,13 +234,13 @@ Deep links should use business IDs where available. Missing/stale references mus
 
 Current event implementation is partial. Do not infer events unless approved.
 
-## 8. Ownership Boundaries
+## 9. Ownership Boundaries
 
 Customer owns customer identity, commercial account profile, and customer aggregation. It does not own delivery statuses, Project execution, Warranty status, or Tenant/System operational status.
 
-Opportunity owns commercial lifecycle, delivery intent, requirement definitions, and Project creation/update intent. It does not own Project execution, Requirement Coverage, Allocation, Tenant creation execution, or Warranty.
+Opportunity owns commercial lifecycle, delivery intent, requirement definitions, and Project creation/update intent. It does not own Project execution, Requirement Coverage validation output, Allocation, Tenant creation execution, or Warranty.
 
-Project owns Delivery execution, Delivery health, milestone/task context, and Delivery workspace composition. It consumes facts from MilestonePlan, AllocationContext, RequirementCoverage, SystemInventory, TenantOperations, and WarrantyCollection. It does not own Customer master, Opportunity lifecycle, System logic, Tenant logic, Warranty status, or Requirement Coverage status.
+Project owns Delivery execution, Delivery health, milestone/task context, and Delivery workspace composition. It consumes facts from MilestonePlan, AllocationContext, RequirementCoverage read models, SystemInventory, TenantOperations, and WarrantyCollection. It does not own Customer master, Opportunity lifecycle, System logic, Tenant logic, Warranty status, or Requirement Coverage validation logic.
 
 System owns system identity/configuration/operational facts, Application Configuration Summary, and operational readiness. System is the reusable Delivery Resource of the ERP. Production Inventory and Reused Internal Systems are Systems Workspace views/tabs, not separate business objects with separate ownership. Systems are Delivery-owned supporting Business Objects, not separate role-owned objects. Project allocates Systems through AllocationContext and does not own System configuration. System does not own Tenant warranty, Tenant lifecycle, Project health, or Customer commercial data.
 
@@ -241,18 +248,17 @@ Tenant owns tenant identity/lifecycle facts and tenant operational mode/status c
 
 Warranty owns warranty chain, warranty status, tenant warranty header status, and renewal candidate facts. It does not own Opportunity commercial renewal or Project execution.
 
-RequirementCoverage owns coverage status, missing steps, and requirement fulfillment read models. It does not own requirement definitions or Project/System/Tenant creation.
+RequirementCoverage owns coverage status, missing-step derivation, and coverage alerts as validation/read-model outputs only. It does not own requirement definitions, Project execution, System allocation, Tenant creation, or any editable workflow.
 
 ActivityLog owns event structure, event selectors, and timeline/audit read models. It does not own business rules of emitted facts.
 
-## 9. Core Services Usage Matrix
+## 10. Core Services Usage Matrix
 
 | Object | Identity | Reference Resolver | Status Engine | Rich Text | Config Renderer | Delivery Tables | Business Links | ActivityLog |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Customer | Yes | Yes | Display only | Future notes | No | Read-only context | Yes | Yes |
 | Opportunity | Yes | Yes | Yes | Future notes/comments | Yes, requirements | Context only | Yes | Future |
 | Requirement | Future RID | Yes | Coverage display only | Comments if present | Yes | No | Yes | Future |
-| Requirement Coverage | No direct ID | Yes | Yes | No | No | Dashboard tables | Yes | Future |
 | Project | Yes | Yes | Yes | Task/comment fields | Yes for config context | Yes | Yes | Yes |
 | Milestone | Future MS | Yes future | Yes | Comment | No | Tables | Future | Future |
 | Task | Future TK | Yes future | Yes | Comment | No | Tables | Future | Future |
@@ -266,14 +272,13 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Picklist | Future | No | No | No | No | No | No | Future |
 | Templates | Future | No | No | Rich comments future | No | No | No | Future |
 
-## 10. Shared Component Usage Matrix
+## 11. Shared Component Usage Matrix
 
 | Object | Typical Shared Components |
 | --- | --- |
 | Customer | BusinessObjectLink, BusinessIdLink, StatusBadge, ProgressBar, ActivityTimeline, read-only tables |
 | Opportunity | BusinessObjectLink, FormField, RichTextEditor, ConfigurationRenderer, StatusBadge, dialogs |
 | Requirement | ConfigurationRenderer, FormField, BusinessIdLink, ClampedTableCellContent |
-| Requirement Coverage | DataDashboard, StatusBadge, AlertStatusIcon, BusinessIdLink |
 | Project | PageHeader, FormField, ProgressBar, AlertStatusIcon, StatusBadge, DeliveryTables, RichTextEditor |
 | Milestone | StatusBadge, AlertStatusIcon, ProgressBar, RichTextEditor |
 | Task | StatusBadge, AlertStatusIcon, RichTextEditor |
@@ -287,7 +292,7 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Picklist | FormField, select/picklist components |
 | Templates | Admin tables/forms, future |
 
-## 11. Console Architecture
+## 12. Console Architecture
 
 ```text
 Sales Console
@@ -307,7 +312,7 @@ Delivery Console
   Tenants
   Warranty Workspace
   Renewal Work Queue
-  Requirement Coverage
+  Requirement Coverage (validation/read-model surface)
   Future: Delivery Dashboard
   Future: Delivery Alerts
 
@@ -323,16 +328,16 @@ Admin Console
   Future: Admin Alerts
 ```
 
-Consoles are operational areas. Workspaces are complete environments for business objects. Business objects define ownership.
+Consoles are operational areas. Workspaces are complete environments for business objects. Business objects define ownership. Some visible console entries, such as Requirement Coverage, may be dashboard/read-model surfaces rather than Business Object Workspaces when they own no editable lifecycle or master data.
 
-## 12. Version 1.0 Scope
+## 13. Version 1.0 Scope
 
 Included in V1:
 
 - Customer / Account
 - Opportunity
 - Requirement definitions
-- Requirement Coverage
+- Requirement Coverage validation/read-model capability
 - Project
 - Milestone
 - Task
@@ -359,7 +364,7 @@ Not fully included but likely needed for commercial V1:
 - Admin template management
 - Product/package definitions
 
-## 13. Version 2.0 Expansion
+## 14. Version 2.0 Expansion
 
 Version 2.0 is the configurable ERP platform phase.
 
@@ -383,12 +388,12 @@ Potential V2 expansions:
 
 Do not redesign V1 around V2 configurability.
 
-## 14. Architecture Observations
+## 15. Architecture Observations
 
 | Type | Observation | Recommendation |
 | --- | --- | --- |
 | Risk | Customer aggregates many Delivery facts. | Continue enforcing CustomerAccount as aggregator only. |
-| Risk | Requirement has split ownership: Sales intent, Delivery coverage. | Keep TenantRequirement and RequirementCoverage boundaries explicit. |
+| Risk | Requirements have Sales-owned definitions and Delivery-owned fulfillment validation. | Keep TenantRequirement-owned definitions separate from RequirementCoverage validation/read-model output. |
 | Risk | Renewal has commercial and operational meanings. | Continue naming commercial Renewal under Opportunity and operational Renewal as Renewal Work Queue. |
 | Risk | Activity Log is partial but already visible. | Treat as Admin-owned audit surface; avoid page-level event emission. |
 | Risk | Documents are attached to multiple parent types but no full document workspace exists. | Keep parent-context document behavior in V1 unless a Document Workspace is approved. |
