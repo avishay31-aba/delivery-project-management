@@ -563,7 +563,7 @@ export interface ReusedInternalSystem {
   id: string
   machineId: string
   source: 'Reused Internal Systems'
-  purpose: 'POC' | 'Demo' | 'Training' | 'Support'
+  purpose: 'Available' | 'POC' | 'Demo' | 'Training' | 'Support'
   status: ReusedInternalSystemStatus
   logo?: string
   url?: string
