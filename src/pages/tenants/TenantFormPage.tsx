@@ -1388,8 +1388,9 @@ export function TenantFormPage() {
           {renderActiveTab()}
         </div>
       </section>
+      {formType === 'POC' ? null : renderWarranties()}
       {renderRemarks()}
-      {formType === 'POC' ? renderConfigurationHistory() : renderWarranties()}
+      {renderConfigurationHistory()}
       </div>
     </div>
   )
