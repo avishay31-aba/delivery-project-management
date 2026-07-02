@@ -37,5 +37,9 @@ export function validateSystemInventoryRequiredFields(
     messages.push({ field: 'usedInRegion', message: 'Used In Region is required.' })
   }
 
+  if ('source' in record && record.source === 'Production' && 'timeGroup' in record && !textValue(record.timeGroup).trim()) {
+    messages.push({ field: 'timeGroup', message: 'Used In Region is required.' })
+  }
+
   return messages
 }

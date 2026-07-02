@@ -51,6 +51,7 @@ export interface SystemInventoryHeaderField {
   line: number
   inputType?: 'text' | 'date' | 'integer' | 'picklist' | 'readonly'
   options?: string[]
+  required?: boolean
 }
 
 export interface SystemInventoryTab {

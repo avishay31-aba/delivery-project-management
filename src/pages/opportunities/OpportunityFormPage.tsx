@@ -1085,6 +1085,15 @@ export function OpportunityFormPage() {
     return (labels[fieldKey] ?? []).some((message) => saveMessages.includes(message))
   }
 
+  function headerRequired(fieldKey: OpportunityHeaderField['key']): boolean {
+    if (['opportunityId', 'opportunityName', 'accountId', 'salesManagerId'].includes(fieldKey)) return true
+    if (fieldKey === 'deliveryDate') return metadata?.headerFields.some((field) => field.key === 'deliveryDate') ?? false
+    if (fieldKey === 'pocStartDate') return metadata?.headerFields.some((field) => field.key === 'pocStartDate') ?? false
+    if (fieldKey === 'pocEndDate') return metadata?.headerFields.some((field) => field.key === 'pocEndDate') ?? false
+    if (fieldKey === 'warrantyRecordId') return metadata?.headerFields.some((field) => field.key === 'warrantyRecordId') ?? false
+    return false
+  }
+
   function updateAccount(accountId: string) {
     if (isViewMode) return
     const nextAccount = accounts.find((candidate) => candidate.id === accountId)
@@ -1372,7 +1381,7 @@ export function OpportunityFormPage() {
   function renderHeaderField(field: OpportunityHeaderField) {
     if (field.key === 'type') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('type'), true, headerMissing(field.key))}
             value={currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type}
@@ -1390,7 +1399,7 @@ export function OpportunityFormPage() {
 
     if (field.key === 'subType') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('subType'), true, headerMissing(field.key))}
             value={currentDraft.subType}
@@ -1413,7 +1422,7 @@ export function OpportunityFormPage() {
 
     if (field.key === 'accountId') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('accountId'), true, headerMissing(field.key))}
             value={currentDraft.accountId}
@@ -1431,7 +1440,7 @@ export function OpportunityFormPage() {
 
     if (field.key === 'salesManagerId') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('salesManagerId'), true, headerMissing(field.key))}
             value={currentDraft.salesManagerId}
@@ -1449,7 +1458,7 @@ export function OpportunityFormPage() {
 
     if (field.key === 'dealPackage') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('dealPackage'), true, headerMissing(field.key))}
             value={currentDraft.dealPackage ?? 'Silver'}
@@ -1467,7 +1476,7 @@ export function OpportunityFormPage() {
       const tenantIds = new Set(accountTenants.map((tenant) => tenant.id))
       const accountWarrantyRecords = warrantyRecords.filter((record) => tenantIds.has(record.tenantId))
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
           <select
             className={headerControlClassName(headerChanged('warrantyRecordId'), true, headerMissing(field.key))}
             value={currentDraft.warrantyRecordId ?? ''}
@@ -1492,13 +1501,9 @@ export function OpportunityFormPage() {
     return (
       <FormField
         key={field.key}
-        label={
-          <>
-            {field.label}
-            {isDate ? <span className="ml-0.5 text-red-600">*</span> : null}
-          </>
-        }
+        label={field.label}
         controlWidthClassName={headerFieldWidthClass(field.key)}
+        required={headerRequired(field.key)}
       >
         <input
           className={headerControlClassName(changed, field.editable, headerMissing(field.key))}

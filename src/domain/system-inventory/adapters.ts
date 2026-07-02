@@ -50,7 +50,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     purpose: SYSTEM_PURPOSE_DELIVERY,
     logo: 'T',
     url: `https://${sid}.example.production`,
-    cognitoRegion: 'NA',
+    cognitoRegion: '',
     productType: 'Tangles',
     ...defaultHostingContext(),
     mapCenter: '',

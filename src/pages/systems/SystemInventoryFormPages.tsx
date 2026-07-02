@@ -61,6 +61,7 @@ import {
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
   reusedInternalPurposeHistory,
+  SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
   systemIdentity,
   systemTimeGroup,
@@ -239,6 +240,7 @@ function derivedValue(record: InventoryRecord, key: string, projects: Project[],
   if (key === 'linkedProjects') return deriveLinkedProjects(record, projects)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
+  if (key === 'availability' && 'source' in record && record.source === SYSTEM_SOURCE_PRODUCTION) return 'Available'
   if (key === 'timeGroupAlert') {
     return systemTimeGroupAlert(record, tenants, readRecordValue(record, key))
   }
@@ -543,15 +545,15 @@ function InventoryForm<T extends InventoryRecord>({
       if (field.key === 'logo') {
         const productType = applicationSummaryProduct()
         return (
-          <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+          <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
             {productType ? <ProductLogoIcon product={productType} /> : null}
           </FormField>
         )
       }
 
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={width}>
-          <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+        <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
+          <div className="sf-readonly-field min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
             {value || '-'}
           </div>
         </FormField>
@@ -561,7 +563,7 @@ function InventoryForm<T extends InventoryRecord>({
     if (field.inputType === 'picklist') {
       if (field.key === 'operationalStatus') {
         return (
-          <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+          <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
             <OperationalStatusSelect
               value={value}
               options={field.options ?? []}
@@ -574,8 +576,9 @@ function InventoryForm<T extends InventoryRecord>({
       }
 
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
           <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
+            <option value="" />
             {(field.options ?? []).map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
@@ -586,14 +589,14 @@ function InventoryForm<T extends InventoryRecord>({
 
     if (field.inputType === 'date') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName="w-40">
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-40" required={field.required}>
           <input className={fieldClassName(isChanged, isInvalid)} type="date" value={value} onChange={(event) => updateField(field.key, event.target.value || null)} />
         </FormField>
       )
     }
 
     return (
-      <FormField key={field.key} label={field.label} controlWidthClassName={width}>
+      <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
         <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
       </FormField>
     )

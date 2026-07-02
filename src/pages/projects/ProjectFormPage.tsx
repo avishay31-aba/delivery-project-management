@@ -1794,10 +1794,10 @@ export function ProjectFormPage() {
                     className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
                     onClick={() => {
                       const routePath = systemReference(system).routePath
-                      if (routePath) navigate(routePath)
+                      if (routePath) navigate(routePath, { state: { mode: isViewMode ? 'view' : 'edit' } })
                     }}
                   >
-                    Edit
+                    {isViewMode ? 'View' : 'Edit'}
                   </button>
                   {link && !isViewMode ? (
                     <button

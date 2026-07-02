@@ -105,8 +105,21 @@
   .sf-view-mode input:not([type='checkbox']):not([type='radio']),
   .sf-view-mode select,
   .sf-view-mode textarea,
-  .sf-view-mode .rich-text-editor {
+  .sf-view-mode .rich-text-editor,
+  .sf-view-mode .sf-readonly-field {
     pointer-events: none;
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .sf-view-mode select,
+  .sf-view-mode input[type='date'] {
+    appearance: none;
+    background-image: none;
+  }
+
+  .sf-view-mode label > span:last-child > div {
     border-color: transparent;
     background-color: transparent;
     box-shadow: none;
@@ -119,6 +132,8 @@
 
   .sf-view-mode button:not(.sf-view-mode-allow) {
     pointer-events: none;
-    opacity: 0.55;
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
   }
 }
