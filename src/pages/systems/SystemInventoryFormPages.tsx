@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
@@ -69,6 +70,7 @@ import {
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
+import type { OwnerRecord } from '@/domain/owners'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
@@ -1153,6 +1155,19 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderOwnerTab() {
+    if (metadata.source !== SYSTEM_SOURCE_REUSED_INTERNAL) {
+      return `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`
+    }
+
+    return (
+      <OwnerGrid
+        owners={(activeDraft.owners ?? []) as OwnerRecord[]}
+        onChange={(owners) => updateField('owners', owners)}
+      />
+    )
+  }
+
   function renderRemarksSection() {
     return (
       <RemarksGrid
@@ -1292,7 +1307,9 @@ function InventoryForm<T extends InventoryRecord>({
                 ? renderTenantTab()
                 : activeTab === 'documents'
                   ? renderDocumentsTab()
-                  : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+                  : activeTab === 'owner'
+                    ? renderOwnerTab()
+                    : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>

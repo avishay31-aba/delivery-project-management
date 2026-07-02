@@ -140,6 +140,17 @@ export interface RemarkRecord {
   updatedBy?: string
 }
 
+export interface OwnerRecord {
+  id: string
+  userId: string
+  userName: string
+  fullName: string
+  title: string
+  company: string
+  phoneNumber: string
+  email: string
+}
+
 export interface OpportunityRequirementBase {
   id: string
   requirementId: string
@@ -281,6 +292,7 @@ export interface System {
   timeGroupAlert?: string
   operationalStatus: string
   remarks?: RemarkRecord[]
+  owners?: OwnerRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
@@ -516,6 +528,7 @@ export interface ProductionSystemInventoryItem {
   additionalFeatures?: string[]
   alerts: string[]
   remarks?: RemarkRecord[]
+  owners?: OwnerRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -573,6 +586,7 @@ export interface ReusedInternalSystem {
   alerts: string[]
   operationalStatus: string
   remarks?: RemarkRecord[]
+  owners?: OwnerRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string

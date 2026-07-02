@@ -3,6 +3,7 @@ import {
   defaultSystemHostingContext,
   hostingContextFromSource,
 } from '@/domain/hosting-context'
+import { normalizeOwners } from '@/domain/owners'
 import { normalizeRemarks } from '@/domain/remarks'
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
@@ -34,6 +35,7 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     ...record,
     documents: Array.isArray(record.documents) ? record.documents : [],
     remarks: normalizeRemarks(record.remarks),
+    owners: normalizeOwners(record.owners),
   }
 }
 
@@ -64,6 +66,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     tenantCount: 0,
     alerts: [],
     remarks: [],
+    owners: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -120,6 +123,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     alerts: [],
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
     remarks: [],
+    owners: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -146,6 +150,7 @@ export function createStandaloneSystem(sid: string, now: string): System {
     timeGroup: '',
     operationalStatus: '',
     remarks: [],
+    owners: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -216,6 +221,7 @@ export function systemFromReusedInternalAllocation(
     timeGroupAlert: reusedSystem.timeGroupAlert,
     operationalStatus: reusedSystem.operationalStatus,
     remarks: [],
+    owners: [],
     documents: reusedSystem.documents ?? [],
     createdAt,
     updatedAt: createdAt,

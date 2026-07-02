@@ -79,5 +79,5 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
     { key: 'occupationStartDate', label: 'Occupation Start Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
     { key: 'occupationEndDate', label: 'Occupation End Date', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'date' },
   ],
-  tabs: SYSTEM_INVENTORY_TABS,
+  tabs: [...SYSTEM_INVENTORY_TABS, { id: 'owner', label: 'Owner' }],
 }
