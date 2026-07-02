@@ -348,6 +348,38 @@ without unnecessary visual redesign or workflow changes.
 
 This principle becomes part of the permanent Architecture Handbook and applies to all future implementations unless explicitly overridden by the Product Owner.
 
+## Global Form And Dashboard Standards
+
+These standards apply to approved Version 1.0 business forms and dashboards unless explicitly overridden by the Product Owner.
+
+### Form Field Standards
+
+- Mandatory fields must show a red asterisk next to the field label.
+- Read-only fields must render as plain read-only values without editable borders, contours, or input styling.
+- Business forms must support View mode and Edit mode.
+- View mode presents business data without accidental edit affordances.
+- Edit mode enables approved editable fields and actions.
+- Pages compose field metadata, owning-domain validation, and shared form components; pages must not redefine mandatory/read-only behavior independently.
+
+### Dashboard Row Action Standards
+
+- Dashboard rows must not be the primary navigation control.
+- Dashboards use a dedicated left-side action column for record actions.
+- The View action, represented by an eye icon, opens the target form/workspace in read-only View mode.
+- The Edit action, represented by a pencil icon, opens the target form/workspace in Edit mode.
+- Dashboard action columns are UI controls only. They are not business data, object fields, report columns, or saved-view business columns.
+- Saved dashboard views may preserve user display preferences, but action controls must not become editable business facts or domain-owned fields.
+
+## Reusable Child Object Principle
+
+Some child structures are reusable across multiple parent Business Objects while still remaining scoped to their parent object instance.
+
+Reusable child objects may include Remarks and Owner/Responsible Contact tables. They can be introduced first under one parent object, such as System, and later reused under Project, Tenant, Customer, Opportunity, Warranty, or other approved parent objects.
+
+Reusable child objects do not transfer ownership of the parent object. The parent object's owning domain controls where the child object is used, while shared metadata/components may standardize rendering and behavior.
+
+Remark author metadata is part of the Remark record. It is not the same concept as the Owner child table.
+
 ## Implementation Completion Checklist
 
 Before considering a task complete, verify:

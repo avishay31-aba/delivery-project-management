@@ -53,7 +53,23 @@ These capabilities are not Business Objects. They do not own independent lifecyc
 
 Requirement Coverage owns coverage status, missing-step derivation, and coverage alerts as read-model outputs only. It does not own requirement definitions, Project execution, System allocation, Tenant creation, or any editable workflow.
 
-## 3. Business Object Hierarchy
+## 3. Reusable Child Business Objects And System-Owned Child Structures
+
+Reusable child Business Objects are scoped to a parent object instance but may be reused across multiple parent object types over time. They are not independent top-level workspaces in Version 1.0 unless explicitly approved.
+
+| Child Structure | Ownership Model | Initial V1 Parent Scope | Responsibility | Current Status | Planned Version |
+| --- | --- | --- | --- | --- | --- |
+| Remark | Reusable child Business Object | System first | User-authored note/task/change record with generated identity, timestamp, author metadata, type, rich text content, due date, and deadline alert output | Planned | V1 |
+| Owner / Responsible Contact | Reusable child Business Object/table | System first | Responsible people/contact rows associated with the parent object | Planned | V1 |
+| System Configuration History | System-owned child history/read model | System only | Read-only System Application Configuration Summary snapshot history caused by approved configuration changes | Planned | V1 |
+
+Remarks may later be reused under System, Project, Tenant, Opportunity, Customer, Warranty, or other parent objects. The Remark `author` / `created by` value is metadata of the Remark record and must not be confused with the Owner child table.
+
+Owner / Responsible Contact may later be reused under System, Project, Tenant, Customer, or other parent objects. It represents responsible people or contacts related to the parent object; it does not replace user/role/privilege governance.
+
+System Configuration History is not generic and is not Activity Log. It belongs to SystemInventory because it records System-owned Application Configuration Summary snapshots/history. Activity Log records that an event happened; Configuration History preserves the business configuration snapshot.
+
+## 4. Business Object Hierarchy
 
 ```text
 Customer / Account
@@ -72,6 +88,9 @@ Customer / Account
        -> Activity
   -> Systems
        -> Tenants
+       -> Remarks
+       -> Owner / Responsible Contacts
+       -> Configuration History
        -> Documents
        -> Activity
   -> Tenants
@@ -92,6 +111,7 @@ Project
   -> Tasks
   -> Allocated Systems
   -> Linked Tenants
+  -> Future reusable Remarks / Owner child structures where approved
   -> Requirement Coverage validation output
   -> Documents
   -> Activity
@@ -99,6 +119,7 @@ Project
 Tenant
   -> Warranty records
   -> Operational status
+  -> Future reusable Remarks / Owner child structures where approved
   -> Documents
 
 Warranty
@@ -114,9 +135,9 @@ Admin
   -> Future users/roles/privileges
 ```
 
-Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects. Project is the central Delivery orchestration Business Object: it owns delivery execution and composes delivery context, while consuming facts from MilestonePlan, AllocationContext, RequirementCoverage read models, SystemInventory, TenantOperations, and WarrantyCollection. System is the reusable Delivery Resource of the ERP: it owns infrastructure configuration, Application Configuration Summary, and operational readiness independently of current Project allocation.
+Hierarchy describes business relationship, not ownership transfer. Customer may aggregate projects/systems/tenants, but Delivery owns those objects. Project is the central Delivery orchestration Business Object: it owns delivery execution and composes delivery context, while consuming facts from MilestonePlan, AllocationContext, RequirementCoverage read models, SystemInventory, TenantOperations, and WarrantyCollection. System is the reusable Delivery Resource of the ERP: it owns infrastructure configuration, Application Configuration Summary, and operational readiness independently of current Project allocation. Reusable child structures such as Remarks and Owner tables remain scoped to their parent object instance and do not transfer parent ownership.
 
-## 4. Relationship Matrix
+## 5. Relationship Matrix
 
 | Object | Parent Objects | Child Objects | Referenced Objects | Referencing Objects |
 | --- | --- | --- | --- | --- |
@@ -126,7 +147,7 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Project | Opportunity N:1, Customer N:1 derived | Milestones 1:N, Tasks through milestones, Allocations 1:N | Customer, Opportunity, Systems, Tenants, RequirementCoverage read models, Warranty context | Customer, Activity |
 | Milestone | Project N:1 | Tasks 1:N | Project | Project health |
 | Task | Milestone N:1 | None | Project/Milestone | Project health |
-| System | Project N:N through Allocation | Tenants 1:N | Customer, Product/config metadata | Project, Tenant, Customer |
+| System | Project N:N through Allocation | Tenants 1:N, Remarks 1:N, Owner rows 1:N, Configuration History 1:N | Customer, Product/config metadata | Project, Tenant, Customer |
 | Production Inventory Item | Systems Workspace view/tab | Allocation target | Product/config metadata | Project allocation |
 | Reused Internal System | Systems Workspace view/tab | Allocation target | Product/config metadata | POC Project allocation |
 | Tenant | System N:1, Project N:N | Warranties 1:N | Customer, Project, Requirement, System | Customer, Project, Warranty |
@@ -139,7 +160,7 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Role | Admin | Privileges N:N | Users, Privileges | Future permissions |
 | Privilege | Admin | None | Role | Future permissions |
 
-## 5. Ownership Matrix
+## 6. Ownership Matrix
 
 | Object | Business Owner | Console Owner | Domain Owner | Workspace Owner | May Modify | May Reference Only |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -153,13 +174,15 @@ Hierarchy describes business relationship, not ownership transfer. Customer may 
 | Tenant | Delivery | Delivery | TenantOperations | Tenant Workspace | Delivery | Sales, Admin |
 | Warranty | Delivery | Delivery | WarrantyCollection | Warranty Workspace / Tenant Workspace | Delivery | Sales, Admin |
 | Allocation | Delivery | Delivery | AllocationContext | Project Workspace | Delivery | Sales |
+| Remark | Parent object owner | Parent console | Parent domain / future shared Remark service | Parent workspace | Parent-authorized users | Related workspaces |
+| Owner / Responsible Contact | Parent object owner | Parent console | Parent domain / future shared child-object service | Parent workspace | Parent-authorized users | Related workspaces |
 | Document | Parent object owner | Parent console | DocumentCollection | Parent workspace | Parent owner | Related workspaces |
 | Activity Event | Admin governance | Admin | ActivityLog | Audit / Activity Log | System/store transactions | All relevant workspaces |
 | Dashboard View | Admin infrastructure | Admin/shared | DashboardView | Dashboard surface | User/dashboard owner | Admin governance |
 | Picklist | Admin | Admin | Config/storage | Future Admin Workspace | Admin | All object forms |
 | Templates | Admin | Admin | Config/MilestonePlan | Future Admin Workspace | Admin | Project Workspace |
 
-## 6. Lifecycle Dependencies
+## 7. Lifecycle Dependencies
 
 ```text
 Customer
@@ -177,6 +200,9 @@ Project
 
 System
   -> Tenant hosting
+  -> Remarks
+  -> Owner / Responsible Contacts
+  -> Configuration History
 
 Tenant
   -> Warranty records
@@ -193,11 +219,11 @@ Project/System/Tenant/Allocation transactions
   -> Activity Events
 ```
 
-Customer must exist before Opportunity. Opportunity may trigger Project creation/update. Project execution begins in Delivery. Project allocates Systems through AllocationContext and does not own System configuration. Tenant executes inside System, but Tenant lifecycle remains owned by TenantOperations. Warranty belongs to Tenant. Requirement Coverage is a Delivery-owned validation/read-model capability, not a Business Object or manually created workflow object. Activity Events are emitted by transaction boundaries, not pages.
+Customer must exist before Opportunity. Opportunity may trigger Project creation/update. Project execution begins in Delivery. Project allocates Systems through AllocationContext and does not own System configuration. Tenant executes inside System, but Tenant lifecycle remains owned by TenantOperations. Warranty belongs to Tenant. Requirement Coverage is a Delivery-owned validation/read-model capability, not a Business Object or manually created workflow object. System Configuration History is generated from System-owned configuration changes. Activity Events are emitted by transaction boundaries, not pages.
 
 Operational renewal belongs to Delivery through Warranty / Renewal Work Queue. Project may display renewal project context, but WarrantyCollection owns warranty chain/status and Renewal Work Queue owns renewal readiness visibility.
 
-## 7. Navigation Model
+## 8. Navigation Model
 
 All business-object navigation uses Business Reference Resolver. Visible business IDs use shared Business Object Links. Routes remain stable. Cross-console navigation is allowed but does not transfer ownership.
 
@@ -214,7 +240,7 @@ All business-object navigation uses Business Reference Resolver. Visible busines
 
 Deep links should use business IDs where available. Missing/stale references must display safely.
 
-## 8. Event Flow
+## 9. Event Flow
 
 | Object | Typical Emitted Events | Typical Consumed Events |
 | --- | --- | --- |
@@ -225,6 +251,8 @@ Deep links should use business IDs where available. Missing/stale references mus
 | Milestone | milestone.created, milestone.completed, milestone.reordered | Project activity timeline |
 | Task | task.created, task.completed, task.reopened | Project activity timeline |
 | System | system.created, system.updated | Allocation events |
+| Remark | remark.created, remark.updated, remark.deleted, remark.completed future | Parent object timelines |
+| Owner / Responsible Contact | owner.added, owner.updated, owner.removed future | Parent object timelines |
 | Allocation | allocation.systemAllocated, allocation.systemDeallocated | Project/system timelines |
 | Tenant | tenant.createdFromRequirement, tenant.movedToSystem, tenant.deletedFromSystem | Allocation/system/project context |
 | Warranty | warranty.created, warranty.renewed, predecessorLinked, noWarrantyOverride | Renewal queue, customer timeline |
@@ -234,7 +262,7 @@ Deep links should use business IDs where available. Missing/stale references mus
 
 Current event implementation is partial. Do not infer events unless approved.
 
-## 9. Ownership Boundaries
+## 10. Ownership Boundaries
 
 Customer owns customer identity, commercial account profile, and customer aggregation. It does not own delivery statuses, Project execution, Warranty status, or Tenant/System operational status.
 
@@ -242,7 +270,11 @@ Opportunity owns commercial lifecycle, delivery intent, requirement definitions,
 
 Project owns Delivery execution, Delivery health, milestone/task context, and Delivery workspace composition. It consumes facts from MilestonePlan, AllocationContext, RequirementCoverage read models, SystemInventory, TenantOperations, and WarrantyCollection. It does not own Customer master, Opportunity lifecycle, System logic, Tenant logic, Warranty status, or Requirement Coverage validation logic.
 
-System owns system identity/configuration/operational facts, Application Configuration Summary, and operational readiness. System is the reusable Delivery Resource of the ERP. Production Inventory and Reused Internal Systems are Systems Workspace views/tabs, not separate business objects with separate ownership. Systems are Delivery-owned supporting Business Objects, not separate role-owned objects. Project allocates Systems through AllocationContext and does not own System configuration. System does not own Tenant warranty, Tenant lifecycle, Project health, or Customer commercial data.
+System owns system identity/configuration/operational facts, Application Configuration Summary, System Configuration History, and operational readiness. System is the reusable Delivery Resource of the ERP. Production Inventory and Reused Internal Systems are Systems Workspace views/tabs, not separate business objects with separate ownership. Systems are Delivery-owned supporting Business Objects, not separate role-owned objects. Project allocates Systems through AllocationContext and does not own System configuration. System does not own Tenant warranty, Tenant lifecycle, Project health, or Customer commercial data.
+
+Remarks are reusable child Business Objects scoped to a parent object instance. They own remark row identity, timestamp, author metadata, type, rich text content, due date, and deadline alert output. In V1 they may be implemented first under System. Remark author metadata is not the Owner table.
+
+Owner / Responsible Contact is a reusable child Business Object/table scoped to a parent object instance. It represents responsible people or contacts for that parent. In V1 it may be implemented first under System.
 
 Tenant owns tenant identity/lifecycle facts and tenant operational mode/status context. Tenant executes inside System, but Tenant lifecycle remains owned by TenantOperations. Tenants are Delivery-owned supporting Business Objects, not separate role-owned objects. Tenant does not own Warranty chain/status, System state, or Project health.
 
@@ -252,7 +284,7 @@ RequirementCoverage owns coverage status, missing-step derivation, and coverage 
 
 ActivityLog owns event structure, event selectors, and timeline/audit read models. It does not own business rules of emitted facts.
 
-## 10. Core Services Usage Matrix
+## 11. Core Services Usage Matrix
 
 | Object | Identity | Reference Resolver | Status Engine | Rich Text | Config Renderer | Delivery Tables | Business Links | ActivityLog |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -263,6 +295,8 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Milestone | Future MS | Yes future | Yes | Comment | No | Tables | Future | Future |
 | Task | Future TK | Yes future | Yes | Comment | No | Tables | Future | Future |
 | System | Yes | Yes | Yes | Comments/docs | Yes | Yes | Yes | Yes |
+| Remark | Yes | Future parent refs | Deadline alerts | Yes | No | Tables | Parent link | Yes future |
+| Owner / Responsible Contact | User ID if available | Future parent refs | No | No | No | Tables | Parent link | Yes future |
 | Tenant | Yes | Yes | Yes | Comments/docs | Yes | Yes | Yes | Yes |
 | Warranty | Yes | Yes partial | Yes | Remarks | No | Dashboard tables | Yes where route exists | Future |
 | Allocation | Generated/internal | Yes via related refs | Alerts only | No | No | Yes | Yes | Yes |
@@ -272,7 +306,7 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Picklist | Future | No | No | No | No | No | No | Future |
 | Templates | Future | No | No | Rich comments future | No | No | No | Future |
 
-## 11. Shared Component Usage Matrix
+## 12. Shared Component Usage Matrix
 
 | Object | Typical Shared Components |
 | --- | --- |
@@ -283,6 +317,8 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Milestone | StatusBadge, AlertStatusIcon, ProgressBar, RichTextEditor |
 | Task | StatusBadge, AlertStatusIcon, RichTextEditor |
 | System | FormField, ConfigurationRenderer, DeliveryTables, BusinessObjectLink, Operational status display |
+| Remark | FormField, RichTextEditor, AlertStatusIcon, editable table/grid |
+| Owner / Responsible Contact | FormField, editable table/grid, BusinessObjectLink where user reference exists |
 | Tenant | FormField, ConfigurationRenderer, DeliveryTables, BusinessObjectLink, Operational status display |
 | Warranty | StatusBadge, AlertStatusIcon, BusinessIdLink, dialogs/forms |
 | Allocation | DeliveryTables, BusinessIdLink, AlertStatusIcon |
@@ -292,7 +328,7 @@ ActivityLog owns event structure, event selectors, and timeline/audit read model
 | Picklist | FormField, select/picklist components |
 | Templates | Admin tables/forms, future |
 
-## 12. Console Architecture
+## 13. Console Architecture
 
 ```text
 Sales Console
@@ -330,7 +366,7 @@ Admin Console
 
 Consoles are operational areas. Workspaces are complete environments for business objects. Business objects define ownership. Some visible console entries, such as Requirement Coverage, may be dashboard/read-model surfaces rather than Business Object Workspaces when they own no editable lifecycle or master data.
 
-## 13. Version 1.0 Scope
+## 14. Version 1.0 Scope
 
 Included in V1:
 
@@ -342,6 +378,7 @@ Included in V1:
 - Milestone
 - Task
 - System
+- System Remarks, Owner rows, and Configuration History as child structures
 - Production System Inventory
 - Reused Internal System
 - Tenant
@@ -364,7 +401,7 @@ Not fully included but likely needed for commercial V1:
 - Admin template management
 - Product/package definitions
 
-## 14. Version 2.0 Expansion
+## 15. Version 2.0 Expansion
 
 Version 2.0 is the configurable ERP platform phase.
 
@@ -388,7 +425,7 @@ Potential V2 expansions:
 
 Do not redesign V1 around V2 configurability.
 
-## 15. Architecture Observations
+## 16. Architecture Observations
 
 | Type | Observation | Recommendation |
 | --- | --- | --- |
