@@ -101,4 +101,24 @@
     overflow-wrap: anywhere;
     line-height: 1.25rem;
   }
+
+  .sf-view-mode input:not([type='checkbox']):not([type='radio']),
+  .sf-view-mode select,
+  .sf-view-mode textarea,
+  .sf-view-mode .rich-text-editor {
+    pointer-events: none;
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .sf-view-mode input[type='checkbox'],
+  .sf-view-mode input[type='radio'] {
+    pointer-events: none;
+  }
+
+  .sf-view-mode button:not(.sf-view-mode-allow) {
+    pointer-events: none;
+    opacity: 0.55;
+  }
 }

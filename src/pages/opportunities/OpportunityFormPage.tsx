@@ -299,7 +299,7 @@ function CollapsibleSection({
   return (
     <section className={className}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
+        <button type="button" className="sf-view-mode-allow flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
           <Indicator className="mt-0.5 h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
           <span>
             <span className="block text-lg font-semibold text-sf-text">{title}</span>
@@ -874,6 +874,7 @@ export function OpportunityFormPage() {
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
   const salesManagers = useAppStore((state) => state.salesManagers)
@@ -986,6 +987,7 @@ export function OpportunityFormPage() {
   }
 
   function patchDraft(patch: Partial<Opportunity>) {
+    if (isViewMode) return
     setDraft((current) => (current ? { ...current, ...patch } : current))
     setSaveMessages([])
   }
@@ -1084,6 +1086,7 @@ export function OpportunityFormPage() {
   }
 
   function updateAccount(accountId: string) {
+    if (isViewMode) return
     const nextAccount = accounts.find((candidate) => candidate.id === accountId)
     if (!nextAccount) return
 
@@ -1099,11 +1102,13 @@ export function OpportunityFormPage() {
   }
 
   function applyOpportunityTypeChange(nextChange: PendingOpportunityTypeChange, deleteIrrelevantRequirements: boolean) {
+    if (isViewMode) return
     patchDraft(opportunityTypeChangePatch(nextChange, deleteIrrelevantRequirements))
     setPendingOpportunityTypeChange(null)
   }
 
   function requestOpportunityTypeChange(nextChange: PendingOpportunityTypeChange) {
+    if (isViewMode) return
     if (isSameOpportunityTypeChange(currentDraft, nextChange)) return
     if (!shouldConfirmOpportunityTypeChange(currentDraft, nextChange)) {
       applyOpportunityTypeChange(nextChange, false)
@@ -1113,11 +1118,13 @@ export function OpportunityFormPage() {
   }
 
   function updateType(type: OpportunityType) {
+    if (isViewMode) return
     const nextSubType = opportunitySubTypeForTypeChange(currentDraft.subType, type)
     requestOpportunityTypeChange({ type, subType: nextSubType })
   }
 
   function updateStage(stage: Opportunity['stage']) {
+    if (isViewMode) return
     if (stage === 'POC') {
       patchDraft({
         stage,
@@ -1130,6 +1137,7 @@ export function OpportunityFormPage() {
   }
 
   function addRequirement(kind: RequirementGridKind) {
+    if (isViewMode) return
     const firstTenant = kind === 'B' || kind === 'C' ? firstAvailableTenant(kind) : accountTenants[0]
     const firstWarranty = firstTenant
       ? warrantyRecordForTenant(firstTenant.id, warrantyRecords)
@@ -1170,6 +1178,7 @@ export function OpportunityFormPage() {
   }
 
   function deleteRequirement(kind: RequirementGridKind, rowId: string) {
+    if (isViewMode) return
     if (kind === 'A') {
       patchDraft({ newTenantRequirements: currentDraft.newTenantRequirements.filter((row) => row.id !== rowId) })
       return
@@ -1184,6 +1193,7 @@ export function OpportunityFormPage() {
   }
 
   function changeRequirementPackage(rowId: string, dealPackage: OpportunityDealPackage) {
+    if (isViewMode) return
     patchDraft({
       newTenantRequirements: currentDraft.newTenantRequirements.map((row) =>
         row.id === rowId
@@ -1194,6 +1204,7 @@ export function OpportunityFormPage() {
   }
 
   function updateRequirement(kind: RequirementGridKind, rowId: string, key: string, value: string | string[] | number | null) {
+    if (isViewMode) return
     const configurationPatch =
       key === 'hostingType' && value === 'On premise'
         ? { [key]: value, cloudPlatform: '' }
@@ -1281,6 +1292,7 @@ export function OpportunityFormPage() {
   }
 
   function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
+    if (isViewMode) return
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
@@ -1294,6 +1306,7 @@ export function OpportunityFormPage() {
   }
 
   function selectAllTenants(kind: 'B' | 'C') {
+    if (isViewMode) return
     const tenantsToAdd = accountTenants.filter((tenant) => !tenantSelectionDisabled(kind, '', tenant.id))
 
     if (tenantsToAdd.length === 0) return
@@ -1329,6 +1342,7 @@ export function OpportunityFormPage() {
   }
 
   function saveChanges(options: PendingSave = {}) {
+    if (isViewMode) return
     setIsSaveMenuOpen(false)
     setHasAttemptedSave(true)
     const messages = validateOpportunity(currentDraft, { accounts, systems, tenants })
@@ -1785,66 +1799,72 @@ export function OpportunityFormPage() {
 
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 border border-sf-border bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-sm text-sf-text-muted">
-          <span>{isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}</span>
+          <span>{isViewMode ? 'View mode.' : isDirty ? 'Unsaved changes are highlighted in yellow.' : 'No unsaved changes.'}</span>
           <StatusBadge
             label={hasAttemptedSave && validationErrors.length > 0 ? 'Needs attention' : hasAttemptedSave && validationWarnings.length > 0 ? 'Warnings' : 'Ready'}
             variant={hasAttemptedSave && validationErrors.length > 0 ? 'error' : hasAttemptedSave && validationWarnings.length > 0 ? 'warning' : 'done'}
           />
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!canUndo}
-            onClick={undoLastChange}
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
-            onClick={discardChanges}
-          >
-            Revert
-          </button>
+          {isViewMode ? null : (
+            <>
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canUndo}
+                onClick={undoLastChange}
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                onClick={discardChanges}
+              >
+                Revert
+              </button>
+            </>
+          )}
           <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={cancelChanges}>
-            Cancel
+            {isViewMode ? 'Back' : 'Cancel'}
           </button>
-          <div className="relative inline-flex">
-            <button
-              type="button"
-              className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
-              onClick={() => saveChanges()}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white hover:opacity-90"
-              aria-haspopup="menu"
-              aria-expanded={isSaveMenuOpen}
-              title="Save actions"
-              onClick={() => setIsSaveMenuOpen((current) => !current)}
-            >
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {isSaveMenuOpen ? (
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded border border-sf-border bg-white py-1 text-sm shadow-lg" role="menu">
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-sf-text hover:bg-sf-surface-alt"
-                  role="menuitem"
-                  onClick={() => saveChanges({ stayOnPage: true })}
-                >
-                  Apply Changes
-                </button>
-              </div>
-            ) : null}
-          </div>
+          {isViewMode ? null : (
+            <div className="relative inline-flex">
+              <button
+                type="button"
+                className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                onClick={() => saveChanges()}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white hover:opacity-90"
+                aria-haspopup="menu"
+                aria-expanded={isSaveMenuOpen}
+                title="Save actions"
+                onClick={() => setIsSaveMenuOpen((current) => !current)}
+              >
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {isSaveMenuOpen ? (
+                <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded border border-sf-border bg-white py-1 text-sm shadow-lg" role="menu">
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-2 text-left text-sf-text hover:bg-sf-surface-alt"
+                    role="menuitem"
+                    onClick={() => saveChanges({ stayOnPage: true })}
+                  >
+                    Apply Changes
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
+      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {hasAttemptedSave && validationMessages.length > 0 ? (
         <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p className="font-semibold">Opportunity validation</p>
@@ -2036,7 +2056,7 @@ export function OpportunityFormPage() {
           <button
             type="button"
             className={[
-              'border-b-2 px-4 py-2 text-base font-semibold',
+              'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
               activeDetailTab === 'requirements'
                 ? 'border-sf-brand bg-white text-sf-text'
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
@@ -2049,7 +2069,7 @@ export function OpportunityFormPage() {
           <button
             type="button"
             className={[
-              'border-b-2 px-4 py-2 text-base font-semibold',
+              'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
               activeDetailTab === 'project'
                 ? 'border-sf-brand bg-white text-sf-text'
                 : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',

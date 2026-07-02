@@ -285,7 +285,7 @@ function CollapsibleSection({
 
   return (
     <section className={className}>
-      <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
+      <button type="button" className="sf-view-mode-allow flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
         <Indicator className="mt-0.5 h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
         <span>
           <span className="block text-lg font-semibold text-sf-text">{title}</span>
@@ -364,6 +364,7 @@ export function ProjectFormPage() {
   const { pid } = useParams<{ pid: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
@@ -528,6 +529,7 @@ export function ProjectFormPage() {
   }
 
   function openAllocationDialog() {
+    if (isViewMode) return
     const initialMode = permittedAllocationModes[0]
     setAllocationMode(initialMode)
     setSelectedAllocationIds([])
@@ -540,6 +542,7 @@ export function ProjectFormPage() {
   }
 
   function changeAllocationMode(mode: AllocationMode) {
+    if (isViewMode) return
     setAllocationMode(mode)
     setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
@@ -548,6 +551,7 @@ export function ProjectFormPage() {
   }
 
   function confirmAllocation() {
+    if (isViewMode) return
     if (selectedAllocationIds.length === 0) {
       setAllocationResult({ ok: false, message: 'Select at least one system before allocating.' })
       return
@@ -584,6 +588,7 @@ export function ProjectFormPage() {
   }
 
   function toggleAllocationCandidate(candidateId: string, selected: boolean) {
+    if (isViewMode) return
     setSelectedAllocationIds((current) => {
       const next = new Set(current)
       if (selected) {
@@ -596,6 +601,7 @@ export function ProjectFormPage() {
   }
 
   function deallocateSystem(link: ProjectSystemLink) {
+    if (isViewMode) return
     const result = deallocateProjectSystem(link.id)
     setAllocationResult(result)
   }
@@ -609,6 +615,7 @@ export function ProjectFormPage() {
   }
 
   function updateDraftField(key: keyof Project, value: string | null) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       if (key === 'opportunityId') {
@@ -625,6 +632,7 @@ export function ProjectFormPage() {
   }
 
   function saveProject(stayOnPage: boolean) {
+    if (isViewMode) return
     const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
@@ -721,46 +729,50 @@ export function ProjectFormPage() {
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative inline-flex">
-          <button
-            type="button"
-            className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
-            onClick={() => saveProject(false)}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
-            aria-label="More save actions"
-            aria-expanded={saveMenuOpen}
-            onClick={() => setSaveMenuOpen((current) => !current)}
-          >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          </button>
-          {saveMenuOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded border border-sf-border bg-white py-1 shadow-lg">
+        {isViewMode ? null : (
+          <>
+            <div className="relative inline-flex">
               <button
                 type="button"
-                className="block w-full px-3 py-2 text-left text-sm text-sf-text hover:bg-sf-surface-alt"
-                onClick={() => {
-                  setSaveMenuOpen(false)
-                  saveProject(true)
-                }}
+                className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => saveProject(false)}
               >
-                Apply Changes
+                Save
               </button>
+              <button
+                type="button"
+                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
+                aria-label="More save actions"
+                aria-expanded={saveMenuOpen}
+                onClick={() => setSaveMenuOpen((current) => !current)}
+              >
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {saveMenuOpen ? (
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded border border-sf-border bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-2 text-left text-sm text-sf-text hover:bg-sf-surface-alt"
+                    onClick={() => {
+                      setSaveMenuOpen(false)
+                      saveProject(true)
+                    }}
+                  >
+                    Apply Changes
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
-          Undo
-        </button>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
-          Revert
-        </button>
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
+              Undo
+            </button>
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
+              Revert
+            </button>
+          </>
+        )}
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={cancelProject}>
-          Cancel
+          {isViewMode ? 'Back' : 'Cancel'}
         </button>
       </div>
     )
@@ -792,6 +804,7 @@ export function ProjectFormPage() {
   }
 
   function updateMilestoneOrder(milestoneId: string, order: number) {
+    if (isViewMode) return
     setDraft((current) => (current ? updateMilestoneOrderInPlan(current, milestoneId, order) : current))
     setSaveMessages([])
   }
@@ -804,6 +817,7 @@ export function ProjectFormPage() {
   }
 
   function updateTaskOrder(taskId: string, order: number) {
+    if (isViewMode) return
     setDraft((current) => (current ? updateTaskOrderInPlan(current, taskId, order) : current))
     setSaveMessages([])
   }
@@ -824,6 +838,7 @@ export function ProjectFormPage() {
   }
 
   function updateMilestone(milestoneId: string, patch: Partial<NonNullable<Project['milestones']>[number]>) {
+    if (isViewMode) return
     setDraft((current) =>
       current
         ? {
@@ -838,11 +853,13 @@ export function ProjectFormPage() {
   }
 
   function updateTask(taskId: string, patch: Partial<NonNullable<Project['tasks']>[number]>) {
+    if (isViewMode) return
     setDraft((current) => (current ? updateTaskInPlan(current, taskId, patch) : current))
     setSaveMessages([])
   }
 
   function openAddMilestoneDialog() {
+    if (isViewMode) return
     const nextOrder = ((projectDraft.milestones ?? []).reduce((maxOrder, milestone) => Math.max(maxOrder, milestone.order), 0) || 0) + 1
     setNewMilestoneName('')
     setNewMilestoneOrder(nextOrder)
@@ -979,11 +996,13 @@ export function ProjectFormPage() {
   }
 
   function updateTaskCompletion(taskId: string, completed: boolean) {
+    if (isViewMode) return
     setDraft((current) => (current ? updateTaskInPlan(current, taskId, { status: completed ? 'DONE' : 'OPEN' }) : current))
     setSaveMessages([])
   }
 
   function updateMilestoneTasksCompletion(milestoneId: string, completed: boolean) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       const taskIds = (current.tasks ?? [])
@@ -1492,7 +1511,9 @@ export function ProjectFormPage() {
         <DocumentsPanel
           documents={projectDraft.documents ?? []}
           emptyText="No documents uploaded for this project."
+          readOnly={isViewMode}
           onChange={(documents) => {
+            if (isViewMode) return
             setDraft((current) => (current ? { ...current, documents } : current))
             setSaveMessages([])
           }}
@@ -1734,14 +1755,16 @@ export function ProjectFormPage() {
           <p className="text-sm text-sf-text-muted">
             Allocation creates Project to System links only. It does not create tenants.
           </p>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
-            onClick={openAllocationDialog}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Allocate System
-          </button>
+          {isViewMode ? null : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+              onClick={openAllocationDialog}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Allocate System
+            </button>
+          )}
         </div>
 
         {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
@@ -1776,7 +1799,7 @@ export function ProjectFormPage() {
                   >
                     Edit
                   </button>
-                  {link ? (
+                  {link && !isViewMode ? (
                     <button
                       type="button"
                       className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
@@ -1833,7 +1856,7 @@ export function ProjectFormPage() {
         actions={renderActionButtons()}
       />
 
-      <div className="sf-form-content-scroll min-h-0 flex-1 pb-2 pr-1">
+      <div className={['sf-form-content-scroll min-h-0 flex-1 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {saveMessages.length > 0 ? (
         <div className={saveMessages.some((message) => message.includes('required')) ? 'mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'mb-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {saveMessages.map((message) => (
@@ -1869,7 +1892,7 @@ export function ProjectFormPage() {
               key={tab}
               type="button"
               className={[
-                'border-b-2 px-4 py-2 text-base font-semibold',
+                'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
                 activeTab === tab
                   ? 'border-sf-brand bg-white text-sf-text'
                   : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',

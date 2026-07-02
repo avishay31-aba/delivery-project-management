@@ -211,7 +211,7 @@ function CollapsibleSection({
 
   return (
     <section className="sf-card space-y-3 p-3">
-      <button type="button" className="flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
+      <button type="button" className="sf-view-mode-allow flex min-w-0 items-start gap-2 text-left" onClick={onToggle} aria-expanded={!collapsed}>
         <Indicator className="mt-0.5 h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
         <span>
           <span className="block text-lg font-semibold text-sf-text">{title}</span>
@@ -328,6 +328,7 @@ function InventoryForm<T extends InventoryRecord>({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
@@ -388,6 +389,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function updateField(key: string, value: unknown) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       const previousUrl = textValue(readRecordValue(current, 'url'))
@@ -414,6 +416,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function handlePicklistChange(key: string, value: string) {
+    if (isViewMode) return
     if (value === 'Add new...') {
       setPendingAddNew({ key, value: '' })
       return
@@ -493,6 +496,7 @@ function InventoryForm<T extends InventoryRecord>({
       : []
 
   function save(stayOnPage: boolean) {
+    if (isViewMode) return
     const nextMessages = validate()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -510,6 +514,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function saveBlockedNavigation() {
+    if (isViewMode) return
     const nextMessages = validate()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -787,6 +792,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function openAddTenantDialog() {
+    if (isViewMode) return
     const linkedProjects = linkedProjectsForSystem()
     const firstProjectId = linkedProjects[0]?.id ?? ''
     const firstRequirementId = firstProjectId ? firstAvailableRequirementId(firstProjectId) : ''
@@ -802,6 +808,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function createTenantFromSelection() {
+    if (isViewMode) return
     if (!selectedProjectId || !selectedRequirementId) return
     const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
     if (selectedRequirementId === 'INTERNAL') {
@@ -837,12 +844,14 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function deleteHostedTenant(tenant: Tenant) {
+    if (isViewMode) return
     if (!window.confirm(`Remove tenant ${tenant.tid} from this system?`)) return
     deleteTenantFromSystem(tenant.id)
     setMessages([`Tenant ${tenant.tid} removed from system.`])
   }
 
   function moveHostedTenant(tenant: Tenant) {
+    if (isViewMode) return
     const destination = window.prompt('Move tenant to SID or MID')
     if (!destination) return
     const normalizedDestination = destination.trim().toLocaleLowerCase()
@@ -973,7 +982,7 @@ function InventoryForm<T extends InventoryRecord>({
               key={tab.id}
               type="button"
               className={[
-                'border-b-2 px-4 py-2 text-sm font-semibold',
+                'sf-view-mode-allow border-b-2 px-4 py-2 text-sm font-semibold',
                 activeInfrastructureTab === tab.id
                   ? 'border-sf-brand bg-white text-sf-text'
                   : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
@@ -1018,35 +1027,39 @@ function InventoryForm<T extends InventoryRecord>({
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative inline-flex">
-          <button type="button" className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => save(false)}>
-            Save
-          </button>
-          <button
-            type="button"
-            className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
-            aria-label="More save actions"
-            aria-expanded={saveMenuOpen}
-            onClick={() => setSaveMenuOpen((current) => !current)}
-          >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          </button>
-          {saveMenuOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded border border-sf-border bg-white py-1 shadow-lg">
-              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-sf-text hover:bg-sf-surface-alt" onClick={() => save(true)}>
-                Apply Changes
+        {isViewMode ? null : (
+          <>
+            <div className="relative inline-flex">
+              <button type="button" className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => save(false)}>
+                Save
               </button>
+              <button
+                type="button"
+                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
+                aria-label="More save actions"
+                aria-expanded={saveMenuOpen}
+                onClick={() => setSaveMenuOpen((current) => !current)}
+              >
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </button>
+              {saveMenuOpen ? (
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded border border-sf-border bg-white py-1 shadow-lg">
+                  <button type="button" className="block w-full px-3 py-2 text-left text-sm text-sf-text hover:bg-sf-surface-alt" onClick={() => save(true)}>
+                    Apply Changes
+                  </button>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
-          Undo
-        </button>
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!isDirty} onClick={() => resetDraft(cloneRecord(activeRecord))}>
-          Revert
-        </button>
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!canUndo} onClick={undoDraft}>
+              Undo
+            </button>
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt disabled:opacity-50" disabled={!isDirty} onClick={() => resetDraft(cloneRecord(activeRecord))}>
+              Revert
+            </button>
+          </>
+        )}
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigate(dashboardPath)}>
-          Cancel
+          {isViewMode ? 'Back' : 'Cancel'}
         </button>
       </div>
     )
@@ -1057,7 +1070,9 @@ function InventoryForm<T extends InventoryRecord>({
       <DocumentsPanel
         documents={activeDraft.documents ?? []}
         emptyText="No documents uploaded for this system."
+        readOnly={isViewMode}
         onChange={(documents) => {
+          if (isViewMode) return
           setDraft((current) => (current ? ({ ...current, documents } as T) : current))
           setMessages([])
         }}
@@ -1165,6 +1180,7 @@ function InventoryForm<T extends InventoryRecord>({
       <OwnerGrid
         owners={(activeDraft.owners ?? []) as OwnerRecord[]}
         onChange={(owners) => updateField('owners', owners)}
+        readOnly={isViewMode}
       />
     )
   }
@@ -1224,6 +1240,7 @@ function InventoryForm<T extends InventoryRecord>({
         onChange={(remarks) => updateField('remarks', remarks)}
         typeOptions={optionsWithCustom(SYSTEM_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Add new...'])}
         onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, SYSTEM_REMARK_TYPE_PICKLIST_KEY, value))}
+        readOnly={isViewMode}
       />
     )
   }
@@ -1296,7 +1313,7 @@ function InventoryForm<T extends InventoryRecord>({
         actions={renderActionButtons()}
       />
 
-      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
+      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {messages.length > 0 ? (
         <div className={messages.some((message) => message.includes('cannot') || message.includes('required') || message.includes('unique')) ? 'rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
           {messages.map((message) => (
@@ -1342,7 +1359,7 @@ function InventoryForm<T extends InventoryRecord>({
                 key={tab.id}
                 type="button"
                 className={[
-                  'border-b-2 px-4 py-2 text-base font-semibold',
+                  'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
                   activeTab === tab.id
                     ? 'border-sf-brand bg-white text-sf-text'
                     : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',

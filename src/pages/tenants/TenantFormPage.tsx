@@ -214,6 +214,7 @@ export function TenantFormPage() {
   const { tid } = useParams<{ tid: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
@@ -374,6 +375,7 @@ export function TenantFormPage() {
   }
 
   function updateConfiguration(key: ConfigKey, value: string | string[] | number | null) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       return {
@@ -388,6 +390,7 @@ export function TenantFormPage() {
   }
 
   function updateTenantType(nextType: TenantFormType) {
+    if (isViewMode) return
     setDraft((current) =>
       current
         ? {
@@ -401,6 +404,7 @@ export function TenantFormPage() {
   }
 
   function attachSystem(nextSystemId: string) {
+    if (isViewMode) return
     const nextSystem = systems.find((candidate) => candidate.id === nextSystemId)
     const nextProject = nextSystem?.linkedProjectIds?.[0]
       ? projects.find((candidate) => candidate.id === nextSystem.linkedProjectIds?.[0])
@@ -414,6 +418,7 @@ export function TenantFormPage() {
   }
 
   function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
+    if (isViewMode) return
     const nextMessages = validateTenantConfiguration()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -445,6 +450,7 @@ export function TenantFormPage() {
   }
 
   function openWarrantyDialog(warranty: TenantWarranty) {
+    if (isViewMode) return
     setEditingWarrantyId(warranty.id)
     setWarrantyDialogErrors([])
     setWarrantyDialogDraft({
@@ -465,11 +471,13 @@ export function TenantFormPage() {
   }
 
   function updateWarrantyDialogDraft(key: keyof WarrantyDialogDraft, value: string | null) {
+    if (isViewMode) return
     setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
     setWarrantyDialogErrors([])
   }
 
   function updateWarrantyInline(id: string, patch: Partial<Pick<TenantWarranty, 'relatedProjectId' | 'startDate' | 'endDate'>>) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       const nextWarranties = (current.warranties ?? []).map((warranty) =>
@@ -481,6 +489,7 @@ export function TenantFormPage() {
   }
 
   function addWarrantyDialogPredecessor() {
+    if (isViewMode) return
     if (!editingWarrantyId || !warrantyDialogDraft) return
     const selection = predecessorSelections[editingWarrantyId]
     if (!selection?.tenantId || !selection.warrantyId) return
@@ -502,6 +511,7 @@ export function TenantFormPage() {
   }
 
   function removeWarrantyDialogPredecessor(value: string) {
+    if (isViewMode) return
     if (!warrantyDialogDraft) return
     setWarrantyDialogDraft({
       ...warrantyDialogDraft,
@@ -510,6 +520,7 @@ export function TenantFormPage() {
   }
 
   function saveWarrantyDialog() {
+    if (isViewMode) return
     if (!warrantyDialogDraft) return
     const errors = validateWarrantyEditDraft(warrantyDialogDraft)
     if (errors.length > 0) {
@@ -546,6 +557,7 @@ export function TenantFormPage() {
   }
 
   function addWarranty() {
+    if (isViewMode) return
     if (!canManageWarranties) {
       setMessages([warrantyManageabilityMessage()])
       return
@@ -561,6 +573,7 @@ export function TenantFormPage() {
   }
 
   function deleteWarranty(id: string) {
+    if (isViewMode) return
     setDraft((current) => {
       if (!current) return current
       const nextWarranties = (current.warranties ?? []).filter((warranty) => warranty.id !== id)
@@ -571,45 +584,51 @@ export function TenantFormPage() {
   function renderActionButtons() {
     return (
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!canUndo}
-          onClick={undoDraft}
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!isDirty}
-          onClick={revertTenant}
-        >
-          Revert
-        </button>
+        {isViewMode ? null : (
+          <>
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!canUndo}
+              onClick={undoDraft}
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!isDirty}
+              onClick={revertTenant}
+            >
+              Revert
+            </button>
+          </>
+        )}
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={cancelTenant}>
-          Cancel
+          {isViewMode ? 'Back' : 'Cancel'}
         </button>
-        <div className="relative inline-flex">
-          <button type="button" className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={() => saveTenant(false)}>
-            Save
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white"
-            aria-label="Save actions"
-            onClick={() => setSaveMenuOpen((current) => !current)}
-          >
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          </button>
-          {saveMenuOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded border border-sf-border bg-white py-1 text-sm shadow-lg">
-              <button type="button" className="block w-full px-3 py-2 text-left hover:bg-sf-surface-alt" onClick={() => saveTenant(true)}>
-                Apply Changes
-              </button>
-            </div>
-          ) : null}
-        </div>
+        {isViewMode ? null : (
+          <div className="relative inline-flex">
+            <button type="button" className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={() => saveTenant(false)}>
+              Save
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white"
+              aria-label="Save actions"
+              onClick={() => setSaveMenuOpen((current) => !current)}
+            >
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {saveMenuOpen ? (
+              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded border border-sf-border bg-white py-1 text-sm shadow-lg">
+                <button type="button" className="block w-full px-3 py-2 text-left hover:bg-sf-surface-alt" onClick={() => saveTenant(true)}>
+                  Apply Changes
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     )
   }
@@ -623,6 +642,7 @@ export function TenantFormPage() {
   }
 
   function updateTenantOperationalMode(value: string) {
+    if (isViewMode) return
     const nextOperationalStatus =
       value === '__DERIVED__'
         ? derivedTenantOperationalMode(activeSystem)
@@ -1029,7 +1049,9 @@ export function TenantFormPage() {
       <DocumentsPanel
         documents={tenantDraft.documents ?? []}
         emptyText="No documents uploaded for this tenant."
+        readOnly={isViewMode}
         onChange={(documents) => {
+          if (isViewMode) return
           setDraft((current) => (current ? { ...current, documents } : current))
           setMessages([])
         }}
@@ -1056,6 +1078,7 @@ export function TenantFormPage() {
           }}
           typeOptions={optionsWithCustom(TENANT_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Warranty', 'Add new...'])}
           onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, TENANT_REMARK_TYPE_PICKLIST_KEY, value))}
+          readOnly={isViewMode}
         />
       </section>
     )
@@ -1335,7 +1358,7 @@ export function TenantFormPage() {
         subtitle={`${formType === 'POC' ? 'Tenant form-POC' : 'Tenant form-Customer'} foundation`}
         actions={renderActionButtons()}
       />
-      <div className="sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1">
+      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {messages.length > 0 ? (
         <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
           {messages.map((message) => <div key={message}>{message}</div>)}
@@ -1350,7 +1373,7 @@ export function TenantFormPage() {
               key={tab.id}
               type="button"
               className={[
-                'border-b-2 px-4 py-2 text-base font-semibold',
+                'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
                 activeTab === tab.id
                   ? 'border-sf-brand bg-white text-sf-text'
                   : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',

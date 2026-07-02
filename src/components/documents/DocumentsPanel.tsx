@@ -14,9 +14,10 @@ interface DocumentsPanelProps {
   documents: DocumentRecord[]
   emptyText: string
   onChange: (documents: DocumentRecord[]) => void
+  readOnly?: boolean
 }
 
-export function DocumentsPanel({ documents, emptyText, onChange }: DocumentsPanelProps) {
+export function DocumentsPanel({ documents, emptyText, onChange, readOnly = false }: DocumentsPanelProps) {
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -62,12 +63,16 @@ export function DocumentsPanel({ documents, emptyText, onChange }: DocumentsPane
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt">
-          <Upload className="h-4 w-4" aria-hidden="true" />
-          Upload
-          <input className="sr-only" type="file" multiple onChange={addDocuments} />
-        </label>
-        <input ref={replaceInputRef} className="sr-only" type="file" onChange={replaceDocument} />
+        {readOnly ? null : (
+          <>
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt">
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Upload
+              <input className="sr-only" type="file" multiple onChange={addDocuments} />
+            </label>
+            <input ref={replaceInputRef} className="sr-only" type="file" onChange={replaceDocument} />
+          </>
+        )}
       </div>
 
       {documents.length > 0 ? (
@@ -112,18 +117,22 @@ export function DocumentsPanel({ documents, emptyText, onChange }: DocumentsPane
                           Open
                         </a>
                       ) : null}
-                      <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => startEdit(document)}>
-                        <Edit3 className="h-4 w-4" aria-hidden="true" />
-                        Edit
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => requestReplace(document.id)}>
-                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                        Replace
-                      </button>
-                      <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => removeDocument(document.id)}>
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        Remove
-                      </button>
+                      {readOnly ? null : (
+                        <>
+                        <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => startEdit(document)}>
+                          <Edit3 className="h-4 w-4" aria-hidden="true" />
+                          Edit
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => requestReplace(document.id)}>
+                          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                          Replace
+                        </button>
+                        <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => removeDocument(document.id)}>
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          Remove
+                        </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
