@@ -55,9 +55,13 @@ return (
       if (!column?.editKey) return
       updateProject(row.id, { [column.editKey]: value } as never)
     }}
-    onRowClick={(row) => {
+    onView={(row) => {
       const routePath = projectReference(row).routePath
-      if (routePath) navigate(routePath, { state: { returnTo } })
+      if (routePath) navigate(routePath, { state: { returnTo, mode: 'view' } })
+    }}
+    onEditRecord={(row) => {
+      const routePath = projectReference(row).routePath
+      if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
     }}
   />
 </div>

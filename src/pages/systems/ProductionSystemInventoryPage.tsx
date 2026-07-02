@@ -48,9 +48,13 @@ export function ProductionSystemInventoryPage() {
           if (!column?.editKey) return
           updateSystem(row.id, { [column.editKey]: value } as never)
         }}
-        onRowClick={(row) => {
+        onView={(row) => {
           const routePath = systemReference(row).routePath
-          if (routePath) navigate(routePath, { state: { returnTo } })
+          if (routePath) navigate(routePath, { state: { returnTo, mode: 'view' } })
+        }}
+        onEditRecord={(row) => {
+          const routePath = systemReference(row).routePath
+          if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
     </div>

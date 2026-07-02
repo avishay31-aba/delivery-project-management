@@ -86,9 +86,13 @@ export function WarrantyDashboardPage() {
         rows={rows}
         columns={columns}
         enableInlineEditing={false}
-        onRowClick={(row) => {
+        onView={(row) => {
           const routePath = routePathForBusinessReference('TENANT', row.tenantTid)
-          if (routePath) navigate(routePath)
+          if (routePath) navigate(routePath, { state: { mode: 'view' } })
+        }}
+        onEditRecord={(row) => {
+          const routePath = routePathForBusinessReference('TENANT', row.tenantTid)
+          if (routePath) navigate(routePath, { state: { mode: 'edit' } })
         }}
       />
     </div>

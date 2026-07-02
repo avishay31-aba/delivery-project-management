@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, ReactNode, SetStateAction } from 'react'
 import {
+  Eye,
+  Pencil,
+} from 'lucide-react'
+import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -60,7 +64,8 @@ interface DataDashboardProps<T extends { id: string }> {
   dashboardScope: DashboardViewScope
   rows: T[]
   columns: DashboardColumn<T>[]
-  onRowClick?: (row: T) => void
+  onView?: (row: T) => void
+  onEditRecord?: (row: T) => void
   onEdit?: (row: T, columnId: string, value: string) => void
   getRowClassName?: (row: T) => string
   toolbar?: ReactNode
@@ -91,6 +96,7 @@ type ColumnDropPlacement = 'before' | 'after'
 const FLOATING_MENU_VIEWPORT_PADDING = 8
 const FLOATING_MENU_TRIGGER_GAP = 4
 const COLUMN_DRAG_DATA_TYPE = 'application/x-dashboard-column-id'
+const ACTION_COLUMN_ID = '__actions'
 const ROW_INDICATOR_COLUMN_ID = '__rowIndicator'
 
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
@@ -732,7 +738,8 @@ export function DataDashboard<T extends { id: string }>({
   dashboardScope,
   rows,
   columns,
-  onRowClick,
+  onView,
+  onEditRecord,
   onEdit,
   getRowClassName,
   toolbar,
@@ -824,8 +831,58 @@ export function DataDashboard<T extends { id: string }>({
     setCollapsedGroupIds(new Set())
   }, [grouping])
 
+  const internalColumnOrder = useMemo(
+    () => [ACTION_COLUMN_ID, ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)],
+    [columnOrder],
+  )
+  const internalColumnVisibility = useMemo(
+    () => ({ ...columnVisibility, [ACTION_COLUMN_ID]: true }),
+    [columnVisibility],
+  )
+
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () => [
+      {
+        id: ACTION_COLUMN_ID,
+        header: 'Actions',
+        accessorFn: () => '',
+        enableSorting: false,
+        enableGrouping: false,
+        enableColumnFilter: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="inline-flex h-7 items-center gap-1 rounded border border-sf-border bg-white px-2 text-sf-text hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+              title="View"
+              aria-label="View record"
+              disabled={!onView}
+              onClick={(event) => {
+                event.stopPropagation()
+                onView?.(row.original)
+              }}
+            >
+              <Eye className="h-4 w-4" aria-hidden="true" />
+              <span>View</span>
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-7 items-center gap-1 rounded border border-sf-border bg-white px-2 text-sf-text hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+              title="Edit"
+              aria-label="Edit record"
+              disabled={!onEditRecord}
+              onClick={(event) => {
+                event.stopPropagation()
+                onEditRecord?.(row.original)
+              }}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              <span>Edit</span>
+            </button>
+          </div>
+        ),
+      },
       {
         id: ROW_INDICATOR_COLUMN_ID,
         header: '',
@@ -891,19 +948,32 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, enableInlineEditing, onEdit],
+    [columns, enableInlineEditing, onEdit, onEditRecord, onView],
   )
 
   const table = useReactTable({
     data: rows,
     columns: tableColumns,
-    state: { globalFilter, sorting, grouping, columnFilters, columnOrder, columnVisibility },
+    state: { globalFilter, sorting, grouping, columnFilters, columnOrder: internalColumnOrder, columnVisibility: internalColumnVisibility },
     onGlobalFilterChange: (updater) => updateDashboardState(setGlobalFilter, updater),
     onSortingChange: (updater) => updateDashboardState(setSorting, updater),
     onGroupingChange: (updater) => updateDashboardState(setGrouping, updater),
     onColumnFiltersChange: (updater) => updateDashboardState(setColumnFilters, updater),
-    onColumnOrderChange: (updater) => updateDashboardState(setColumnOrder, updater),
-    onColumnVisibilityChange: (updater) => updateDashboardState(setColumnVisibility, updater),
+    onColumnOrderChange: (updater) =>
+      updateDashboardState(setColumnOrder, (current) => {
+        const nextColumnOrder = typeof updater === 'function'
+          ? updater([ACTION_COLUMN_ID, ...current])
+          : updater
+        return nextColumnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)
+      }),
+    onColumnVisibilityChange: (updater) =>
+      updateDashboardState(setColumnVisibility, (current) => {
+        const nextColumnVisibility = typeof updater === 'function'
+          ? updater({ ...current, [ACTION_COLUMN_ID]: true })
+          : updater
+        const { [ACTION_COLUMN_ID]: _actionVisibility, ...userColumnVisibility } = nextColumnVisibility
+        return userColumnVisibility
+      }),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -1420,7 +1490,6 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
         <tr
           key={row.id}
           className={joinClassNames(dashboardRowClassName(row.original))}
-          onClick={() => onRowClick?.(row.original)}
         >
           {row.getVisibleCells().map((cell, cellIndex) => (
             <td
@@ -1437,7 +1506,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   }
 
   function exportCsv() {
-    const visibleColumns = table.getVisibleLeafColumns()
+    const visibleColumns = table.getVisibleLeafColumns().filter((column) => column.id !== ACTION_COLUMN_ID)
     const header = visibleColumns.map((column) => column.columnDef.header as string).join(',')
     const lines = table.getFilteredRowModel().rows.map((row) =>
       visibleColumns
@@ -1702,6 +1771,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header, headerIndex) => {
                     const sourceColumn = columns.find((column) => column.id === header.column.id)
+                    const isActionColumn = header.column.id === ACTION_COLUMN_ID
 
                     return (
                       <th
@@ -1716,13 +1786,15 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                             draggedColumnId !== header.column.id &&
                             'bg-blue-50 ring-2 ring-inset ring-sf-brand',
                         )}
-                        onDragOver={(event) => handleColumnDragOver(event, header.column.id)}
+                        onDragOver={isActionColumn ? undefined : (event) => handleColumnDragOver(event, header.column.id)}
                         onDragLeave={() =>
                           setDragOverColumnId((columnId) => (columnId === header.column.id ? null : columnId))
                         }
-                        onDrop={(event) => handleColumnDrop(event, header.column.id)}
+                        onDrop={isActionColumn ? undefined : (event) => handleColumnDrop(event, header.column.id)}
                       >
-                        {header.isPlaceholder ? null : (
+                        {header.isPlaceholder ? null : isActionColumn ? (
+                          <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                        ) : (
                           <div className="inline-flex items-center gap-1">
                             <button
                               type="button"
@@ -1760,7 +1832,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                             </button>
                             <HeaderMenu
                               column={header.column}
-                              allColumns={table.getAllLeafColumns()}
+                              allColumns={table.getAllLeafColumns().filter((column) => column.id !== ACTION_COLUMN_ID)}
                               sourceColumn={sourceColumn}
                               rows={rows}
                               grouping={grouping}

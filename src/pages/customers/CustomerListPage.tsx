@@ -25,9 +25,13 @@ export function CustomerListPage() {
         rows={accounts}
         columns={columns}
         enableInlineEditing={false}
-        onRowClick={(row) => {
+        onView={(row) => {
           const routePath = accountReference(row).routePath
-          if (routePath) navigate(routePath)
+          if (routePath) navigate(routePath, { state: { mode: 'view' } })
+        }}
+        onEditRecord={(row) => {
+          const routePath = accountReference(row).routePath
+          if (routePath) navigate(routePath, { state: { mode: 'edit' } })
         }}
         onEdit={(row, columnId, value) => {
           const column = columns.find((candidate) => candidate.id === columnId)
