@@ -727,8 +727,18 @@ export function ProjectFormPage() {
   }
 
   function renderActionButtons() {
+    function switchToEditMode() {
+      const currentState = typeof location.state === 'object' && location.state ? location.state : {}
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: { ...currentState, mode: 'edit' } })
+    }
+
     return (
       <div className="flex flex-wrap items-center gap-2">
+        {isViewMode ? (
+          <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={switchToEditMode}>
+            Edit
+          </button>
+        ) : null}
         {isViewMode ? null : (
           <>
             <div className="relative inline-flex">
