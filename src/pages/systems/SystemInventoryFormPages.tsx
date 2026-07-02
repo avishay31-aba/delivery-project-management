@@ -85,6 +85,8 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   tabs: false,
   purposeHistory: false,
 }
+const PRODUCT_CHANGE_WITH_TENANTS_MESSAGE =
+  'Product cannot be changed because this system already has tenant(s) created for the current product type. Move or remove the related tenant(s) before changing the system product.'
 
 const ENVIRONMENT_FIELDS = [
   { key: 'hostingType', label: 'Hosting', inputType: 'picklist' },
@@ -390,8 +392,17 @@ function InventoryForm<T extends InventoryRecord>({
     })
   }
 
+  function productChangeBlocked(value: unknown): boolean {
+    if (normalizeProduct(value) === normalizeProduct(readRecordValue(activeDraft, 'productType'))) return false
+    return hostedTenantsForDraft().length > 0
+  }
+
   function updateField(key: string, value: unknown) {
     if (isViewMode) return
+    if (key === 'productType' && productChangeBlocked(value)) {
+      setMessages([PRODUCT_CHANGE_WITH_TENANTS_MESSAGE])
+      return
+    }
     setDraft((current) => {
       if (!current) return current
       const previousUrl = textValue(readRecordValue(current, 'url'))
