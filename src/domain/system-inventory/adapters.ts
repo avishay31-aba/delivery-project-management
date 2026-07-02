@@ -5,7 +5,7 @@ import {
 } from '@/domain/hosting-context'
 import { normalizeOwners } from '@/domain/owners'
 import { normalizeRemarks } from '@/domain/remarks'
-import type { ProductionSystemInventoryItem, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
+import type { ProductionSystemInventoryItem, Project, ReusedInternalPurposeHistoryRecord, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
   REUSED_INTERNAL_STATUS_AVAILABLE,
   REUSED_INTERNAL_STATUS_OCCUPIED,
@@ -37,6 +37,7 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
     configurationHistory: Array.isArray(record.configurationHistory) ? record.configurationHistory : [],
+    ...('currentProjectIds' in record ? { purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory) } : {}),
   }
 }
 
@@ -75,9 +76,113 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
   }
 }
 
-export function occupyReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+function purposeHistoryCounter(value: string): number | null {
+  const match = value.match(/^PH-(\d+)$/i)
+  if (!match) return null
+  const parsed = Number.parseInt(match[1], 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function nextPurposeHistoryRecordId(records: ReusedInternalPurposeHistoryRecord[]): string {
+  const nextCounter = records.reduce((max, record) => {
+    const parsed = purposeHistoryCounter(record.recordId)
+    return parsed == null ? max : Math.max(max, parsed)
+  }, 0) + 1
+  return `PH-${String(nextCounter).padStart(3, '0')}`
+}
+
+function closeOpenPurposeHistory(
+  records: ReusedInternalPurposeHistoryRecord[],
+  endDate: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalPurposeHistoryRecord[] {
+  return records.map((record, index) => (index === 0 && !record.endDate ? { ...record, ...context, endDate } : record))
+}
+
+function createPurposeHistoryRecord(
+  existingRecords: ReusedInternalPurposeHistoryRecord[],
+  startDate: string,
+  purposeType: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalPurposeHistoryRecord {
+  return {
+    id: `purpose-history-${crypto.randomUUID()}`,
+    recordId: nextPurposeHistoryRecordId(existingRecords),
+    startDate,
+    endDate: null,
+    purposeType,
+    pid: '',
+    sid: '',
+    projectName: '',
+    accountName: '',
+    product: '',
+    projectStatus: '',
+    ...context,
+  }
+}
+
+export function normalizeReusedInternalPurposeHistory(value: unknown): ReusedInternalPurposeHistoryRecord[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((record): record is Record<string, unknown> => Boolean(record) && typeof record === 'object')
+    .map((record, index) => ({
+      id: String(record.id ?? `purpose-history-${crypto.randomUUID()}`),
+      recordId: String(record.recordId ?? `PH-${String(index + 1).padStart(3, '0')}`),
+      startDate: String(record.startDate ?? record.allocatedAt ?? ''),
+      endDate: record.endDate == null ? null : String(record.endDate),
+      purposeType: String(record.purposeType ?? record.purpose ?? ''),
+      pid: String(record.pid ?? ''),
+      sid: String(record.sid ?? ''),
+      projectName: String(record.projectName ?? ''),
+      accountName: String(record.accountName ?? ''),
+      product: String(record.product ?? ''),
+      projectStatus: String(record.projectStatus ?? record.status ?? ''),
+    }))
+}
+
+export function appendReusedInternalPurposeHistory(
+  system: ReusedInternalSystem,
+  purposeType: string,
+  startedAt: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+  closingContext: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalSystem {
+  const currentHistory = normalizeReusedInternalPurposeHistory(system.purposeHistory)
+  const closedHistory = closeOpenPurposeHistory(currentHistory, startedAt, closingContext)
   return {
     ...system,
+    purposeHistory: [createPurposeHistoryRecord(closedHistory, startedAt, purposeType, context), ...closedHistory],
+  }
+}
+
+export function purposeHistoryContextFromProject(project: Project, allocatedSystem: System): Partial<ReusedInternalPurposeHistoryRecord> {
+  return {
+    pid: project.pid,
+    sid: allocatedSystem.sid ?? '',
+    projectName: project.opportunityName,
+    accountName: project.accountName,
+    product: allocatedSystem.productType,
+    projectStatus: project.progressStatus,
+  }
+}
+
+export function updateReusedInternalPurpose(system: ReusedInternalSystem, purpose: ReusedInternalSystem['purpose'], updatedAt: string): ReusedInternalSystem {
+  if (system.purpose === purpose) return { ...system, updatedAt }
+  return {
+    ...appendReusedInternalPurposeHistory(system, purpose, updatedAt),
+    purpose,
+    updatedAt,
+  }
+}
+
+export function occupyReusedInternalSystem(
+  system: ReusedInternalSystem,
+  projectId: string,
+  updatedAt: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalSystem {
+  return {
+    ...appendReusedInternalPurposeHistory(system, 'POC', updatedAt, context),
     status: REUSED_INTERNAL_STATUS_OCCUPIED,
     currentProjectIds: Array.from(new Set([...system.currentProjectIds, projectId])),
     occupationStartDate: system.occupationStartDate ?? updatedAt,
@@ -86,10 +191,18 @@ export function occupyReusedInternalSystem(system: ReusedInternalSystem, project
   }
 }
 
-export function releaseReusedInternalSystem(system: ReusedInternalSystem, projectId: string, updatedAt: string): ReusedInternalSystem {
+export function releaseReusedInternalSystem(
+  system: ReusedInternalSystem,
+  projectId: string,
+  updatedAt: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalSystem {
   const currentProjectIds = system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId)
+  const releasedSystem = currentProjectIds.length === 0
+    ? appendReusedInternalPurposeHistory(system, 'Available', updatedAt, {}, context)
+    : system
   return {
-    ...system,
+    ...releasedSystem,
     status: currentProjectIds.length === 0 ? REUSED_INTERNAL_STATUS_AVAILABLE : system.status,
     currentProjectIds,
     occupationEndDate: currentProjectIds.length === 0 ? updatedAt : system.occupationEndDate ?? null,
@@ -121,6 +234,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     occupationStartDate: null,
     occupationEndDate: null,
     currentProjectIds: [],
+    purposeHistory: [createPurposeHistoryRecord([], now, REUSED_INTERNAL_STATUS_AVAILABLE)],
     tenantCount: 0,
     alerts: [],
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,

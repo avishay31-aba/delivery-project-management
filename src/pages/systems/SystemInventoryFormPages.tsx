@@ -1229,7 +1229,7 @@ function InventoryForm<T extends InventoryRecord>({
 
   function renderPurposeHistorySection() {
     if (metadata.source !== SYSTEM_SOURCE_REUSED_INTERNAL) return null
-    const rows = reusedInternalPurposeHistory(activeRecord as ReusedInternalSystem | System, projects, projectSystems)
+    const rows = reusedInternalPurposeHistory(activeRecord as ReusedInternalSystem | System, projects, projectSystems, allocatedSystems)
 
     return (
       <CollapsibleSection
@@ -1243,7 +1243,7 @@ function InventoryForm<T extends InventoryRecord>({
             <table className="min-w-full border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['PID', 'Project Name', 'Purpose', 'Status', 'Start', 'End'].map((label) => (
+                  {['Record ID', 'Start Date', 'End Date', 'Purpose Type', 'PID', 'SID', 'Project Name', 'Account Name', 'Product', 'Project Status'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1255,14 +1255,18 @@ function InventoryForm<T extends InventoryRecord>({
                   const project = projects.find((candidate) => candidate.pid === row.pid)
                   return (
                     <tr key={row.id} className="hover:bg-sf-surface-alt">
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.recordId}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.startDate}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.endDate}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.purposeType}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
                         {project ? <BusinessObjectLink reference={projectReference(project)}>{row.pid}</BusinessObjectLink> : row.pid}
                       </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.sid}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectName}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.purpose}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.status}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.allocatedAt}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.deallocatedAt || '-'}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.accountName}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.product}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectStatus}</td>
                     </tr>
                   )
                 })}

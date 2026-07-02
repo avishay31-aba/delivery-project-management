@@ -446,6 +446,20 @@ export interface ConfigurationHistoryRecord {
   configuration: TenantConfiguration
 }
 
+export interface ReusedInternalPurposeHistoryRecord {
+  id: string
+  recordId: string
+  startDate: string
+  endDate: string | null
+  purposeType: string
+  pid?: string
+  sid?: string
+  projectName?: string
+  accountName?: string
+  product?: string
+  projectStatus?: string
+}
+
 export interface TenantWarranty {
   id: string
   warrantyId: string
@@ -570,6 +584,7 @@ export interface ReusedInternalSystem {
   occupationStartDate?: string | null
   occupationEndDate?: string | null
   currentProjectIds: string[]
+  purposeHistory?: ReusedInternalPurposeHistoryRecord[]
   tenantCount: number
   licenses?: number | null
   users?: number | null

@@ -45,10 +45,12 @@ import {
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
   occupyReusedInternalSystem,
+  purposeHistoryContextFromProject,
   releaseReusedInternalSystem,
   systemApplicationConfigurationSummary,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
+  updateReusedInternalPurpose,
 } from '@/domain/system-inventory'
 import {
   syncOpportunityProjectsFromOpportunity,
@@ -240,6 +242,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 .map((link) => link.sourceMachineId as string),
             )
           : new Set<string>()
+      const sourceMachinePurposeContext = new Map<string, ReturnType<typeof purposeHistoryContextFromProject>>()
+      if (updatedProject && sourceMachineIds.size > 0) {
+        const completedProject = updatedProject
+        state.projectSystems
+          .filter((link) => link.projectId === id && link.sourceMachineId && sourceMachineIds.has(link.sourceMachineId))
+          .forEach((link) => {
+            const system = state.systems.find((candidate) => candidate.id === link.systemId)
+            sourceMachinePurposeContext.set(
+              link.sourceMachineId as string,
+              system
+                ? purposeHistoryContextFromProject(completedProject, system)
+                : {
+                    pid: completedProject.pid,
+                    sid: '',
+                    projectName: completedProject.opportunityName,
+                    accountName: completedProject.accountName,
+                    product: '',
+                    projectStatus: completedProject.progressStatus,
+                  },
+            )
+          })
+      }
 
       return {
         projects,
@@ -247,7 +271,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           sourceMachineIds.size > 0
             ? state.reusedInternalSystems.map((system) =>
                 sourceMachineIds.has(system.machineId) && system.currentProjectIds.includes(id)
-                  ? releaseReusedInternalSystem(system, id, now)
+                  ? releaseReusedInternalSystem(system, id, now, sourceMachinePurposeContext.get(system.machineId))
                   : system,
               )
             : state.reusedInternalSystems,
@@ -552,10 +576,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   updateReusedInternalSystem: (id, patch) => {
+    const now = new Date().toISOString()
     set((state) => ({
-      reusedInternalSystems: state.reusedInternalSystems.map((system) =>
-        system.id === id ? { ...system, ...patch, updatedAt: new Date().toISOString() } : system,
-      ),
+      reusedInternalSystems: state.reusedInternalSystems.map((system) => {
+        if (system.id !== id) return system
+        const { purposeHistory: _purposeHistory, ...safePatch } = patch
+        const nextSystem = patch.purpose && patch.purpose !== system.purpose
+          ? updateReusedInternalPurpose(system, patch.purpose, now)
+          : { ...system, updatedAt: now }
+        return { ...nextSystem, ...safePatch, updatedAt: now }
+      }),
     }))
     get().saveToStorage()
   },
@@ -878,7 +908,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       idCounters,
       reusedInternalSystems: current.reusedInternalSystems.map((candidate) =>
         candidate.id === reusedSystemId
-          ? occupyReusedInternalSystem(candidate, projectId, now)
+          ? occupyReusedInternalSystem(candidate, projectId, now, purposeHistoryContextFromProject(project, allocatedSystem))
           : candidate,
       ),
       systems: [allocatedSystem, ...current.systems],
@@ -947,6 +977,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (!allocation) return { ok: false, message: 'Allocation not found.' }
     const project = state.projects.find((candidate) => candidate.id === allocation.projectId)
     const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
+    const allocatedSystemForPurposeHistory = system
     const now = new Date().toISOString()
 
     set((current) => ({
@@ -967,7 +998,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ),
       reusedInternalSystems: current.reusedInternalSystems.map((system) =>
         allocation.allocationType === 'REUSED_INTERNAL' && system.machineId === allocation.sourceMachineId
-          ? releaseReusedInternalSystem(system, allocation.projectId, now)
+          ? releaseReusedInternalSystem(system, allocation.projectId, now, project && allocatedSystemForPurposeHistory ? purposeHistoryContextFromProject(project, allocatedSystemForPurposeHistory) : {})
           : system,
       ),
       activityEvents: appendActivityEvent(current.activityEvents, now, {

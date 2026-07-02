@@ -233,34 +233,60 @@ export function systemRoutePath(record: SystemInventoryRecord): string {
 
 export interface ReusedInternalPurposeHistoryRow {
   id: string
+  recordId: string
+  startDate: string
+  endDate: string
+  purposeType: string
   pid: string
+  sid: string
   projectName: string
-  purpose: string
-  status: string
-  allocatedAt: string
-  deallocatedAt: string
+  accountName: string
+  product: string
+  projectStatus: string
 }
 
 export function reusedInternalPurposeHistory(
   record: ReusedInternalSystem | System,
   projects: Project[],
   projectSystems: ProjectSystemLink[],
+  systems: System[] = [],
 ): ReusedInternalPurposeHistoryRow[] {
   const machineId = 'machineId' in record ? record.machineId : null
   if (!machineId) return []
 
+  if ('purposeHistory' in record && Array.isArray(record.purposeHistory) && record.purposeHistory.length > 0) {
+    return record.purposeHistory.map((history) => ({
+      id: history.id,
+      recordId: history.recordId,
+      startDate: history.startDate,
+      endDate: history.endDate ?? '',
+      purposeType: history.purposeType,
+      pid: history.pid ?? '',
+      sid: history.sid ?? '',
+      projectName: history.projectName ?? '',
+      accountName: history.accountName ?? '',
+      product: history.product ?? '',
+      projectStatus: history.projectStatus ?? '',
+    }))
+  }
+
   const rows: ReusedInternalPurposeHistoryRow[] = projectSystems
     .filter((link) => link.sourceMachineId === machineId)
-    .map((link) => {
+    .map((link, index) => {
       const project = projects.find((candidate) => candidate.id === link.projectId)
+      const system = systems.find((candidate) => candidate.id === link.systemId)
       return {
         id: link.id,
+        recordId: `PH-${String(index + 1).padStart(3, '0')}`,
+        startDate: link.allocatedAt,
+        endDate: link.deallocatedAt ?? '',
+        purposeType: project?.mainType === 'POC' ? 'POC' : 'POC',
         pid: project?.pid ?? link.projectId,
+        sid: system?.sid ?? '',
         projectName: project?.opportunityName ?? '',
-        purpose: 'purpose' in record ? record.purpose : project?.mainType ?? '',
-        status: link.allocationStatus ?? 'ALLOCATED',
-        allocatedAt: link.allocatedAt,
-        deallocatedAt: link.deallocatedAt ?? '',
+        accountName: project?.accountName ?? '',
+        product: system?.productType ?? '',
+        projectStatus: project?.progressStatus ?? link.allocationStatus ?? '',
       }
     })
 
@@ -272,15 +298,19 @@ export function reusedInternalPurposeHistory(
       if (knownProjectIds.has(pid)) return
       rows.push({
         id: `${machineId}-${projectId}`,
+        recordId: `PH-${String(rows.length + 1).padStart(3, '0')}`,
+        startDate: record.occupationStartDate ?? '',
+        endDate: record.occupationEndDate ?? '',
+        purposeType: record.purpose,
         pid,
+        sid: '',
         projectName: project?.opportunityName ?? '',
-        purpose: record.purpose,
-        status: record.status,
-        allocatedAt: record.occupationStartDate ?? '',
-        deallocatedAt: record.occupationEndDate ?? '',
+        accountName: project?.accountName ?? '',
+        product: 'productType' in record ? record.productType : '',
+        projectStatus: project?.progressStatus ?? record.status,
       })
     })
   }
 
-  return rows.sort((first, second) => second.allocatedAt.localeCompare(first.allocatedAt))
+  return rows.sort((first, second) => second.startDate.localeCompare(first.startDate))
 }
