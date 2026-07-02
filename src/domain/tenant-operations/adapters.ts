@@ -183,7 +183,7 @@ export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, syste
   const configurationHistory = [...(draft.configurationHistory ?? [])]
 
   if (!valuesEqual(tenantConfigurationFromTenant(saved, system), configuration)) {
-    const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now)
+    const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now, 'Local User', draft.tid)
     if (record) configurationHistory.unshift(record)
   }
 
@@ -198,12 +198,14 @@ export function createTenantConfigurationHistoryRecord(
   existingRecords: Tenant['configurationHistory'] = [],
   timestamp = new Date().toISOString(),
   recordedBy = 'Local User',
+  tid = '',
 ) {
   if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null
   return {
       id: `tenant-config-history-${crypto.randomUUID()}`,
       recordId: `CH-${String(existingRecords.length + 1).padStart(3, '0')}`,
       timestamp,
+      tid,
       recordedBy,
       configuration,
     }

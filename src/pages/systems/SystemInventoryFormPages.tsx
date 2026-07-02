@@ -1183,7 +1183,7 @@ function InventoryForm<T extends InventoryRecord>({
         <table className="w-max border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {['Record ID', 'Timestamp', 'Recorded By'].map((label) => (
+              {['Record ID', 'Timestamp', 'TID', 'Recorded By'].map((label) => (
                 <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                   {label}
                 </th>
@@ -1201,6 +1201,7 @@ function InventoryForm<T extends InventoryRecord>({
               <tr key={record.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordId}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.timestamp}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.tid ?? ''}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordedBy}</td>
                 {APPLICATION_SUMMARY_FIELDS.map((field) => (
                   <td key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">

@@ -432,6 +432,7 @@ export interface TenantConfigurationHistoryRecord {
   id: string
   recordId: string
   timestamp: string
+  tid?: string
   recordedBy: string
   configuration: TenantConfiguration
 }
@@ -440,6 +441,7 @@ export interface ConfigurationHistoryRecord {
   id: string
   recordId: string
   timestamp: string
+  tid?: string
   recordedBy: string
   configuration: TenantConfiguration
 }

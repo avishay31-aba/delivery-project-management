@@ -1069,6 +1069,7 @@ export function TenantFormPage() {
           headers={[
             'Record ID',
             'Timestamp',
+            'TID',
             'Recorded By',
             ...CONFIGURATION_FIELDS.map((field) => (
               <span key={field.key}>
@@ -1080,6 +1081,7 @@ export function TenantFormPage() {
           rows={records.map((record: TenantConfigurationHistoryRecord) => [
             record.recordId,
             record.timestamp,
+            'this',
             record.recordedBy,
             ...CONFIGURATION_FIELDS.map((field) => textValue(configurationValue(record.configuration, field))),
           ])}

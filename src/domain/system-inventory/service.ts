@@ -137,12 +137,14 @@ export function createSystemConfigurationHistoryRecord(
   existingRecords: ConfigurationHistoryRecord[] = [],
   timestamp = new Date().toISOString(),
   recordedBy = 'Local User',
+  tid = '',
 ): ConfigurationHistoryRecord | null {
   if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null
   return {
     id: `system-config-history-${crypto.randomUUID()}`,
     recordId: nextConfigurationHistoryRecordId(existingRecords),
     timestamp,
+    tid,
     recordedBy,
     configuration,
   }

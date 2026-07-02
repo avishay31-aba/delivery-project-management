@@ -304,7 +304,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         if (!beforeSummary || valuesEqual(beforeSummary, afterSummary)) return system
 
         const existingHistory = system.configurationHistory ?? []
-        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now)
+        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now, 'Local User', savedTenant.tid)
         if (!record) return system
 
         return {
