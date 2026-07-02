@@ -126,6 +126,20 @@ export interface ProjectTask {
   comment?: string
 }
 
+export type RemarkType = 'Note' | 'Task' | 'Temporary Change' | 'Permanent Change / Task' | string
+
+export interface RemarkRecord {
+  id: string
+  remarkId: string
+  createdAt: string
+  author: string
+  type: RemarkType
+  content: string
+  dueDate: string | null
+  updatedAt?: string
+  updatedBy?: string
+}
+
 export interface OpportunityRequirementBase {
   id: string
   requirementId: string
@@ -266,6 +280,7 @@ export interface System {
   timeGroup: string
   timeGroupAlert?: string
   operationalStatus: string
+  remarks?: RemarkRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
@@ -500,6 +515,7 @@ export interface ProductionSystemInventoryItem {
   aiFeatures?: string[]
   additionalFeatures?: string[]
   alerts: string[]
+  remarks?: RemarkRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -556,6 +572,7 @@ export interface ReusedInternalSystem {
   additionalFeatures?: string[]
   alerts: string[]
   operationalStatus: string
+  remarks?: RemarkRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string

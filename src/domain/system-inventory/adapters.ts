@@ -3,6 +3,7 @@ import {
   defaultSystemHostingContext,
   hostingContextFromSource,
 } from '@/domain/hosting-context'
+import { normalizeRemarks } from '@/domain/remarks'
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
   REUSED_INTERNAL_STATUS_AVAILABLE,
@@ -26,6 +27,14 @@ export function systemDisplayName(record: SystemInventoryRecord): string {
 
 export function systemSourceLabel(record: SystemInventoryRecord): string {
   return systemSource(record)
+}
+
+export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(record: T): T {
+  return {
+    ...record,
+    documents: Array.isArray(record.documents) ? record.documents : [],
+    remarks: normalizeRemarks(record.remarks),
+  }
 }
 
 export function createProductionInventorySystem(sid: string, now: string): ProductionSystemInventoryItem {
@@ -54,6 +63,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
     tenantCount: 0,
     alerts: [],
+    remarks: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -109,6 +119,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     tenantCount: 0,
     alerts: [],
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
+    remarks: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -134,6 +145,7 @@ export function createStandaloneSystem(sid: string, now: string): System {
     state: '',
     timeGroup: '',
     operationalStatus: '',
+    remarks: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -203,6 +215,7 @@ export function systemFromReusedInternalAllocation(
     timeGroup: assignmentLocation.timeGroup || reusedSystem.timeGroup,
     timeGroupAlert: reusedSystem.timeGroupAlert,
     operationalStatus: reusedSystem.operationalStatus,
+    remarks: [],
     documents: reusedSystem.documents ?? [],
     createdAt,
     updatedAt: createdAt,

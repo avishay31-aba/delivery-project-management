@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
@@ -67,10 +68,12 @@ import {
   validateReusedInternalMachineId,
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
+import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
 type InfrastructureInnerTab = 'environment' | 'infrastructure'
+const SYSTEM_REMARK_TYPE_PICKLIST_KEY = 'systemRemarkType'
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
   header: false,
@@ -1150,6 +1153,17 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderRemarksSection() {
+    return (
+      <RemarksGrid
+        remarks={(activeDraft.remarks ?? []) as RemarkRecord[]}
+        onChange={(remarks) => updateField('remarks', remarks)}
+        typeOptions={optionsWithCustom(SYSTEM_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Add new...'])}
+        onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, SYSTEM_REMARK_TYPE_PICKLIST_KEY, value))}
+      />
+    )
+  }
+
   function renderPurposeHistorySection() {
     if (metadata.source !== SYSTEM_SOURCE_REUSED_INTERNAL) return null
     const rows = reusedInternalPurposeHistory(activeRecord as ReusedInternalSystem | System, projects, projectSystems)
@@ -1282,6 +1296,7 @@ function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       </CollapsibleSection>
+      {renderRemarksSection()}
       {renderPurposeHistorySection()}
       </div>
 

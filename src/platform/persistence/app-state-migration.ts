@@ -8,6 +8,7 @@ import {
 import { normalizeActivityEvents } from '@/domain/activity-log'
 import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
 import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
+import { normalizeSystemInventoryRecord } from '@/domain/system-inventory'
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
@@ -27,12 +28,14 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     opportunities,
     projects,
     productionSystemInventory: Array.isArray(state.productionSystemInventory)
-      ? state.productionSystemInventory
-      : seedState.productionSystemInventory,
+      ? state.productionSystemInventory.map(normalizeSystemInventoryRecord)
+      : seedState.productionSystemInventory.map(normalizeSystemInventoryRecord),
     reusedInternalSystems: Array.isArray(state.reusedInternalSystems)
-      ? state.reusedInternalSystems
-      : seedState.reusedInternalSystems,
-    systems: Array.isArray(state.systems) ? state.systems : seedState.systems,
+      ? state.reusedInternalSystems.map(normalizeSystemInventoryRecord)
+      : seedState.reusedInternalSystems.map(normalizeSystemInventoryRecord),
+    systems: Array.isArray(state.systems)
+      ? state.systems.map(normalizeSystemInventoryRecord)
+      : seedState.systems.map(normalizeSystemInventoryRecord),
     tenants: Array.isArray(state.tenants)
       ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
       : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
