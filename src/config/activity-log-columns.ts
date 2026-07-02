@@ -18,6 +18,7 @@ import {
   alertVariantForActivitySeverity,
   badgeVariantForActivitySeverity,
 } from '@/domain/status-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 export interface ActivityDashboardRow {
   id: string
@@ -100,7 +101,7 @@ export function activityDashboardRows(events: ActivityEvent[]): ActivityDashboar
     const requirementId = firstRef(event, 'REQUIREMENT')
     return {
       id: event.id,
-      occurredAt: event.occurredAt,
+      occurredAt: formatDateTimeSeconds(event.occurredAt),
       severity: event.severity,
       severityLabel: ACTIVITY_EVENT_SEVERITY_LABELS[event.severity],
       category: event.category,

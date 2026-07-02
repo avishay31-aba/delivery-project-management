@@ -78,6 +78,7 @@ import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
+import { formatDate, formatDateTime } from '@/domain/date-time-presentation'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -671,7 +672,7 @@ function RequirementGrid({
           <option value="">Select warranty</option>
           {tenantWarrantyRecords.map((record) => (
             <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
-              {record.warrantyRecordId} - {record.status} - {record.endDate ?? 'No end'}
+              {record.warrantyRecordId} - {record.status} - {formatDate(record.endDate, { fallback: 'No end' })}
             </option>
           ))}
         </select>
@@ -1461,7 +1462,7 @@ export function OpportunityFormPage() {
             <option value="">Select warranty</option>
             {accountWarrantyRecords.map((record) => (
               <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
-                {record.warrantyRecordId} - {record.status} - {record.endDate ?? 'No end'}
+                {record.warrantyRecordId} - {record.status} - {formatDate(record.endDate, { fallback: 'No end' })}
               </option>
             ))}
           </select>
@@ -2108,8 +2109,8 @@ export function OpportunityFormPage() {
                               variant={badgeVariantForProjectStatus(project.progressStatus)}
                             />
                           </td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{project.createdAt}</td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{project.updatedAt}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTime(project.createdAt)}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTime(project.updatedAt)}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
                             <BusinessObjectLink reference={projectReference(project)}>
                               Open project

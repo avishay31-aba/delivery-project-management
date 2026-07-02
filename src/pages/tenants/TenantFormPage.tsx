@@ -74,6 +74,7 @@ import {
 import { projectReference, systemReference } from '@/domain/business-reference'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
+import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
@@ -1080,7 +1081,7 @@ export function TenantFormPage() {
           ]}
           rows={records.map((record: TenantConfigurationHistoryRecord) => [
             record.recordId,
-            record.timestamp,
+            formatDateTimeSeconds(record.timestamp),
             'this',
             record.recordedBy,
             ...CONFIGURATION_FIELDS.map((field) => textValue(configurationValue(record.configuration, field))),
@@ -1111,8 +1112,8 @@ export function TenantFormPage() {
               warranty.accountId,
               warranty.relatedProjectId,
               warranty.opportunityId,
-              warranty.startDate ?? '',
-              warranty.endDate ?? '',
+              formatDate(warranty.startDate, { fallback: '' }),
+              formatDate(warranty.endDate, { fallback: '' }),
               warranty.durationDays ?? '',
               warranty.daysBeforeExpiration ?? '',
               displayWarrantyStatus(warranty.warrantyStatus),

@@ -6,6 +6,7 @@ import {
   alertVariantForActivitySeverity,
   badgeVariantForActivitySeverity,
 } from '@/domain/status-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 function severityVariant(severity: ActivityEvent['severity']): AlertStatusIconVariant {
   return alertVariantForActivitySeverity(severity)
@@ -77,7 +78,7 @@ export function ActivityTimeline({
           <tbody>
             {visibleEvents.length > 0 ? visibleEvents.map((event) => (
               <tr key={event.id} className="hover:bg-sf-surface-alt">
-                <td className="whitespace-nowrap border border-sf-border px-2 py-1 align-top text-sf-text">{event.occurredAt}</td>
+                <td className="whitespace-nowrap border border-sf-border px-2 py-1 align-top text-sf-text">{formatDateTimeSeconds(event.occurredAt)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-2 py-1 align-top text-sf-text">
                   <span className="inline-flex items-center gap-1.5">
                     <AlertStatusIcon variant={severityVariant(event.severity)} label={event.severity} />

@@ -370,6 +370,17 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Dashboard action columns are UI controls only. They are not business data, object fields, report columns, or saved-view business columns.
 - Saved dashboard views may preserve user display preferences, but action controls must not become editable business facts or domain-owned fields.
 
+### Date And Time Presentation Standard
+
+- Business data storage keeps canonical date and timestamp values. Transactional timestamps should remain ISO-compatible values where already used.
+- Canonical date-only fields may remain date-only values when required by browser date inputs, persistence, or owning-domain rules.
+- UI rendering must use the shared DateTimePresentation service for user-facing date and time display.
+- Raw ISO timestamps must not be exposed to end users in forms, dashboards, activity timelines, history tables, remarks, or other read-only display surfaces.
+- Date and time display must always separate the date and time with a visible space.
+- Date and time rendering should use the current browser/user locale until explicit ERP user locale settings are introduced.
+- Shared presentation formats include Date, Time, Date + Time, and Date + Time + Seconds.
+- The DateTimePresentation service is presentation-only. It must not own business deadline rules, timezone policy, persistence normalization, or domain date calculations.
+
 ## Reusable Child Object Principle
 
 Some child structures are reusable across multiple parent Business Objects while still remaining scoped to their parent object instance.

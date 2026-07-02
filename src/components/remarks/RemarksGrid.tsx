@@ -8,6 +8,7 @@ import {
   type RemarkRecord,
 } from '@/domain/remarks'
 import { alertPresentationForDeadline } from '@/domain/status-presentation'
+import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 interface RemarksGridProps {
   remarks: RemarkRecord[]
@@ -144,7 +145,7 @@ export function RemarksGrid({
                     )}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.remarkId}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.createdAt}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{formatDateTimeSeconds(remark.createdAt)}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.author}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? (
@@ -182,7 +183,7 @@ export function RemarksGrid({
                         onChange={(event) => updateRemark(remark.id, { dueDate: event.target.value || null })}
                       />
                     ) : (
-                      remark.dueDate ?? ''
+                      formatDate(remark.dueDate, { fallback: '' })
                     )}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
@@ -204,4 +205,3 @@ export function RemarksGrid({
     </section>
   )
 }
-

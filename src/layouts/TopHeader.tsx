@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store/useAppStore'
+import { formatDateTime } from '@/domain/date-time-presentation'
 
 interface TopHeaderProps {
   title?: string
@@ -18,7 +19,7 @@ export function TopHeader({ title = 'Delivery Project Management' }: TopHeaderPr
       <div className="flex items-center gap-4">
         {lastPersistedAt && (
           <span className="hidden text-xs text-sf-text-muted sm:inline">
-            Saved {new Date(lastPersistedAt).toLocaleString()}
+            Saved {formatDateTime(lastPersistedAt)}
           </span>
         )}
         <button

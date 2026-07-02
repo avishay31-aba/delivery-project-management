@@ -71,6 +71,7 @@ import {
 } from '@/domain/system-inventory'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
@@ -1200,7 +1201,7 @@ function InventoryForm<T extends InventoryRecord>({
             {records.map((record) => (
               <tr key={record.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordId}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.timestamp}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(record.timestamp)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.tid ?? ''}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordedBy}</td>
                 {APPLICATION_SUMMARY_FIELDS.map((field) => (
@@ -1256,8 +1257,8 @@ function InventoryForm<T extends InventoryRecord>({
                   return (
                     <tr key={row.id} className="hover:bg-sf-surface-alt">
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.recordId}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.startDate}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.endDate}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(row.startDate)}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(row.endDate, { fallback: '' })}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.purposeType}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
                         {project ? <BusinessObjectLink reference={projectReference(project)}>{row.pid}</BusinessObjectLink> : row.pid}
