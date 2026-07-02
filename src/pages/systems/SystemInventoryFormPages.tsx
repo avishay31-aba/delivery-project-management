@@ -1168,6 +1168,53 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderConfigurationHistoryTab() {
+    const records = activeDraft.configurationHistory ?? []
+    if (records.length === 0) {
+      return (
+        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+          No configuration history has been recorded for this system.
+        </div>
+      )
+    }
+
+    return (
+      <div className="sf-scroll-x rounded border border-sf-border bg-white">
+        <table className="w-max border-collapse text-sm leading-tight">
+          <thead className="bg-sf-surface-alt text-left">
+            <tr>
+              {['Record ID', 'Timestamp', 'Recorded By'].map((label) => (
+                <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                  {label}
+                </th>
+              ))}
+              {APPLICATION_SUMMARY_FIELDS.map((field) => (
+                <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                  <span>{field.label}</span>
+                  <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((record) => (
+              <tr key={record.id} className="hover:bg-sf-surface-alt">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordId}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.timestamp}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordedBy}</td>
+                {APPLICATION_SUMMARY_FIELDS.map((field) => (
+                  <td key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                    {textValue((record.configuration as unknown as Record<string, unknown>)[field.configKey]) || '-'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   function renderRemarksSection() {
     return (
       <RemarksGrid
@@ -1305,6 +1352,8 @@ function InventoryForm<T extends InventoryRecord>({
               ? renderInfrastructureTab()
               : activeTab === 'tenant'
                 ? renderTenantTab()
+                : activeTab === 'configurationHistory'
+                  ? renderConfigurationHistoryTab()
                 : activeTab === 'documents'
                   ? renderDocumentsTab()
                   : activeTab === 'owner'

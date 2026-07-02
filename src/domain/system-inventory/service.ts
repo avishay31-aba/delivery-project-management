@@ -1,4 +1,10 @@
 import { timeGroupForCountry } from '@/config/time-groups'
+import {
+  applicationConfigurationFromTenant,
+  applicationConfigurationValue,
+  APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
+} from '@/domain/application-configuration'
+import type { ConfigurationHistoryRecord, TenantConfiguration } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import {
   REUSED_INTERNAL_STATUS_OCCUPIED,
@@ -39,6 +45,107 @@ export function joinUniqueValues(values: Array<string | null | undefined>, separ
 
 export function hostedTenantsForSystem(systemId: string, tenants: Tenant[]): Tenant[] {
   return tenants.filter((tenant) => tenant.systemId === systemId || tenant.hostedSystemId === systemId)
+}
+
+const INTEGER_SUMMARY_KEYS = new Set([
+  'licenses',
+  'users',
+  'concurrentSearches',
+  'dailySearches',
+  'monthlySearches',
+  'concurrentAnalyses',
+  'topicAnalyses',
+  'dailyAnalyses',
+  'monthlyAnalyses',
+  'standardMonitors',
+  'fullMonitors',
+  'topicMonitors',
+  'tangles',
+  'tanglesGo',
+  'webloc',
+  'webeye',
+  'ingest',
+  'apiDailyQty',
+  'apiMonthlyQty',
+])
+
+function valuesEqual(first: unknown, second: unknown): boolean {
+  return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
+}
+
+function uniqueValues(values: unknown[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value) => value !== null && value !== undefined && value !== '')
+        .map(String),
+    ),
+  )
+}
+
+export function systemApplicationConfigurationSummary(system: System, tenants: Tenant[]): TenantConfiguration {
+  const hostedTenants = hostedTenantsForSystem(system.id, tenants)
+  const summary = applicationConfigurationFromTenant({
+    ...(hostedTenants[0] ?? {}),
+    id: `${system.id}-configuration-summary`,
+    tid: '',
+    accountId: system.accountId ?? '',
+    systemId: system.id,
+    tenantType: 'CUSTOMER',
+    accountName: '',
+    country: system.country ?? '',
+    timeGroup: system.timeGroup,
+    operationalStatus: '',
+    productType: system.productType,
+    warrantyStatus: 'NOT_SET',
+    warrantyEndDate: null,
+    pocStartDate: null,
+    pocEndDate: null,
+    createdAt: system.createdAt,
+    updatedAt: system.updatedAt,
+  } as Tenant, system.productType)
+
+  APPLICATION_CONFIGURATION_SUMMARY_FIELDS.forEach((field) => {
+    if (field.key === 'productType') {
+      summary.product = system.productType || uniqueValues(hostedTenants.map((tenant) => tenant.productType))[0] || ''
+      return
+    }
+
+    const values = hostedTenants.map((tenant) => applicationConfigurationValue(applicationConfigurationFromTenant(tenant, system.productType), field))
+    if (field.inputType === 'multiselect') {
+      ;(summary as unknown as Record<string, unknown>)[field.configKey] = uniqueValues(values)
+      return
+    }
+    if (INTEGER_SUMMARY_KEYS.has(field.key)) {
+      const total = values.reduce<number>((sum, value) => sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0), 0)
+      ;(summary as unknown as Record<string, unknown>)[field.configKey] = total || null
+      return
+    }
+    ;(summary as unknown as Record<string, unknown>)[field.configKey] = uniqueValues(values).join('; ')
+  })
+
+  return summary
+}
+
+function nextConfigurationHistoryRecordId(records: ConfigurationHistoryRecord[]): string {
+  return `CH-${String(records.length + 1).padStart(3, '0')}`
+}
+
+export function createSystemConfigurationHistoryRecord(
+  configuration: TenantConfiguration,
+  existingRecords: ConfigurationHistoryRecord[] = [],
+  timestamp = new Date().toISOString(),
+  recordedBy = 'Local User',
+): ConfigurationHistoryRecord | null {
+  if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null
+  return {
+    id: `system-config-history-${crypto.randomUUID()}`,
+    recordId: nextConfigurationHistoryRecordId(existingRecords),
+    timestamp,
+    recordedBy,
+    configuration,
+  }
 }
 
 export function tenantCountForSystem(record: SystemInventoryRecord, tenants: Tenant[]): number {

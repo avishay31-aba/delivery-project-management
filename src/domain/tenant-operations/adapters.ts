@@ -13,6 +13,7 @@ import {
   tenantHostingPatchFromSystem,
 } from '@/domain/hosting-context'
 import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
+import { normalizeRemarks } from '@/domain/remarks'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
 import { daysBeforeExpiration, daysBetween, normalizeTenantWarranties } from '@/domain/warranty-collection'
 import { tenantFormType, tenantFormTypeForSystem } from './service'
@@ -40,7 +41,7 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
     configuration: applicationConfigurationFromTenant(tenant),
     hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
     engagementCircle: normalizeEngagementCircleSnapshot(tenant.engagementCircle),
-    remarks: Array.isArray(tenant.remarks) ? tenant.remarks : [],
+    remarks: normalizeRemarks(tenant.remarks),
     configurationHistory: Array.isArray(tenant.configurationHistory) ? tenant.configurationHistory : [],
     warranties: normalizeTenantWarranties(tenant.warranties),
     documents: Array.isArray(tenant.documents) ? tenant.documents : [],
@@ -182,17 +183,39 @@ export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, syste
   const configurationHistory = [...(draft.configurationHistory ?? [])]
 
   if (!valuesEqual(tenantConfigurationFromTenant(saved, system), configuration)) {
-    configurationHistory.unshift({
-      id: `tenant-config-history-${crypto.randomUUID()}`,
-      recordId: `CH-${String(configurationHistory.length + 1).padStart(3, '0')}`,
-      timestamp: now,
-      recordedBy: 'Current user',
-      configuration,
-    })
+    const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now)
+    if (record) configurationHistory.unshift(record)
   }
 
   return {
     configuration,
+    patch: tenantConfigurationPatch(draft, configuration, system, configurationHistory),
+  }
+}
+
+export function createTenantConfigurationHistoryRecord(
+  configuration: TenantConfiguration,
+  existingRecords: Tenant['configurationHistory'] = [],
+  timestamp = new Date().toISOString(),
+  recordedBy = 'Local User',
+) {
+  if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null
+  return {
+      id: `tenant-config-history-${crypto.randomUUID()}`,
+      recordId: `CH-${String(existingRecords.length + 1).padStart(3, '0')}`,
+      timestamp,
+      recordedBy,
+      configuration,
+    }
+}
+
+function tenantConfigurationPatch(
+  draft: Tenant,
+  configuration: TenantConfiguration,
+  system: System | undefined,
+  configurationHistory: NonNullable<Tenant['configurationHistory']>,
+): TenantConfigurationSaveDraft['patch'] {
+  return {
     patch: {
       tenantFormType: tenantFormType(draft),
       hostedSystemId: system?.id ?? draft.systemId,
@@ -235,7 +258,7 @@ export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, syste
       aiFeatures: configuration.aiFeatures,
       additionalFeatures: configuration.additionalFeatures,
     },
-  }
+  }.patch
 }
 
 export function tenantDraftWithAttachedSystem(

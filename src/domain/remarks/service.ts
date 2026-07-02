@@ -47,12 +47,12 @@ export function createRemarkRecord(
   }
 }
 
-export function normalizeRemarkRecord(remark: Partial<RemarkRecord>, existingRemarks: RemarkRecord[] = []): RemarkRecord {
+export function normalizeRemarkRecord(remark: Partial<RemarkRecord> & Record<string, unknown>, existingRemarks: RemarkRecord[] = []): RemarkRecord {
   const now = new Date().toISOString()
   return {
     id: textValue(remark.id) || `remark-${crypto.randomUUID()}`,
-    remarkId: textValue(remark.remarkId) || nextRemarkId(existingRemarks),
-    createdAt: textValue(remark.createdAt) || now,
+    remarkId: textValue(remark.remarkId) || textValue(remark.recordId) || nextRemarkId(existingRemarks),
+    createdAt: textValue(remark.createdAt) || textValue(remark.timestamp) || now,
     author: textValue(remark.author) || REMARK_AUTHOR_LOCAL_USER,
     type: textValue(remark.type) as RemarkType || REMARK_TYPE_OPTIONS[0],
     content: textValue(remark.content),
@@ -67,7 +67,7 @@ export function normalizeRemarks(value: unknown): RemarkRecord[] {
   const remarks: RemarkRecord[] = []
   value.forEach((candidate) => {
     if (!candidate || typeof candidate !== 'object') return
-    remarks.push(normalizeRemarkRecord(candidate as Partial<RemarkRecord>, remarks))
+    remarks.push(normalizeRemarkRecord(candidate as Partial<RemarkRecord> & Record<string, unknown>, remarks))
   })
   return remarks
 }
@@ -92,4 +92,3 @@ export function remarkDeadlineAlertLabel(status: RemarkDeadlineAlertStatus): str
   if (status === 'WARNING') return 'Pending'
   return ''
 }
-

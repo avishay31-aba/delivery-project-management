@@ -1,10 +1,11 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { RemarksGrid } from '@/components/remarks'
 import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -27,7 +28,6 @@ import type {
   TenantConfiguration,
   TenantConfigurationHistoryRecord,
   TenantFormType,
-  TenantRemark,
   TenantWarranty,
   YesNo,
 } from '@/data/seed.types'
@@ -65,23 +65,22 @@ import {
   effectiveTenantOperationalMode,
   isManualTenantOperationalMode,
   tenantConfigurationFromTenant,
-  tenantConfigurationSaveDraft,
   tenantDraftWithAttachedSystem,
   tenantFormType,
   TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
-  TENANT_REMARK_TYPES,
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
 import { projectReference, systemReference } from '@/domain/business-reference'
+import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
-type RemarkKey = keyof Pick<TenantRemark, 'type' | 'content' | 'dueDate' | 'eventCreated'>
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
 type WarrantyDialogDraft = Pick<TenantWarranty, 'id' | 'relatedProjectId' | 'predecessor' | 'startDate' | 'endDate' | 'noWarranty' | 'remark'>
+const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
@@ -122,15 +121,6 @@ function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
   if (event.ctrlKey || event.metaKey || event.altKey) return
   if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
   if (!/^\d$/.test(event.key)) event.preventDefault()
-}
-
-function formatLocalTimestamp(value = new Date()): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  const hour = String(value.getHours()).padStart(2, '0')
-  const minute = String(value.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
@@ -229,7 +219,7 @@ export function TenantFormPage() {
   const accounts = useAppStore((state) => state.accounts)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
-  const updateTenant = useAppStore((state) => state.updateTenant)
+  const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
   const savedTenant = useMemo(() => tenants.find((tenant) => tenant.tid === tid), [tenants, tid])
   const system = useMemo(
     () => systems.find((candidate) => candidate.id === (savedTenant?.hostedSystemId ?? savedTenant?.systemId)),
@@ -248,7 +238,6 @@ export function TenantFormPage() {
   const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
-  const [editingRemarkIds, setEditingRemarkIds] = useState<string[]>([])
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const [editingWarrantyId, setEditingWarrantyId] = useState<string | null>(null)
   const [warrantyDialogDraft, setWarrantyDialogDraft] = useState<WarrantyDialogDraft | null>(null)
@@ -434,7 +423,7 @@ export function TenantFormPage() {
       ...tenantDraft,
       warranties: computedWarranties(tenantDraft.warranties ?? []),
     }
-    updateTenant(persistedTenant.id, tenantConfigurationSaveDraft(normalizedDraft, persistedTenant, activeSystem).patch)
+    saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id)
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()
@@ -452,54 +441,6 @@ export function TenantFormPage() {
   function cancelTenant() {
     resetDraft(cloneTenant(persistedTenant))
     navigate('/tenants')
-  }
-
-  function updateRemark(id: string, key: RemarkKey, value: string | boolean | null) {
-    setDraft((current) => {
-      if (!current) return current
-      return {
-        ...current,
-        remarks: (current.remarks ?? []).map((remark) => (remark.id === id ? { ...remark, [key]: value } : remark)),
-      }
-    })
-  }
-
-  function saveRemark(id: string) {
-    const remarks = tenantDraft.remarks ?? []
-    updateTenant(persistedTenant.id, { remarks })
-    setEditingRemarkIds((current) => current.filter((remarkId) => remarkId !== id))
-    setMessages([`Remark ${remarks.find((remark) => remark.id === id)?.recordId ?? ''} saved.`])
-  }
-
-  function editRemark(id: string) {
-    setEditingRemarkIds((current) => (current.includes(id) ? current : [...current, id]))
-  }
-
-  function addRemark() {
-    const now = formatLocalTimestamp()
-    const remarkId = `tenant-remark-${crypto.randomUUID()}`
-    setDraft((current) => {
-      if (!current) return current
-      const remarks = current.remarks ?? []
-      const remark: TenantRemark = {
-        id: remarkId,
-        recordId: `R-${String(remarks.length + 1).padStart(3, '0')}`,
-        timestamp: now,
-        author: 'Current user',
-        type: 'Note',
-        content: '',
-        dueDate: null,
-        eventCreated: false,
-      }
-      return { ...current, remarks: [...remarks, remark] }
-    })
-    setEditingRemarkIds((current) => [...current, remarkId])
-  }
-
-  function deleteRemark(id: string) {
-    const remarks = (tenantDraft.remarks ?? []).filter((remark) => remark.id !== id)
-    setDraft((current) => (current ? { ...current, remarks } : current))
-    updateTenant(persistedTenant.id, { remarks })
   }
 
   function openWarrantyDialog(warranty: TenantWarranty) {
@@ -852,7 +793,7 @@ export function TenantFormPage() {
     )
   }
 
-  function optionsWithCustom(key: ConfigKey, options: string[]): string[] {
+  function optionsWithCustom(key: string, options: string[]): string[] {
     return [
       ...options.filter((option) => option !== 'Add new...'),
       ...(customPicklistOptions[key] ?? []),
@@ -1104,84 +1045,17 @@ export function TenantFormPage() {
   }
 
   function renderRemarks() {
-    const remarks = tenantDraft.remarks ?? []
     return (
       <section className="sf-card space-y-3 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-sf-text">Remarks</h2>
-            <p className="text-sm text-sf-text-muted">Editable tenant remarks. Outlook event creation is not implemented in this phase.</p>
-          </div>
-          <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addRemark}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add remark
-          </button>
-        </div>
-        <div className="overflow-x-auto rounded border border-sf-border bg-white">
-          <table className="min-w-full border-collapse text-sm leading-tight">
-            <thead className="bg-sf-surface-alt text-left">
-              <tr>
-                {['Record ID', 'Timestamp', 'User / author', 'Type', 'Remark content', 'Due date', 'Event created', 'Action'].map((header) => (
-                  <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {remarks.map((remark) => {
-                const isEditing = editingRemarkIds.includes(remark.id)
-                return (
-                    <tr key={remark.id}>
-                      <td className="border border-sf-border px-1.5 py-1">{remark.recordId}</td>
-                      <td className="border border-sf-border px-1.5 py-1">{remark.timestamp}</td>
-                      <td className="border border-sf-border px-1.5 py-1">{remark.author}</td>
-                      <td className="border border-sf-border px-1.5 py-1">
-                        {isEditing ? (
-                          <select className="h-8 rounded border border-sf-border px-2 py-1" value={remark.type} onChange={(event) => updateRemark(remark.id, 'type', event.target.value)}>
-                            {TENANT_REMARK_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-                          </select>
-                        ) : remark.type}
-                      </td>
-                      <td className="min-w-96 border border-sf-border px-1.5 py-1">
-                        {isEditing ? (
-                          <RichTextEditor value={remark.content} onChange={(value) => updateRemark(remark.id, 'content', value)} />
-                        ) : <RichTextContent value={remark.content} />}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1">
-                        {isEditing ? (
-                          <input className="h-8 rounded border border-sf-border px-2 py-1" type="date" value={remark.dueDate ?? ''} onChange={(event) => updateRemark(remark.id, 'dueDate', event.target.value || null)} />
-                        ) : remark.dueDate ?? ''}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1 text-center">
-                        {isEditing ? (
-                          <input type="checkbox" checked={remark.eventCreated} onChange={(event) => updateRemark(remark.id, 'eventCreated', event.target.checked)} />
-                        ) : remark.eventCreated ? 'Yes' : 'No'}
-                      </td>
-                      <td className="border border-sf-border px-1.5 py-1">
-                        <div className="flex gap-2">
-                          {isEditing ? (
-                            <button type="button" className="text-sf-brand hover:underline" onClick={() => saveRemark(remark.id)}>
-                              Save
-                            </button>
-                          ) : (
-                            <button type="button" className="text-sf-brand hover:underline" onClick={() => editRemark(remark.id)}>
-                              Edit
-                            </button>
-                          )}
-                          <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteRemark(remark.id)}>
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                )
-              })}
-              {remarks.length === 0 ? (
-                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={8}>No remarks yet.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <RemarksGrid
+          remarks={(tenantDraft.remarks ?? []) as RemarkRecord[]}
+          onChange={(remarks) => {
+            setDraft((current) => (current ? { ...current, remarks } : current))
+            setMessages([])
+          }}
+          typeOptions={optionsWithCustom(TENANT_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Warranty', 'Add new...'])}
+          onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, TENANT_REMARK_TYPE_PICKLIST_KEY, value))}
+        />
       </section>
     )
   }

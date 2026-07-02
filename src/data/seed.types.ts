@@ -293,6 +293,7 @@ export interface System {
   operationalStatus: string
   remarks?: RemarkRecord[]
   owners?: OwnerRecord[]
+  configurationHistory?: ConfigurationHistoryRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
@@ -319,7 +320,7 @@ export interface Tenant {
   configuration?: TenantConfiguration
   hostingSnapshot?: TenantHostingSnapshot
   engagementCircle?: EngagementCircleContact[]
-  remarks?: TenantRemark[]
+  remarks?: RemarkRecord[]
   configurationHistory?: TenantConfigurationHistoryRecord[]
   warranties?: TenantWarranty[]
   documents?: DocumentRecord[]
@@ -435,6 +436,14 @@ export interface TenantConfigurationHistoryRecord {
   configuration: TenantConfiguration
 }
 
+export interface ConfigurationHistoryRecord {
+  id: string
+  recordId: string
+  timestamp: string
+  recordedBy: string
+  configuration: TenantConfiguration
+}
+
 export interface TenantWarranty {
   id: string
   warrantyId: string
@@ -529,6 +538,7 @@ export interface ProductionSystemInventoryItem {
   alerts: string[]
   remarks?: RemarkRecord[]
   owners?: OwnerRecord[]
+  configurationHistory?: ConfigurationHistoryRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -587,6 +597,7 @@ export interface ReusedInternalSystem {
   operationalStatus: string
   remarks?: RemarkRecord[]
   owners?: OwnerRecord[]
+  configurationHistory?: ConfigurationHistoryRecord[]
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string

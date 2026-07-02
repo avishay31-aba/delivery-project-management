@@ -36,6 +36,7 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     documents: Array.isArray(record.documents) ? record.documents : [],
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
+    configurationHistory: Array.isArray(record.configurationHistory) ? record.configurationHistory : [],
   }
 }
 
@@ -67,6 +68,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     alerts: [],
     remarks: [],
     owners: [],
+    configurationHistory: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -124,6 +126,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
     remarks: [],
     owners: [],
+    configurationHistory: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -151,6 +154,7 @@ export function createStandaloneSystem(sid: string, now: string): System {
     operationalStatus: '',
     remarks: [],
     owners: [],
+    configurationHistory: [],
     documents: [],
     createdAt: now,
     updatedAt: now,
@@ -222,6 +226,7 @@ export function systemFromReusedInternalAllocation(
     operationalStatus: reusedSystem.operationalStatus,
     remarks: [],
     owners: [],
+    configurationHistory: [],
     documents: reusedSystem.documents ?? [],
     createdAt,
     updatedAt: createdAt,

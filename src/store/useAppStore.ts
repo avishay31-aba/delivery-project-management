@@ -43,8 +43,10 @@ import {
   createProductionInventorySystem,
   createReusedInternalInventorySystem,
   createStandaloneSystem,
+  createSystemConfigurationHistoryRecord,
   occupyReusedInternalSystem,
   releaseReusedInternalSystem,
+  systemApplicationConfigurationSummary,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
 } from '@/domain/system-inventory'
@@ -60,6 +62,7 @@ import {
   movedTenantHostedSystemHistory,
   resolveTenantCreationSource,
   tenantCreationDraftFromSource,
+  tenantConfigurationSaveDraft,
 } from '@/domain/tenant-operations'
 import { isPocReleaseComplete } from '@/domain/milestone-plan'
 
@@ -128,6 +131,10 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   }
 }
 
+function valuesEqual(first: unknown, second: unknown): boolean {
+  return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
+}
+
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
   initialize: () => void
@@ -140,6 +147,7 @@ interface AppStore extends AppDataState {
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
+  saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string) => void
   deleteTenantFromSystem: (id: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
@@ -263,6 +271,51 @@ export const useAppStore = create<AppStore>((set, get) => ({
         t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
       ),
     }))
+    get().saveToStorage()
+  },
+
+  saveTenantConfiguration: (id, draft, activeSystemId) => {
+    const now = new Date().toISOString()
+    set((state) => {
+      const savedTenant = state.tenants.find((tenant) => tenant.id === id)
+      if (!savedTenant) return state
+
+      const affectedSystemIds = Array.from(new Set([
+        savedTenant.hostedSystemId ?? savedTenant.systemId,
+        draft.hostedSystemId ?? draft.systemId,
+        activeSystemId,
+      ].filter((value): value is string => Boolean(value))))
+      const systemSummariesBefore = new Map(
+        affectedSystemIds
+          .map((systemId) => state.systems.find((system) => system.id === systemId))
+          .filter((system): system is AppDataState['systems'][number] => Boolean(system))
+          .map((system) => [system.id, systemApplicationConfigurationSummary(system, state.tenants)]),
+      )
+      const activeSystem = state.systems.find((system) => system.id === activeSystemId)
+        ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
+      const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
+      const tenants = state.tenants.map((tenant) =>
+        tenant.id === id ? { ...tenant, ...patch, updatedAt: now } : tenant,
+      )
+      const systems = state.systems.map((system) => {
+        if (!affectedSystemIds.includes(system.id)) return system
+        const beforeSummary = systemSummariesBefore.get(system.id)
+        const afterSummary = systemApplicationConfigurationSummary(system, tenants)
+        if (!beforeSummary || valuesEqual(beforeSummary, afterSummary)) return system
+
+        const existingHistory = system.configurationHistory ?? []
+        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now)
+        if (!record) return system
+
+        return {
+          ...system,
+          configurationHistory: [record, ...existingHistory],
+          updatedAt: now,
+        }
+      })
+
+      return { tenants, systems }
+    })
     get().saveToStorage()
   },
 
