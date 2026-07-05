@@ -1,4 +1,4 @@
-import { Navigate, createBrowserRouter } from 'react-router-dom'
+import { Navigate, createHashRouter } from 'react-router-dom'
 import { AppShell } from '@/layouts/AppShell'
 import { OpportunityListPage } from '@/pages/opportunities/OpportunityListPage'
 import { OpportunityFormPage } from '@/pages/opportunities/OpportunityFormPage'
@@ -19,7 +19,7 @@ import { RequirementCoverageDashboardPage } from '@/pages/requirement-coverage/R
 import { RenewalWorkQueuePage } from '@/pages/renewals/RenewalWorkQueuePage'
 import { ActivityLogDashboardPage } from '@/pages/activity-log/ActivityLogDashboardPage'
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: '/',
     element: <AppShell />,

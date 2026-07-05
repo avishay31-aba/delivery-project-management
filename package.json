@@ -4,12 +4,59 @@
   "version": "1.0.0-beta",
   "description": "Delivery Project Management ERP",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build-release.ps1 -SkipBuild"
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build-release.ps1"
+  },
+  "build": {
+    "appId": "com.deliveryerp.beta",
+    "productName": "Delivery ERP",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "release/DeliveryERP-1.0-Beta"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "compression": "maximum",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}-${name}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Delivery ERP",
+      "artifactName": "DeliveryERP-1.0.0-beta-Installer.${ext}"
+    },
+    "portable": {
+      "artifactName": "DeliveryERP-1.0.0-beta-Portable.${ext}"
+    }
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
@@ -26,6 +73,8 @@
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
