@@ -1,13 +1,15 @@
 {
   "name": "delivery-project-management",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0-beta",
+  "description": "Delivery Project Management ERP",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build-release.ps1 -SkipBuild"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",
