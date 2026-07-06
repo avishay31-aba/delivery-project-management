@@ -1724,7 +1724,9 @@ export function ProjectFormPage() {
               </div>
             ) : (
               <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-                No available systems for this allocation mode.
+                {selectedMode === 'EXISTING_SYSTEM'
+                  ? 'No new tenant system requirements.'
+                  : 'No available systems for this allocation mode.'}
               </div>
             )}
           </div>

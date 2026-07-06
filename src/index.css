@@ -145,8 +145,6 @@
   .fixed.inset-0:has([role='dialog']) [role='dialog'] {
     pointer-events: auto;
     resize: both;
-    max-width: calc(100vw - 2rem);
-    max-height: calc(100vh - 2rem);
     overflow: auto;
   }
 }

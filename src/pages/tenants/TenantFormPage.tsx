@@ -1172,7 +1172,7 @@ export function TenantFormPage() {
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['Warranty ID', 'Warranty Type', 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark', 'Action'].map((header) => (
+                {['Actions', 'Warranty ID', 'Warranty Type', 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
                 ))}
               </tr>
@@ -1181,6 +1181,12 @@ export function TenantFormPage() {
               {warranties.map((warranty, warrantyIndex) => {
                 return (
                 <tr key={warranty.id}>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <div className="flex items-center gap-2">
+                      <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
+                      <button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button>
+                    </div>
+                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
                   <td className="border border-sf-border px-1.5 py-1 text-center">{warrantyIndex === 0 ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
@@ -1209,12 +1215,6 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
                   <td className="border border-sf-border px-1.5 py-1"><RichTextContent value={warranty.remark} /></td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <div className="flex items-center gap-2">
-                      <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
-                      <button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button>
-                    </div>
-                  </td>
                 </tr>
                 )
               })}
