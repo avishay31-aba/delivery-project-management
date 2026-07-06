@@ -80,7 +80,7 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['File', 'Type', 'Size', 'Uploaded At', 'Replaced At', 'Actions'].map((header) => (
+                {['Actions', 'File', 'Type', 'Size', 'Uploaded At', 'Replaced At'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                     {header}
                   </th>
@@ -90,25 +90,6 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
             <tbody>
               {documents.map((document) => (
                 <tr key={document.id} className="hover:bg-sf-surface-alt">
-                  <td className="min-w-64 border border-sf-border px-1.5 py-1 align-top">
-                    {editingId === document.id ? (
-                      <div className="flex flex-wrap items-center gap-1">
-                        <input className="h-8 min-w-56 rounded border border-sf-border px-2 py-1 text-sm" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
-                        <button type="button" className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white" onClick={() => saveEdit(document.id)}>
-                          Save
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center gap-1">
-                        <FileText className="h-4 w-4 text-sf-text-muted" aria-hidden="true" />
-                        {document.fileName}
-                      </span>
-                    )}
-                  </td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{document.fileType}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDocumentSize(document.fileSize)}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.uploadedAt, { fallback: '' })}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.replacedAt, { fallback: '' })}</td>
                   <td className="border border-sf-border px-1.5 py-1 align-top">
                     <div className="flex flex-wrap items-center gap-2">
                       {document.objectUrl ? (
@@ -135,6 +116,25 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                       )}
                     </div>
                   </td>
+                  <td className="min-w-64 border border-sf-border px-1.5 py-1 align-top">
+                    {editingId === document.id ? (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <input className="h-8 min-w-56 rounded border border-sf-border px-2 py-1 text-sm" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
+                        <button type="button" className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white" onClick={() => saveEdit(document.id)}>
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        <FileText className="h-4 w-4 text-sf-text-muted" aria-hidden="true" />
+                        {document.fileName}
+                      </span>
+                    )}
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{document.fileType}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDocumentSize(document.fileSize)}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.uploadedAt, { fallback: '' })}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.replacedAt, { fallback: '' })}</td>
                 </tr>
               ))}
             </tbody>

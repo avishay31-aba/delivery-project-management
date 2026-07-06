@@ -1012,14 +1012,14 @@ export function DataDashboard<T extends { id: string }>({
   }, [columnOrder, columnVisibility, rows.length, isFreezeEnabled])
 
   function columnPositionStyle(index: number, columnId: string): CSSProperties | undefined {
-    if (columnId === ACTION_COLUMN_ID) return { left: 0 }
+    if (columnId === ACTION_COLUMN_ID) return { insetInlineStart: 0 }
     return isFreezeEnabled && index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
   }
 
   function frozenColumnClassName(index: number, isHeader = false, columnId = ''): string {
     if (columnId === ACTION_COLUMN_ID) {
       return joinClassNames(
-        'sticky left-0 shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
+        'sticky shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
         isHeader ? 'z-40 bg-sf-surface-alt' : 'z-30 bg-inherit',
       )
     }

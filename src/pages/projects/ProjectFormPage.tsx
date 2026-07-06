@@ -437,8 +437,8 @@ export function ProjectFormPage() {
     return linkedSystemsForProject(currentDraft, systems, activeSystemLinks, linkedOpportunity, tenants)
   }, [activeSystemLinks, currentDraft, linkedOpportunity, systems, tenants])
   const linkedTenants = useMemo(() => {
-    return linkedTenantsForProject(currentDraft, projectTenants, tenants)
-  }, [currentDraft, projectTenants, tenants])
+    return linkedTenantsForProject(currentDraft, projectTenants, tenants, linkedOpportunity)
+  }, [currentDraft, linkedOpportunity, projectTenants, tenants])
   const projectActivityEvents = useMemo(() => {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)

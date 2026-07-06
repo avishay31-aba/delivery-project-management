@@ -658,6 +658,7 @@ export function linkedTenantsForProject(
   project: Project | undefined,
   projectTenants: ProjectTenantLink[],
   tenants: Tenant[],
+  opportunity?: Opportunity,
 ): Tenant[] {
   if (!project) return []
   const linkedTenantIds = new Set(
@@ -665,6 +666,7 @@ export function linkedTenantsForProject(
       .filter((link) => link.projectId === project.id)
       .map((link) => link.tenantId),
   )
+  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
   tenants
     .filter((tenant) => tenant.deliveryPid === project.pid)
     .forEach((tenant) => linkedTenantIds.add(tenant.id))
