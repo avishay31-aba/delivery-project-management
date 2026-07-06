@@ -66,7 +66,6 @@ import {
   tenantCreationDraftFromSource,
   tenantConfigurationSaveDraft,
 } from '@/domain/tenant-operations'
-import { isPocReleaseComplete } from '@/domain/milestone-plan'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
 
@@ -229,7 +228,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         return updatedProject
       })
       const sourceMachineIds =
-        updatedProject && isPocReleaseComplete(updatedProject)
+        updatedProject?.mainType === 'POC' && updatedProject.progressStatus === 'DONE'
           ? new Set(
               state.projectSystems
                 .filter(
