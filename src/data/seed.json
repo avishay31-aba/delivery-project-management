@@ -185,8 +185,943 @@
       "updatedAt": "2026-07-05T09:00:00.000Z"
     }
   ],
-  "opportunities": [],
-  "projects": [],
+  "opportunities": [
+    {
+      "id": "opp-qa-001",
+      "opportunityId": "OPP0001",
+      "opportunityName": "Northbridge POC Deployment",
+      "stage": "POC",
+      "accountId": "acct-beta-001",
+      "salesManagerId": "sm-beta-001",
+      "type": "POC",
+      "subType": "FREE",
+      "financialProfile": "Free",
+      "dealPackage": "Gold",
+      "deliveryDate": "2026-07-25",
+      "pocStartDate": "2026-07-08",
+      "pocEndDate": "2026-07-28",
+      "warrantyServiceMonths": 12,
+      "region": "EMEA",
+      "country": "Germany",
+      "state": "Berlin",
+      "timeZone": "Europe/Berlin",
+      "timeGroup": "EMEA",
+      "currentMilestone": "POC Execution",
+      "projectAlerts": [
+        "POC ending soon"
+      ],
+      "newTenantRequirements": [
+        {
+          "id": "req-a-poc-001",
+          "requirementId": "REQ-A-POC-001",
+          "hostingType": "Cloud",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "eu-central-1",
+          "statisticsId": "STAT-1",
+          "authId": "AUTH-1",
+          "rdmId": "RDM-1",
+          "performanceTier": "STANDARD",
+          "vpnEnabled": "YES",
+          "vpnType": "Site-to-Site",
+          "ipRestrictionEnabled": "YES",
+          "productType": "Tangles",
+          "mapCenter": "Berlin",
+          "licenses": 25,
+          "users": 60,
+          "concurrentSearches": 5,
+          "dailySearches": 3500,
+          "monthlySearches": 100000,
+          "concurrentAnalyses": 3,
+          "topicAnalyses": 5,
+          "dailyAnalyses": 250,
+          "monthlyAnalyses": 7000,
+          "tangles": 1,
+          "tanglesGo": 1,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "YES",
+          "crossSystemFeatures": [
+            "Advanced Search",
+            "Case Export"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1100,
+          "apiMonthlyQty": 31000,
+          "aiFeatures": [
+            "OCR",
+            "Entity Extraction"
+          ],
+          "additionalFeatures": [
+            "Audit Export"
+          ],
+          "standardMonitors": 25,
+          "fullMonitors": 6,
+          "topicMonitors": 12,
+          "deployTarget": "NEW_SYSTEM",
+          "existingSystemId": null
+        }
+      ],
+      "changeRequestRequirements": [],
+      "standardRenewalRequirements": [],
+      "pocProjectIds": [
+        "proj-qa-poc"
+      ],
+      "finalProjectId": null,
+      "createdAt": "2026-07-01T09:00:00.000Z",
+      "updatedAt": "2026-07-03T09:00:00.000Z"
+    },
+    {
+      "id": "opp-qa-002",
+      "opportunityId": "OPP0002",
+      "opportunityName": "Harborview New Delivery",
+      "stage": "WON",
+      "accountId": "acct-beta-002",
+      "salesManagerId": "sm-beta-002",
+      "type": "DELIVERY",
+      "subType": "NEW",
+      "financialProfile": "Paid",
+      "dealPackage": "Platinum",
+      "deliveryDate": "2026-07-30",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "warrantyServiceMonths": 24,
+      "region": "AMER",
+      "country": "USA",
+      "state": "New York",
+      "timeZone": "America/New_York",
+      "timeGroup": "AMER",
+      "currentMilestone": "Delivery Planning",
+      "projectAlerts": [],
+      "newTenantRequirements": [
+        {
+          "id": "req-a-new-001",
+          "requirementId": "REQ-A-NEW-001",
+          "hostingType": "Hybrid",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-2",
+          "authId": "AUTH-2",
+          "rdmId": "RDM-2",
+          "performanceTier": "POWERED",
+          "vpnEnabled": "NO",
+          "vpnType": "",
+          "ipRestrictionEnabled": "YES",
+          "productType": "WebLOC",
+          "mapCenter": "New York",
+          "licenses": 30,
+          "users": 70,
+          "concurrentSearches": 6,
+          "dailySearches": 4000,
+          "monthlySearches": 110000,
+          "concurrentAnalyses": 4,
+          "topicAnalyses": 6,
+          "dailyAnalyses": 300,
+          "monthlyAnalyses": 8000,
+          "tangles": 0,
+          "tanglesGo": 0,
+          "webloc": 1,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "NO",
+          "crossSystemFeatures": [
+            "Federated Search"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1200,
+          "apiMonthlyQty": 32000,
+          "aiFeatures": [
+            "Translation"
+          ],
+          "additionalFeatures": [
+            "Priority Support"
+          ],
+          "standardMonitors": 30,
+          "fullMonitors": 7,
+          "topicMonitors": 14,
+          "deployTarget": "NEW_SYSTEM",
+          "existingSystemId": null
+        },
+        {
+          "id": "req-a-new-002",
+          "requirementId": "REQ-A-NEW-002",
+          "hostingType": "Cloud",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-3",
+          "authId": "AUTH-3",
+          "rdmId": "RDM-3",
+          "performanceTier": "STANDARD",
+          "vpnEnabled": "YES",
+          "vpnType": "Site-to-Site",
+          "ipRestrictionEnabled": "YES",
+          "productType": "Tangles",
+          "mapCenter": "Berlin",
+          "licenses": 35,
+          "users": 80,
+          "concurrentSearches": 7,
+          "dailySearches": 4500,
+          "monthlySearches": 120000,
+          "concurrentAnalyses": 5,
+          "topicAnalyses": 7,
+          "dailyAnalyses": 350,
+          "monthlyAnalyses": 9000,
+          "tangles": 1,
+          "tanglesGo": 1,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "YES",
+          "crossSystemFeatures": [
+            "Advanced Search",
+            "Case Export"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1300,
+          "apiMonthlyQty": 33000,
+          "aiFeatures": [
+            "OCR",
+            "Entity Extraction"
+          ],
+          "additionalFeatures": [
+            "Audit Export"
+          ],
+          "standardMonitors": 35,
+          "fullMonitors": 8,
+          "topicMonitors": 16,
+          "deployTarget": "NEW_SYSTEM",
+          "existingSystemId": null
+        }
+      ],
+      "changeRequestRequirements": [],
+      "standardRenewalRequirements": [],
+      "pocProjectIds": [],
+      "finalProjectId": "proj-qa-new",
+      "wonAt": "2026-07-02T09:00:00.000Z",
+      "createdAt": "2026-07-01T09:00:00.000Z",
+      "updatedAt": "2026-07-03T09:00:00.000Z"
+    },
+    {
+      "id": "opp-qa-003",
+      "opportunityId": "OPP0003",
+      "opportunityName": "Cedar County Renewal 2026",
+      "stage": "WON",
+      "accountId": "acct-beta-003",
+      "salesManagerId": "sm-beta-005",
+      "type": "RENEWAL",
+      "subType": "STANDARD",
+      "financialProfile": "Paid",
+      "dealPackage": "Silver",
+      "deliveryDate": "2026-07-24",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "warrantyServiceMonths": 12,
+      "region": "NA",
+      "country": "Canada",
+      "state": "Ontario",
+      "timeZone": "America/Toronto",
+      "timeGroup": "AMER",
+      "currentMilestone": "Renewal Review",
+      "projectAlerts": [
+        "Warranty pending renewal"
+      ],
+      "newTenantRequirements": [],
+      "changeRequestRequirements": [],
+      "standardRenewalRequirements": [
+        {
+          "id": "req-renew-001",
+          "requirementId": "REQ-RENEW-001",
+          "hostingType": "Cloud",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-1",
+          "authId": "AUTH-1",
+          "rdmId": "RDM-1",
+          "performanceTier": "STANDARD",
+          "vpnEnabled": "YES",
+          "vpnType": "Site-to-Site",
+          "ipRestrictionEnabled": "YES",
+          "productType": "Tangles",
+          "mapCenter": "Berlin",
+          "licenses": 25,
+          "users": 60,
+          "concurrentSearches": 5,
+          "dailySearches": 3500,
+          "monthlySearches": 100000,
+          "concurrentAnalyses": 3,
+          "topicAnalyses": 5,
+          "dailyAnalyses": 250,
+          "monthlyAnalyses": 7000,
+          "tangles": 1,
+          "tanglesGo": 1,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "YES",
+          "crossSystemFeatures": [
+            "Advanced Search",
+            "Case Export"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1100,
+          "apiMonthlyQty": 31000,
+          "aiFeatures": [
+            "OCR",
+            "Entity Extraction"
+          ],
+          "additionalFeatures": [
+            "Audit Export"
+          ],
+          "standardMonitors": 25,
+          "fullMonitors": 6,
+          "topicMonitors": 12,
+          "tenantId": "ten-cedar-001",
+          "systemId": "sys-cedar-001",
+          "warrantyRecordId": "wr-ten-cedar-001",
+          "warrantyStatus": "VALID",
+          "warrantyEndDate": "2026-07-25"
+        },
+        {
+          "id": "req-renew-002",
+          "requirementId": "REQ-RENEW-002",
+          "hostingType": "Hybrid",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-2",
+          "authId": "AUTH-2",
+          "rdmId": "RDM-2",
+          "performanceTier": "POWERED",
+          "vpnEnabled": "NO",
+          "vpnType": "",
+          "ipRestrictionEnabled": "YES",
+          "productType": "Tangles",
+          "mapCenter": "New York",
+          "licenses": 30,
+          "users": 70,
+          "concurrentSearches": 6,
+          "dailySearches": 4000,
+          "monthlySearches": 110000,
+          "concurrentAnalyses": 4,
+          "topicAnalyses": 6,
+          "dailyAnalyses": 300,
+          "monthlyAnalyses": 8000,
+          "tangles": 1,
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "NO",
+          "crossSystemFeatures": [
+            "Federated Search"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1200,
+          "apiMonthlyQty": 32000,
+          "aiFeatures": [
+            "Translation"
+          ],
+          "additionalFeatures": [
+            "Priority Support"
+          ],
+          "standardMonitors": 30,
+          "fullMonitors": 7,
+          "topicMonitors": 14,
+          "tenantId": "ten-cedar-002",
+          "systemId": "sys-cedar-001",
+          "warrantyRecordId": "wr-ten-cedar-002",
+          "warrantyStatus": "PENDING",
+          "warrantyEndDate": "2026-07-26"
+        },
+        {
+          "id": "req-renew-003",
+          "requirementId": "REQ-RENEW-003",
+          "hostingType": "Cloud",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-3",
+          "authId": "AUTH-3",
+          "rdmId": "RDM-3",
+          "performanceTier": "STANDARD",
+          "vpnEnabled": "YES",
+          "vpnType": "Site-to-Site",
+          "ipRestrictionEnabled": "YES",
+          "productType": "Tangles",
+          "mapCenter": "Berlin",
+          "licenses": 35,
+          "users": 80,
+          "concurrentSearches": 7,
+          "dailySearches": 4500,
+          "monthlySearches": 120000,
+          "concurrentAnalyses": 5,
+          "topicAnalyses": 7,
+          "dailyAnalyses": 350,
+          "monthlyAnalyses": 9000,
+          "tangles": 1,
+          "tanglesGo": 1,
+          "webloc": 0,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "YES",
+          "crossSystemFeatures": [
+            "Advanced Search",
+            "Case Export"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1300,
+          "apiMonthlyQty": 33000,
+          "aiFeatures": [
+            "OCR",
+            "Entity Extraction"
+          ],
+          "additionalFeatures": [
+            "Audit Export"
+          ],
+          "standardMonitors": 35,
+          "fullMonitors": 8,
+          "topicMonitors": 16,
+          "tenantId": "ten-cedar-003",
+          "systemId": "sys-cedar-001",
+          "warrantyRecordId": "wr-ten-cedar-003",
+          "warrantyStatus": "VALID",
+          "warrantyEndDate": "2026-07-27"
+        }
+      ],
+      "pocProjectIds": [],
+      "finalProjectId": "proj-qa-renewal",
+      "wonAt": "2026-07-02T09:00:00.000Z",
+      "createdAt": "2026-07-01T09:00:00.000Z",
+      "updatedAt": "2026-07-03T09:00:00.000Z"
+    },
+    {
+      "id": "opp-qa-004",
+      "opportunityId": "OPP0004",
+      "opportunityName": "Cedar County Upsell Analytics",
+      "stage": "WON",
+      "accountId": "acct-beta-003",
+      "salesManagerId": "sm-beta-005",
+      "type": "DELIVERY",
+      "subType": "UPSELL",
+      "financialProfile": "Paid",
+      "dealPackage": "Gold",
+      "deliveryDate": "2026-07-27",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "warrantyServiceMonths": 12,
+      "region": "NA",
+      "country": "Canada",
+      "state": "Ontario",
+      "timeZone": "America/Toronto",
+      "timeGroup": "AMER",
+      "currentMilestone": "Change Request",
+      "projectAlerts": [
+        "Product mismatch review"
+      ],
+      "newTenantRequirements": [],
+      "changeRequestRequirements": [
+        {
+          "id": "req-change-001",
+          "requirementId": "REQ-CHANGE-001",
+          "hostingType": "Hybrid",
+          "cloudPlatform": "AWS",
+          "csp": "AWS",
+          "cloudRegion": "us-east-1",
+          "statisticsId": "STAT-4",
+          "authId": "AUTH-4",
+          "rdmId": "RDM-4",
+          "performanceTier": "POWERED",
+          "vpnEnabled": "NO",
+          "vpnType": "",
+          "ipRestrictionEnabled": "YES",
+          "productType": "WebLOC",
+          "mapCenter": "New York",
+          "licenses": 40,
+          "users": 90,
+          "concurrentSearches": 8,
+          "dailySearches": 5000,
+          "monthlySearches": 130000,
+          "concurrentAnalyses": 6,
+          "topicAnalyses": 8,
+          "dailyAnalyses": 400,
+          "monthlyAnalyses": 10000,
+          "tangles": 0,
+          "tanglesGo": 0,
+          "webloc": 1,
+          "webeye": 0,
+          "ingest": 1,
+          "blockchain": "NO",
+          "crossSystemFeatures": [
+            "Federated Search"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1400,
+          "apiMonthlyQty": 34000,
+          "aiFeatures": [
+            "Translation"
+          ],
+          "additionalFeatures": [
+            "Priority Support"
+          ],
+          "standardMonitors": 40,
+          "fullMonitors": 9,
+          "topicMonitors": 18,
+          "tenantId": "ten-cedar-004",
+          "systemId": "sys-cedar-002"
+        }
+      ],
+      "standardRenewalRequirements": [],
+      "pocProjectIds": [],
+      "finalProjectId": "proj-qa-change",
+      "wonAt": "2026-07-03T09:00:00.000Z",
+      "createdAt": "2026-07-01T09:00:00.000Z",
+      "updatedAt": "2026-07-04T09:00:00.000Z"
+    },
+    {
+      "id": "opp-qa-005",
+      "opportunityId": "OPP0005",
+      "opportunityName": "Pacific Gov Upsell Delivery",
+      "stage": "WON",
+      "accountId": "acct-beta-004",
+      "salesManagerId": "sm-beta-003",
+      "type": "DELIVERY",
+      "subType": "UPSELL",
+      "financialProfile": "Paid",
+      "dealPackage": "Platinum",
+      "deliveryDate": "2026-07-29",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "warrantyServiceMonths": 18,
+      "region": "APAC",
+      "country": "Singapore",
+      "state": "Central Region",
+      "timeZone": "Asia/Singapore",
+      "timeGroup": "APAC",
+      "currentMilestone": "Upsell Delivery",
+      "projectAlerts": [],
+      "newTenantRequirements": [
+        {
+          "id": "req-a-upsell-001",
+          "requirementId": "REQ-A-UPSELL-001",
+          "hostingType": "Hybrid",
+          "cloudPlatform": "Azure",
+          "csp": "Azure",
+          "cloudRegion": "southeastasia",
+          "statisticsId": "STAT-4",
+          "authId": "AUTH-4",
+          "rdmId": "RDM-4",
+          "performanceTier": "POWERED",
+          "vpnEnabled": "NO",
+          "vpnType": "",
+          "ipRestrictionEnabled": "YES",
+          "productType": "WebEye",
+          "mapCenter": "New York",
+          "licenses": 40,
+          "users": 90,
+          "concurrentSearches": 8,
+          "dailySearches": 5000,
+          "monthlySearches": 130000,
+          "concurrentAnalyses": 6,
+          "topicAnalyses": 8,
+          "dailyAnalyses": 400,
+          "monthlyAnalyses": 10000,
+          "tangles": 0,
+          "tanglesGo": 0,
+          "webloc": 0,
+          "webeye": 1,
+          "ingest": 1,
+          "blockchain": "NO",
+          "crossSystemFeatures": [
+            "Federated Search"
+          ],
+          "apiEnabled": "YES",
+          "apiDailyQty": 1400,
+          "apiMonthlyQty": 34000,
+          "aiFeatures": [
+            "Translation"
+          ],
+          "additionalFeatures": [
+            "Priority Support"
+          ],
+          "standardMonitors": 40,
+          "fullMonitors": 9,
+          "topicMonitors": 18,
+          "deployTarget": "NEW_SYSTEM",
+          "existingSystemId": null
+        }
+      ],
+      "changeRequestRequirements": [],
+      "standardRenewalRequirements": [],
+      "pocProjectIds": [],
+      "finalProjectId": "proj-qa-upsell",
+      "wonAt": "2026-07-03T09:00:00.000Z",
+      "createdAt": "2026-07-01T09:00:00.000Z",
+      "updatedAt": "2026-07-04T09:00:00.000Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-qa-poc",
+      "pid": "P3001",
+      "opportunityId": "opp-qa-001",
+      "projectSource": "POC",
+      "accountName": "Northbridge Public Safety",
+      "mainType": "POC",
+      "subType": "NONE",
+      "deliveryDate": "2026-07-28",
+      "pocStartDate": "2026-07-08",
+      "pocEndDate": "2026-07-28",
+      "progressStatus": "IN_PROGRESS",
+      "dealOwner": "Maya Cohen",
+      "opportunityName": "Northbridge POC Deployment",
+      "canceledAt": null,
+      "milestoneTemplateId": "poc-template",
+      "createdAt": "2026-07-02T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "milestones": [
+        {
+          "id": "proj-qa-poc-ms-1",
+          "name": "POC Kickoff",
+          "order": 1,
+          "status": "DONE",
+          "deadline": "2026-07-10",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-poc-ms-2",
+          "name": "End of POC",
+          "order": 2,
+          "status": "OPEN",
+          "deadline": "2026-07-20",
+          "comment": ""
+        }
+      ],
+      "tasks": [
+        {
+          "id": "proj-qa-poc-task-1",
+          "milestoneId": "proj-qa-poc-ms-1",
+          "name": "Validate requirements",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "DONE",
+          "order": 1,
+          "deadline": "2026-07-11",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-poc-task-2",
+          "milestoneId": "proj-qa-poc-ms-2",
+          "name": "Configure system and tenant",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 2,
+          "deadline": "2026-07-21",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-poc-task-3",
+          "milestoneId": "proj-qa-poc-ms-2",
+          "name": "End of POC",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 3,
+          "deadline": "2026-07-24",
+          "comment": ""
+        }
+      ],
+      "documents": []
+    },
+    {
+      "id": "proj-qa-new",
+      "pid": "P3002",
+      "opportunityId": "opp-qa-002",
+      "projectSource": "FINAL",
+      "accountName": "Harborview Intelligence Bureau",
+      "mainType": "DELIVERY",
+      "subType": "NEW",
+      "deliveryDate": "2026-07-30",
+      "progressStatus": "OPEN",
+      "dealOwner": "Daniel Brooks",
+      "opportunityName": "Harborview New Delivery",
+      "canceledAt": null,
+      "milestoneTemplateId": "delivery-template",
+      "createdAt": "2026-07-02T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "milestones": [
+        {
+          "id": "proj-qa-new-ms-1",
+          "name": "Delivery Kickoff",
+          "order": 1,
+          "status": "DONE",
+          "deadline": "2026-07-11",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-new-ms-2",
+          "name": "Delivery Execution",
+          "order": 2,
+          "status": "OPEN",
+          "deadline": "2026-07-21",
+          "comment": ""
+        }
+      ],
+      "tasks": [
+        {
+          "id": "proj-qa-new-task-1",
+          "milestoneId": "proj-qa-new-ms-1",
+          "name": "Validate requirements",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "DONE",
+          "order": 1,
+          "deadline": "2026-07-12",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-new-task-2",
+          "milestoneId": "proj-qa-new-ms-2",
+          "name": "Configure system and tenant",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 2,
+          "deadline": "2026-07-22",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-new-task-3",
+          "milestoneId": "proj-qa-new-ms-2",
+          "name": "Confirm delivery handover",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 3,
+          "deadline": "2026-07-25",
+          "comment": ""
+        }
+      ],
+      "documents": []
+    },
+    {
+      "id": "proj-qa-renewal",
+      "pid": "P3003",
+      "opportunityId": "opp-qa-003",
+      "projectSource": "FINAL",
+      "accountName": "Cedar County Investigations",
+      "mainType": "RENEWAL",
+      "subType": "STANDARD",
+      "deliveryDate": "2026-07-24",
+      "progressStatus": "OPEN",
+      "dealOwner": "Noah Stein",
+      "opportunityName": "Cedar County Renewal 2026",
+      "canceledAt": null,
+      "milestoneTemplateId": "renewal-template",
+      "createdAt": "2026-07-02T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "milestones": [
+        {
+          "id": "proj-qa-renewal-ms-1",
+          "name": "Delivery Kickoff",
+          "order": 1,
+          "status": "OPEN",
+          "deadline": "2026-07-12",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-renewal-ms-2",
+          "name": "Delivery Execution",
+          "order": 2,
+          "status": "OPEN",
+          "deadline": "2026-07-22",
+          "comment": ""
+        }
+      ],
+      "tasks": [
+        {
+          "id": "proj-qa-renewal-task-1",
+          "milestoneId": "proj-qa-renewal-ms-1",
+          "name": "Validate requirements",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 1,
+          "deadline": "2026-07-13",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-renewal-task-2",
+          "milestoneId": "proj-qa-renewal-ms-2",
+          "name": "Configure system and tenant",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 2,
+          "deadline": "2026-07-23",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-renewal-task-3",
+          "milestoneId": "proj-qa-renewal-ms-2",
+          "name": "Confirm delivery handover",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 3,
+          "deadline": "2026-07-26",
+          "comment": ""
+        }
+      ],
+      "documents": []
+    },
+    {
+      "id": "proj-qa-change",
+      "pid": "P3004",
+      "opportunityId": "opp-qa-004",
+      "projectSource": "FINAL",
+      "accountName": "Cedar County Investigations",
+      "mainType": "DELIVERY",
+      "subType": "UPSELL",
+      "deliveryDate": "2026-07-27",
+      "progressStatus": "IN_PROGRESS",
+      "dealOwner": "Noah Stein",
+      "opportunityName": "Cedar County Upsell Analytics",
+      "canceledAt": null,
+      "milestoneTemplateId": "change-template",
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "milestones": [
+        {
+          "id": "proj-qa-change-ms-1",
+          "name": "Delivery Kickoff",
+          "order": 1,
+          "status": "OPEN",
+          "deadline": "2026-07-13",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-change-ms-2",
+          "name": "Delivery Execution",
+          "order": 2,
+          "status": "OPEN",
+          "deadline": "2026-07-23",
+          "comment": ""
+        }
+      ],
+      "tasks": [
+        {
+          "id": "proj-qa-change-task-1",
+          "milestoneId": "proj-qa-change-ms-1",
+          "name": "Validate requirements",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 1,
+          "deadline": "2026-07-14",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-change-task-2",
+          "milestoneId": "proj-qa-change-ms-2",
+          "name": "Configure system and tenant",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 2,
+          "deadline": "2026-07-24",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-change-task-3",
+          "milestoneId": "proj-qa-change-ms-2",
+          "name": "Confirm delivery handover",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 3,
+          "deadline": "2026-07-27",
+          "comment": ""
+        }
+      ],
+      "documents": []
+    },
+    {
+      "id": "proj-qa-upsell",
+      "pid": "P3005",
+      "opportunityId": "opp-qa-005",
+      "projectSource": "FINAL",
+      "accountName": "Bluefield Digital Forensics",
+      "mainType": "DELIVERY",
+      "subType": "UPSELL",
+      "deliveryDate": "2026-07-29",
+      "progressStatus": "OPEN",
+      "dealOwner": "Priya Raman",
+      "opportunityName": "Pacific Gov Upsell Delivery",
+      "canceledAt": null,
+      "milestoneTemplateId": "delivery-template",
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "milestones": [
+        {
+          "id": "proj-qa-upsell-ms-1",
+          "name": "Delivery Kickoff",
+          "order": 1,
+          "status": "OPEN",
+          "deadline": "2026-07-14",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-upsell-ms-2",
+          "name": "Delivery Execution",
+          "order": 2,
+          "status": "OPEN",
+          "deadline": "2026-07-24",
+          "comment": ""
+        }
+      ],
+      "tasks": [
+        {
+          "id": "proj-qa-upsell-task-1",
+          "milestoneId": "proj-qa-upsell-ms-1",
+          "name": "Validate requirements",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 1,
+          "deadline": "2026-07-15",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-upsell-task-2",
+          "milestoneId": "proj-qa-upsell-ms-2",
+          "name": "Configure system and tenant",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 2,
+          "deadline": "2026-07-25",
+          "comment": ""
+        },
+        {
+          "id": "proj-qa-upsell-task-3",
+          "milestoneId": "proj-qa-upsell-ms-2",
+          "name": "Confirm delivery handover",
+          "department": "Delivery",
+          "resource": "Delivery Specialist",
+          "status": "OPEN",
+          "order": 3,
+          "deadline": "2026-07-28",
+          "comment": ""
+        }
+      ],
+      "documents": []
+    }
+  ],
   "productionSystemInventory": [
     {
       "id": "prod-inv-beta-001",
@@ -199,9 +1134,9 @@
       "cognitoRegion": "EU",
       "productType": "Tangles",
       "hostingType": "Cloud",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "USA",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -237,14 +1172,14 @@
       "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-002",
@@ -258,8 +1193,8 @@
       "productType": "Weaver",
       "hostingType": "Cloud",
       "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "us-east-1 (N. Virginia)",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "United Kingdom",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -297,14 +1232,14 @@
       "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-003",
@@ -318,8 +1253,8 @@
       "productType": "Tangles Light",
       "hostingType": "Cloud",
       "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "USA",
       "performanceTier": "POWERED",
       "vpnEnabled": "NO",
@@ -349,20 +1284,20 @@
       "apiMonthlyQty": 103000,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "EMEA",
-      "country": "United Kingdom",
+      "region": "APAC",
+      "country": "Singapore",
       "state": "England",
-      "timeGroup": "EMEA",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-004",
@@ -375,9 +1310,9 @@
       "cognitoRegion": "NA",
       "productType": "Webloc",
       "hostingType": "On premise",
-      "cloudPlatform": "Customer's datacenter",
-      "csp": "Customer",
-      "cloudRegion": "",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "France",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -412,20 +1347,20 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "region": "AMER",
-      "country": "USA",
+      "region": "EMEA",
+      "country": "Germany",
       "state": "California",
-      "timeGroup": "AMER",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-005",
@@ -438,9 +1373,9 @@
       "cognitoRegion": "EU",
       "productType": "Trapdoor",
       "hostingType": "Hybrid",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "Australia",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -472,20 +1407,20 @@
       "additionalFeatures": [
         "Advanced Search"
       ],
-      "region": "EMEA",
-      "country": "France",
+      "region": "AMER",
+      "country": "USA",
       "state": "Ile-de-France",
-      "timeGroup": "EMEA",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-006",
@@ -498,9 +1433,9 @@
       "cognitoRegion": "APAC",
       "productType": "Lynx",
       "hostingType": "Cloud",
-      "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "ap-southeast-2 (Sydney)",
+      "cloudPlatform": "Azure",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "Singapore",
       "performanceTier": "POWERED",
       "vpnEnabled": "YES",
@@ -533,19 +1468,19 @@
       "aiFeatures": [],
       "additionalFeatures": [],
       "region": "APAC",
-      "country": "Australia",
+      "country": "Singapore",
       "state": "New South Wales",
       "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-007",
@@ -558,9 +1493,9 @@
       "cognitoRegion": "APAC",
       "productType": "DataAPI",
       "hostingType": "Cloud",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "Southeast Asia",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "Colombia",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -590,20 +1525,20 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "APAC",
-      "country": "Singapore",
+      "region": "EMEA",
+      "country": "Germany",
       "state": "Central Region",
-      "timeGroup": "APAC",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-008",
@@ -617,8 +1552,8 @@
       "productType": "Tangles",
       "hostingType": "Cloud",
       "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "sa-east-1 (Sao Paulo)",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "Germany",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -653,20 +1588,20 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "region": "LATAM",
-      "country": "Colombia",
+      "region": "AMER",
+      "country": "USA",
       "state": "Bogota",
-      "timeGroup": "LATAM",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-009",
@@ -680,8 +1615,8 @@
       "productType": "Tangles",
       "hostingType": "Cloud",
       "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "USA",
       "performanceTier": "POWERED",
       "vpnEnabled": "NO",
@@ -711,20 +1646,20 @@
       "apiMonthlyQty": 109000,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "EMEA",
-      "country": "Germany",
+      "region": "APAC",
+      "country": "Singapore",
       "state": "Berlin",
-      "timeGroup": "EMEA",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-010",
@@ -738,8 +1673,8 @@
       "productType": "Weaver",
       "hostingType": "Cloud",
       "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "us-east-1 (N. Virginia)",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "United Kingdom",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -773,20 +1708,20 @@
       "additionalFeatures": [
         "Advanced Search"
       ],
-      "region": "AMER",
-      "country": "USA",
+      "region": "EMEA",
+      "country": "Germany",
       "state": "Virginia",
-      "timeGroup": "AMER",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-011",
@@ -799,9 +1734,9 @@
       "cognitoRegion": "EU",
       "productType": "Tangles Light",
       "hostingType": "Cloud",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "USA",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -831,20 +1766,20 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "EMEA",
-      "country": "United Kingdom",
+      "region": "AMER",
+      "country": "USA",
       "state": "England",
-      "timeGroup": "EMEA",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-012",
@@ -857,9 +1792,9 @@
       "cognitoRegion": "NA",
       "productType": "Webloc",
       "hostingType": "On premise",
-      "cloudPlatform": "Customer's datacenter",
-      "csp": "Customer",
-      "cloudRegion": "",
+      "cloudPlatform": "Azure",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "France",
       "performanceTier": "POWERED",
       "vpnEnabled": "YES",
@@ -894,20 +1829,20 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "region": "AMER",
-      "country": "USA",
+      "region": "APAC",
+      "country": "Singapore",
       "state": "California",
-      "timeGroup": "AMER",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-013",
@@ -920,9 +1855,9 @@
       "cognitoRegion": "EU",
       "productType": "Trapdoor",
       "hostingType": "Hybrid",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "Australia",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -953,19 +1888,19 @@
       "aiFeatures": [],
       "additionalFeatures": [],
       "region": "EMEA",
-      "country": "France",
+      "country": "Germany",
       "state": "Ile-de-France",
       "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-014",
@@ -979,8 +1914,8 @@
       "productType": "Lynx",
       "hostingType": "Cloud",
       "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "ap-southeast-2 (Sydney)",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "Singapore",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -1012,20 +1947,20 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "APAC",
-      "country": "Australia",
+      "region": "AMER",
+      "country": "USA",
       "state": "New South Wales",
-      "timeGroup": "APAC",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-015",
@@ -1039,8 +1974,8 @@
       "productType": "DataAPI",
       "hostingType": "Cloud",
       "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "Southeast Asia",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "Colombia",
       "performanceTier": "POWERED",
       "vpnEnabled": "NO",
@@ -1078,14 +2013,14 @@
       "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-016",
@@ -1099,8 +2034,8 @@
       "productType": "Tangles",
       "hostingType": "Cloud",
       "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "sa-east-1 (Sao Paulo)",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "Germany",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -1135,20 +2070,20 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "region": "LATAM",
-      "country": "Colombia",
+      "region": "EMEA",
+      "country": "Germany",
       "state": "Bogota",
-      "timeGroup": "LATAM",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-017",
@@ -1161,9 +2096,9 @@
       "cognitoRegion": "EU",
       "productType": "Tangles",
       "hostingType": "Cloud",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "USA",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -1193,20 +2128,20 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "EMEA",
-      "country": "Germany",
+      "region": "AMER",
+      "country": "USA",
       "state": "Berlin",
-      "timeGroup": "EMEA",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-018",
@@ -1219,9 +2154,9 @@
       "cognitoRegion": "NA",
       "productType": "Weaver",
       "hostingType": "Cloud",
-      "cloudPlatform": "AWS",
-      "csp": "Automate IT",
-      "cloudRegion": "us-east-1 (N. Virginia)",
+      "cloudPlatform": "Azure",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
       "mapCenter": "United Kingdom",
       "performanceTier": "POWERED",
       "vpnEnabled": "YES",
@@ -1253,20 +2188,20 @@
       "apiMonthlyQty": 118000,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "region": "AMER",
-      "country": "USA",
+      "region": "APAC",
+      "country": "Singapore",
       "state": "Virginia",
-      "timeGroup": "AMER",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-019",
@@ -1279,9 +2214,9 @@
       "cognitoRegion": "EU",
       "productType": "Tangles Light",
       "hostingType": "Cloud",
-      "cloudPlatform": "Azure",
-      "csp": "SELA",
-      "cloudRegion": "West Europe",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
       "mapCenter": "USA",
       "performanceTier": "STANDARD",
       "vpnEnabled": "NO",
@@ -1312,19 +2247,19 @@
       "aiFeatures": [],
       "additionalFeatures": [],
       "region": "EMEA",
-      "country": "United Kingdom",
+      "country": "Germany",
       "state": "England",
       "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "prod-inv-beta-020",
@@ -1337,9 +2272,9 @@
       "cognitoRegion": "NA",
       "productType": "Webloc",
       "hostingType": "On premise",
-      "cloudPlatform": "Customer's datacenter",
-      "csp": "Customer",
-      "cloudRegion": "",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
       "mapCenter": "France",
       "performanceTier": "STANDARD",
       "vpnEnabled": "YES",
@@ -1382,14 +2317,14 @@
       "timeGroup": "AMER",
       "timeGroupAlert": "",
       "linkedProjects": [],
-      "operationalStatus": "On",
+      "operationalStatus": "Operative",
       "tenantCount": 0,
       "documents": [],
       "alerts": [],
       "remarks": [],
       "configurationHistory": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     }
   ],
   "reusedInternalSystems": [
@@ -1397,8 +2332,8 @@
       "id": "reused-beta-001",
       "machineId": "M7001",
       "source": "Reused Internal Systems",
-      "purpose": "Available",
-      "status": "Available",
+      "purpose": "POC",
+      "status": "Occupied",
       "logo": "T",
       "url": "https://m7001.beta.example.internal",
       "cognitoRegion": "EU",
@@ -1441,17 +2376,43 @@
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
-      "currentProjectIds": [],
-      "purposeHistory": [],
+      "currentProjectIds": [
+        "proj-qa-poc"
+      ],
+      "purposeHistory": [
+        {
+          "id": "ph-qa-m2101-001",
+          "recordId": "PH-001",
+          "startDate": "2026-07-03T09:00:00.000Z",
+          "endDate": null,
+          "purposeType": "POC",
+          "pid": "P3001",
+          "sid": "S3104",
+          "projectName": "Northbridge POC Deployment",
+          "accountName": "Northbridge Public Safety",
+          "product": "Tangles",
+          "projectStatus": "IN_PROGRESS"
+        }
+      ],
       "tenantCount": 0,
       "alerts": [],
       "operationalStatus": "On",
-      "remarks": [],
+      "remarks": [
+        {
+          "id": "remark-reused-beta-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Temporary Change",
+          "content": "<p>Reserved for Northbridge POC.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
       "owners": [],
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-002",
@@ -1498,7 +2459,7 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "usedInRegion": "AMER",
+      "usedInRegion": "",
       "timeGroup": "AMER",
       "timeGroupAlert": "",
       "occupationStartDate": null,
@@ -1513,7 +2474,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-003",
@@ -1558,8 +2519,8 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "usedInRegion": "EMEA",
-      "timeGroup": "EMEA",
+      "usedInRegion": "",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1573,7 +2534,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-004",
@@ -1623,8 +2584,8 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "usedInRegion": "AMER",
-      "timeGroup": "AMER",
+      "usedInRegion": "",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1638,7 +2599,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-005",
@@ -1685,8 +2646,8 @@
       "additionalFeatures": [
         "Advanced Search"
       ],
-      "usedInRegion": "APAC",
-      "timeGroup": "APAC",
+      "usedInRegion": "",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1700,7 +2661,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-006",
@@ -1747,7 +2708,7 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "usedInRegion": "APAC",
+      "usedInRegion": "",
       "timeGroup": "APAC",
       "timeGroupAlert": "",
       "occupationStartDate": null,
@@ -1762,7 +2723,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-007",
@@ -1807,8 +2768,8 @@
       "apiMonthlyQty": 127000,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "usedInRegion": "LATAM",
-      "timeGroup": "LATAM",
+      "usedInRegion": "",
+      "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1822,7 +2783,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-008",
@@ -1872,8 +2833,8 @@
         "Entity Extraction"
       ],
       "additionalFeatures": [],
-      "usedInRegion": "EMEA",
-      "timeGroup": "EMEA",
+      "usedInRegion": "",
+      "timeGroup": "AMER",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1887,7 +2848,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-009",
@@ -1932,8 +2893,8 @@
       "apiMonthlyQty": null,
       "aiFeatures": [],
       "additionalFeatures": [],
-      "usedInRegion": "AMER",
-      "timeGroup": "AMER",
+      "usedInRegion": "",
+      "timeGroup": "APAC",
       "timeGroupAlert": "",
       "occupationStartDate": null,
       "occupationEndDate": null,
@@ -1947,7 +2908,7 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     },
     {
       "id": "reused-beta-010",
@@ -1996,7 +2957,7 @@
       "additionalFeatures": [
         "Advanced Search"
       ],
-      "usedInRegion": "EMEA",
+      "usedInRegion": "",
       "timeGroup": "EMEA",
       "timeGroupAlert": "",
       "occupationStartDate": null,
@@ -2011,19 +2972,2426 @@
       "configurationHistory": [],
       "documents": [],
       "createdAt": "2026-07-05T09:00:00.000Z",
-      "updatedAt": "2026-07-05T09:00:00.000Z"
+      "updatedAt": "2026-07-06T07:00:00.000Z"
     }
   ],
-  "systems": [],
-  "tenants": [],
-  "warrantyRecords": [],
-  "projectSystems": [],
-  "projectTenants": [],
+  "systems": [
+    {
+      "id": "sys-cedar-001",
+      "accountId": "acct-beta-003",
+      "salesManagerId": "sm-beta-005",
+      "sid": "S3101",
+      "deliveryPid": "P3003",
+      "machineId": null,
+      "linkedProjectIds": [
+        "proj-qa-renewal"
+      ],
+      "tenantIds": [
+        "ten-cedar-001",
+        "ten-cedar-002",
+        "ten-cedar-003"
+      ],
+      "systemClass": "CUSTOMER",
+      "purpose": "Delivery",
+      "availability": "OCCUPIED",
+      "logo": "T",
+      "url": "https://s3101.qa.deliveryerp.local",
+      "cognitoRegion": "us-east-1",
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "region": "AMER",
+      "country": "Canada",
+      "state": "Ontario",
+      "timeGroup": "AMER",
+      "timeGroupAlert": "",
+      "operationalStatus": "Operative",
+      "remarks": [
+        {
+          "id": "remark-sys-cedar-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>S3101 is ready for QA validation.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "owners": [],
+      "configurationHistory": [
+        {
+          "id": "ch-sys-cedar-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-06T09:00:00.000Z",
+          "tid": "T001",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 25,
+            "users": 60,
+            "concurrentSearches": 5,
+            "dailySearches": 3500,
+            "monthlySearches": 100000,
+            "concurrentAnalyses": 3,
+            "dailyAnalyses": 250,
+            "monthlyAnalyses": 7000,
+            "topicAnalyses": 5,
+            "standardMonitors": 25,
+            "fullMonitors": 6,
+            "topicMonitors": 12,
+            "mapCenter": "Berlin",
+            "tangles": 1,
+            "tanglesGo": 1,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1100,
+            "apiMonthlyQty": 31000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "documents": [],
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "product": "Tangles",
+      "licenses": 25,
+      "users": 60,
+      "concurrentSearches": 5,
+      "dailySearches": 3500,
+      "monthlySearches": 100000,
+      "concurrentAnalyses": 3,
+      "dailyAnalyses": 250,
+      "monthlyAnalyses": 7000,
+      "topicAnalyses": 5,
+      "standardMonitors": 25,
+      "fullMonitors": 6,
+      "topicMonitors": 12,
+      "tangles": 1,
+      "tanglesGo": 1,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1100,
+      "apiMonthlyQty": 31000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ]
+    },
+    {
+      "id": "sys-cedar-002",
+      "accountId": "acct-beta-003",
+      "salesManagerId": "sm-beta-005",
+      "sid": "S3102",
+      "deliveryPid": "P3003",
+      "machineId": null,
+      "linkedProjectIds": [
+        "proj-qa-renewal"
+      ],
+      "tenantIds": [
+        "ten-cedar-004",
+        "ten-cedar-005"
+      ],
+      "systemClass": "CUSTOMER",
+      "purpose": "Delivery",
+      "availability": "OCCUPIED",
+      "logo": "W",
+      "url": "https://s3102.qa.deliveryerp.local",
+      "cognitoRegion": "us-east-1",
+      "productType": "WebLOC",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "POWERED",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "region": "AMER",
+      "country": "Canada",
+      "state": "Ontario",
+      "timeGroup": "AMER",
+      "timeGroupAlert": "",
+      "operationalStatus": "Operative",
+      "remarks": [
+        {
+          "id": "remark-sys-cedar-002-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>S3102 is ready for QA validation.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "owners": [],
+      "configurationHistory": [
+        {
+          "id": "ch-sys-cedar-002-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-07T09:00:00.000Z",
+          "tid": "T004",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebLOC",
+            "licenses": 30,
+            "users": 70,
+            "concurrentSearches": 6,
+            "dailySearches": 4000,
+            "monthlySearches": 110000,
+            "concurrentAnalyses": 4,
+            "dailyAnalyses": 300,
+            "monthlyAnalyses": 8000,
+            "topicAnalyses": 6,
+            "standardMonitors": 30,
+            "fullMonitors": 7,
+            "topicMonitors": 14,
+            "mapCenter": "New York",
+            "tangles": 0,
+            "tanglesGo": 0,
+            "webloc": 1,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1200,
+            "apiMonthlyQty": 32000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "documents": [],
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "product": "WebLOC",
+      "licenses": 30,
+      "users": 70,
+      "concurrentSearches": 6,
+      "dailySearches": 4000,
+      "monthlySearches": 110000,
+      "concurrentAnalyses": 4,
+      "dailyAnalyses": 300,
+      "monthlyAnalyses": 8000,
+      "topicAnalyses": 6,
+      "standardMonitors": 30,
+      "fullMonitors": 7,
+      "topicMonitors": 14,
+      "tangles": 0,
+      "tanglesGo": 0,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1200,
+      "apiMonthlyQty": 32000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ]
+    },
+    {
+      "id": "sys-prod-new-001",
+      "accountId": "acct-beta-002",
+      "salesManagerId": "sm-beta-002",
+      "sid": "S3103",
+      "deliveryPid": "P3002",
+      "machineId": null,
+      "linkedProjectIds": [
+        "proj-qa-new"
+      ],
+      "tenantIds": [
+        "ten-new-001"
+      ],
+      "systemClass": "CUSTOMER",
+      "purpose": "Delivery",
+      "availability": "OCCUPIED",
+      "logo": "W",
+      "url": "https://s3103.qa.deliveryerp.local",
+      "cognitoRegion": "us-east-1",
+      "productType": "WebLOC",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "region": "AMER",
+      "country": "USA",
+      "state": "New York",
+      "timeGroup": "AMER",
+      "timeGroupAlert": "",
+      "operationalStatus": "Operative",
+      "remarks": [
+        {
+          "id": "remark-sys-prod-new-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>S3103 is ready for QA validation.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "owners": [],
+      "configurationHistory": [
+        {
+          "id": "ch-sys-prod-new-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-08T09:00:00.000Z",
+          "tid": "T001",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebLOC",
+            "licenses": 35,
+            "users": 80,
+            "concurrentSearches": 7,
+            "dailySearches": 4500,
+            "monthlySearches": 120000,
+            "concurrentAnalyses": 5,
+            "dailyAnalyses": 350,
+            "monthlyAnalyses": 9000,
+            "topicAnalyses": 7,
+            "standardMonitors": 35,
+            "fullMonitors": 8,
+            "topicMonitors": 16,
+            "mapCenter": "Berlin",
+            "tangles": 0,
+            "tanglesGo": 1,
+            "webloc": 1,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1300,
+            "apiMonthlyQty": 33000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "documents": [],
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "product": "WebLOC",
+      "licenses": 35,
+      "users": 80,
+      "concurrentSearches": 7,
+      "dailySearches": 4500,
+      "monthlySearches": 120000,
+      "concurrentAnalyses": 5,
+      "dailyAnalyses": 350,
+      "monthlyAnalyses": 9000,
+      "topicAnalyses": 7,
+      "standardMonitors": 35,
+      "fullMonitors": 8,
+      "topicMonitors": 16,
+      "tangles": 0,
+      "tanglesGo": 1,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1300,
+      "apiMonthlyQty": 33000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ]
+    },
+    {
+      "id": "sys-reused-poc-001",
+      "accountId": "acct-beta-001",
+      "salesManagerId": "sm-beta-001",
+      "sid": "S3104",
+      "deliveryPid": "P3001",
+      "machineId": "M2101",
+      "source": "Reused Internal Systems",
+      "linkedProjectIds": [
+        "proj-qa-poc"
+      ],
+      "tenantIds": [
+        "ten-poc-001"
+      ],
+      "systemClass": "POC_DEMO_TRAINING",
+      "purpose": "POC",
+      "availability": "OCCUPIED",
+      "logo": "T",
+      "url": "https://s3104.qa.deliveryerp.local",
+      "cognitoRegion": "eu-central-1",
+      "productType": "Tangles",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
+      "performanceTier": "POWERED",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "region": "EMEA",
+      "country": "Germany",
+      "state": "Berlin",
+      "timeGroup": "EMEA",
+      "timeGroupAlert": "",
+      "operationalStatus": "Operative",
+      "remarks": [
+        {
+          "id": "remark-sys-reused-poc-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>S3104 is ready for QA validation.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "owners": [],
+      "configurationHistory": [
+        {
+          "id": "ch-sys-reused-poc-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-06T09:00:00.000Z",
+          "tid": "T001",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 25,
+            "users": 60,
+            "concurrentSearches": 5,
+            "dailySearches": 3500,
+            "monthlySearches": 100000,
+            "concurrentAnalyses": 3,
+            "dailyAnalyses": 250,
+            "monthlyAnalyses": 7000,
+            "topicAnalyses": 5,
+            "standardMonitors": 25,
+            "fullMonitors": 6,
+            "topicMonitors": 12,
+            "mapCenter": "Berlin",
+            "tangles": 1,
+            "tanglesGo": 1,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1100,
+            "apiMonthlyQty": 31000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "documents": [],
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "product": "Tangles",
+      "licenses": 25,
+      "users": 60,
+      "concurrentSearches": 5,
+      "dailySearches": 3500,
+      "monthlySearches": 100000,
+      "concurrentAnalyses": 3,
+      "dailyAnalyses": 250,
+      "monthlyAnalyses": 7000,
+      "topicAnalyses": 5,
+      "standardMonitors": 25,
+      "fullMonitors": 6,
+      "topicMonitors": 12,
+      "tangles": 1,
+      "tanglesGo": 1,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1100,
+      "apiMonthlyQty": 31000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ]
+    },
+    {
+      "id": "sys-prod-upsell-001",
+      "accountId": "acct-beta-004",
+      "salesManagerId": "sm-beta-003",
+      "sid": "S3105",
+      "deliveryPid": "P3005",
+      "machineId": null,
+      "linkedProjectIds": [
+        "proj-qa-upsell"
+      ],
+      "tenantIds": [
+        "ten-upsell-001"
+      ],
+      "systemClass": "CUSTOMER",
+      "purpose": "Delivery",
+      "availability": "OCCUPIED",
+      "logo": "W",
+      "url": "https://s3105.qa.deliveryerp.local",
+      "cognitoRegion": "southeastasia",
+      "productType": "WebEye",
+      "hostingType": "Cloud",
+      "cloudPlatform": "Azure",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "region": "APAC",
+      "country": "Singapore",
+      "state": "Central Region",
+      "timeGroup": "APAC",
+      "timeGroupAlert": "",
+      "operationalStatus": "Operative",
+      "remarks": [
+        {
+          "id": "remark-sys-prod-upsell-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>S3105 is ready for QA validation.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "owners": [],
+      "configurationHistory": [
+        {
+          "id": "ch-sys-prod-upsell-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-09T09:00:00.000Z",
+          "tid": "T001",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebEye",
+            "licenses": 40,
+            "users": 90,
+            "concurrentSearches": 8,
+            "dailySearches": 5000,
+            "monthlySearches": 130000,
+            "concurrentAnalyses": 6,
+            "dailyAnalyses": 400,
+            "monthlyAnalyses": 10000,
+            "topicAnalyses": 8,
+            "standardMonitors": 40,
+            "fullMonitors": 9,
+            "topicMonitors": 18,
+            "mapCenter": "New York",
+            "tangles": 0,
+            "tanglesGo": 0,
+            "webloc": 0,
+            "webeye": 1,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1400,
+            "apiMonthlyQty": 34000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "documents": [],
+      "createdAt": "2026-07-03T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z",
+      "product": "WebEye",
+      "licenses": 40,
+      "users": 90,
+      "concurrentSearches": 8,
+      "dailySearches": 5000,
+      "monthlySearches": 130000,
+      "concurrentAnalyses": 6,
+      "dailyAnalyses": 400,
+      "monthlyAnalyses": 10000,
+      "topicAnalyses": 8,
+      "standardMonitors": 40,
+      "fullMonitors": 9,
+      "topicMonitors": 18,
+      "tangles": 0,
+      "tanglesGo": 0,
+      "webloc": 0,
+      "webeye": 1,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1400,
+      "apiMonthlyQty": 34000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ]
+    }
+  ],
+  "tenants": [
+    {
+      "id": "ten-cedar-001",
+      "tid": "T4001",
+      "tenantName": "T4001 Cedar County Investigations",
+      "accountId": "acct-beta-003",
+      "systemId": "sys-cedar-001",
+      "deliveryPid": "P3003",
+      "tenantType": "CUSTOMER",
+      "accountName": "Cedar County Investigations",
+      "country": "Canada",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-cedar-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-cedar-001",
+      "hostingSid": "S3101",
+      "sourceRequirementId": "req-renew-001",
+      "configuration": {
+        "product": "Tangles",
+        "licenses": 25,
+        "users": 60,
+        "concurrentSearches": 5,
+        "dailySearches": 3500,
+        "monthlySearches": 100000,
+        "concurrentAnalyses": 3,
+        "dailyAnalyses": 250,
+        "monthlyAnalyses": 7000,
+        "topicAnalyses": 5,
+        "standardMonitors": 25,
+        "fullMonitors": 6,
+        "topicMonitors": 12,
+        "mapCenter": "Berlin",
+        "tangles": 1,
+        "tanglesGo": 1,
+        "webloc": 0,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "YES",
+        "crossSystemFeatures": [
+          "Advanced Search",
+          "Case Export"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1100,
+        "apiMonthlyQty": 31000,
+        "aiFeatures": [
+          "OCR",
+          "Entity Extraction"
+        ],
+        "additionalFeatures": [
+          "Audit Export"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3101",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3101",
+        "versionNumber": "1.0",
+        "hostingType": "Cloud",
+        "url": "https://s3101.qa.deliveryerp.local",
+        "performanceTier": "STANDARD",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-cedar-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-cedar-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-06T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 25,
+            "users": 60,
+            "concurrentSearches": 5,
+            "dailySearches": 3500,
+            "monthlySearches": 100000,
+            "concurrentAnalyses": 3,
+            "dailyAnalyses": 250,
+            "monthlyAnalyses": 7000,
+            "topicAnalyses": 5,
+            "standardMonitors": 25,
+            "fullMonitors": 6,
+            "topicMonitors": 12,
+            "mapCenter": "Berlin",
+            "tangles": 1,
+            "tanglesGo": 1,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1100,
+            "apiMonthlyQty": 31000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "product": "Tangles",
+      "licenses": 25,
+      "users": 60,
+      "concurrentSearches": 5,
+      "dailySearches": 3500,
+      "monthlySearches": 100000,
+      "concurrentAnalyses": 3,
+      "dailyAnalyses": 250,
+      "monthlyAnalyses": 7000,
+      "topicAnalyses": 5,
+      "standardMonitors": 25,
+      "fullMonitors": 6,
+      "topicMonitors": 12,
+      "tangles": 1,
+      "tanglesGo": 1,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1100,
+      "apiMonthlyQty": 31000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ],
+      "warrantyStatus": "VALID",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-25",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-cedar-002",
+      "tid": "T4002",
+      "tenantName": "T4002 Cedar County Investigations",
+      "accountId": "acct-beta-003",
+      "systemId": "sys-cedar-001",
+      "deliveryPid": "P3003",
+      "tenantType": "CUSTOMER",
+      "accountName": "Cedar County Investigations",
+      "country": "Canada",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-cedar-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-cedar-001",
+      "hostingSid": "S3101",
+      "sourceRequirementId": "req-renew-002",
+      "configuration": {
+        "product": "Tangles",
+        "licenses": 30,
+        "users": 70,
+        "concurrentSearches": 6,
+        "dailySearches": 4000,
+        "monthlySearches": 110000,
+        "concurrentAnalyses": 4,
+        "dailyAnalyses": 300,
+        "monthlyAnalyses": 8000,
+        "topicAnalyses": 6,
+        "standardMonitors": 30,
+        "fullMonitors": 7,
+        "topicMonitors": 14,
+        "mapCenter": "New York",
+        "tangles": 1,
+        "tanglesGo": 0,
+        "webloc": 0,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "NO",
+        "crossSystemFeatures": [
+          "Federated Search"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1200,
+        "apiMonthlyQty": 32000,
+        "aiFeatures": [
+          "Translation"
+        ],
+        "additionalFeatures": [
+          "Priority Support"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3101",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3101",
+        "versionNumber": "1.0",
+        "hostingType": "Cloud",
+        "url": "https://s3101.qa.deliveryerp.local",
+        "performanceTier": "STANDARD",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-cedar-002-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Warranty",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-cedar-002-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-07T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 30,
+            "users": 70,
+            "concurrentSearches": 6,
+            "dailySearches": 4000,
+            "monthlySearches": 110000,
+            "concurrentAnalyses": 4,
+            "dailyAnalyses": 300,
+            "monthlyAnalyses": 8000,
+            "topicAnalyses": 6,
+            "standardMonitors": 30,
+            "fullMonitors": 7,
+            "topicMonitors": 14,
+            "mapCenter": "New York",
+            "tangles": 1,
+            "tanglesGo": 0,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1200,
+            "apiMonthlyQty": 32000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "product": "Tangles",
+      "licenses": 30,
+      "users": 70,
+      "concurrentSearches": 6,
+      "dailySearches": 4000,
+      "monthlySearches": 110000,
+      "concurrentAnalyses": 4,
+      "dailyAnalyses": 300,
+      "monthlyAnalyses": 8000,
+      "topicAnalyses": 6,
+      "standardMonitors": 30,
+      "fullMonitors": 7,
+      "topicMonitors": 14,
+      "tangles": 1,
+      "tanglesGo": 0,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1200,
+      "apiMonthlyQty": 32000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ],
+      "warrantyStatus": "PENDING",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-26",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-cedar-003",
+      "tid": "T4003",
+      "tenantName": "T4003 Cedar County Investigations",
+      "accountId": "acct-beta-003",
+      "systemId": "sys-cedar-001",
+      "deliveryPid": "P3003",
+      "tenantType": "CUSTOMER",
+      "accountName": "Cedar County Investigations",
+      "country": "Canada",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-cedar-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-cedar-001",
+      "hostingSid": "S3101",
+      "sourceRequirementId": "req-renew-003",
+      "configuration": {
+        "product": "Tangles",
+        "licenses": 35,
+        "users": 80,
+        "concurrentSearches": 7,
+        "dailySearches": 4500,
+        "monthlySearches": 120000,
+        "concurrentAnalyses": 5,
+        "dailyAnalyses": 350,
+        "monthlyAnalyses": 9000,
+        "topicAnalyses": 7,
+        "standardMonitors": 35,
+        "fullMonitors": 8,
+        "topicMonitors": 16,
+        "mapCenter": "Berlin",
+        "tangles": 1,
+        "tanglesGo": 1,
+        "webloc": 0,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "YES",
+        "crossSystemFeatures": [
+          "Advanced Search",
+          "Case Export"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1300,
+        "apiMonthlyQty": 33000,
+        "aiFeatures": [
+          "OCR",
+          "Entity Extraction"
+        ],
+        "additionalFeatures": [
+          "Audit Export"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3101",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3101",
+        "versionNumber": "1.0",
+        "hostingType": "Cloud",
+        "url": "https://s3101.qa.deliveryerp.local",
+        "performanceTier": "STANDARD",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-cedar-003-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-cedar-003-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-08T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 35,
+            "users": 80,
+            "concurrentSearches": 7,
+            "dailySearches": 4500,
+            "monthlySearches": 120000,
+            "concurrentAnalyses": 5,
+            "dailyAnalyses": 350,
+            "monthlyAnalyses": 9000,
+            "topicAnalyses": 7,
+            "standardMonitors": 35,
+            "fullMonitors": 8,
+            "topicMonitors": 16,
+            "mapCenter": "Berlin",
+            "tangles": 1,
+            "tanglesGo": 1,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1300,
+            "apiMonthlyQty": 33000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "Tangles",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "product": "Tangles",
+      "licenses": 35,
+      "users": 80,
+      "concurrentSearches": 7,
+      "dailySearches": 4500,
+      "monthlySearches": 120000,
+      "concurrentAnalyses": 5,
+      "dailyAnalyses": 350,
+      "monthlyAnalyses": 9000,
+      "topicAnalyses": 7,
+      "standardMonitors": 35,
+      "fullMonitors": 8,
+      "topicMonitors": 16,
+      "tangles": 1,
+      "tanglesGo": 1,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1300,
+      "apiMonthlyQty": 33000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ],
+      "warrantyStatus": "VALID",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-27",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-cedar-004",
+      "tid": "T4004",
+      "tenantName": "T4004 Cedar County Investigations",
+      "accountId": "acct-beta-003",
+      "systemId": "sys-cedar-002",
+      "deliveryPid": "P3003",
+      "tenantType": "CUSTOMER",
+      "accountName": "Cedar County Investigations",
+      "country": "Canada",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-cedar-002",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-cedar-002",
+      "hostingSid": "S3102",
+      "sourceRequirementId": "req-change-001",
+      "configuration": {
+        "product": "WebLOC",
+        "licenses": 40,
+        "users": 90,
+        "concurrentSearches": 8,
+        "dailySearches": 5000,
+        "monthlySearches": 130000,
+        "concurrentAnalyses": 6,
+        "dailyAnalyses": 400,
+        "monthlyAnalyses": 10000,
+        "topicAnalyses": 8,
+        "standardMonitors": 40,
+        "fullMonitors": 9,
+        "topicMonitors": 18,
+        "mapCenter": "New York",
+        "tangles": 0,
+        "tanglesGo": 0,
+        "webloc": 1,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "NO",
+        "crossSystemFeatures": [
+          "Federated Search"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1400,
+        "apiMonthlyQty": 34000,
+        "aiFeatures": [
+          "Translation"
+        ],
+        "additionalFeatures": [
+          "Priority Support"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3102",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3102",
+        "versionNumber": "1.0",
+        "hostingType": "Hybrid",
+        "url": "https://s3102.qa.deliveryerp.local",
+        "performanceTier": "POWERED",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-cedar-004-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-cedar-004-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-09T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebLOC",
+            "licenses": 40,
+            "users": 90,
+            "concurrentSearches": 8,
+            "dailySearches": 5000,
+            "monthlySearches": 130000,
+            "concurrentAnalyses": 6,
+            "dailyAnalyses": 400,
+            "monthlyAnalyses": 10000,
+            "topicAnalyses": 8,
+            "standardMonitors": 40,
+            "fullMonitors": 9,
+            "topicMonitors": 18,
+            "mapCenter": "New York",
+            "tangles": 0,
+            "tanglesGo": 0,
+            "webloc": 1,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1400,
+            "apiMonthlyQty": 34000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "WebLOC",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "POWERED",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "product": "WebLOC",
+      "licenses": 40,
+      "users": 90,
+      "concurrentSearches": 8,
+      "dailySearches": 5000,
+      "monthlySearches": 130000,
+      "concurrentAnalyses": 6,
+      "dailyAnalyses": 400,
+      "monthlyAnalyses": 10000,
+      "topicAnalyses": 8,
+      "standardMonitors": 40,
+      "fullMonitors": 9,
+      "topicMonitors": 18,
+      "tangles": 0,
+      "tanglesGo": 0,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1400,
+      "apiMonthlyQty": 34000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ],
+      "warrantyStatus": "VALID",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-28",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-cedar-005",
+      "tid": "T4005",
+      "tenantName": "T4005 Cedar County Investigations",
+      "accountId": "acct-beta-003",
+      "systemId": "sys-cedar-002",
+      "deliveryPid": "P3003",
+      "tenantType": "CUSTOMER",
+      "accountName": "Cedar County Investigations",
+      "country": "Canada",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-cedar-002",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-cedar-002",
+      "hostingSid": "S3102",
+      "sourceRequirementId": "unlinked-control",
+      "configuration": {
+        "product": "WebLOC",
+        "licenses": 45,
+        "users": 100,
+        "concurrentSearches": 9,
+        "dailySearches": 5500,
+        "monthlySearches": 140000,
+        "concurrentAnalyses": 7,
+        "dailyAnalyses": 450,
+        "monthlyAnalyses": 11000,
+        "topicAnalyses": 9,
+        "standardMonitors": 45,
+        "fullMonitors": 10,
+        "topicMonitors": 20,
+        "mapCenter": "Berlin",
+        "tangles": 0,
+        "tanglesGo": 1,
+        "webloc": 1,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "YES",
+        "crossSystemFeatures": [
+          "Advanced Search",
+          "Case Export"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1500,
+        "apiMonthlyQty": 35000,
+        "aiFeatures": [
+          "OCR",
+          "Entity Extraction"
+        ],
+        "additionalFeatures": [
+          "Audit Export"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3102",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3102",
+        "versionNumber": "1.0",
+        "hostingType": "Hybrid",
+        "url": "https://s3102.qa.deliveryerp.local",
+        "performanceTier": "POWERED",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-cedar-005-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-cedar-005-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-10T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebLOC",
+            "licenses": 45,
+            "users": 100,
+            "concurrentSearches": 9,
+            "dailySearches": 5500,
+            "monthlySearches": 140000,
+            "concurrentAnalyses": 7,
+            "dailyAnalyses": 450,
+            "monthlyAnalyses": 11000,
+            "topicAnalyses": 9,
+            "standardMonitors": 45,
+            "fullMonitors": 10,
+            "topicMonitors": 20,
+            "mapCenter": "Berlin",
+            "tangles": 0,
+            "tanglesGo": 1,
+            "webloc": 1,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1500,
+            "apiMonthlyQty": 35000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "WebLOC",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "POWERED",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "product": "WebLOC",
+      "licenses": 45,
+      "users": 100,
+      "concurrentSearches": 9,
+      "dailySearches": 5500,
+      "monthlySearches": 140000,
+      "concurrentAnalyses": 7,
+      "dailyAnalyses": 450,
+      "monthlyAnalyses": 11000,
+      "topicAnalyses": 9,
+      "standardMonitors": 45,
+      "fullMonitors": 10,
+      "topicMonitors": 20,
+      "tangles": 0,
+      "tanglesGo": 1,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1500,
+      "apiMonthlyQty": 35000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ],
+      "warrantyStatus": "VALID",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-25",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-new-001",
+      "tid": "T4006",
+      "tenantName": "T4006 Harborview Intelligence Bureau",
+      "accountId": "acct-beta-002",
+      "systemId": "sys-prod-new-001",
+      "deliveryPid": "P3002",
+      "tenantType": "CUSTOMER",
+      "accountName": "Harborview Intelligence Bureau",
+      "country": "USA",
+      "timeGroup": "AMER",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-prod-new-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-prod-new-001",
+      "hostingSid": "S3103",
+      "sourceRequirementId": "req-a-new-001",
+      "configuration": {
+        "product": "WebLOC",
+        "licenses": 50,
+        "users": 110,
+        "concurrentSearches": 10,
+        "dailySearches": 6000,
+        "monthlySearches": 150000,
+        "concurrentAnalyses": 8,
+        "dailyAnalyses": 500,
+        "monthlyAnalyses": 12000,
+        "topicAnalyses": 10,
+        "standardMonitors": 50,
+        "fullMonitors": 11,
+        "topicMonitors": 22,
+        "mapCenter": "New York",
+        "tangles": 0,
+        "tanglesGo": 0,
+        "webloc": 1,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "NO",
+        "crossSystemFeatures": [
+          "Federated Search"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1600,
+        "apiMonthlyQty": 36000,
+        "aiFeatures": [
+          "Translation"
+        ],
+        "additionalFeatures": [
+          "Priority Support"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3103",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3103",
+        "versionNumber": "1.0",
+        "hostingType": "Cloud",
+        "url": "https://s3103.qa.deliveryerp.local",
+        "performanceTier": "STANDARD",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "us-east-1",
+        "azureRegion": "us-east-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-new-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-new-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-11T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebLOC",
+            "licenses": 50,
+            "users": 110,
+            "concurrentSearches": 10,
+            "dailySearches": 6000,
+            "monthlySearches": 150000,
+            "concurrentAnalyses": 8,
+            "dailyAnalyses": 500,
+            "monthlyAnalyses": 12000,
+            "topicAnalyses": 10,
+            "standardMonitors": 50,
+            "fullMonitors": 11,
+            "topicMonitors": 22,
+            "mapCenter": "New York",
+            "tangles": 0,
+            "tanglesGo": 0,
+            "webloc": 1,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1600,
+            "apiMonthlyQty": 36000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "WebLOC",
+      "hostingType": "Cloud",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "us-east-1",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "product": "WebLOC",
+      "licenses": 50,
+      "users": 110,
+      "concurrentSearches": 10,
+      "dailySearches": 6000,
+      "monthlySearches": 150000,
+      "concurrentAnalyses": 8,
+      "dailyAnalyses": 500,
+      "monthlyAnalyses": 12000,
+      "topicAnalyses": 10,
+      "standardMonitors": 50,
+      "fullMonitors": 11,
+      "topicMonitors": 22,
+      "tangles": 0,
+      "tanglesGo": 0,
+      "webloc": 1,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1600,
+      "apiMonthlyQty": 36000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ],
+      "warrantyStatus": "PLANNED",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-26",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-poc-001",
+      "tid": "T4007",
+      "tenantName": "T4007 Northbridge Public Safety",
+      "accountId": "acct-beta-001",
+      "systemId": "sys-reused-poc-001",
+      "deliveryPid": "P3001",
+      "tenantType": "POC",
+      "accountName": "Northbridge Public Safety",
+      "country": "Germany",
+      "timeGroup": "EMEA",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-reused-poc-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "POC",
+      "hostedSystemId": "sys-reused-poc-001",
+      "hostingSid": "S3104",
+      "sourceRequirementId": "req-a-poc-001",
+      "configuration": {
+        "product": "Tangles",
+        "licenses": 55,
+        "users": 120,
+        "concurrentSearches": 11,
+        "dailySearches": 6500,
+        "monthlySearches": 160000,
+        "concurrentAnalyses": 9,
+        "dailyAnalyses": 550,
+        "monthlyAnalyses": 13000,
+        "topicAnalyses": 11,
+        "standardMonitors": 55,
+        "fullMonitors": 12,
+        "topicMonitors": 24,
+        "mapCenter": "Berlin",
+        "tangles": 1,
+        "tanglesGo": 1,
+        "webloc": 0,
+        "webeye": 0,
+        "ingest": 1,
+        "blockchain": "YES",
+        "crossSystemFeatures": [
+          "Advanced Search",
+          "Case Export"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1700,
+        "apiMonthlyQty": 37000,
+        "aiFeatures": [
+          "OCR",
+          "Entity Extraction"
+        ],
+        "additionalFeatures": [
+          "Audit Export"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3104",
+        "operationalStatus": "Operative",
+        "machineNumber": "M2101",
+        "versionNumber": "1.0",
+        "hostingType": "Hybrid",
+        "url": "https://s3104.qa.deliveryerp.local",
+        "performanceTier": "POWERED",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "AWS",
+        "csp": "AWS",
+        "awsRegion": "eu-central-1",
+        "azureRegion": "eu-central-1"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-poc-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-poc-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-12T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "Tangles",
+            "licenses": 55,
+            "users": 120,
+            "concurrentSearches": 11,
+            "dailySearches": 6500,
+            "monthlySearches": 160000,
+            "concurrentAnalyses": 9,
+            "dailyAnalyses": 550,
+            "monthlyAnalyses": 13000,
+            "topicAnalyses": 11,
+            "standardMonitors": 55,
+            "fullMonitors": 12,
+            "topicMonitors": 24,
+            "mapCenter": "Berlin",
+            "tangles": 1,
+            "tanglesGo": 1,
+            "webloc": 0,
+            "webeye": 0,
+            "ingest": 1,
+            "blockchain": "YES",
+            "crossSystemFeatures": [
+              "Advanced Search",
+              "Case Export"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1700,
+            "apiMonthlyQty": 37000,
+            "aiFeatures": [
+              "OCR",
+              "Entity Extraction"
+            ],
+            "additionalFeatures": [
+              "Audit Export"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "Tangles",
+      "hostingType": "Hybrid",
+      "cloudPlatform": "AWS",
+      "csp": "AWS",
+      "cloudRegion": "eu-central-1",
+      "performanceTier": "POWERED",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "Berlin",
+      "product": "Tangles",
+      "licenses": 55,
+      "users": 120,
+      "concurrentSearches": 11,
+      "dailySearches": 6500,
+      "monthlySearches": 160000,
+      "concurrentAnalyses": 9,
+      "dailyAnalyses": 550,
+      "monthlyAnalyses": 13000,
+      "topicAnalyses": 11,
+      "standardMonitors": 55,
+      "fullMonitors": 12,
+      "topicMonitors": 24,
+      "tangles": 1,
+      "tanglesGo": 1,
+      "webloc": 0,
+      "webeye": 0,
+      "ingest": 1,
+      "blockchain": "YES",
+      "crossSystemFeatures": [
+        "Advanced Search",
+        "Case Export"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1700,
+      "apiMonthlyQty": 37000,
+      "aiFeatures": [
+        "OCR",
+        "Entity Extraction"
+      ],
+      "additionalFeatures": [
+        "Audit Export"
+      ],
+      "warrantyStatus": "NO_WARRANTY",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": null,
+      "pocStartDate": "2026-07-08",
+      "pocEndDate": "2026-07-28",
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "id": "ten-upsell-001",
+      "tid": "T4008",
+      "tenantName": "T4008 Bluefield Digital Forensics",
+      "accountId": "acct-beta-004",
+      "systemId": "sys-prod-upsell-001",
+      "deliveryPid": "P3005",
+      "tenantType": "CUSTOMER",
+      "accountName": "Bluefield Digital Forensics",
+      "country": "Singapore",
+      "timeGroup": "APAC",
+      "operationalStatus": "Operative",
+      "contractStatus": "UNDER_CONTRACT",
+      "hostedSystemHistory": [
+        {
+          "systemId": "sys-prod-upsell-001",
+          "startedAt": "2026-07-04T09:00:00.000Z",
+          "endedAt": null,
+          "reason": "Created"
+        }
+      ],
+      "tenantFormType": "CUSTOMER",
+      "hostedSystemId": "sys-prod-upsell-001",
+      "hostingSid": "S3105",
+      "sourceRequirementId": "req-a-upsell-001",
+      "configuration": {
+        "product": "WebEye",
+        "licenses": 60,
+        "users": 130,
+        "concurrentSearches": 12,
+        "dailySearches": 7000,
+        "monthlySearches": 170000,
+        "concurrentAnalyses": 10,
+        "dailyAnalyses": 600,
+        "monthlyAnalyses": 14000,
+        "topicAnalyses": 12,
+        "standardMonitors": 60,
+        "fullMonitors": 13,
+        "topicMonitors": 26,
+        "mapCenter": "New York",
+        "tangles": 0,
+        "tanglesGo": 0,
+        "webloc": 0,
+        "webeye": 1,
+        "ingest": 1,
+        "blockchain": "NO",
+        "crossSystemFeatures": [
+          "Federated Search"
+        ],
+        "apiEnabled": "YES",
+        "apiDailyQty": 1800,
+        "apiMonthlyQty": 38000,
+        "aiFeatures": [
+          "Translation"
+        ],
+        "additionalFeatures": [
+          "Priority Support"
+        ]
+      },
+      "hostingSnapshot": {
+        "currentSystem": true,
+        "sid": "S3105",
+        "operationalStatus": "Operative",
+        "machineNumber": "S3105",
+        "versionNumber": "1.0",
+        "hostingType": "Cloud",
+        "url": "https://s3105.qa.deliveryerp.local",
+        "performanceTier": "STANDARD",
+        "vpnEnabled": "YES",
+        "vpnType": "Site-to-Site",
+        "ipRestrictionEnabled": "YES",
+        "platform": "Azure",
+        "csp": "Azure",
+        "awsRegion": "southeastasia",
+        "azureRegion": "southeastasia"
+      },
+      "remarks": [
+        {
+          "id": "remark-ten-upsell-001-1",
+          "remarkId": "R-001",
+          "createdAt": "2026-07-03T09:00:00.000Z",
+          "author": "QA Seed User",
+          "type": "Note",
+          "content": "<p>QA-ready operational note.</p>",
+          "dueDate": "2026-07-21"
+        }
+      ],
+      "configurationHistory": [
+        {
+          "id": "tenant-ch-ten-upsell-001-001",
+          "recordId": "CH-001",
+          "timestamp": "2026-07-13T09:00:00.000Z",
+          "tid": "this",
+          "recordedBy": "QA Seed User",
+          "configuration": {
+            "product": "WebEye",
+            "licenses": 60,
+            "users": 130,
+            "concurrentSearches": 12,
+            "dailySearches": 7000,
+            "monthlySearches": 170000,
+            "concurrentAnalyses": 10,
+            "dailyAnalyses": 600,
+            "monthlyAnalyses": 14000,
+            "topicAnalyses": 12,
+            "standardMonitors": 60,
+            "fullMonitors": 13,
+            "topicMonitors": 26,
+            "mapCenter": "New York",
+            "tangles": 0,
+            "tanglesGo": 0,
+            "webloc": 0,
+            "webeye": 1,
+            "ingest": 1,
+            "blockchain": "NO",
+            "crossSystemFeatures": [
+              "Federated Search"
+            ],
+            "apiEnabled": "YES",
+            "apiDailyQty": 1800,
+            "apiMonthlyQty": 38000,
+            "aiFeatures": [
+              "Translation"
+            ],
+            "additionalFeatures": [
+              "Priority Support"
+            ]
+          }
+        }
+      ],
+      "warranties": [],
+      "documents": [],
+      "productType": "WebEye",
+      "hostingType": "Cloud",
+      "cloudPlatform": "Azure",
+      "csp": "Azure",
+      "cloudRegion": "southeastasia",
+      "performanceTier": "STANDARD",
+      "vpnEnabled": "YES",
+      "vpnType": "Site-to-Site",
+      "ipRestrictionEnabled": "YES",
+      "mapCenter": "New York",
+      "product": "WebEye",
+      "licenses": 60,
+      "users": 130,
+      "concurrentSearches": 12,
+      "dailySearches": 7000,
+      "monthlySearches": 170000,
+      "concurrentAnalyses": 10,
+      "dailyAnalyses": 600,
+      "monthlyAnalyses": 14000,
+      "topicAnalyses": 12,
+      "standardMonitors": 60,
+      "fullMonitors": 13,
+      "topicMonitors": 26,
+      "tangles": 0,
+      "tanglesGo": 0,
+      "webloc": 0,
+      "webeye": 1,
+      "ingest": 1,
+      "blockchain": "NO",
+      "crossSystemFeatures": [
+        "Federated Search"
+      ],
+      "apiEnabled": "YES",
+      "apiDailyQty": 1800,
+      "apiMonthlyQty": 38000,
+      "aiFeatures": [
+        "Translation"
+      ],
+      "additionalFeatures": [
+        "Priority Support"
+      ],
+      "warrantyStatus": "PLANNED",
+      "warrantyStartDate": "2026-07-01",
+      "warrantyEndDate": "2026-07-28",
+      "pocStartDate": null,
+      "pocEndDate": null,
+      "createdAt": "2026-07-04T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    }
+  ],
+  "warrantyRecords": [
+    {
+      "warrantyRecordId": "W5001",
+      "tenantId": "ten-cedar-001",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-25",
+      "status": "VALID",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5002",
+      "tenantId": "ten-cedar-002",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-26",
+      "status": "PENDING",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5003",
+      "tenantId": "ten-cedar-003",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-27",
+      "status": "VALID",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5004",
+      "tenantId": "ten-cedar-004",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-28",
+      "status": "VALID",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5005",
+      "tenantId": "ten-cedar-005",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-25",
+      "status": "VALID",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5006",
+      "tenantId": "ten-new-001",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-26",
+      "status": "PLANNED",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    },
+    {
+      "warrantyRecordId": "W5007",
+      "tenantId": "ten-upsell-001",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-28",
+      "status": "PLANNED",
+      "predecessorWarrantyId": null,
+      "createdAt": "2026-07-05T09:00:00.000Z",
+      "updatedAt": "2026-07-06T09:00:00.000Z"
+    }
+  ],
+  "projectSystems": [
+    {
+      "id": "alloc-qa-001",
+      "projectId": "proj-qa-renewal",
+      "systemId": "sys-cedar-001",
+      "tenantIds": [
+        "ten-cedar-001",
+        "ten-cedar-002",
+        "ten-cedar-003"
+      ],
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "sourceMachineId": null,
+      "allocatedAt": "2026-07-03T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "alloc-qa-002",
+      "projectId": "proj-qa-renewal",
+      "systemId": "sys-cedar-002",
+      "tenantIds": [
+        "ten-cedar-004",
+        "ten-cedar-005"
+      ],
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "sourceMachineId": null,
+      "allocatedAt": "2026-07-04T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "alloc-qa-003",
+      "projectId": "proj-qa-new",
+      "systemId": "sys-prod-new-001",
+      "tenantIds": [
+        "ten-new-001"
+      ],
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "sourceMachineId": null,
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "alloc-qa-004",
+      "projectId": "proj-qa-poc",
+      "systemId": "sys-reused-poc-001",
+      "tenantIds": [
+        "ten-poc-001"
+      ],
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "REUSED_INTERNAL",
+      "sourceMachineId": "M2101",
+      "allocatedAt": "2026-07-06T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "alloc-qa-005",
+      "projectId": "proj-qa-upsell",
+      "systemId": "sys-prod-upsell-001",
+      "tenantIds": [
+        "ten-upsell-001"
+      ],
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "sourceMachineId": null,
+      "allocatedAt": "2026-07-07T09:00:00.000Z",
+      "deallocatedAt": null
+    }
+  ],
+  "projectTenants": [
+    {
+      "id": "proj-ten-qa-001",
+      "projectId": "proj-qa-renewal",
+      "tenantId": "ten-cedar-001",
+      "systemId": "sys-cedar-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-002",
+      "projectId": "proj-qa-renewal",
+      "tenantId": "ten-cedar-002",
+      "systemId": "sys-cedar-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-003",
+      "projectId": "proj-qa-renewal",
+      "tenantId": "ten-cedar-003",
+      "systemId": "sys-cedar-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-004",
+      "projectId": "proj-qa-change",
+      "tenantId": "ten-cedar-004",
+      "systemId": "sys-cedar-002",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-005",
+      "projectId": "proj-qa-new",
+      "tenantId": "ten-new-001",
+      "systemId": "sys-prod-new-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-006",
+      "projectId": "proj-qa-poc",
+      "tenantId": "ten-poc-001",
+      "systemId": "sys-reused-poc-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "REUSED_INTERNAL",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    },
+    {
+      "id": "proj-ten-qa-007",
+      "projectId": "proj-qa-upsell",
+      "tenantId": "ten-upsell-001",
+      "systemId": "sys-prod-upsell-001",
+      "allocationStatus": "ALLOCATED",
+      "allocationType": "PRODUCTION",
+      "allocatedAt": "2026-07-05T09:00:00.000Z",
+      "deallocatedAt": null
+    }
+  ],
   "idCounters": {
-    "pid": 999,
-    "sid": 4020,
-    "tid": 999,
-    "mid": 7010
+    "pid": 3006,
+    "sid": 3106,
+    "tid": 4009,
+    "mid": 2111
   },
-  "activityEvents": []
+  "activityEvents": [
+    {
+      "id": "act-qa-001",
+      "occurredAt": "2026-07-03T09:00:00.000Z",
+      "actorId": "qa-seed",
+      "actorName": "QA Seed User",
+      "source": "SYSTEM",
+      "eventType": "project.created",
+      "severity": "SUCCESS",
+      "category": "PROJECT",
+      "primaryObject": {
+        "objectType": "Project",
+        "id": "proj-qa-poc",
+        "businessId": "P3001",
+        "displayLabel": "Northbridge POC Deployment",
+        "routePath": "/projects/proj-qa-poc"
+      },
+      "relatedObjects": [],
+      "summary": "QA POC project created.",
+      "schemaVersion": 1
+    },
+    {
+      "id": "act-qa-002",
+      "occurredAt": "2026-07-04T09:00:00.000Z",
+      "actorId": "qa-seed",
+      "actorName": "QA Seed User",
+      "source": "SYSTEM",
+      "eventType": "allocation.systemAllocated",
+      "severity": "SUCCESS",
+      "category": "ALLOCATION",
+      "primaryObject": {
+        "objectType": "System",
+        "id": "sys-reused-poc-001",
+        "businessId": "S3104",
+        "displayLabel": "S3104",
+        "routePath": "/systems/sys-reused-poc-001"
+      },
+      "relatedObjects": [],
+      "summary": "Reused internal system allocated to POC project.",
+      "schemaVersion": 1
+    },
+    {
+      "id": "act-qa-003",
+      "occurredAt": "2026-07-05T09:00:00.000Z",
+      "actorId": "qa-seed",
+      "actorName": "QA Seed User",
+      "source": "SYSTEM",
+      "eventType": "tenant.created",
+      "severity": "SUCCESS",
+      "category": "TENANT",
+      "primaryObject": {
+        "objectType": "Tenant",
+        "id": "ten-poc-001",
+        "businessId": "T4007",
+        "displayLabel": "T4007",
+        "routePath": "/tenants/ten-poc-001"
+      },
+      "relatedObjects": [],
+      "summary": "POC tenant created.",
+      "schemaVersion": 1
+    },
+    {
+      "id": "act-qa-004",
+      "occurredAt": "2026-07-06T09:00:00.000Z",
+      "actorId": "qa-seed",
+      "actorName": "QA Seed User",
+      "source": "SYSTEM",
+      "eventType": "warranty.pending",
+      "severity": "WARNING",
+      "category": "WARRANTY",
+      "primaryObject": {
+        "objectType": "Project",
+        "id": "proj-qa-renewal",
+        "businessId": "P3003",
+        "displayLabel": "Cedar County Renewal 2026",
+        "routePath": "/projects/proj-qa-renewal"
+      },
+      "relatedObjects": [],
+      "summary": "Cedar County renewal warranties require review.",
+      "schemaVersion": 1
+    }
+  ]
 }

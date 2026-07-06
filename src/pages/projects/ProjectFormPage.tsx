@@ -437,8 +437,8 @@ export function ProjectFormPage() {
     return linkedSystemsForProject(currentDraft, systems, activeSystemLinks, linkedOpportunity, tenants)
   }, [activeSystemLinks, currentDraft, linkedOpportunity, systems, tenants])
   const linkedTenants = useMemo(() => {
-    return linkedTenantsForProject(currentDraft, linkedSystems, projectTenants, tenants, linkedOpportunity)
-  }, [currentDraft, linkedOpportunity, linkedSystems, projectTenants, tenants])
+    return linkedTenantsForProject(currentDraft, projectTenants, tenants)
+  }, [currentDraft, projectTenants, tenants])
   const projectActivityEvents = useMemo(() => {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
@@ -1279,7 +1279,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="max-h-[88vh] w-full max-w-6xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-milestone-title">
+        <div className="max-h-[88vh] w-full max-w-6xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="add-milestone-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="add-milestone-title" className="text-xl font-semibold text-sf-text">Add milestone</h2>
@@ -1378,10 +1378,10 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded border border-sf-border bg-white shadow-xl">
+        <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="milestone-dialog-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
-              <h2 className="text-xl font-semibold text-sf-text">{milestone.name}</h2>
+              <h2 id="milestone-dialog-title" className="text-xl font-semibold text-sf-text">{milestone.name}</h2>
               <p className="text-sm text-sf-text-muted">Tasks in this milestone are local to Project {projectDraft.pid}.</p>
             </div>
             <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close milestone form" onClick={() => setSelectedMilestoneId(null)}>
@@ -1570,7 +1570,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
-        <div className="flex h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="project-allocation-title">
+        <div className="flex h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>

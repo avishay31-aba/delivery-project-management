@@ -10,7 +10,7 @@ export function UnsavedChangesDialog({ onDiscardChanges, onCancel, onSave }: Uns
       <div
         className="w-full max-w-sm rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl"
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
         aria-labelledby="unsaved-dashboard-changes-title"
       >
         <h2 id="unsaved-dashboard-changes-title" className="text-base font-semibold">

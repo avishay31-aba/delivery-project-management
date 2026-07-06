@@ -1239,7 +1239,7 @@ export function TenantFormPage() {
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
-        <div className="w-full max-w-2xl rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="true" aria-labelledby="warranty-dialog-title">
+        <div className="w-full max-w-2xl rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="warranty-dialog-title">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 id="warranty-dialog-title" className="text-lg font-semibold">Edit warranty {warranty.warrantyId}</h2>

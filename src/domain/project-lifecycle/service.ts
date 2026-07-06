@@ -100,7 +100,7 @@ function opportunityRequirementRows(opportunity: Opportunity | undefined): Proje
 function projectConfigurationSources(context: ProjectDeliveryDashboardContext, opportunity: Opportunity | undefined) {
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
   const systems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
-  const tenants = linkedTenantsForProject(context.project, systems, context.projectTenants, context.tenants)
+  const tenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
   return {
     systems,
     tenants,
@@ -322,8 +322,7 @@ export function projectHealthReadModel(
   const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
   const deadlineSummary = completed ? EMPTY_PROJECT_DEADLINE_SUMMARY : projectDeadlineSummary(context.project, today)
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
-  const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
-  const linkedTenants = linkedTenantsForProject(context.project, linkedSystems, context.projectTenants, context.tenants)
+  const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
   const taskCounts = projectTaskCounts(context.project)
   const deliveryDateStatus = projectDeliveryDateStatus(context.project, completed, today)
   const missingSystems = activeSystemLinks.length === 0
@@ -424,9 +423,7 @@ export function projectWorkspaceSystemSummary(context: ProjectSystemsTenantsCont
 }
 
 export function projectWorkspaceTenantSummary(context: ProjectSystemsTenantsContext): ProjectWorkspaceTenantSummary {
-  const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
-  const linkedSystems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
-  const linkedTenants = linkedTenantsForProject(context.project, linkedSystems, context.projectTenants, context.tenants)
+  const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
 
   return {
     linkedTenants: linkedTenants.length,
@@ -659,10 +656,8 @@ export function linkedSystemsForProject(
 
 export function linkedTenantsForProject(
   project: Project | undefined,
-  linkedSystems: System[],
   projectTenants: ProjectTenantLink[],
   tenants: Tenant[],
-  opportunity?: Opportunity,
 ): Tenant[] {
   if (!project) return []
   const linkedTenantIds = new Set(
@@ -670,12 +665,9 @@ export function linkedTenantsForProject(
       .filter((link) => link.projectId === project.id)
       .map((link) => link.tenantId),
   )
-  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
-  linkedSystems.forEach((system) => {
-    tenants
-      .filter((tenant) => tenant.systemId === system.id || tenant.hostedSystemId === system.id)
-      .forEach((tenant) => linkedTenantIds.add(tenant.id))
-  })
+  tenants
+    .filter((tenant) => tenant.deliveryPid === project.pid)
+    .forEach((tenant) => linkedTenantIds.add(tenant.id))
   return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
 }
 

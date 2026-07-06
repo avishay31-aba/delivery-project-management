@@ -218,7 +218,7 @@ function SaveDashboardViewDialog({
       <form
         className="w-full max-w-md space-y-4 rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl"
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
         aria-labelledby="save-dashboard-view-title"
         onSubmit={handleSubmit}
       >
@@ -1011,11 +1011,18 @@ export function DataDashboard<T extends { id: string }>({
     return () => observer.disconnect()
   }, [columnOrder, columnVisibility, rows.length, isFreezeEnabled])
 
-  function frozenColumnStyle(index: number): CSSProperties | undefined {
+  function columnPositionStyle(index: number, columnId: string): CSSProperties | undefined {
+    if (columnId === ACTION_COLUMN_ID) return { left: 0 }
     return isFreezeEnabled && index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
   }
 
-  function frozenColumnClassName(index: number, isHeader = false): string {
+  function frozenColumnClassName(index: number, isHeader = false, columnId = ''): string {
+    if (columnId === ACTION_COLUMN_ID) {
+      return joinClassNames(
+        'sticky left-0 shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-sf-border',
+        isHeader ? 'z-40 bg-sf-surface-alt' : 'z-30 bg-inherit',
+      )
+    }
     if (!isFreezeEnabled || index >= 3) return ''
     const isLastFrozenColumn = index === 2
     return joinClassNames(
@@ -1494,8 +1501,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           {row.getVisibleCells().map((cell, cellIndex) => (
             <td
               key={cell.id}
-              style={frozenColumnStyle(cellIndex)}
-              className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex))}
+              style={columnPositionStyle(cellIndex, cell.column.id)}
+              className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex, false, cell.column.id))}
             >
               {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
             </td>
@@ -1562,8 +1569,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
       ) : null}
       {isReplaceDialogOpen && replaceColumns.length > 0 ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-sf-text">Search & Replace</h2>
+          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="false" aria-labelledby="search-replace-title">
+            <h2 id="search-replace-title" className="text-lg font-semibold text-sf-text">Search & Replace</h2>
             <p className="mt-1 text-sm text-sf-text-muted">Replace exact matches in one selected dashboard field.</p>
             <div className="mt-4 space-y-3">
               <label className="block text-sm font-medium text-sf-text">
@@ -1776,11 +1783,11 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                     return (
                       <th
                         key={header.id}
-                        style={frozenColumnStyle(headerIndex)}
+                        style={columnPositionStyle(headerIndex, header.column.id)}
                         className={joinClassNames(
                           'whitespace-nowrap px-3 py-2 font-semibold text-sf-text transition-colors',
                           'sticky top-0 z-10 bg-sf-surface-alt',
-                          frozenColumnClassName(headerIndex, true),
+                          frozenColumnClassName(headerIndex, true, header.column.id),
                           draggedColumnId === header.column.id && 'opacity-60',
                           dragOverColumnId === header.column.id &&
                             draggedColumnId !== header.column.id &&

@@ -1906,8 +1906,8 @@ export function OpportunityFormPage() {
 
       {pendingWonSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-base font-semibold text-sf-text">Mark Opportunity as WON?</h2>
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="false" aria-labelledby="won-confirmation-title">
+            <h2 id="won-confirmation-title" className="text-base font-semibold text-sf-text">Mark Opportunity as WON?</h2>
             <p className="mt-2 text-sm text-sf-text-muted">
               WON is irreversible. After this, no new POC projects can be created and one final Delivery/Renewal project
               will be created or updated.
@@ -1934,8 +1934,8 @@ export function OpportunityFormPage() {
 
       {pendingPocSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-base font-semibold text-sf-text">Create POC project?</h2>
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="false" aria-labelledby="poc-confirmation-title">
+            <h2 id="poc-confirmation-title" className="text-base font-semibold text-sf-text">Create POC project?</h2>
             <p className="mt-2 text-sm text-sf-text-muted">
               {activePocProject(currentDraft, currentSavedOpportunity)
                 ? `POC Project ${activePocProject(currentDraft, currentSavedOpportunity)?.pid} is not Done. What would you like to do?`
@@ -1972,8 +1972,8 @@ export function OpportunityFormPage() {
 
       {pendingOpportunityTypeChange ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-base font-semibold text-sf-text">Opportunity Type Change</h2>
+          <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="false" aria-labelledby="opportunity-type-change-title">
+            <h2 id="opportunity-type-change-title" className="text-base font-semibold text-sf-text">Opportunity Type Change</h2>
             <p className="mt-2 text-sm text-sf-text-muted">
               Changing the Opportunity Type/Subtype may make existing requirement records irrelevant.
             </p>

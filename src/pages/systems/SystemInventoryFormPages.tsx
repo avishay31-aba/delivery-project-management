@@ -1120,7 +1120,7 @@ function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="add-tenant-title">
+        <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="add-tenant-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="add-tenant-title" className="text-lg font-semibold text-sf-text">Add tenant</h2>
@@ -1415,8 +1415,8 @@ function InventoryForm<T extends InventoryRecord>({
 
       {navigationBlocker.state === 'blocked' ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-sf-text">Unsaved changes</h2>
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="false" aria-labelledby="system-unsaved-changes-title">
+            <h2 id="system-unsaved-changes-title" className="text-lg font-semibold text-sf-text">Unsaved changes</h2>
             <p className="mt-2 text-sm text-sf-text-muted">
               You have unsaved system changes. What would you like to do before leaving this form?
             </p>
