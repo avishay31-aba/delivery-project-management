@@ -58,7 +58,7 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
-import { createStandaloneProject, projectHeaderFieldValue } from '@/domain/project-lifecycle'
+import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import {
   deletedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
@@ -225,7 +225,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       let updatedProject: AppDataState['projects'][number] | undefined
       const projects = state.projects.map((project) => {
         if (project.id !== id) return project
-        updatedProject = { ...project, ...patch, updatedAt: now }
+        updatedProject = applyProjectLifecycleStatus({ ...project, ...patch, updatedAt: now })
         return updatedProject
       })
       const sourceMachineIds =

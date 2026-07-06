@@ -21,6 +21,18 @@ export function projectSavePatch(project: Project): Partial<Project> {
   }
 }
 
+export function projectStatusFromTaskCompletion(project: Pick<Project, 'progressStatus' | 'tasks'>): Project['progressStatus'] {
+  const tasks = project.tasks ?? []
+  if (tasks.length > 0 && tasks.every((task) => task.status === 'DONE')) return 'DONE'
+  if (tasks.some((task) => task.status !== 'DONE') && project.progressStatus === 'DONE') return 'OPEN'
+  return project.progressStatus
+}
+
+export function applyProjectLifecycleStatus(project: Project): Project {
+  const progressStatus = projectStatusFromTaskCompletion(project)
+  return progressStatus === project.progressStatus ? project : { ...project, progressStatus }
+}
+
 export function projectSourceFor(project: Project): Project['projectSource'] {
   return project.projectSource ?? (project.mainType === 'POC' ? 'POC' : 'FINAL')
 }
