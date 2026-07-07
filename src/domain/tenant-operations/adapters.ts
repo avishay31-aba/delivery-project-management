@@ -1,5 +1,6 @@
 import { incrementCounter } from '@/data/id-generator'
 import type { AllocationType, NewTenantRequirement, Project, System, Tenant, TenantConfiguration } from '@/data/seed.types'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import {
   applicationConfigurationFromRequirement,
   applicationConfigurationFromTenant,
@@ -183,7 +184,7 @@ export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, syste
   const configurationHistory = [...(draft.configurationHistory ?? [])]
 
   if (!valuesEqual(tenantConfigurationFromTenant(saved, system), configuration)) {
-    const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now, 'Local User', draft.tid)
+    const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now, CURRENT_USER_DISPLAY_NAME, draft.tid)
     if (record) configurationHistory.unshift(record)
   }
 
@@ -197,7 +198,7 @@ export function createTenantConfigurationHistoryRecord(
   configuration: TenantConfiguration,
   existingRecords: Tenant['configurationHistory'] = [],
   timestamp = new Date().toISOString(),
-  recordedBy = 'Local User',
+  recordedBy = CURRENT_USER_DISPLAY_NAME,
   tid = '',
 ) {
   if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null

@@ -6,9 +6,11 @@ import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
-import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor } from '@/components/ui'
+import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor, SaveButtonLabel } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { handleDateInputPaste } from '@/utils/date-input'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
@@ -239,6 +241,7 @@ export function TenantFormPage() {
   })
   const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const [editingWarrantyId, setEditingWarrantyId] = useState<string | null>(null)
@@ -250,6 +253,7 @@ export function TenantFormPage() {
   const [operationalStatusOpen, setOperationalStatusOpen] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
   const navigationBlocker = useBlocker(isDirty)
+  useBeforeUnloadWarning(isDirty)
 
   useEffect(() => {
     resetDraft(savedTenant ? cloneTenant(savedTenant) : null)
@@ -429,6 +433,8 @@ export function TenantFormPage() {
       ...tenantDraft,
       warranties: computedWarranties(tenantDraft.warranties ?? []),
     }
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
     saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id)
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
@@ -620,7 +626,7 @@ export function TenantFormPage() {
         {isViewMode ? null : (
           <div className="relative inline-flex">
             <button type="button" className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={() => saveTenant(false)}>
-              Save
+              <SaveButtonLabel saving={isSaving} />
             </button>
             <button
               type="button"
@@ -1205,10 +1211,22 @@ export function TenantFormPage() {
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={warranty.startDate ?? ''} onChange={(event) => updateWarrantyInline(warranty.id, { startDate: event.target.value || null })} />
+                    <input
+                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                      type="date"
+                      value={warranty.startDate ?? ''}
+                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { startDate: nextValue }))}
+                      onChange={(event) => updateWarrantyInline(warranty.id, { startDate: event.target.value || null })}
+                    />
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={warranty.endDate ?? ''} onChange={(event) => updateWarrantyInline(warranty.id, { endDate: event.target.value || null })} />
+                    <input
+                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                      type="date"
+                      value={warranty.endDate ?? ''}
+                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { endDate: nextValue }))}
+                      onChange={(event) => updateWarrantyInline(warranty.id, { endDate: event.target.value || null })}
+                    />
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
@@ -1269,11 +1287,23 @@ export function TenantFormPage() {
             </div>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
-              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.startDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('startDate', event.target.value || null)} />
+              <input
+                className="h-9 w-full rounded border border-sf-border px-2 py-1"
+                type="date"
+                value={warrantyDialogDraft.startDate ?? ''}
+                onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDialogDraft('startDate', nextValue))}
+                onChange={(event) => updateWarrantyDialogDraft('startDate', event.target.value || null)}
+              />
             </label>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date</span>
-              <input className="h-9 w-full rounded border border-sf-border px-2 py-1" type="date" value={warrantyDialogDraft.endDate ?? ''} onChange={(event) => updateWarrantyDialogDraft('endDate', event.target.value || null)} />
+              <input
+                className="h-9 w-full rounded border border-sf-border px-2 py-1"
+                type="date"
+                value={warrantyDialogDraft.endDate ?? ''}
+                onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDialogDraft('endDate', nextValue))}
+                onChange={(event) => updateWarrantyDialogDraft('endDate', event.target.value || null)}
+              />
             </label>
             <div className="space-y-2 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Predecessors</span>

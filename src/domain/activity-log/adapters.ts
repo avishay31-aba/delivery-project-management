@@ -1,5 +1,6 @@
 import { ACTIVITY_EVENT_SCHEMA_VERSION } from './metadata'
 import { validateActivityEventShape, validateActivityObjectRefShape } from './validation'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import type {
   ActivityEvent,
   ActivityEventCategory,
@@ -9,7 +10,7 @@ import type {
 
 export const LOCAL_ACTIVITY_ACTOR = {
   actorId: null,
-  actorName: 'Local User',
+  actorName: CURRENT_USER_DISPLAY_NAME,
 } as const
 
 export interface ActivityObjectRefInput {

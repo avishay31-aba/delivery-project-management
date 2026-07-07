@@ -9,6 +9,8 @@ import {
 } from '@/domain/remarks'
 import { alertPresentationForDeadline } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { handleDateInputPaste } from '@/utils/date-input'
 
 interface RemarksGridProps {
   remarks: RemarkRecord[]
@@ -52,7 +54,7 @@ export function RemarksGrid({
     onChange(
       remarks.map((remark) =>
         remark.id === id
-          ? { ...remark, ...patch, updatedAt: now, updatedBy: 'Local User' }
+          ? { ...remark, ...patch, updatedAt: now, updatedBy: CURRENT_USER_DISPLAY_NAME }
           : remark,
       ),
     )
@@ -180,6 +182,7 @@ export function RemarksGrid({
                         className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
                         type="date"
                         value={remark.dueDate ?? ''}
+                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateRemark(remark.id, { dueDate: nextValue }))}
                         onChange={(event) => updateRemark(remark.id, { dueDate: event.target.value || null })}
                       />
                     ) : (

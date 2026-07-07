@@ -1,4 +1,5 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, SalesManager, System, Tenant, WarrantyRecord } from '@/data/seed.types'
 import {
   CUSTOMER_ACCOUNT_FIELD_LABELS,
@@ -28,7 +29,7 @@ export function createCustomerColumns(
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.salesManager,
       getValue: (row) => accountManagerDisplayName(row.salesManagerId, salesManagers),
     },
-    { id: 'region', label: CUSTOMER_ACCOUNT_FIELD_LABELS.region, getValue: (row) => row.region, editKey: 'region' },
+    { id: 'region', label: CUSTOMER_ACCOUNT_FIELD_LABELS.region, getValue: (row) => row.region, editKey: 'region', options: REGION_OPTIONS },
     { id: 'country', label: CUSTOMER_ACCOUNT_FIELD_LABELS.country, getValue: (row) => row.country, editKey: 'country' },
     { id: 'state', label: CUSTOMER_ACCOUNT_FIELD_LABELS.state, getValue: (row) => row.state, editKey: 'state' },
     { id: 'timeZone', label: CUSTOMER_ACCOUNT_FIELD_LABELS.timeZone, getValue: (row) => row.timeZone, editKey: 'timeZone' },

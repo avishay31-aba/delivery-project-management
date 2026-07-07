@@ -1,6 +1,7 @@
 import { PRODUCT_OPTIONS } from '@/config/cloud-platform-metadata'
 import {
   PRODUCTION_OPERATIONAL_STATUS_OPTIONS,
+  COGNITO_REGION_OPTIONS,
   REGION_OPTIONS,
   REUSED_OPERATIONAL_STATUS_OPTIONS,
   REUSED_PURPOSE_OPTIONS,
@@ -45,7 +46,7 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
     { key: 'productType', label: 'Product', editable: true, source: '2. Header', line: 2, inputType: 'picklist', options: PRODUCT_OPTIONS },
     { key: 'logo', label: 'Product Logo', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
     { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 2, inputType: 'integer' },
-    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
+    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: COGNITO_REGION_OPTIONS, required: true },
     { key: 'timeGroup', label: 'Used In Region / Time Group', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'linkedProjects', label: 'Linked Project', editable: false, source: '2. Header', line: 4, inputType: 'readonly' },
@@ -74,7 +75,7 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
     { key: 'productType', label: 'Product', editable: true, source: '2. Header', line: 2, inputType: 'picklist', options: PRODUCT_OPTIONS },
     { key: 'logo', label: 'Logo', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
     { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 2, inputType: 'integer' },
-    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
+    { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: COGNITO_REGION_OPTIONS, required: true },
     { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'usedInRegion', label: 'Used in Region', editable: true, source: 'POC/Training/Demo pool', line: 4, inputType: 'picklist', options: REGION_OPTIONS, required: true },

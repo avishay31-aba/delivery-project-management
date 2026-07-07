@@ -1,4 +1,5 @@
 import { timeGroupForCountry } from '@/config/time-groups'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import {
   applicationConfigurationFromTenant,
   applicationConfigurationValue,
@@ -136,7 +137,7 @@ export function createSystemConfigurationHistoryRecord(
   configuration: TenantConfiguration,
   existingRecords: ConfigurationHistoryRecord[] = [],
   timestamp = new Date().toISOString(),
-  recordedBy = 'Local User',
+  recordedBy = CURRENT_USER_DISPLAY_NAME,
   tid = '',
 ): ConfigurationHistoryRecord | null {
   if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null

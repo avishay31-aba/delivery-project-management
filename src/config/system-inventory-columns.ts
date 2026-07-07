@@ -3,7 +3,7 @@ import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
-import { REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
+import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 import {
   joinUniqueValues,
   systemSourceLabel,
@@ -43,11 +43,11 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
-  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.timeGroup ?? '', editable: true, editKey: 'timeGroup' },
-  { id: 'region', label: 'Region', getValue: (row) => row.region ?? '', editable: true, editKey: 'region' },
+  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.timeGroup ?? '', editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
+  { id: 'region', label: 'Region', getValue: (row) => row.region ?? '', editable: true, editKey: 'region', options: REGION_OPTIONS },
   { id: 'country', label: 'Country', getValue: (row) => row.country ?? '', editable: true, editKey: 'country' },
   { id: 'state', label: 'State', getValue: (row) => row.state ?? '', editable: true, editKey: 'state' },
-  { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup' },
+  { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
   { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
   { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
@@ -63,7 +63,7 @@ export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
-  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.usedInRegion ?? row.timeGroup ?? '', editable: true, editKey: 'usedInRegion' },
+  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.usedInRegion ?? row.timeGroup ?? '', editable: true, editKey: 'usedInRegion', options: REGION_OPTIONS },
   { id: 'occupationStartDate', label: 'Occupation Start', getValue: (row) => row.occupationStartDate ?? '', editable: true, editKey: 'occupationStartDate' },
   { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => row.occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
   { id: 'currentProjects', label: 'Current Projects', getValue: (row) => row.currentProjectIds.join('; ') },
@@ -118,8 +118,8 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editKey: 'cloudRegion', replaceable: true },
-    { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true },
-    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true },
+    { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true, options: REGION_OPTIONS },
+    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true, options: REGION_OPTIONS },
     { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editKey: 'operationalStatus', replaceable: true },
     { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTime(row.updatedAt) },
   ]

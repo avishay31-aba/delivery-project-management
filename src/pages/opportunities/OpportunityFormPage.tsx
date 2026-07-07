@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
   PRODUCT_OPTIONS,
@@ -36,10 +36,13 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel, StatusBadge } from '@/components/ui'
+import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { handleDateInputPaste } from '@/utils/date-input'
 import {
   getAccountSystems,
   getAccountTenants,
@@ -84,7 +87,7 @@ type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project'
 type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
-type PendingSave = { stayOnPage?: boolean }
+type PendingSave = { stayOnPage?: boolean; onSaved?: () => void }
 type PendingOpportunityTypeChange = { type: OpportunityType; subType: OpportunitySubType }
 type CollapsibleSectionId = 'opportunityHeader' | 'existingSystems' | 'gridA' | 'gridB' | 'gridC' | 'createdProject'
 type ExistingActionValue =
@@ -905,6 +908,7 @@ export function OpportunityFormPage() {
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false)
   const [activeDetailTab, setActiveDetailTab] = useState<OpportunityDetailTab>('requirements')
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [projectChanges, setProjectChanges] = useState<ProjectLifecycleChange[]>([])
   const [pendingWonSave, setPendingWonSave] = useState<PendingSave | null>(null)
   const [pendingPocSave, setPendingPocSave] = useState<PendingSave | null>(null)
@@ -960,6 +964,8 @@ export function OpportunityFormPage() {
     [accounts],
   )
   const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
+  const navigationBlocker = useBlocker(isDirty && !isViewMode)
+  useBeforeUnloadWarning(isDirty && !isViewMode)
 
   if (!savedOpportunity || !draft || !metadata) {
     return (
@@ -1302,12 +1308,15 @@ export function OpportunityFormPage() {
 
   function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
     if (isViewMode) return
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
     setPendingPocSave(null)
     setPendingWonSave(null)
+    options.onSaved?.()
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
@@ -1524,6 +1533,8 @@ export function OpportunityFormPage() {
                   event.preventDefault()
                   patchDraft({ [field.key]: parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')) } as Partial<Opportunity>)
                 }
+              : isDate
+                ? (event) => handleDateInputPaste(event, (nextValue) => patchDraft({ [field.key]: nextValue } as Partial<Opportunity>))
               : undefined
           }
           onChange={(event) =>
@@ -1793,6 +1804,13 @@ export function OpportunityFormPage() {
 
   return (
     <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+      {navigationBlocker.state === 'blocked' ? (
+        <UnsavedChangesDialog
+          onSave={() => saveChanges({ stayOnPage: true, onSaved: () => navigationBlocker.proceed?.() })}
+          onDiscardChanges={() => navigationBlocker.proceed?.()}
+          onCancel={() => navigationBlocker.reset?.()}
+        />
+      ) : null}
       <PageHeader
         title="Opportunity Workspace"
         subtitle={`${currentDraft.opportunityId} - ${currentDraft.opportunityName || 'Unnamed opportunity'} - ${metadata.sourceSheet} - ${visibleRequirementTypes.join('+') || 'No'} visible requirement grids`}
@@ -1850,7 +1868,7 @@ export function OpportunityFormPage() {
                 className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
                 onClick={() => saveChanges()}
               >
-                Save
+                <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"

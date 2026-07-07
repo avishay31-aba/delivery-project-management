@@ -1,5 +1,6 @@
 import { useAppStore } from '@/store/useAppStore'
 import { formatDateTime } from '@/domain/date-time-presentation'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 
 interface TopHeaderProps {
   title?: string
@@ -43,7 +44,7 @@ export function TopHeader({ title = 'Delivery Project Management' }: TopHeaderPr
           >
             DU
           </div>
-          <span className="text-sm text-sf-text">Demo User</span>
+          <span className="text-sm text-sf-text">{CURRENT_USER_DISPLAY_NAME}</span>
         </div>
       </div>
     </header>

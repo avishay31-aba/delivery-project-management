@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
@@ -18,7 +18,8 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel } from '@/components/ui'
+import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
@@ -26,6 +27,8 @@ import { SystemDeliveryTable } from '@/components/systems'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { handleDateInputPaste } from '@/utils/date-input'
 import {
   allocationModeLabelForProject,
   allowedAllocationModes,
@@ -394,6 +397,7 @@ export function ProjectFormPage() {
   })
   const [activeTab, setActiveTab] = useState<ProjectFormTab>('milestones')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [isAddMilestoneDialogOpen, setIsAddMilestoneDialogOpen] = useState(false)
@@ -444,6 +448,8 @@ export function ProjectFormPage() {
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
   const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
+  const navigationBlocker = useBlocker(isDirty && !isViewMode)
+  useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
 
   if (currentDraft && !currentDraft.opportunityName.trim()) {
@@ -631,17 +637,25 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
-  function saveProject(stayOnPage: boolean) {
+  function startSaveIndicator() {
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
+  }
+
+  function saveProject(stayOnPage: boolean, onSaved?: () => void) {
     if (isViewMode) return
     const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
+      navigationBlocker.reset?.()
       return
     }
 
+    startSaveIndicator()
     updateProject(projectDraft.id, projectSavePatch(projectDraft))
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
+    onSaved?.()
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
@@ -709,6 +723,7 @@ export function ProjectFormPage() {
             className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
             type="date"
             value={value}
+            onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateDraftField(field.key as keyof Project, nextValue))}
             onChange={(event) => updateDraftField(field.key as keyof Project, event.target.value || null)}
           />
         </FormField>
@@ -747,7 +762,7 @@ export function ProjectFormPage() {
                 className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
                 onClick={() => saveProject(false)}
               >
-                Save
+                <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"
@@ -1254,6 +1269,7 @@ export function ProjectFormPage() {
                             className="h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm"
                             type="date"
                             value={task.deadline ?? ''}
+                            onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateTask(task.id, { deadline: nextValue }))}
                             onChange={(event) => updateTask(task.id, { deadline: event.target.value || null })}
                           />
                         </td>
@@ -1299,7 +1315,13 @@ export function ProjectFormPage() {
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="number" min={1} value={newMilestoneOrder} onChange={(event) => setNewMilestoneOrder(Number(event.target.value) || 1)} />
               </FormField>
               <FormField label="Deadline" controlWidthClassName="w-40">
-                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={newMilestoneDeadline} onChange={(event) => setNewMilestoneDeadline(event.target.value)} />
+                <input
+                  className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  type="date"
+                  value={newMilestoneDeadline}
+                  onPaste={(event) => handleDateInputPaste(event, setNewMilestoneDeadline)}
+                  onChange={(event) => setNewMilestoneDeadline(event.target.value)}
+                />
               </FormField>
               <FormField label="Comment" controlWidthClassName="w-96">
                 <RichTextEditor value={newMilestoneComment} onChange={setNewMilestoneComment} minHeightClassName="min-h-16" />
@@ -1335,7 +1357,13 @@ export function ProjectFormPage() {
                           <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateMilestoneTaskDraft(index, { resource: event.target.value })} />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
-                          <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={task.deadline ?? ''} onChange={(event) => updateMilestoneTaskDraft(index, { deadline: event.target.value || null })} />
+                          <input
+                            className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+                            type="date"
+                            value={task.deadline ?? ''}
+                            onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateMilestoneTaskDraft(index, { deadline: nextValue }))}
+                            onChange={(event) => updateMilestoneTaskDraft(index, { deadline: event.target.value || null })}
+                          />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
                           <select className="h-8 w-20 rounded border border-sf-border px-2 py-1 text-sm" value={task.status} onChange={(event) => updateMilestoneTaskDraft(index, { status: event.target.value as 'OPEN' | 'DONE' })}>
@@ -1394,7 +1422,13 @@ export function ProjectFormPage() {
                 <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" value={milestone.name} onChange={(event) => updateMilestone(milestone.id, { name: event.target.value })} />
               </FormField>
               <FormField label="Deadline" controlWidthClassName="w-40">
-                <input className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm" type="date" value={milestone.deadline ?? ''} onChange={(event) => updateMilestone(milestone.id, { deadline: event.target.value || null })} />
+                <input
+                  className="h-8 w-full rounded border border-sf-border px-2 py-1 text-sm"
+                  type="date"
+                  value={milestone.deadline ?? ''}
+                  onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateMilestone(milestone.id, { deadline: nextValue }))}
+                  onChange={(event) => updateMilestone(milestone.id, { deadline: event.target.value || null })}
+                />
               </FormField>
               <FormField label="Comment" controlWidthClassName="w-96">
                 <RichTextEditor value={milestone.comment ?? ''} onChange={(value) => updateMilestone(milestone.id, { comment: value })} minHeightClassName="min-h-16" />
@@ -1473,7 +1507,13 @@ export function ProjectFormPage() {
                       <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" value={task.resource} onChange={(event) => updateTask(task.id, { resource: event.target.value })} />
                     </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
-                      <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={task.deadline ?? ''} onChange={(event) => updateTask(task.id, { deadline: event.target.value || null })} />
+                      <input
+                        className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+                        type="date"
+                        value={task.deadline ?? ''}
+                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateTask(task.id, { deadline: nextValue }))}
+                        onChange={(event) => updateTask(task.id, { deadline: event.target.value || null })}
+                      />
                     </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">{renderTaskStatusSelect(task)}</td>
                     <td className="max-w-64 border border-sf-border px-1 py-1">
@@ -1857,6 +1897,13 @@ export function ProjectFormPage() {
 
   return (
     <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+      {navigationBlocker.state === 'blocked' ? (
+        <UnsavedChangesDialog
+          onSave={() => saveProject(true, () => navigationBlocker.proceed?.())}
+          onDiscardChanges={() => navigationBlocker.proceed?.()}
+          onCancel={() => navigationBlocker.reset?.()}
+        />
+      ) : null}
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">

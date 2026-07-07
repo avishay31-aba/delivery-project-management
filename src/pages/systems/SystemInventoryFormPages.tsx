@@ -18,9 +18,11 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { BusinessObjectLink, FormField, PlaceholderCard } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel } from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { handleDateInputPaste } from '@/utils/date-input'
 import {
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
@@ -356,6 +358,7 @@ function InventoryForm<T extends InventoryRecord>({
   const [activeTab, setActiveTab] = useState(metadata.tabs[0]?.id ?? 'tenant')
   const [activeInfrastructureTab, setActiveInfrastructureTab] = useState<InfrastructureInnerTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
@@ -365,6 +368,7 @@ function InventoryForm<T extends InventoryRecord>({
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
   const navigationBlocker = useBlocker(isDirty)
+  useBeforeUnloadWarning(isDirty)
 
   useEffect(() => {
     resetDraft(record ? cloneRecord(record) : null)
@@ -517,6 +521,8 @@ function InventoryForm<T extends InventoryRecord>({
     }
 
     const nextDraft = sanitizedDraftForSave()
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
@@ -536,6 +542,8 @@ function InventoryForm<T extends InventoryRecord>({
     }
 
     const nextDraft = sanitizedDraftForSave()
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>)
     setMessages(['System inventory record saved.'])
     navigationBlocker.proceed?.()
@@ -601,7 +609,13 @@ function InventoryForm<T extends InventoryRecord>({
     if (field.inputType === 'date') {
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName="w-40" required={field.required}>
-          <input className={fieldClassName(isChanged, isInvalid)} type="date" value={value} onChange={(event) => updateField(field.key, event.target.value || null)} />
+          <input
+            className={fieldClassName(isChanged, isInvalid)}
+            type="date"
+            value={value}
+            onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateField(field.key, nextValue))}
+            onChange={(event) => updateField(field.key, event.target.value || null)}
+          />
         </FormField>
       )
     }
@@ -1055,7 +1069,7 @@ function InventoryForm<T extends InventoryRecord>({
           <>
             <div className="relative inline-flex">
               <button type="button" className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => save(false)}>
-                Save
+                <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"

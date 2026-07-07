@@ -6,6 +6,7 @@ import type {
   OpportunityType,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
+import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { generateBusinessId } from '@/domain/business-identity'
 import {
   createActivityEvent,
@@ -327,7 +328,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         if (!beforeSummary || valuesEqual(beforeSummary, afterSummary)) return system
 
         const existingHistory = system.configurationHistory ?? []
-        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now, 'Local User', savedTenant.tid)
+        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now, CURRENT_USER_DISPLAY_NAME, savedTenant.tid)
         if (!record) return system
 
         return {
