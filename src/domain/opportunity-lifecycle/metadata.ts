@@ -37,6 +37,7 @@ export interface OpportunityHeaderField {
     | 'projectAlerts'
     | 'currentMilestone'
     | 'salesManagerId'
+    | 'salesComments'
   label: string
   editable: boolean
   source: string
@@ -64,6 +65,7 @@ const COMMON_HEADER_FIELDS: OpportunityHeaderField[] = [
   { key: 'salesManagerId', label: 'Deal Owner', editable: true, source: '2. Header yellow cells' },
   { key: 'currentMilestone', label: 'Current milestone', editable: false, source: '2. Header yellow cells' },
   { key: 'projectAlerts', label: 'Project Alerts', editable: false, source: '2. Header yellow cells' },
+  { key: 'salesComments', label: 'Sales Comments', editable: true, source: '2. Header yellow cells' },
 ]
 
 const POC_HEADER_FIELDS: OpportunityHeaderField[] = [

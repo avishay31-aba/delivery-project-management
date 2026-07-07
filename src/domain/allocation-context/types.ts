@@ -24,6 +24,7 @@ export interface AllocationValidationContext {
   productionSystemInventory: Array<{ id: string }>
   reusedInternalSystems: ReusedInternalSystem[]
   systems: System[]
+  opportunities?: Array<{ opportunityId: string; id: string; newTenantRequirements?: Array<{ existingSystemId?: string | null; deployTarget?: string }>; changeRequestRequirements?: Array<{ systemId?: string | null }>; standardRenewalRequirements?: Array<{ systemId?: string | null }> }>
 }
 
 export interface AllocationValidationInput {

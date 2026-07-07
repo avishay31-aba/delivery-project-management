@@ -85,6 +85,14 @@ export function requestedSystemCandidatesForProject(
       requestedSystemIds.add(requirement.existingSystemId)
     }
   })
+  if (isPocProject(project)) {
+    opportunity?.changeRequestRequirements.forEach((requirement) => {
+      if (requirement.systemId) requestedSystemIds.add(requirement.systemId)
+    })
+    opportunity?.standardRenewalRequirements.forEach((requirement) => {
+      if (requirement.systemId) requestedSystemIds.add(requirement.systemId)
+    })
+  }
 
   const activeLinks = activeProjectSystemLinks(projectSystems)
   return systems.filter(

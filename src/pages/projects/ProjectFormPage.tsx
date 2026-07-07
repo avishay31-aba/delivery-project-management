@@ -80,6 +80,7 @@ import {
   projectMilestoneStatus,
   projectMilestoneTaskProgress,
   resolveProjectMilestoneTemplate,
+  resetAllTasksOpenInPlan,
   updateMilestoneOrderInPlan,
   updateTaskOrderInPlan,
   updateTaskInPlan,
@@ -343,7 +344,7 @@ function RequirementSection({
             </thead>
             <tbody className="bg-white">
               {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-sf-surface-alt">
+                <tr key={row.id} className={section.kind === 'B' ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-sf-surface-alt'}>
                   {section.columns.map((column) => (
                     <td key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
                       {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
@@ -384,6 +385,7 @@ export function ProjectFormPage() {
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
+  const archiveProject = useAppStore((state) => state.archiveProject)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const {
     value: draft,
@@ -413,11 +415,17 @@ export function ProjectFormPage() {
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([])
+  const [pendingAllocationIds, setPendingAllocationIds] = useState<string[]>([])
   const [allocationCandidateSearch, setAllocationCandidateSearch] = useState('')
   const [allocationCandidateFilters, setAllocationCandidateFilters] = useState<AllocationCandidateFilters>(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
   const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
   const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deletionReason, setDeletionReason] = useState('')
+  const [templateDialogMode, setTemplateDialogMode] = useState<'replacement' | 'new' | null>(null)
+  const [templateName, setTemplateName] = useState('')
+  const [templateDialogError, setTemplateDialogError] = useState('')
   const [expandedLinkedSystemIds, setExpandedLinkedSystemIds] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
 
@@ -447,7 +455,7 @@ export function ProjectFormPage() {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
-  const isDirty = Boolean(savedProject && currentDraft && !valuesEqual(savedProject, currentDraft))
+  const isDirty = Boolean(savedProject && currentDraft && (!valuesEqual(savedProject, currentDraft) || pendingAllocationIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode)
   useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
@@ -587,6 +595,12 @@ export function ProjectFormPage() {
           }
 
     setAllocationResult(result)
+    const successfulAllocationIds = results
+      .filter((candidate) => candidate.ok && candidate.allocationId)
+      .map((candidate) => candidate.allocationId as string)
+    if (successfulAllocationIds.length > 0) {
+      setPendingAllocationIds((current) => Array.from(new Set([...current, ...successfulAllocationIds])))
+    }
     if (result.ok) {
       setIsAllocationDialogOpen(false)
       setSelectedAllocationIds([])
@@ -609,6 +623,7 @@ export function ProjectFormPage() {
   function deallocateSystem(link: ProjectSystemLink) {
     if (isViewMode) return
     const result = deallocateProjectSystem(link.id)
+    setPendingAllocationIds((current) => current.filter((allocationId) => allocationId !== link.id))
     setAllocationResult(result)
   }
 
@@ -653,6 +668,7 @@ export function ProjectFormPage() {
 
     startSaveIndicator()
     updateProject(projectDraft.id, projectSavePatch(projectDraft))
+    setPendingAllocationIds([])
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
     onSaved?.()
@@ -668,7 +684,25 @@ export function ProjectFormPage() {
   }
 
   function cancelProject() {
+    pendingAllocationIds.forEach((allocationId) => deallocateProjectSystem(allocationId))
     resetDraft(cloneProjectDraft(persistedProject))
+    navigate('/projects')
+  }
+
+  function discardProjectChangesAndProceed() {
+    pendingAllocationIds.forEach((allocationId) => deallocateProjectSystem(allocationId))
+    navigationBlocker.proceed?.()
+  }
+
+  function archiveCurrentProject() {
+    const reason = deletionReason.trim()
+    if (!reason) {
+      setSaveMessages(['Deletion reason is required.'])
+      return
+    }
+    archiveProject(projectDraft.id, reason)
+    setIsDeleteDialogOpen(false)
+    setDeletionReason('')
     navigate('/projects')
   }
 
@@ -687,6 +721,15 @@ export function ProjectFormPage() {
     )
 
     if (!isEditable) {
+      if (field.inputType === 'richText') {
+        return (
+          <FormField key={field.key} label={label} controlWidthClassName="w-[32rem] max-w-full">
+            <div className="min-h-16 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+              <RichTextContent value={value} />
+            </div>
+          </FormField>
+        )
+      }
       return (
         <FormField key={field.key} label={label} controlWidthClassName="w-44">
           <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
@@ -725,6 +768,19 @@ export function ProjectFormPage() {
             value={value}
             onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateDraftField(field.key as keyof Project, nextValue))}
             onChange={(event) => updateDraftField(field.key as keyof Project, event.target.value || null)}
+          />
+        </FormField>
+      )
+    }
+
+    if (field.inputType === 'richText') {
+      return (
+        <FormField key={field.key} label={label} controlWidthClassName="w-[32rem] max-w-full">
+          <RichTextEditor
+            value={value}
+            onChange={(nextValue) => updateDraftField(field.key as keyof Project, nextValue)}
+            minHeightClassName="min-h-16"
+            toolbarMode="focus"
           />
         </FormField>
       )
@@ -793,6 +849,9 @@ export function ProjectFormPage() {
             </button>
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
               Revert
+            </button>
+            <button type="button" className="rounded border border-red-200 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50" onClick={() => setIsDeleteDialogOpen(true)}>
+              Delete
             </button>
           </>
         )}
@@ -1041,6 +1100,33 @@ export function ProjectFormPage() {
     setSaveMessages([])
   }
 
+  function resetAllTasksOpen() {
+    if (isViewMode) return
+    setDraft((current) => (current ? resetAllTasksOpenInPlan(current) : current))
+    setSaveMessages([])
+  }
+
+  function openTemplateNameDialog(mode: 'replacement' | 'new') {
+    if (isViewMode) return
+    const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
+    const template = PROJECT_MILESTONE_TASK_TEMPLATES[resolution.templateId]
+    setTemplateDialogMode(mode)
+    setTemplateName(mode === 'replacement' ? template.name : `${projectDraft.opportunityName || projectDraft.pid} template`)
+    setTemplateDialogError('')
+  }
+
+  function confirmTemplateNameDialog() {
+    const trimmedName = templateName.trim()
+    if (!trimmedName) {
+      setTemplateDialogError('Template name is required.')
+      return
+    }
+    setSaveMessages([`Template "${trimmedName}" is ready to save when Admin template persistence is enabled.`])
+    setTemplateDialogMode(null)
+    setTemplateName('')
+    setTemplateDialogError('')
+  }
+
   function renderMilestonesTab() {
     const sectionId: CollapsibleSectionId = 'milestones'
     const resolution = resolveProjectMilestoneTemplate(projectDraft, linkedOpportunity)
@@ -1059,10 +1145,10 @@ export function ProjectFormPage() {
           <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={openAddMilestoneDialog}>
             + Add Milestone
           </button>
-          <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+          <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => openTemplateNameDialog('replacement')}>
             Save as replacement template
           </button>
-          <button type="button" className="rounded border border-sf-border bg-sf-surface-alt px-3 py-1.5 text-sm text-sf-text-muted" disabled>
+          <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => openTemplateNameDialog('new')}>
             Save as new template
           </button>
         </div>
@@ -1165,6 +1251,16 @@ export function ProjectFormPage() {
         onToggle={() => toggleSection(sectionId)}
         className="space-y-3 p-3"
       >
+        {tasks.length > 0 && !isViewMode ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={resetAllTasksOpen}>
+              Reset All
+            </button>
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => openTemplateNameDialog('new')}>
+              Save as Template
+            </button>
+          </div>
+        ) : null}
         {tasks.length > 0 ? (
           <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="table-auto border-collapse text-sm leading-tight">
@@ -1598,7 +1694,7 @@ export function ProjectFormPage() {
       ...(isReusedInternalAllocationMode ? ['MID'] : ['ID', 'MID']),
       'Source',
       'Status',
-      'Region / Time Group',
+      'Used in Region',
       'Country',
       'Product',
       'Hosting',
@@ -1789,6 +1885,79 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderDeleteDialog() {
+    if (!isDeleteDialogOpen) return null
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-delete-title">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="project-delete-title" className="text-lg font-semibold">Archive project {projectDraft.pid}</h2>
+              <p className="text-sm text-sf-text-muted">Historical systems, tenants, warranties, links, and activity remain intact.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close archive dialog" onClick={() => setIsDeleteDialogOpen(false)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <label className="block space-y-1">
+            <span className="text-sm font-semibold">Deletion Reason <span className="text-red-600">*</span></span>
+            <textarea
+              className="min-h-24 w-full resize-y rounded border border-sf-border px-2 py-1 text-sm"
+              value={deletionReason}
+              onChange={(event) => setDeletionReason(event.target.value)}
+            />
+          </label>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!deletionReason.trim()}
+              onClick={archiveCurrentProject}
+            >
+              Archive Project
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderTemplateNameDialog() {
+    if (!templateDialogMode) return null
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="template-name-title">
+          <h2 id="template-name-title" className="text-lg font-semibold">
+            {templateDialogMode === 'replacement' ? 'Save as replacement template' : 'Save as new template'}
+          </h2>
+          <label className="mt-3 block space-y-1">
+            <span className="text-sm font-semibold">Template Name <span className="text-red-600">*</span></span>
+            <input
+              className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm"
+              value={templateName}
+              onChange={(event) => {
+                setTemplateName(event.target.value)
+                setTemplateDialogError('')
+              }}
+            />
+          </label>
+          {templateDialogError ? <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{templateDialogError}</div> : null}
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setTemplateDialogMode(null)}>
+              Cancel
+            </button>
+            <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={confirmTemplateNameDialog}>
+              Continue
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderSystemsTenantsSection() {
     const tenantSections = [
       {
@@ -1900,10 +2069,12 @@ export function ProjectFormPage() {
       {navigationBlocker.state === 'blocked' ? (
         <UnsavedChangesDialog
           onSave={() => saveProject(true, () => navigationBlocker.proceed?.())}
-          onDiscardChanges={() => navigationBlocker.proceed?.()}
+          onDiscardChanges={discardProjectChangesAndProceed}
           onCancel={() => navigationBlocker.reset?.()}
         />
       ) : null}
+      {renderDeleteDialog()}
+      {renderTemplateNameDialog()}
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">

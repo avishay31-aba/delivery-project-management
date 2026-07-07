@@ -36,7 +36,7 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor, SaveButtonLabel, StatusBadge } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
@@ -1511,6 +1511,30 @@ export function OpportunityFormPage() {
     const isDate = dateFields.has(field.key)
     const isNumber = field.key === 'warrantyServiceMonths'
     const changed = headerChanged(field.key)
+
+    if (field.key === 'salesComments') {
+      return (
+        <FormField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName="w-[32rem] max-w-full"
+          required={headerRequired(field.key)}
+        >
+          {field.editable ? (
+            <RichTextEditor
+              value={currentDraft.salesComments ?? ''}
+              onChange={(value) => patchDraft({ salesComments: value })}
+              minHeightClassName="min-h-16"
+              toolbarMode="focus"
+            />
+          ) : (
+            <div className="min-h-16 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+              <RichTextContent value={currentDraft.salesComments ?? ''} />
+            </div>
+          )}
+        </FormField>
+      )
+    }
 
     return (
       <FormField

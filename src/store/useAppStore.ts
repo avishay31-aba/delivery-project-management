@@ -145,6 +145,7 @@ interface AppStore extends AppDataState {
   hydrated: boolean
 
   updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>) => void
+  archiveProject: (id: string, reason: string) => void
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
@@ -275,6 +276,36 @@ export const useAppStore = create<AppStore>((set, get) => ({
                   : system,
               )
             : state.reusedInternalSystems,
+      }
+    })
+    get().saveToStorage()
+  },
+
+  archiveProject: (id, reason) => {
+    const now = new Date().toISOString()
+    set((state) => {
+      const project = state.projects.find((candidate) => candidate.id === id)
+      return {
+        projects: state.projects.map((candidate) =>
+          candidate.id === id
+            ? {
+                ...candidate,
+                progressStatus: 'ARCHIVED',
+                archivedAt: now,
+                deletionReason: reason.trim(),
+                updatedAt: now,
+              }
+            : candidate,
+        ),
+        activityEvents: project
+          ? appendActivityEvent(state.activityEvents, now, {
+              category: 'PROJECT',
+              eventType: 'project.archived',
+              severity: 'WARNING',
+              summary: `Project ${project.pid} archived. Reason: ${reason.trim()}`,
+              primaryObject: projectRef(project),
+            })
+          : state.activityEvents,
       }
     })
     get().saveToStorage()

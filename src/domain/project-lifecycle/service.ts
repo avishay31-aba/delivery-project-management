@@ -266,6 +266,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
 
 export function projectStatusLabel(status: string): string {
   if (status === 'DONE') return 'Done'
+  if (status === 'IN_PROGRESS') return 'In Progress'
+  if (status === 'ARCHIVED') return 'Archived'
   return 'Open'
 }
 
@@ -434,6 +436,7 @@ export function projectWorkspaceTenantSummary(context: ProjectSystemsTenantsCont
 }
 
 export function projectListRowClassName(project: Project): string {
+  if (project.progressStatus === 'ARCHIVED') return 'bg-gray-50 hover:bg-gray-100'
   return project.progressStatus === 'DONE'
     ? 'bg-blue-50 hover:bg-blue-100'
     : 'bg-green-50 hover:bg-green-100'
@@ -477,6 +480,8 @@ export function projectHeaderFieldValue(
     case 'reportToDirect':
     case 'reportToLevel2':
       return ''
+    case 'salesComments':
+      return context.linkedOpportunity?.salesComments ?? ''
     case 'dealOwner':
       return context.salesManager?.name ?? project.dealOwner
     default:

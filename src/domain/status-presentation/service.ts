@@ -64,6 +64,7 @@ const PROJECT_PRESENTATIONS: Record<string, StatusPresentation> = {
   open: { ...BADGE_PRESENTATIONS.open, key: 'open', kind: 'project', label: 'Open', tooltip: 'Project status: Open' },
   in_progress: { ...BADGE_PRESENTATIONS.in_progress, key: 'in_progress', kind: 'project', label: 'In Progress', tooltip: 'Project status: In Progress' },
   done: { ...BADGE_PRESENTATIONS.done, key: 'done', kind: 'project', label: 'Done', tooltip: 'Project status: Done' },
+  archived: { ...BADGE_PRESENTATIONS.default, key: 'archived', kind: 'project', label: 'Archived', icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: 'Project status: Archived' },
 }
 
 const RECORD_CHANGE_PRESENTATIONS: Record<string, StatusPresentation> = {
@@ -126,6 +127,7 @@ export function productMismatchPresentation(): StatusPresentation {
 export function badgeVariantForProjectStatus(status: string): StatusBadgeVariant {
   if (status === 'DONE') return 'done'
   if (status === 'IN_PROGRESS') return 'in_progress'
+  if (status === 'ARCHIVED') return 'default'
   return 'open'
 }
 

@@ -25,6 +25,7 @@ const projectListColumns = useMemo(
   () => createProjectListColumns({ accounts, opportunities, salesManagers, systems, tenants, projectSystems, projectTenants }),
   [accounts, opportunities, projectSystems, projectTenants, salesManagers, systems, tenants],
 )
+const activeProjects = useMemo(() => projects.filter((project) => project.progressStatus !== 'ARCHIVED'), [projects])
 
 return (
 <div>
@@ -33,7 +34,7 @@ return (
   <DataDashboard
     title="Project list"
     dashboardScope="projects"
-    rows={projects}
+    rows={activeProjects}
     columns={projectListColumns}
     enableInlineEditing={false}
     toolbar={

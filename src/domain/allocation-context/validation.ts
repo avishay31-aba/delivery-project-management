@@ -48,8 +48,20 @@ export function validateExistingSystemLink(
   const project = context.projects.find((candidate) => candidate.id === input.projectId)
   const system = context.systems.find((candidate) => candidate.id === input.systemId)
   if (!project) return failed('Project not found.')
-  if (project.mainType === 'POC') return failed('POC projects cannot link existing production systems in F1.')
   if (!system) return failed('Existing system not found.')
+  if (project.mainType === 'POC') {
+    const opportunity = context.opportunities?.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+    const requestedSystemIds = new Set([
+      ...(opportunity?.newTenantRequirements ?? [])
+        .filter((requirement) => requirement.deployTarget === 'EXISTING_SID')
+        .map((requirement) => requirement.existingSystemId),
+      ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.systemId),
+      ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.systemId),
+    ].filter(Boolean))
+    if (!requestedSystemIds.has(input.systemId)) {
+      return failed('POC projects can only link existing systems specified in the Opportunity tenant requirements.')
+    }
+  }
   if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && link.systemId === input.systemId)) {
     return failed('This system is already allocated to the project.')
   }

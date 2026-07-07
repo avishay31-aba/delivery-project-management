@@ -42,6 +42,8 @@ export type ProjectHeaderFieldKey =
   | 'dealOwner'
   | 'reportToDirect'
   | 'reportToLevel2'
+  | 'salesComments'
+  | 'projectComments'
 
 export interface ProjectHeaderFieldMetadata {
   key: ProjectHeaderFieldKey
@@ -49,7 +51,7 @@ export interface ProjectHeaderFieldMetadata {
   editable: boolean
   source: string
   required?: boolean
-  inputType?: 'text' | 'date'
+  inputType?: 'text' | 'date' | 'richText'
 }
 
 export interface ProjectRequirementSectionMetadata {
@@ -79,6 +81,8 @@ const REPORTING_FIELDS: ProjectHeaderFieldMetadata[] = [
   { key: 'dealOwner', label: 'Deal/Sale owner', editable: false, source: '2. Header' },
   { key: 'reportToDirect', label: 'Report to - direct', editable: false, source: '2. Header' },
   { key: 'reportToLevel2', label: 'Report to - level 2', editable: false, source: '2. Header' },
+  { key: 'salesComments', label: 'Sales Comments', editable: false, source: '2. Header', inputType: 'richText' },
+  { key: 'projectComments', label: 'Project Comments', editable: true, source: '2. Header', inputType: 'richText' },
 ]
 
 const LOCATION_FIELDS: ProjectHeaderFieldMetadata[] = [

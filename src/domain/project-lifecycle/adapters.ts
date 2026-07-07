@@ -18,10 +18,12 @@ export function projectSavePatch(project: Project): Partial<Project> {
     milestones: project.milestones,
     tasks: project.tasks,
     documents: project.documents ?? [],
+    projectComments: project.projectComments ?? '',
   }
 }
 
 export function projectStatusFromTaskCompletion(project: Pick<Project, 'progressStatus' | 'tasks'>): Project['progressStatus'] {
+  if (project.progressStatus === 'ARCHIVED') return 'ARCHIVED'
   const tasks = project.tasks ?? []
   if (tasks.length > 0 && tasks.every((task) => task.status === 'DONE')) return 'DONE'
   if (tasks.some((task) => task.status !== 'DONE') && project.progressStatus === 'DONE') return 'OPEN'
@@ -62,6 +64,9 @@ export function createStandaloneProject(nextPid: string, now: string): Project {
     dealOwner: '',
     opportunityName: '',
     canceledAt: null,
+    archivedAt: null,
+    deletionReason: '',
+    projectComments: '',
     documents: [],
     createdAt: now,
     updatedAt: now,
