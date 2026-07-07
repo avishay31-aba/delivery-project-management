@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
+import { ActivityTimeline } from '@/components/activity'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
@@ -52,6 +53,7 @@ import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
 import { projectReference, tenantReference } from '@/domain/business-reference'
+import { activityEventsForSystem } from '@/domain/activity-log'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import {
   hostingContextPatchForFieldChange,
@@ -338,6 +340,7 @@ function InventoryForm<T extends InventoryRecord>({
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
@@ -367,8 +370,8 @@ function InventoryForm<T extends InventoryRecord>({
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
-  const navigationBlocker = useBlocker(isDirty)
-  useBeforeUnloadWarning(isDirty)
+  const navigationBlocker = useBlocker(isDirty && !isViewMode)
+  useBeforeUnloadWarning(isDirty && !isViewMode)
 
   useEffect(() => {
     resetDraft(record ? cloneRecord(record) : null)
@@ -385,6 +388,10 @@ function InventoryForm<T extends InventoryRecord>({
 
   const activeRecord = record
   const activeDraft = draft
+  const systemActivityEvents = useMemo(
+    () => activityEventsForSystem(activityEvents, systemIdentity(activeRecord) || activeRecord.id),
+    [activityEvents, activeRecord],
+  )
   const invalidFields = new Set<string>()
 
   function allocatedSystemForTenantCreation(): System | undefined {
@@ -514,6 +521,11 @@ function InventoryForm<T extends InventoryRecord>({
 
   function save(stayOnPage: boolean) {
     if (isViewMode) return
+    if (!isDirty) {
+      setMessages(['No changes to save.'])
+      setSaveMenuOpen(false)
+      return
+    }
     const nextMessages = validate()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -1223,6 +1235,21 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderActivityTab() {
+    return (
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold text-sf-text">Activity</h3>
+          <p className="text-sm text-sf-text-muted">Read-only System activity timeline from ActivityLog.</p>
+        </div>
+        <ActivityTimeline
+          events={systemActivityEvents}
+          emptyText="No activity has been recorded for this System yet."
+        />
+      </div>
+    )
+  }
+
   function renderConfigurationHistorySection() {
     const records = activeDraft.configurationHistory ?? []
     return (
@@ -1393,7 +1420,7 @@ function InventoryForm<T extends InventoryRecord>({
       >
         <div className="overflow-hidden rounded border border-sf-border bg-sf-surface">
           <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
-            {metadata.tabs.map((tab) => (
+            {[...metadata.tabs, { id: 'activity', label: 'Activity' }].map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -1416,6 +1443,8 @@ function InventoryForm<T extends InventoryRecord>({
                 ? renderTenantTab()
               : activeTab === 'documents'
                   ? renderDocumentsTab()
+                  : activeTab === 'activity'
+                    ? renderActivityTab()
                   : activeTab === 'owner'
                     ? renderOwnerTab()
                     : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}

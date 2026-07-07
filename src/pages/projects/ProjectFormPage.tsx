@@ -659,6 +659,12 @@ export function ProjectFormPage() {
 
   function saveProject(stayOnPage: boolean, onSaved?: () => void) {
     if (isViewMode) return
+    if (!isDirty) {
+      setSaveMessages(['No changes to save.'])
+      setSaveMenuOpen(false)
+      onSaved?.()
+      return
+    }
     const messages = validateProjectSave(projectDraft)
     if (messages.length > 0) {
       setSaveMessages(messages)
@@ -1706,7 +1712,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
-        <div className="flex h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
+        <div className="flex h-[82vh] w-full max-w-3xl resize overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>
@@ -1808,7 +1814,7 @@ export function ProjectFormPage() {
                     </button>
                   ) : null}
                 </div>
-                <div className="sf-scroll-x rounded border border-sf-border bg-white">
+                <div className="sf-scroll-x rounded border border-sf-border bg-white" style={{ scrollbarGutter: 'stable' }}>
                 <table className="min-w-full border-collapse text-sm leading-tight">
                   <thead className="bg-sf-surface-alt text-left">
                     <tr>

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
@@ -8,6 +8,7 @@ import { projectListRowClassName } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
 
 export function ProjectListPage() {
+const [projectVisibility, setProjectVisibility] = useState<'active' | 'archived' | 'all'>('active')
 const navigate = useNavigate()
 const location = useLocation()
 const returnTo = `${location.pathname}${location.search}`
@@ -25,7 +26,11 @@ const projectListColumns = useMemo(
   () => createProjectListColumns({ accounts, opportunities, salesManagers, systems, tenants, projectSystems, projectTenants }),
   [accounts, opportunities, projectSystems, projectTenants, salesManagers, systems, tenants],
 )
-const activeProjects = useMemo(() => projects.filter((project) => project.progressStatus !== 'ARCHIVED'), [projects])
+const visibleProjects = useMemo(() => {
+  if (projectVisibility === 'archived') return projects.filter((project) => project.progressStatus === 'ARCHIVED')
+  if (projectVisibility === 'all') return projects
+  return projects.filter((project) => project.progressStatus !== 'ARCHIVED')
+}, [projectVisibility, projects])
 
 return (
 <div>
@@ -34,21 +39,35 @@ return (
   <DataDashboard
     title="Project list"
     dashboardScope="projects"
-    rows={activeProjects}
+    rows={visibleProjects}
     columns={projectListColumns}
     enableInlineEditing={false}
     toolbar={
-      <button
-        type="button"
-        className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
-        onClick={() => {
-          const project = createProject()
-          const routePath = projectReference(project).routePath
-          if (routePath) navigate(routePath, { state: { returnTo } })
-        }}
-      >
-        + New Project
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="font-medium text-sf-text-muted">Projects</span>
+          <select
+            className="rounded border border-sf-border px-2 py-1"
+            value={projectVisibility}
+            onChange={(event) => setProjectVisibility(event.target.value as 'active' | 'archived' | 'all')}
+          >
+            <option value="active">Active Projects</option>
+            <option value="archived">Archived Projects</option>
+            <option value="all">All Projects</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+          onClick={() => {
+            const project = createProject()
+            const routePath = projectReference(project).routePath
+            if (routePath) navigate(routePath, { state: { returnTo } })
+          }}
+        >
+          + New Project
+        </button>
+      </div>
     }
     getRowClassName={projectListRowClassName}
     onEdit={(row, columnId, value) => {

@@ -6,10 +6,15 @@ import type {
   ActivityLogSummary,
 } from './types'
 
+function normalizeObjectType(value: string): string {
+  return value.trim().toLocaleUpperCase()
+}
+
 function eventMatchesObject(event: ActivityEvent, objectType: string, idOrBusinessId: string): boolean {
   const refs = [event.primaryObject, ...event.relatedObjects]
+  const normalizedType = normalizeObjectType(objectType)
   return refs.some((ref) =>
-    ref.objectType === objectType &&
+    normalizeObjectType(ref.objectType) === normalizedType &&
     (ref.id === idOrBusinessId || ref.businessId === idOrBusinessId),
   )
 }
@@ -29,23 +34,27 @@ export function activityEventsForObject(
 }
 
 export function activityEventsForCustomer(events: ActivityEvent[], accountIdOrCode: string): ActivityEvent[] {
-  return activityEventsForObject(events, 'Customer', accountIdOrCode)
+  return activityEventsForObject(events, 'ACCOUNT', accountIdOrCode)
+}
+
+export function activityEventsForOpportunity(events: ActivityEvent[], opportunityIdOrCode: string): ActivityEvent[] {
+  return activityEventsForObject(events, 'OPPORTUNITY', opportunityIdOrCode)
 }
 
 export function activityEventsForProject(events: ActivityEvent[], projectIdOrPid: string): ActivityEvent[] {
-  return activityEventsForObject(events, 'Project', projectIdOrPid)
+  return activityEventsForObject(events, 'PROJECT', projectIdOrPid)
 }
 
 export function activityEventsForTenant(events: ActivityEvent[], tenantIdOrTid: string): ActivityEvent[] {
-  return activityEventsForObject(events, 'Tenant', tenantIdOrTid)
+  return activityEventsForObject(events, 'TENANT', tenantIdOrTid)
 }
 
 export function activityEventsForSystem(events: ActivityEvent[], systemIdOrSidOrMid: string): ActivityEvent[] {
-  return activityEventsForObject(events, 'System', systemIdOrSidOrMid)
+  return activityEventsForObject(events, 'SYSTEM', systemIdOrSidOrMid)
 }
 
 export function activityEventsForWarranty(events: ActivityEvent[], warrantyId: string): ActivityEvent[] {
-  return activityEventsForObject(events, 'Warranty', warrantyId)
+  return activityEventsForObject(events, 'WARRANTY', warrantyId)
 }
 
 export function activityEventsByCategory(events: ActivityEvent[], category: ActivityEventCategory): ActivityEvent[] {

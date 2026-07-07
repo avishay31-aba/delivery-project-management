@@ -349,9 +349,10 @@ interface ViewActionsMenuProps {
   onRename: () => void
   onDuplicate: () => void
   onDelete: () => void
+  onSetDefault: () => void
 }
 
-function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: ViewActionsMenuProps) {
+function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetDefault }: ViewActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const menuWrapperRef = useRef<HTMLDivElement>(null)
   const isFullDashboard = selectedView.isFullDashboard
@@ -390,12 +391,7 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: View
       <button
         type="button"
         className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
-        disabled={isFullDashboard}
-        title={
-          isFullDashboard
-            ? 'Full Dashboard cannot be renamed, duplicated, or deleted.'
-            : 'Open saved view actions'
-        }
+        title="Open saved view actions"
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((isVisible) => !isVisible)}
@@ -403,7 +399,7 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: View
         View Actions ▾
       </button>
 
-      {isOpen && !isFullDashboard ? (
+      {isOpen ? (
         <div
           className="absolute left-0 top-full z-30 mt-1 w-44 rounded border border-sf-border bg-white p-1 text-sm shadow-lg"
           role="menu"
@@ -411,8 +407,18 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: View
         >
           <button
             type="button"
+            className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted"
+            role="menuitem"
+            disabled={selectedView.isDefault}
+            onClick={() => closeAfterAction(onSetDefault)}
+          >
+            Set as Default View
+          </button>
+          <button
+            type="button"
             className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt"
             role="menuitem"
+            disabled={isFullDashboard}
             onClick={() => closeAfterAction(onRename)}
           >
             Rename View
@@ -421,6 +427,7 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: View
             type="button"
             className="block w-full rounded px-2 py-1 text-left hover:bg-sf-surface-alt"
             role="menuitem"
+            disabled={isFullDashboard}
             onClick={() => closeAfterAction(onDuplicate)}
           >
             Duplicate View
@@ -429,6 +436,7 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete }: View
             type="button"
             className="block w-full rounded px-2 py-1 text-left text-red-700 hover:bg-red-50"
             role="menuitem"
+            disabled={isFullDashboard}
             onClick={() => closeAfterAction(onDelete)}
           >
             Delete View
@@ -1681,6 +1689,10 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               onRename={renameSelectedView}
               onDuplicate={duplicateSelectedView}
               onDelete={deleteSelectedView}
+              onSetDefault={() => {
+                const error = setSelectedViewAsDefault()
+                if (error) window.alert(error)
+              }}
             />
           ) : null}
 
