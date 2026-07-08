@@ -104,7 +104,7 @@ const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey
   { key: 'product', label: 'Product' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
-  { key: 'region', label: 'Region / Time Group' },
+  { key: 'region', label: 'Used in Region' },
 ]
 
 const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
@@ -116,7 +116,7 @@ const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
 const ALLOCATION_CANDIDATE_FILTER_OPTIONS: Array<{ key: AllocationCandidateFilterKey; label: string }> = [
   { key: 'hostingType', label: 'Hosting' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'regionTimeGroup', label: 'Region / Time Group' },
+  { key: 'regionTimeGroup', label: 'Used in Region' },
 ]
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
@@ -547,10 +547,11 @@ export function ProjectFormPage() {
   function openAllocationDialog() {
     if (isViewMode) return
     const initialMode = permittedAllocationModes[0]
+    const projectRegion = projectHeaderFieldValue(projectDraft, 'region', { linkedOpportunity, account })
     setAllocationMode(initialMode)
     setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
-    setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
+    setAllocationCandidateFilters({ ...EMPTY_ALLOCATION_CANDIDATE_FILTERS, regionTimeGroup: projectRegion })
     setAllocationCandidateSortKey('id')
     setAllocationCandidateSortDirection('asc')
     setAllocationResult(null)
@@ -562,7 +563,7 @@ export function ProjectFormPage() {
     setAllocationMode(mode)
     setSelectedAllocationIds([])
     setAllocationCandidateSearch('')
-    setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
+    setAllocationCandidateFilters({ ...EMPTY_ALLOCATION_CANDIDATE_FILTERS, regionTimeGroup: projectHeaderFieldValue(projectDraft, 'region', { linkedOpportunity, account }) })
     setAllocationResult(null)
   }
 
@@ -1723,7 +1724,7 @@ export function ProjectFormPage() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
-        <div className="flex h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
+        <div className="flex h-[82vh] w-full max-w-[96rem] flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
           <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
             <div>
               <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>

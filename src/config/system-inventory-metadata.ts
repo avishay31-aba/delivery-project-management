@@ -47,7 +47,7 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
     { key: 'logo', label: 'Product Logo', editable: false, source: '2. Header', line: 2, inputType: 'readonly' },
     { key: 'tenantCount', label: 'Number of Tenants', editable: false, source: '2. Header', line: 2, inputType: 'integer' },
     { key: 'cognitoRegion', label: 'Cognito Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: COGNITO_REGION_OPTIONS, required: true },
-    { key: 'timeGroup', label: 'Used In Region / Time Group', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
+    { key: 'timeGroup', label: 'Used in Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'linkedProjects', label: 'Linked Project', editable: false, source: '2. Header', line: 4, inputType: 'readonly' },
   ],

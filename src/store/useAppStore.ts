@@ -153,6 +153,7 @@ interface AppStore extends AppDataState {
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
   saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
   deleteTenantFromSystem: (id: string) => void
+  rollbackSystemFormTenantCreation: (tenantId: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
   createInternalTenantForSystem: (projectId: string, systemId: string) => AllocationActionResult
@@ -431,6 +432,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
+  rollbackSystemFormTenantCreation: (tenantId) => {
+    const state = get()
+    const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
+    if (!tenant) return
+    const systemIds = [tenant.systemId, tenant.hostedSystemId].filter(Boolean)
+    set((current) => ({
+      tenants: current.tenants.filter((candidate) => candidate.id !== tenantId),
+      systems: current.systems.map((system) =>
+        systemIds.includes(system.id)
+          ? {
+              ...system,
+              tenantIds: (system.tenantIds ?? []).filter((id) => id !== tenantId),
+            }
+          : system,
+      ),
+      projectSystems: current.projectSystems.map((link) =>
+        systemIds.includes(link.systemId)
+          ? {
+              ...link,
+              tenantIds: (link.tenantIds ?? []).filter((id) => id !== tenantId),
+            }
+          : link,
+      ),
+      projectTenants: current.projectTenants.filter((link) => link.tenantId !== tenantId),
+      activityEvents: current.activityEvents.filter((event) => {
+        const refs = [event.primaryObject, ...event.relatedObjects]
+        return !refs.some((ref) => ref.objectType === 'Tenant' && (ref.id === tenant.id || ref.businessId === tenant.tid))
+      }),
+    }))
+    get().saveToStorage()
+  },
+
   moveTenantToSystem: (id, destinationSystemId) => {
     const state = get()
     const tenant = state.tenants.find((candidate) => candidate.id === id)
@@ -502,7 +535,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }),
     }))
     get().saveToStorage()
-    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
+    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id, tenantId: tenant.id }
   },
 
   createInternalTenantForSystem: (projectId, systemId) => {
@@ -591,7 +624,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       projectTenants: [projectTenant, ...current.projectTenants],
     }))
     get().saveToStorage()
-    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id }
+    return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id, tenantId: tenant.id }
   },
 
   updateAccount: (id, patch) => {

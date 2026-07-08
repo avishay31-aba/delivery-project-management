@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { ActivityTimeline } from '@/components/activity'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
@@ -75,6 +76,7 @@ import {
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { activityEventsForSystem } from '@/domain/activity-log'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type SaveTimestampOptions = { preserveNewState?: boolean }
@@ -340,12 +342,14 @@ function InventoryForm<T extends InventoryRecord>({
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
   const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
+  const rollbackSystemFormTenantCreation = useAppStore((state) => state.rollbackSystemFormTenantCreation)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const {
     value: draft,
@@ -369,6 +373,7 @@ function InventoryForm<T extends InventoryRecord>({
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
+  const [pendingTenantCreationIds, setPendingTenantCreationIds] = useState<string[]>([])
   const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
@@ -388,6 +393,18 @@ function InventoryForm<T extends InventoryRecord>({
 
   const activeRecord = record
   const activeDraft = draft
+  const systemTabs = [...metadata.tabs, { id: 'activity', label: 'Activity' }]
+  const systemActivityEvents = (() => {
+    const ids = [systemIdentity(activeRecord), readRecordValue(activeRecord, 'sid'), readRecordValue(activeRecord, 'machineId'), activeRecord.id]
+      .map((value) => textValue(value))
+      .filter(Boolean)
+    const seen = new Set<string>()
+    return ids.flatMap((id) => activityEventsForSystem(activityEvents, id)).filter((event) => {
+      if (seen.has(event.id)) return false
+      seen.add(event.id)
+      return true
+    })
+  })()
   const invalidFields = new Set<string>()
 
   function allocatedSystemForTenantCreation(): System | undefined {
@@ -540,6 +557,7 @@ function InventoryForm<T extends InventoryRecord>({
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
+    setPendingTenantCreationIds([])
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
     if (!stayOnPage && returnTo) {
@@ -561,14 +579,23 @@ function InventoryForm<T extends InventoryRecord>({
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
+    setPendingTenantCreationIds([])
     setMessages(['System inventory record saved.'])
     navigationBlocker.proceed?.()
   }
 
   function cancelSystemForm() {
+    pendingTenantCreationIds.forEach((tenantId) => rollbackSystemFormTenantCreation(tenantId))
+    setPendingTenantCreationIds([])
     resetDraft(cloneRecord(activeRecord))
     setBypassUnsavedPrompt(true)
     window.setTimeout(() => navigate(dashboardPath), 0)
+  }
+
+  function discardSystemChangesAndProceed() {
+    pendingTenantCreationIds.forEach((tenantId) => rollbackSystemFormTenantCreation(tenantId))
+    setPendingTenantCreationIds([])
+    navigationBlocker.proceed?.()
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
@@ -865,6 +892,7 @@ function InventoryForm<T extends InventoryRecord>({
       const result = createInternalTenantForSystem(selectedProjectId, systemForTenant.id)
       setMessages([result.message])
       if (result.ok) {
+        if (result.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, result.tenantId as string])))
         setAddTenantOpen(false)
         setSelectedProjectId('')
         setSelectedRequirementId('')
@@ -887,6 +915,7 @@ function InventoryForm<T extends InventoryRecord>({
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     setMessages([result.message])
     if (result.ok) {
+      if (result.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, result.tenantId as string])))
       setAddTenantOpen(false)
       setSelectedProjectId('')
       setSelectedRequirementId('')
@@ -1245,6 +1274,18 @@ function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderActivityTab() {
+    return (
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold text-sf-text">Activity</h3>
+          <p className="text-sm text-sf-text-muted">Read-only System activity timeline from ActivityLog.</p>
+        </div>
+        <ActivityTimeline events={systemActivityEvents} emptyText="No activity has been recorded for this system." />
+      </div>
+    )
+  }
+
   function renderConfigurationHistorySection() {
     const records = activeDraft.configurationHistory ?? []
     return (
@@ -1415,7 +1456,7 @@ function InventoryForm<T extends InventoryRecord>({
       >
         <div className="overflow-hidden rounded border border-sf-border bg-sf-surface">
           <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
-            {metadata.tabs.map((tab) => (
+            {systemTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -1431,16 +1472,18 @@ function InventoryForm<T extends InventoryRecord>({
               </button>
             ))}
           </div>
-          <div className="min-h-48 p-4 text-sm text-sf-text-muted" role="tabpanel" aria-label={metadata.tabs.find((tab) => tab.id === activeTab)?.label}>
+          <div className="min-h-48 p-4 text-sm text-sf-text-muted" role="tabpanel" aria-label={systemTabs.find((tab) => tab.id === activeTab)?.label}>
             {activeTab === 'infrastructure'
               ? renderInfrastructureTab()
               : activeTab === 'tenant'
                 ? renderTenantTab()
-              : activeTab === 'documents'
+                : activeTab === 'documents'
                   ? renderDocumentsTab()
                   : activeTab === 'owner'
                     ? renderOwnerTab()
-                    : `${metadata.tabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+                    : activeTab === 'activity'
+                      ? renderActivityTab()
+                      : `${systemTabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>
@@ -1460,7 +1503,7 @@ function InventoryForm<T extends InventoryRecord>({
               <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={saveBlockedNavigation}>
                 Save Changes
               </button>
-              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.proceed?.()}>
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={discardSystemChangesAndProceed}>
                 Discard Changes
               </button>
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigationBlocker.reset?.()}>

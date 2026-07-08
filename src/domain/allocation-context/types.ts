@@ -16,6 +16,7 @@ export interface AllocationActionResult {
   ok: boolean
   message: string
   allocationId?: string
+  tenantId?: string
 }
 
 export interface AllocationValidationContext {
