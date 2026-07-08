@@ -68,7 +68,10 @@ import {
   isManualTenantOperationalMode,
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
+  tenantActiveProjects,
+  tenantDeliveryPidDisplay,
   tenantFormType,
+  tenantPocPidDisplay,
   TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
   validateTenantConfigurationSave,
@@ -147,9 +150,9 @@ function configurationValue(configuration: TenantConfiguration, column: TenantCo
   return applicationConfigurationValue(configuration, column)
 }
 
-function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string }>, systems: System[]): Project | undefined {
-  const linkedProjectId = projectTenants.find((link) => link.tenantId === tenant.id)?.projectId
-  if (linkedProjectId) return projects.find((project) => project.id === linkedProjectId)
+function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string; allocationStatus?: string }>, systems: System[]): Project | undefined {
+  const activeLinkedProjectId = projectTenants.find((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')?.projectId
+  if (activeLinkedProjectId) return projects.find((project) => project.id === activeLinkedProjectId)
   const system = systems.find((candidate) => candidate.id === tenant.systemId)
   return projects.find((project) => project.pid === tenant.deliveryPid || system?.linkedProjectIds?.includes(project.id))
 }
@@ -292,12 +295,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const persistedTenant = savedTenant
   const tenantDraft = draft
   const activeSystem = systems.find((candidate) => candidate.id === (tenantDraft.hostedSystemId ?? tenantDraft.systemId)) ?? system
-  const linkedProjects = projects.filter(
-    (candidate) =>
-      projectTenants.some((link) => link.tenantId === tenantDraft.id && link.projectId === candidate.id) ||
-      candidate.pid === tenantDraft.deliveryPid ||
-      Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
-  )
+  const activeTenantProjects = tenantActiveProjects(tenantDraft, projects, projectTenants)
+  const linkedProjects = activeTenantProjects.length > 0
+    ? activeTenantProjects
+    : projects.filter(
+        (candidate) =>
+          candidate.pid === tenantDraft.deliveryPid ||
+          Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
+      )
   const project = resolveProject(tenantDraft, projects, projectTenants, systems) ?? linkedProjects[0]
   const opportunity = resolveOpportunity(project, opportunities)
   const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
@@ -317,6 +322,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     ),
   ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = linkedProjects
+  const deliveryPidDisplay = tenantDeliveryPidDisplay(tenantDraft, projects, projectTenants)
+  const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
@@ -674,6 +681,24 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     )
   }
 
+  function renderPidLinks(pidList: string) {
+    const pids = pidList.split(';').map((pid) => pid.trim()).filter(Boolean)
+    if (pids.length === 0) return ''
+    return (
+      <span className="inline-flex flex-wrap gap-1">
+        {pids.map((pid, index) => {
+          const linkedProject = projects.find((candidate) => candidate.pid === pid)
+          return (
+            <span key={pid}>
+              {linkedProject ? <BusinessObjectLink reference={projectReference(linkedProject)}>{pid}</BusinessObjectLink> : pid}
+              {index < pids.length - 1 ? '; ' : ''}
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
+
   function updateTenantOperationalMode(value: string) {
     if (isViewMode) return
     const nextOperationalStatus =
@@ -811,7 +836,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const commonFields = [
       renderTenantTypeField(),
       renderOperationalModeField(),
-      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(tenantDraft.deliveryPid ?? '', hosting.sid, tenantDraft.tid), 'w-64') : null,
+      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(deliveryPidDisplay, hosting.sid, tenantDraft.tid), 'w-64') : null,
       formType === 'CUSTOMER' ? renderHeaderField('Warranty status', renderWarrantyHeaderStatus()) : null,
       renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : ''),
     ].filter(Boolean)
@@ -822,7 +847,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Project Type', project?.mainType ?? '')}
           {renderHeaderField('Project Name', project?.opportunityName ?? '')}
-          {renderHeaderField('Delivery PID', project ? <BusinessObjectLink reference={projectReference(project)}>{project.pid}</BusinessObjectLink> : '')}
+          {renderHeaderField('Delivery PID', renderPidLinks(deliveryPidDisplay))}
+          {renderHeaderField('POC PID', renderPidLinks(pocPidDisplay))}
           {renderHeaderField('SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
           {formType === 'POC'

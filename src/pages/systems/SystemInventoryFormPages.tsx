@@ -46,7 +46,7 @@ import {
   type SystemInventoryHeaderField,
   type SystemInventoryMetadata,
 } from '@/config/system-inventory-metadata'
-import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
+import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
@@ -61,6 +61,7 @@ import {
 } from '@/domain/hosting-context'
 import {
   hostedTenantsForSystem,
+  currentProjectPidsForSystem,
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
   reusedInternalPurposeHistory,
@@ -231,8 +232,12 @@ function CollapsibleSection({
   )
 }
 
-function deriveLinkedProjects(record: InventoryRecord, projects: Project[]): string {
-  return linkedProjectDisplay(record, projects)
+function deriveLinkedProjects(record: InventoryRecord, projects: Project[], projectSystems: ProjectSystemLink[] = []): string {
+  return linkedProjectDisplay(record, projects, projectSystems)
+}
+
+function deriveCurrentPid(record: InventoryRecord, projects: Project[], projectSystems: ProjectSystemLink[] = []): string {
+  return currentProjectPidsForSystem(record, projects, projectSystems).join('; ')
 }
 
 function deriveTenantCount(record: InventoryRecord, tenants: Tenant[]): number {
@@ -243,8 +248,9 @@ function deriveTimeGroup(record: InventoryRecord, tenants: Tenant[]): string {
   return systemTimeGroup(record, tenants)
 }
 
-function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[]): string {
-  if (key === 'linkedProjects') return deriveLinkedProjects(record, projects)
+function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[], projectSystems: ProjectSystemLink[] = []): string {
+  if (key === 'currentPid') return deriveCurrentPid(record, projects, projectSystems)
+  if (key === 'linkedProjects') return deriveLinkedProjects(record, projects, projectSystems)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
   if (key === 'availability' && 'source' in record && record.source === SYSTEM_SOURCE_PRODUCTION) return 'Available'
@@ -599,13 +605,13 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
-    const value = derivedValue(activeDraft, field.key, projects, tenants)
+    const value = derivedValue(activeDraft, field.key, projects, tenants, projectSystems)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const width =
       field.key === 'url'
         ? 'w-96'
-        : field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'linkedProjects'
+        : field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'linkedProjects' || field.key === 'currentPid'
           ? 'w-80'
           : 'w-48'
 

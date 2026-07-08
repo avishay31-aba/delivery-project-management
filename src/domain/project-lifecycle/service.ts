@@ -671,8 +671,10 @@ export function linkedTenantsForProject(
     activeProjectTenantLinks(projectTenantLinksForProject)
       .map((link) => link.tenantId),
   )
-  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
   const tenantsWithProjectLinks = new Set(projectTenantLinksForProject.map((link) => link.tenantId))
+  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => {
+    if (!tenantsWithProjectLinks.has(tenantId)) linkedTenantIds.add(tenantId)
+  })
   tenants
     .filter((tenant) => tenant.deliveryPid === project.pid && !tenantsWithProjectLinks.has(tenant.id))
     .forEach((tenant) => linkedTenantIds.add(tenant.id))

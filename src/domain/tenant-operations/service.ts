@@ -63,12 +63,29 @@ export function tenantActiveProjectPids(
     .filter((pid): pid is string => Boolean(pid))
 }
 
+export function tenantActiveProjects(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): Project[] {
+  const projectIds = new Set(
+    activeProjectTenantLinks(projectTenants)
+      .filter((link) => link.tenantId === tenant.id)
+      .map((link) => link.projectId),
+  )
+  return Array.from(projectIds)
+    .map((projectId) => projects.find((project) => project.id === projectId))
+    .filter((project): project is Project => Boolean(project))
+}
+
 export function tenantDeliveryPidDisplay(
   tenant: Tenant,
   projects: Project[],
   projectTenants: ProjectTenantLink[] = [],
 ): string {
-  const pids = tenantActiveProjectPids(tenant, projects, projectTenants)
+  const pids = tenantActiveProjects(tenant, projects, projectTenants)
+    .filter((project) => project.mainType !== 'POC')
+    .map((project) => project.pid)
   const hasProjectTenantLink = projectTenants.some((link) => link.tenantId === tenant.id)
   return pids.length > 0 ? pids.join('; ') : hasProjectTenantLink ? '' : tenant.deliveryPid ?? ''
 }
@@ -78,8 +95,9 @@ export function tenantPocPidDisplay(
   projects: Project[],
   projectTenants: ProjectTenantLink[] = [],
 ): string {
-  return tenantActiveProjectPids(tenant, projects, projectTenants)
-    .filter((pid) => projects.find((project) => project.pid === pid)?.mainType === 'POC')
+  return tenantActiveProjects(tenant, projects, projectTenants)
+    .filter((project) => project.mainType === 'POC')
+    .map((project) => project.pid)
     .join('; ')
 }
 
