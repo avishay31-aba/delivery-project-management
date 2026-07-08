@@ -1137,10 +1137,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
     const allocatedSystemForPurposeHistory = system
     const now = new Date().toISOString()
+    const hostedTenantIds = new Set([
+      ...(allocation.tenantIds ?? []),
+      ...state.tenants
+        .filter((tenant) => tenant.systemId === allocation.systemId || tenant.hostedSystemId === allocation.systemId)
+        .map((tenant) => tenant.id),
+    ])
     const tenantLinksToUnlink = state.projectTenants.filter(
       (candidate) =>
         candidate.projectId === allocation.projectId &&
-        candidate.systemId === allocation.systemId &&
+        (candidate.systemId === allocation.systemId || hostedTenantIds.has(candidate.tenantId)) &&
         candidate.allocationStatus !== 'DEALLOCATED',
     )
 
@@ -1151,7 +1157,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : candidate,
       ),
       projectTenants: current.projectTenants.map((candidate) =>
-        candidate.projectId === allocation.projectId && candidate.systemId === allocation.systemId && candidate.allocationStatus !== 'DEALLOCATED'
+        candidate.projectId === allocation.projectId &&
+        (candidate.systemId === allocation.systemId || hostedTenantIds.has(candidate.tenantId)) &&
+        candidate.allocationStatus !== 'DEALLOCATED'
           ? deallocateProjectTenantLink(candidate, now)
           : candidate,
       ),

@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
-import { reusedInternalSystemColumns } from '@/config/system-inventory-columns'
+import { createReusedInternalSystemColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
 
@@ -11,12 +11,18 @@ export function ReusedInternalSystemsInventoryPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.reusedInternalSystems)
+  const projects = useAppStore((state) => state.projects)
+  const projectSystems = useAppStore((state) => state.projectSystems)
   const sortedSystems = useMemo(
     () => [...systems].sort((first, second) => String(second.machineId).localeCompare(String(first.machineId), undefined, { numeric: true })),
     [systems],
   )
   const createSystem = useAppStore((state) => state.createReusedInternalSystem)
   const updateSystem = useAppStore((state) => state.updateReusedInternalSystem)
+  const reusedInternalSystemColumns = useMemo(
+    () => createReusedInternalSystemColumns(projects, projectSystems),
+    [projectSystems, projects],
+  )
 
   return (
     <div>

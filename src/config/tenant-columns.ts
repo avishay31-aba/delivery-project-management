@@ -1,8 +1,9 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, CountryFlag } from '@/components/ui'
-import type { System, Tenant } from '@/data/seed.types'
+import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
+import { tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
   objectDefinitionToRuntimeFormModel,
@@ -29,7 +30,7 @@ function tenantRuntimeColumn(
   return column
 }
 
-export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[] {
+export function createTenantColumns(systems: System[], projects: Project[] = [], projectTenants: ProjectTenantLink[] = []): DashboardColumn<Tenant>[] {
   return [
     { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tid }, row.tid) },
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
@@ -40,8 +41,16 @@ export function createTenantColumns(systems: System[]): DashboardColumn<Tenant>[
     {
       id: 'deliveryPid',
       label: 'Delivery PID',
-      getValue: (row) => row.deliveryPid ?? '',
-      render: (row) => row.deliveryPid ? createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: row.deliveryPid }, row.deliveryPid) : '',
+      getValue: (row) => tenantDeliveryPidDisplay(row, projects, projectTenants),
+      render: (row) => {
+        const value = tenantDeliveryPidDisplay(row, projects, projectTenants)
+        return value ? createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: value.split(';')[0]?.trim() ?? value }, value) : ''
+      },
+    },
+    {
+      id: 'pocPid',
+      label: 'POC PID',
+      getValue: (row) => tenantPocPidDisplay(row, projects, projectTenants),
     },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },

@@ -172,10 +172,18 @@ export function linkedProjectIdsForSystem(record: SystemInventoryRecord, project
   return Array.from(projectIds)
 }
 
-export function linkedProjectDisplay(record: SystemInventoryRecord, projects: Project[], projectSystems: ProjectSystemLink[] = []): string {
+export function currentProjectPidsForSystem(
+  record: SystemInventoryRecord,
+  projects: Project[],
+  projectSystems: ProjectSystemLink[] = [],
+): string[] {
   return linkedProjectIdsForSystem(record, projectSystems)
     .map((projectId) => projects.find((project) => project.id === projectId)?.pid ?? projectId)
-    .join(', ')
+    .filter(Boolean)
+}
+
+export function linkedProjectDisplay(record: SystemInventoryRecord, projects: Project[], projectSystems: ProjectSystemLink[] = []): string {
+  return currentProjectPidsForSystem(record, projects, projectSystems).join('; ')
 }
 
 export function systemTimeGroup(record: SystemInventoryRecord, tenants: Tenant[]): string {

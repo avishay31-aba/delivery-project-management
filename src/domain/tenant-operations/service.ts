@@ -1,4 +1,5 @@
-import type { System, Tenant, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import type { Project, ProjectTenantLink, System, Tenant, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import { activeProjectTenantLinks } from '@/domain/allocation-context'
 import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 
 export type TenantOperationalMode =
@@ -45,6 +46,41 @@ export function tenantHostedSystemHistory(tenant: Tenant): TenantHostedSystemHis
   return tenant.hostedSystemHistory ?? [
     { systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' },
   ]
+}
+
+export function tenantActiveProjectPids(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): string[] {
+  const projectIds = new Set(
+    activeProjectTenantLinks(projectTenants)
+      .filter((link) => link.tenantId === tenant.id)
+      .map((link) => link.projectId),
+  )
+  return Array.from(projectIds)
+    .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
+    .filter((pid): pid is string => Boolean(pid))
+}
+
+export function tenantDeliveryPidDisplay(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): string {
+  const pids = tenantActiveProjectPids(tenant, projects, projectTenants)
+  const hasProjectTenantLink = projectTenants.some((link) => link.tenantId === tenant.id)
+  return pids.length > 0 ? pids.join('; ') : hasProjectTenantLink ? '' : tenant.deliveryPid ?? ''
+}
+
+export function tenantPocPidDisplay(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): string {
+  return tenantActiveProjectPids(tenant, projects, projectTenants)
+    .filter((pid) => projects.find((project) => project.pid === pid)?.mainType === 'POC')
+    .join('; ')
 }
 
 export function deletedTenantHostedSystemHistory(tenant: Tenant, deletedAt: string): TenantHostedSystemHistory[] {

@@ -666,14 +666,15 @@ export function linkedTenantsForProject(
   opportunity?: Opportunity,
 ): Tenant[] {
   if (!project) return []
+  const projectTenantLinksForProject = projectTenants.filter((link) => link.projectId === project.id)
   const linkedTenantIds = new Set(
-    activeProjectTenantLinks(projectTenants)
-      .filter((link) => link.projectId === project.id)
+    activeProjectTenantLinks(projectTenantLinksForProject)
       .map((link) => link.tenantId),
   )
   referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => linkedTenantIds.add(tenantId))
+  const tenantsWithProjectLinks = new Set(projectTenantLinksForProject.map((link) => link.tenantId))
   tenants
-    .filter((tenant) => tenant.deliveryPid === project.pid)
+    .filter((tenant) => tenant.deliveryPid === project.pid && !tenantsWithProjectLinks.has(tenant.id))
     .forEach((tenant) => linkedTenantIds.add(tenant.id))
   return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
 }

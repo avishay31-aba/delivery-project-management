@@ -11,9 +11,11 @@ const location = useLocation()
 const returnTo = `${location.pathname}${location.search}`
 const tenants = useAppStore((s) => s.tenants)
 const systems = useAppStore((s) => s.systems)
+const projects = useAppStore((s) => s.projects)
+const projectTenants = useAppStore((s) => s.projectTenants)
 const updateTenant = useAppStore((s) => s.updateTenant)
 const createTenant = useAppStore((s) => s.createTenant)
-const tenantListColumns = createTenantColumns(systems)
+const tenantListColumns = createTenantColumns(systems, projects, projectTenants)
 
 return (
 <div>

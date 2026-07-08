@@ -1,11 +1,12 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, Tenant } from '@/data/seed.types'
+import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
 import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 import {
   joinUniqueValues,
+  currentProjectPidsForSystem,
   systemSourceLabel,
   tenantCountForSystem,
 } from '@/domain/system-inventory'
@@ -53,7 +54,8 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
 ]
 
-export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[] = [
+export function createReusedInternalSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[]): DashboardColumn<ReusedInternalSystem>[] {
+  return [
   { id: 'machineId', label: 'MID', getValue: (row) => row.machineId },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
@@ -66,11 +68,12 @@ export const reusedInternalSystemColumns: DashboardColumn<ReusedInternalSystem>[
   { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.usedInRegion ?? row.timeGroup ?? '', editable: true, editKey: 'usedInRegion', options: REGION_OPTIONS },
   { id: 'occupationStartDate', label: 'Occupation Start', getValue: (row) => row.occupationStartDate ?? '', editable: true, editKey: 'occupationStartDate' },
   { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => row.occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
-  { id: 'currentProjects', label: 'Current Projects', getValue: (row) => row.currentProjectIds.join('; ') },
+  { id: 'currentProjects', label: 'Current PID', getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; ') },
   { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
   { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
-]
+  ]
+}
 
 export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<AllocatedSystemDashboardRow>[] {
   return [
@@ -78,13 +81,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'pid',
       label: 'PID',
-      getValue: (row) =>
-        joinUniqueValues(
-          row.allocationProjectIds
-            .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
-            .filter(Boolean),
-          '; ',
-        ),
+      getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
     },
     { id: 'machineId', label: 'MID', getValue: (row) => row.machineId ?? '' },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
@@ -95,13 +92,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'projects',
       label: 'Linked Projects',
-      getValue: (row) =>
-        joinUniqueValues(
-          row.allocationProjectIds
-            .map((projectId) => projects.find((project) => project.id === projectId)?.pid)
-            .filter(Boolean),
-          '; ',
-        ),
+      getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
     },
     {
       id: 'tenantCount',
