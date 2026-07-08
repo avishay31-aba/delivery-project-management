@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, Plus } from 'lucide-react'
 import { PageHeader } from '@/components/record'
-import { ActivityTimeline } from '@/components/activity'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
@@ -75,12 +74,11 @@ import {
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
 import { projectReference, systemReference } from '@/domain/business-reference'
-import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
-type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
+type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
@@ -93,7 +91,6 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
-  { id: 'activity', label: 'Activity' },
 ]
 
 const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
@@ -221,7 +218,6 @@ export function TenantFormPage() {
   const location = useLocation()
   const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
   const tenants = useAppStore((state) => state.tenants)
-  const activityEvents = useAppStore((state) => state.activityEvents)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
   const accounts = useAppStore((state) => state.accounts)
@@ -250,7 +246,6 @@ export function TenantFormPage() {
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const [editingWarrantyId, setEditingWarrantyId] = useState<string | null>(null)
   const [warrantyDialogDraft, setWarrantyDialogDraft] = useState<WarrantyDialogDraft | null>(null)
-  const [isNewWarrantyDialog, setIsNewWarrantyDialog] = useState(false)
   const [warrantyDialogErrors, setWarrantyDialogErrors] = useState<string[]>([])
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
@@ -326,10 +321,6 @@ export function TenantFormPage() {
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
   const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(draftComputedWarranties, tenantDraft.tid).label
-  const tenantActivityEvents = useMemo(
-    () => activityEventsForTenant(activityEvents, tenantDraft.tid || tenantDraft.id),
-    [activityEvents, tenantDraft],
-  )
 
   function warrantyOptionsForTenant(selectedTenantId: string, currentWarrantyId: string): Array<{ tenant: Tenant; warranty: TenantWarranty }> {
     if (selectedTenantId === tenantDraft.id) {
@@ -432,12 +423,6 @@ export function TenantFormPage() {
 
   function saveTenant(stayOnPage: boolean, onSuccess?: () => void) {
     if (isViewMode) return
-    if (!isDirty) {
-      setMessages(['No changes to save.'])
-      setSaveMenuOpen(false)
-      onSuccess?.()
-      return
-    }
     const nextMessages = validateTenantConfiguration()
     if (nextMessages.length > 0) {
       setMessages(nextMessages)
@@ -472,7 +457,6 @@ export function TenantFormPage() {
 
   function openWarrantyDialog(warranty: TenantWarranty) {
     if (isViewMode) return
-    setIsNewWarrantyDialog(false)
     setEditingWarrantyId(warranty.id)
     setWarrantyDialogErrors([])
     setWarrantyDialogDraft({
@@ -489,7 +473,6 @@ export function TenantFormPage() {
   function closeWarrantyDialog() {
     setEditingWarrantyId(null)
     setWarrantyDialogDraft(null)
-    setIsNewWarrantyDialog(false)
     setWarrantyDialogErrors([])
   }
 
@@ -497,6 +480,18 @@ export function TenantFormPage() {
     if (isViewMode) return
     setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
     setWarrantyDialogErrors([])
+  }
+
+  function updateWarrantyInline(id: string, patch: Partial<Pick<TenantWarranty, 'relatedProjectId' | 'startDate' | 'endDate'>>) {
+    if (isViewMode) return
+    setDraft((current) => {
+      if (!current) return current
+      const nextWarranties = (current.warranties ?? []).map((warranty) =>
+        warranty.id === id ? { ...warranty, ...patch } : warranty,
+      )
+      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
+    })
+    setMessages([])
   }
 
   function addWarrantyDialogPredecessor() {
@@ -559,23 +554,6 @@ export function TenantFormPage() {
             }
           : warranty,
       )
-      if (!currentWarranties.some((warranty) => warranty.id === warrantyDialogDraft.id)) {
-        const warranty = createTenantWarranty(current, currentWarranties, project, linkedOpportunityId)
-        const nextWarranty = {
-          ...warranty,
-          id: warrantyDialogDraft.id,
-          relatedProjectId: warrantyDialogDraft.relatedProjectId,
-          predecessor: warrantyDialogDraft.predecessor,
-          startDate: warrantyDialogDraft.startDate,
-          endDate: warrantyDialogDraft.endDate,
-          noWarranty: warrantyDialogDraft.noWarranty ?? 'NO',
-          remark: warrantyDialogDraft.remark,
-        }
-        return {
-          ...current,
-          warranties: computedWarrantiesForTenant(current, [...currentWarranties, nextWarranty]),
-        }
-      }
       return {
         ...current,
         warranties: computedWarrantiesForTenant(current, nextWarranties),
@@ -591,19 +569,12 @@ export function TenantFormPage() {
       return
     }
 
-    const warranties = tenantDraft.warranties ?? []
-    const warranty = createTenantWarranty(tenantDraft, warranties, project, linkedOpportunityId)
-    setIsNewWarrantyDialog(true)
-    setEditingWarrantyId(warranty.id)
-    setWarrantyDialogErrors([])
-    setWarrantyDialogDraft({
-      id: warranty.id,
-      relatedProjectId: warranty.relatedProjectId,
-      predecessor: warranty.predecessor,
-      startDate: warranty.startDate,
-      endDate: warranty.endDate,
-      noWarranty: warranty.noWarranty ?? 'NO',
-      remark: warranty.remark,
+    setDraft((current) => {
+      if (!current) return current
+      const warranties = current.warranties ?? []
+      const warranty = createTenantWarranty(current, warranties, project, linkedOpportunityId)
+      const nextWarranties = [...warranties, warranty]
+      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
     })
   }
 
@@ -1104,27 +1075,11 @@ export function TenantFormPage() {
     )
   }
 
-  function renderActivityTab() {
-    return (
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-lg font-semibold text-sf-text">Activity</h3>
-          <p className="text-sm text-sf-text-muted">Read-only Tenant activity timeline from ActivityLog.</p>
-        </div>
-        <ActivityTimeline
-          events={tenantActivityEvents}
-          emptyText="No activity has been recorded for this Tenant yet."
-        />
-      </div>
-    )
-  }
-
   function renderActiveTab() {
     if (activeTab === 'configuration') return renderConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'documents') return renderDocumentsTab()
-    if (activeTab === 'activity') return renderActivityTab()
     return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">Usage will be defined in a later phase.</div>
   }
 
@@ -1214,12 +1169,10 @@ export function TenantFormPage() {
       <section className="sf-card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-sf-text">Warranties</h2>
-          {isViewMode ? null : (
-            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add warranty
-            </button>
-          )}
+          <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add warranty
+          </button>
         </div>
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
           <table className="min-w-full border-collapse text-sm leading-tight">
@@ -1246,10 +1199,35 @@ export function TenantFormPage() {
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{relatedProjects.find((candidate) => candidate.id === warranty.relatedProjectId)?.pid ?? warranty.relatedProjectId}</td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <select className="h-8 min-w-44 rounded border border-sf-border px-2 py-1 text-sm" value={warranty.relatedProjectId} onChange={(event) => updateWarrantyInline(warranty.id, { relatedProjectId: event.target.value })}>
+                      <option value="">Select project</option>
+                      {relatedProjects.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.pid}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{formatDate(warranty.startDate, { fallback: '' })}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{formatDate(warranty.endDate, { fallback: '' })}</td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <input
+                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                      type="date"
+                      value={warranty.startDate ?? ''}
+                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { startDate: nextValue }))}
+                      onChange={(event) => updateWarrantyInline(warranty.id, { startDate: event.target.value || null })}
+                    />
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    <input
+                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                      type="date"
+                      value={warranty.endDate ?? ''}
+                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { endDate: nextValue }))}
+                      onChange={(event) => updateWarrantyInline(warranty.id, { endDate: event.target.value || null })}
+                    />
+                  </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
@@ -1271,19 +1249,18 @@ export function TenantFormPage() {
   function renderWarrantyDialog() {
     if (!editingWarrantyId || !warrantyDialogDraft) return null
     const warranty = draftComputedWarranties.find((candidate) => candidate.id === editingWarrantyId)
-    if (!warranty && !isNewWarrantyDialog) return null
-    const dialogWarrantyId = editingWarrantyId
-    const selectedPredecessorTenantId = predecessorSelections[dialogWarrantyId]?.tenantId ?? tenantDraft.id
-    const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, editingWarrantyId)
+    if (!warranty) return null
+    const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
+    const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
     const predecessorValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
-    const hasSuccessors = warranty ? successorRefsForWarranty(warranty, draftComputedWarranties, tenantDraft.tid).length > 0 : false
+    const hasSuccessors = successorRefsForWarranty(warranty, draftComputedWarranties, tenantDraft.tid).length > 0
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
         <div className="w-full max-w-2xl rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="warranty-dialog-title">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 id="warranty-dialog-title" className="text-lg font-semibold">{isNewWarrantyDialog ? 'Add warranty' : `Edit warranty ${warranty?.warrantyId ?? ''}`}</h2>
+              <h2 id="warranty-dialog-title" className="text-lg font-semibold">Edit warranty {warranty.warrantyId}</h2>
             </div>
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
           </div>
@@ -1306,7 +1283,7 @@ export function TenantFormPage() {
             </label>
             <div className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Status</span>
-              <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">{displayWarrantyStatus(warranty?.warrantyStatus ?? 'NOT_SET')}</div>
+              <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">{displayWarrantyStatus(warranty.warrantyStatus)}</div>
             </div>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
@@ -1337,7 +1314,7 @@ export function TenantFormPage() {
                   onChange={(event) =>
                     setPredecessorSelections((current) => ({
                       ...current,
-                      [dialogWarrantyId]: { tenantId: event.target.value, warrantyId: '' },
+                      [warranty.id]: { tenantId: event.target.value, warrantyId: '' },
                     }))
                   }
                 >
@@ -1347,12 +1324,12 @@ export function TenantFormPage() {
                 </select>
                 <select
                   className="h-9 rounded border border-sf-border px-2 py-1"
-                  value={predecessorSelections[dialogWarrantyId]?.warrantyId ?? ''}
+                  value={predecessorSelections[warranty.id]?.warrantyId ?? ''}
                   onChange={(event) =>
                     setPredecessorSelections((current) => ({
                       ...current,
-                      [dialogWarrantyId]: {
-                        tenantId: current[dialogWarrantyId]?.tenantId ?? tenantDraft.id,
+                      [warranty.id]: {
+                        tenantId: current[warranty.id]?.tenantId ?? tenantDraft.id,
                         warrantyId: event.target.value,
                       },
                     }))

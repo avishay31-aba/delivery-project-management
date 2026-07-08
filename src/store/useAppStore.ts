@@ -137,11 +137,6 @@ function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
-function hasPersistedChanges<T extends Record<string, unknown>>(record: T, patch: Partial<T>): boolean {
-  const next = { ...record, ...patch }
-  return !valuesEqual(record, next)
-}
-
 interface AppStore extends AppDataState {
   projectLifecycleChangesByOpportunityId: Record<string, ProjectLifecycleChange[]>
   initialize: () => void
@@ -231,10 +226,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       let updatedProject: AppDataState['projects'][number] | undefined
       const projects = state.projects.map((project) => {
         if (project.id !== id) return project
-        if (!hasPersistedChanges(project as unknown as Record<string, unknown>, patch as Record<string, unknown>)) {
-          updatedProject = project
-          return project
-        }
         updatedProject = applyProjectLifecycleStatus({ ...project, ...patch, updatedAt: now })
         return updatedProject
       })
@@ -323,9 +314,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateSystem: (id, patch) => {
     set((state) => ({
       systems: state.systems.map((s) =>
-        s.id === id && hasPersistedChanges(s as unknown as Record<string, unknown>, patch as Record<string, unknown>)
-          ? { ...s, ...patch, updatedAt: new Date().toISOString() }
-          : s,
+        s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s,
       ),
     }))
     get().saveToStorage()
@@ -334,9 +323,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateTenant: (id, patch) => {
     set((state) => ({
       tenants: state.tenants.map((t) =>
-        t.id === id && hasPersistedChanges(t as unknown as Record<string, unknown>, patch as Record<string, unknown>)
-          ? { ...t, ...patch, updatedAt: new Date().toISOString() }
-          : t,
+        t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
       ),
     }))
     get().saveToStorage()
@@ -604,9 +591,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateAccount: (id, patch) => {
     set((state) => ({
       accounts: state.accounts.map((account) =>
-        account.id === id && hasPersistedChanges(account as unknown as Record<string, unknown>, patch as Record<string, unknown>)
-          ? { ...account, ...patch, updatedAt: new Date().toISOString() }
-          : account,
+        account.id === id ? { ...account, ...patch, updatedAt: new Date().toISOString() } : account,
       ),
     }))
     get().saveToStorage()
@@ -615,9 +600,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateProductionSystemInventoryItem: (id, patch) => {
     set((state) => ({
       productionSystemInventory: state.productionSystemInventory.map((system) =>
-        system.id === id && hasPersistedChanges(system as unknown as Record<string, unknown>, patch as Record<string, unknown>)
-          ? { ...system, ...patch, updatedAt: new Date().toISOString() }
-          : system,
+        system.id === id ? { ...system, ...patch, updatedAt: new Date().toISOString() } : system,
       ),
     }))
     get().saveToStorage()
@@ -629,7 +612,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       reusedInternalSystems: state.reusedInternalSystems.map((system) => {
         if (system.id !== id) return system
         const { purposeHistory: _purposeHistory, ...safePatch } = patch
-        if (!hasPersistedChanges(system as unknown as Record<string, unknown>, safePatch as Record<string, unknown>)) return system
         const nextSystem = patch.purpose && patch.purpose !== system.purpose
           ? updateReusedInternalPurpose(system, patch.purpose, now)
           : { ...system, updatedAt: now }
@@ -642,9 +624,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateOpportunity: (id, patch) => {
     set((state) => ({
       opportunities: state.opportunities.map((opportunity) =>
-        opportunity.id === id && hasPersistedChanges(opportunity as unknown as Record<string, unknown>, patch as Record<string, unknown>)
-          ? { ...opportunity, ...patch, updatedAt: new Date().toISOString() }
-          : opportunity,
+        opportunity.id === id ? { ...opportunity, ...patch, updatedAt: new Date().toISOString() } : opportunity,
       ),
     }))
     get().saveToStorage()
@@ -1030,20 +1010,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
     const allocatedSystemForPurposeHistory = system
     const now = new Date().toISOString()
-    const tenantIdsToUnlink = new Set([
-      ...(allocation.tenantIds ?? []),
-      ...state.tenants
-        .filter((tenant) => (tenant.systemId === allocation.systemId || tenant.hostedSystemId === allocation.systemId))
-        .map((tenant) => tenant.id),
-      ...state.projectTenants
-        .filter(
-          (link) =>
-            link.projectId === allocation.projectId &&
-            link.systemId === allocation.systemId &&
-            link.allocationStatus !== 'DEALLOCATED',
-        )
-        .map((link) => link.tenantId),
-    ])
 
     set((current) => ({
       projectSystems: current.projectSystems.map((candidate) =>
@@ -1052,9 +1018,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : candidate,
       ),
       projectTenants: current.projectTenants.map((candidate) =>
-        candidate.projectId === allocation.projectId &&
-        candidate.allocationStatus !== 'DEALLOCATED' &&
-        (candidate.systemId === allocation.systemId || tenantIdsToUnlink.has(candidate.tenantId))
+        candidate.projectId === allocation.projectId && candidate.systemId === allocation.systemId && candidate.allocationStatus !== 'DEALLOCATED'
           ? deallocateProjectTenantLink(candidate, now)
           : candidate,
       ),

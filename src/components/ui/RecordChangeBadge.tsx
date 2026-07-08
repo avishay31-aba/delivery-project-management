@@ -4,7 +4,6 @@ import { recordChangePresentation } from '@/domain/status-presentation'
 type RecordChangeState = 'New' | 'Updated'
 
 const CHANGE_BADGE_WINDOW_MS = 48 * 60 * 60 * 1000
-const CREATION_TRANSACTION_GRACE_MS = 1000
 
 function timestampMs(value?: string): number | null {
   if (!value) return null
@@ -20,7 +19,7 @@ export function recordChangeState(
   const updatedAt = timestampMs(record.updatedAt)
   if (createdAt == null || updatedAt == null) return null
 
-  if (updatedAt - createdAt > CREATION_TRANSACTION_GRACE_MS && nowMs - updatedAt <= CHANGE_BADGE_WINDOW_MS) return 'Updated'
+  if (updatedAt > createdAt && nowMs - updatedAt <= CHANGE_BADGE_WINDOW_MS) return 'Updated'
 
   return nowMs - createdAt <= CHANGE_BADGE_WINDOW_MS ? 'New' : null
 }
