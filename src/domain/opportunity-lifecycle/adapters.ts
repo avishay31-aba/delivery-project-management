@@ -46,7 +46,7 @@ export function syncOpportunityProjectsFromOpportunity(
           ? savedOpportunity.wonAt ?? opportunity.wonAt ?? context.now
           : context.now
         : null,
-    updatedAt: context.now,
+    updatedAt: context.preserveOpportunityUpdatedAt ?? context.now,
   }
 
   const buildProjectPatch = (projectSource: Project['projectSource']) => ({

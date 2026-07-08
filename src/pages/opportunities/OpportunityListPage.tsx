@@ -39,7 +39,7 @@ export function OpportunityListPage() {
             onClick={() => {
               const opportunity = createOpportunity('DELIVERY', 'NEW')
               const routePath = opportunityReference(opportunity).routePath
-              if (routePath) navigate(routePath, { state: { returnTo } })
+              if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
             }}
           >
             + New Opportunity

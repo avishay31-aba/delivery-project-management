@@ -214,9 +214,10 @@ function ReadonlyTable({ headers, rows, emptyText }: { headers: ReactNode[]; row
 
 export function TenantFormPage() {
   const { tid } = useParams<{ tid: string }>()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+const navigate = useNavigate()
+const location = useLocation()
+const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
@@ -251,9 +252,10 @@ export function TenantFormPage() {
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
   const [operationalStatusOpen, setOperationalStatusOpen] = useState(false)
+  const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
-  const navigationBlocker = useBlocker(isDirty)
-  useBeforeUnloadWarning(isDirty)
+  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
+  useBeforeUnloadWarning(isDirty && !isViewMode)
 
   useEffect(() => {
     resetDraft(savedTenant ? cloneTenant(savedTenant) : null)
@@ -433,16 +435,30 @@ export function TenantFormPage() {
       ...tenantDraft,
       warranties: computedWarranties(tenantDraft.warranties ?? []),
     }
-    setIsSaving(true)
-    window.setTimeout(() => setIsSaving(false), 500)
-    saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id)
-    setMessages(['Tenant saved.'])
-    setSaveMenuOpen(false)
-    onSuccess?.()
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (!stayOnPage && returnTo) navigate(returnTo)
+    if (!isDirty) {
+      setMessages(['No changes to save.'])
+      setSaveMenuOpen(false)
+      onSuccess?.()
+      if (!stayOnPage && returnTo) {
+        setBypassUnsavedPrompt(true)
+        window.setTimeout(() => navigate(returnTo), 0)
+      }
+      return
+    }
+
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
+    saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id, { preserveNewState: isNewRecordSession })
+    setMessages(['Tenant saved.'])
+    setSaveMenuOpen(false)
+    onSuccess?.()
+    if (!stayOnPage && returnTo) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(returnTo), 0)
+    }
   }
 
   function revertTenant() {
@@ -452,7 +468,8 @@ export function TenantFormPage() {
 
   function cancelTenant() {
     resetDraft(cloneTenant(persistedTenant))
-    navigate('/tenants')
+    setBypassUnsavedPrompt(true)
+    window.setTimeout(() => navigate('/tenants'), 0)
   }
 
   function openWarrantyDialog(warranty: TenantWarranty) {

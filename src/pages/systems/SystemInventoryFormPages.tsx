@@ -77,6 +77,7 @@ import type { OwnerRecord } from '@/domain/owners'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
+type SaveTimestampOptions = { preserveNewState?: boolean }
 type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
 type InfrastructureInnerTab = 'environment' | 'infrastructure'
 const SYSTEM_REMARK_TYPE_PICKLIST_KEY = 'systemRemarkType'
@@ -329,12 +330,13 @@ function InventoryForm<T extends InventoryRecord>({
   record: T | undefined
   records: T[]
   metadata: SystemInventoryMetadata
-  onSave: (id: string, patch: Partial<T>) => void
+  onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions) => void
   dashboardPath: string
 }) {
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+  const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
@@ -366,9 +368,10 @@ function InventoryForm<T extends InventoryRecord>({
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
+  const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
-  const navigationBlocker = useBlocker(isDirty)
-  useBeforeUnloadWarning(isDirty)
+  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
+  useBeforeUnloadWarning(isDirty && !isViewMode)
 
   useEffect(() => {
     resetDraft(record ? cloneRecord(record) : null)
@@ -520,16 +523,29 @@ function InventoryForm<T extends InventoryRecord>({
       return
     }
 
-    const nextDraft = sanitizedDraftForSave()
-    setIsSaving(true)
-    window.setTimeout(() => setIsSaving(false), 500)
-    onSave(nextDraft.id, nextDraft as Partial<T>)
-    setMessages(['System inventory record saved.'])
-    setSaveMenuOpen(false)
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (!stayOnPage && returnTo) navigate(returnTo)
+    const nextDraft = sanitizedDraftForSave()
+    if (!isDirty) {
+      setMessages(['No changes to save.'])
+      setSaveMenuOpen(false)
+      if (!stayOnPage && returnTo) {
+        setBypassUnsavedPrompt(true)
+        window.setTimeout(() => navigate(returnTo), 0)
+      }
+      return
+    }
+
+    setIsSaving(true)
+    window.setTimeout(() => setIsSaving(false), 500)
+    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
+    setMessages(['System inventory record saved.'])
+    setSaveMenuOpen(false)
+    if (!stayOnPage && returnTo) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(returnTo), 0)
+    }
   }
 
   function saveBlockedNavigation() {
@@ -544,9 +560,15 @@ function InventoryForm<T extends InventoryRecord>({
     const nextDraft = sanitizedDraftForSave()
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    onSave(nextDraft.id, nextDraft as Partial<T>)
+    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
     setMessages(['System inventory record saved.'])
     navigationBlocker.proceed?.()
+  }
+
+  function cancelSystemForm() {
+    resetDraft(cloneRecord(activeRecord))
+    setBypassUnsavedPrompt(true)
+    window.setTimeout(() => navigate(dashboardPath), 0)
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
@@ -1096,7 +1118,7 @@ function InventoryForm<T extends InventoryRecord>({
             </button>
           </>
         )}
-        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => navigate(dashboardPath)}>
+        <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={cancelSystemForm}>
           {isViewMode ? 'Back' : 'Cancel'}
         </button>
       </div>
@@ -1468,12 +1490,12 @@ export function ProductionSystemInventoryFormPage() {
       record={record}
       records={records}
       metadata={productionSystemMetadata}
-      onSave={(id, patch) => {
+      onSave={(id, patch, options) => {
         if (inventoryRecords.some((system) => system.id === id)) {
-          updateInventoryRecord(id, patch as Partial<ProductionSystemInventoryItem>)
+          updateInventoryRecord(id, patch as Partial<ProductionSystemInventoryItem>, options)
           return
         }
-        updateAllocatedRecord(id, patch as Partial<System>)
+        updateAllocatedRecord(id, patch as Partial<System>, options)
       }}
       dashboardPath="/systems/production-inventory"
     />
@@ -1495,12 +1517,12 @@ export function ReusedInternalSystemFormPage() {
       record={record}
       records={records}
       metadata={reusedInternalSystemMetadata}
-      onSave={(id, patch) => {
+      onSave={(id, patch, options) => {
         if (inventoryRecords.some((system) => system.id === id)) {
-          updateInventoryRecord(id, patch as Partial<ReusedInternalSystem>)
+          updateInventoryRecord(id, patch as Partial<ReusedInternalSystem>, options)
           return
         }
-        updateAllocatedRecord(id, patch as Partial<System>)
+        updateAllocatedRecord(id, patch as Partial<System>, options)
       }}
       dashboardPath="/systems/reused-internal"
     />

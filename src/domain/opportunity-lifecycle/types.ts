@@ -48,6 +48,7 @@ export interface OpportunityProjectSyncContext {
   idCounters: IdCounters
   projects: Project[]
   now: string
+  preserveOpportunityUpdatedAt?: string
 }
 
 export type {

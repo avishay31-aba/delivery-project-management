@@ -36,7 +36,7 @@ export function ProductionSystemInventoryPage() {
             onClick={() => {
               const system = createSystem()
               const routePath = systemReference(system).routePath
-              if (routePath) navigate(routePath, { state: { returnTo } })
+              if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
             }}
           >
             + New Production System

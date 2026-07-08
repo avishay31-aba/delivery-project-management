@@ -69,6 +69,7 @@ import {
 } from '@/domain/tenant-operations'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
+type SaveTimestampOptions = { preserveNewState?: boolean }
 
 function appendActivityEvent(
   events: ActivityEvent[],
@@ -144,19 +145,19 @@ interface AppStore extends AppDataState {
   resetToSeed: () => void
   hydrated: boolean
 
-  updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>) => void
+  updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>, options?: SaveTimestampOptions) => void
   archiveProject: (id: string, reason: string) => void
-  updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>) => void
-  updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>) => void
-  updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>) => void
-  updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>) => void
-  saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string) => void
+  updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
+  updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
+  updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
+  updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
+  saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
   deleteTenantFromSystem: (id: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
   createInternalTenantForSystem: (projectId: string, systemId: string) => AllocationActionResult
   updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
-  updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>) => void
+  updateOpportunity: (id: string, patch: Partial<AppDataState['opportunities'][number]>, options?: SaveTimestampOptions) => void
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
   createProductionSystemInventoryItem: () => AppDataState['productionSystemInventory'][number]
@@ -165,6 +166,7 @@ interface AppStore extends AppDataState {
     opportunity: Opportunity,
     savedOpportunity: Opportunity,
     options?: OpportunityProjectSyncOptions,
+    timestampOptions?: SaveTimestampOptions,
   ) => OpportunityProjectSyncResult
   createSystem: () => AppDataState['systems'][number]
   createTenant: () => AppDataState['tenants'][number]
@@ -220,13 +222,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ ...createInitialState(), hydrated: true, projectLifecycleChangesByOpportunityId: {} })
   },
 
-  updateProject: (id, patch) => {
+  updateProject: (id, patch, options) => {
     const now = new Date().toISOString()
     set((state) => {
       let updatedProject: AppDataState['projects'][number] | undefined
       const projects = state.projects.map((project) => {
         if (project.id !== id) return project
-        updatedProject = applyProjectLifecycleStatus({ ...project, ...patch, updatedAt: now })
+        updatedProject = applyProjectLifecycleStatus({
+          ...project,
+          ...patch,
+          updatedAt: options?.preserveNewState ? project.createdAt : now,
+        })
         return updatedProject
       })
       const sourceMachineIds =
@@ -311,25 +317,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
-  updateSystem: (id, patch) => {
+  updateSystem: (id, patch, options) => {
     set((state) => ({
       systems: state.systems.map((s) =>
-        s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s,
+        s.id === id ? { ...s, ...patch, updatedAt: options?.preserveNewState ? s.createdAt : new Date().toISOString() } : s,
       ),
     }))
     get().saveToStorage()
   },
 
-  updateTenant: (id, patch) => {
+  updateTenant: (id, patch, options) => {
     set((state) => ({
       tenants: state.tenants.map((t) =>
-        t.id === id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t,
+        t.id === id ? { ...t, ...patch, updatedAt: options?.preserveNewState ? t.createdAt : new Date().toISOString() } : t,
       ),
     }))
     get().saveToStorage()
   },
 
-  saveTenantConfiguration: (id, draft, activeSystemId) => {
+  saveTenantConfiguration: (id, draft, activeSystemId, options) => {
     const now = new Date().toISOString()
     set((state) => {
       const savedTenant = state.tenants.find((tenant) => tenant.id === id)
@@ -350,7 +356,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
       const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
       const tenants = state.tenants.map((tenant) =>
-        tenant.id === id ? { ...tenant, ...patch, updatedAt: now } : tenant,
+        tenant.id === id ? { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now } : tenant,
       )
       const systems = state.systems.map((system) => {
         if (!affectedSystemIds.includes(system.id)) return system
@@ -597,16 +603,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
-  updateProductionSystemInventoryItem: (id, patch) => {
+  updateProductionSystemInventoryItem: (id, patch, options) => {
     set((state) => ({
       productionSystemInventory: state.productionSystemInventory.map((system) =>
-        system.id === id ? { ...system, ...patch, updatedAt: new Date().toISOString() } : system,
+        system.id === id ? { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : new Date().toISOString() } : system,
       ),
     }))
     get().saveToStorage()
   },
 
-  updateReusedInternalSystem: (id, patch) => {
+  updateReusedInternalSystem: (id, patch, options) => {
     const now = new Date().toISOString()
     set((state) => ({
       reusedInternalSystems: state.reusedInternalSystems.map((system) => {
@@ -614,17 +620,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const { purposeHistory: _purposeHistory, ...safePatch } = patch
         const nextSystem = patch.purpose && patch.purpose !== system.purpose
           ? updateReusedInternalPurpose(system, patch.purpose, now)
-          : { ...system, updatedAt: now }
-        return { ...nextSystem, ...safePatch, updatedAt: now }
+          : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        return { ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
       }),
     }))
     get().saveToStorage()
   },
 
-  updateOpportunity: (id, patch) => {
+  updateOpportunity: (id, patch, options) => {
     set((state) => ({
       opportunities: state.opportunities.map((opportunity) =>
-        opportunity.id === id ? { ...opportunity, ...patch, updatedAt: new Date().toISOString() } : opportunity,
+        opportunity.id === id ? { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : new Date().toISOString() } : opportunity,
       ),
     }))
     get().saveToStorage()
@@ -740,7 +746,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return system
   },
 
-  saveOpportunityWithProjectSync: (opportunity, savedOpportunity, options) => {
+  saveOpportunityWithProjectSync: (opportunity, savedOpportunity, options, timestampOptions) => {
     const state = get()
     const account = state.accounts.find((candidate) => candidate.id === opportunity.accountId)
     const salesManager = state.salesManagers.find((candidate) => candidate.id === opportunity.salesManagerId)
@@ -754,6 +760,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         idCounters: state.idCounters,
         projects: state.projects,
         now,
+        preserveOpportunityUpdatedAt: timestampOptions?.preserveNewState ? savedOpportunity.createdAt : undefined,
       },
       options,
     )

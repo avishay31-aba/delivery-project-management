@@ -31,7 +31,7 @@ return (
         onClick={() => {
           const tenant = createTenant()
           const routePath = tenantReference(tenant).routePath
-          if (routePath) navigate(routePath, { state: { returnTo } })
+          if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
         }}
       >
         + New Tenant

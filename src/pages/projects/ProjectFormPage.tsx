@@ -369,6 +369,7 @@ export function ProjectFormPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+  const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
@@ -428,6 +429,7 @@ export function ProjectFormPage() {
   const [templateDialogError, setTemplateDialogError] = useState('')
   const [expandedLinkedSystemIds, setExpandedLinkedSystemIds] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
+  const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
   useEffect(() => {
     resetDraft(savedProject ? cloneProjectDraft(savedProject) : null)
@@ -456,7 +458,7 @@ export function ProjectFormPage() {
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
   const isDirty = Boolean(savedProject && currentDraft && (!valuesEqual(savedProject, currentDraft) || pendingAllocationIds.length > 0))
-  const navigationBlocker = useBlocker(isDirty && !isViewMode)
+  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
 
@@ -666,16 +668,30 @@ export function ProjectFormPage() {
       return
     }
 
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    if (!isDirty) {
+      setSaveMessages(['No changes to save.'])
+      setSaveMenuOpen(false)
+      onSaved?.()
+      if (!stayOnPage && returnTo) {
+        setBypassUnsavedPrompt(true)
+        window.setTimeout(() => navigate(returnTo), 0)
+      }
+      return
+    }
+
     startSaveIndicator()
-    updateProject(projectDraft.id, projectSavePatch(projectDraft))
+    updateProject(projectDraft.id, projectSavePatch(projectDraft), { preserveNewState: isNewRecordSession })
     setPendingAllocationIds([])
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
     onSaved?.()
-    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
-      ? String(location.state.returnTo ?? '')
-      : ''
-    if (!stayOnPage && returnTo) navigate(returnTo)
+    if (!stayOnPage && returnTo) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(returnTo), 0)
+    }
   }
 
   function revertProject() {
@@ -686,7 +702,8 @@ export function ProjectFormPage() {
   function cancelProject() {
     pendingAllocationIds.forEach((allocationId) => deallocateProjectSystem(allocationId))
     resetDraft(cloneProjectDraft(persistedProject))
-    navigate('/projects')
+    setBypassUnsavedPrompt(true)
+    window.setTimeout(() => navigate('/projects'), 0)
   }
 
   function discardProjectChangesAndProceed() {

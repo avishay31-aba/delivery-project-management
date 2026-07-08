@@ -44,7 +44,7 @@ return (
         onClick={() => {
           const project = createProject()
           const routePath = projectReference(project).routePath
-          if (routePath) navigate(routePath, { state: { returnTo } })
+          if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
         }}
       >
         + New Project

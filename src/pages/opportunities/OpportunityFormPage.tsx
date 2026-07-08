@@ -878,6 +878,7 @@ export function OpportunityFormPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+  const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
   const salesManagers = useAppStore((state) => state.salesManagers)
@@ -914,6 +915,7 @@ export function OpportunityFormPage() {
   const [pendingPocSave, setPendingPocSave] = useState<PendingSave | null>(null)
   const [pendingOpportunityTypeChange, setPendingOpportunityTypeChange] = useState<PendingOpportunityTypeChange | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
+  const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
   useEffect(() => {
     resetDraft(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null)
@@ -964,7 +966,7 @@ export function OpportunityFormPage() {
     [accounts],
   )
   const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
-  const navigationBlocker = useBlocker(isDirty && !isViewMode)
+  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
   if (!savedOpportunity || !draft || !metadata) {
@@ -1291,7 +1293,8 @@ export function OpportunityFormPage() {
   function cancelChanges() {
     resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
-    navigate('/opportunities')
+    setBypassUnsavedPrompt(true)
+    window.setTimeout(() => navigate('/opportunities'), 0)
   }
 
   function undoLastChange() {
@@ -1310,7 +1313,7 @@ export function OpportunityFormPage() {
     if (isViewMode) return
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions)
+    const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])
@@ -1320,7 +1323,10 @@ export function OpportunityFormPage() {
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (!options.stayOnPage && returnTo) navigate(returnTo)
+    if (!options.stayOnPage && returnTo) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(returnTo), 0)
+    }
   }
 
   function selectAllTenants(kind: 'B' | 'C') {
@@ -1371,6 +1377,19 @@ export function OpportunityFormPage() {
 
     if (messages.length > 0) {
       setSaveMessages(messages)
+      return
+    }
+
+    if (!isDirty) {
+      setSaveMessages(['No changes to save.'])
+      options.onSaved?.()
+      const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+        ? String(location.state.returnTo ?? '')
+        : ''
+      if (!options.stayOnPage && returnTo) {
+        setBypassUnsavedPrompt(true)
+        window.setTimeout(() => navigate(returnTo), 0)
+      }
       return
     }
 
