@@ -7,9 +7,10 @@ import type {
 } from './types'
 
 function eventMatchesObject(event: ActivityEvent, objectType: string, idOrBusinessId: string): boolean {
+  const normalizedObjectType = objectType.toUpperCase()
   const refs = [event.primaryObject, ...event.relatedObjects]
   return refs.some((ref) =>
-    ref.objectType === objectType &&
+    ref.objectType.toUpperCase() === normalizedObjectType &&
     (ref.id === idOrBusinessId || ref.businessId === idOrBusinessId),
   )
 }

@@ -134,6 +134,71 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   }
 }
 
+function appendUniqueSemicolonValue(current: string | null | undefined, value: string | null | undefined): string {
+  const nextValue = String(value ?? '').trim()
+  const values = String(current ?? '')
+    .split(';')
+    .map((candidate) => candidate.trim())
+    .filter(Boolean)
+  if (nextValue && !values.includes(nextValue)) values.push(nextValue)
+  return values.join('; ')
+}
+
+function appendProjectSaveActivityEvents(
+  events: ActivityEvent[],
+  now: string,
+  previousProject: AppDataState['projects'][number],
+  nextProject: AppDataState['projects'][number],
+): ActivityEvent[] {
+  let nextEvents = events
+  const projectReference = projectRef(nextProject)
+  const previousTasksById = new Map((previousProject.tasks ?? []).map((task) => [task.id, task]))
+  const nextTasks = nextProject.tasks ?? []
+  const changedTasks = nextTasks.filter((task) => {
+    const previousTask = previousTasksById.get(task.id)
+    return previousTask && previousTask.status !== task.status
+  })
+
+  changedTasks.forEach((task) => {
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category: 'MILESTONE',
+      eventType: 'project.taskStatusChanged',
+      severity: task.status === 'DONE' ? 'SUCCESS' : 'INFO',
+      summary: `Task "${task.name}" marked ${task.status === 'DONE' ? 'DONE' : 'OPEN'} on project ${nextProject.pid}.`,
+      primaryObject: projectReference,
+    })
+  })
+
+  const changedTaskIds = new Set(changedTasks.map((task) => task.id))
+  ;(nextProject.milestones ?? []).forEach((milestone) => {
+    const milestoneTasks = nextTasks.filter((task) => task.milestoneId === milestone.id)
+    if (milestoneTasks.length === 0) return
+    const everyTaskChanged = milestoneTasks.every((task) => changedTaskIds.has(task.id))
+    const status = milestoneTasks[0]?.status
+    const oneStatus = status && milestoneTasks.every((task) => task.status === status)
+    if (!everyTaskChanged || !oneStatus) return
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category: 'MILESTONE',
+      eventType: 'project.milestoneTasksStatusChanged',
+      severity: status === 'DONE' ? 'SUCCESS' : 'INFO',
+      summary: `Milestone "${milestone.name}" tasks marked ${status === 'DONE' ? 'DONE' : 'OPEN'} on project ${nextProject.pid}.`,
+      primaryObject: projectReference,
+    })
+  })
+
+  if (previousProject.progressStatus !== nextProject.progressStatus) {
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category: 'PROJECT',
+      eventType: 'project.statusChanged',
+      severity: nextProject.progressStatus === 'DONE' ? 'SUCCESS' : 'INFO',
+      summary: `Project ${nextProject.pid} status changed from ${previousProject.progressStatus} to ${nextProject.progressStatus}.`,
+      primaryObject: projectReference,
+    })
+  }
+
+  return nextEvents
+}
+
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
@@ -227,8 +292,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     set((state) => {
       let updatedProject: AppDataState['projects'][number] | undefined
+      let previousProject: AppDataState['projects'][number] | undefined
       const projects = state.projects.map((project) => {
         if (project.id !== id) return project
+        previousProject = project
         updatedProject = applyProjectLifecycleStatus({
           ...project,
           ...patch,
@@ -275,6 +342,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
       return {
         projects,
+        activityEvents:
+          previousProject && updatedProject
+            ? appendProjectSaveActivityEvents(state.activityEvents, now, previousProject, updatedProject)
+            : state.activityEvents,
         reusedInternalSystems:
           sourceMachineIds.size > 0
             ? state.reusedInternalSystems.map((system) =>
@@ -385,6 +456,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const tenant = state.tenants.find((candidate) => candidate.id === id)
     const system = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
+    const relatedProjects = tenant
+      ? state.projectTenants
+          .filter((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
+          .map((link) => state.projects.find((project) => project.id === link.projectId))
+          .filter((project): project is AppDataState['projects'][number] => Boolean(project))
+      : []
     const now = new Date().toISOString()
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
@@ -425,7 +502,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             severity: 'WARNING',
             summary: `Tenant ${tenant.tid} removed from system.`,
             primaryObject: tenantRef(tenant),
-            relatedObjects: relatedRefs(system ? systemRef(system) : null),
+            relatedObjects: relatedRefs(system ? systemRef(system) : null, ...relatedProjects.map(projectRef)),
           })
         : state.activityEvents,
     }))
@@ -458,7 +535,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       projectTenants: current.projectTenants.filter((link) => link.tenantId !== tenantId),
       activityEvents: current.activityEvents.filter((event) => {
         const refs = [event.primaryObject, ...event.relatedObjects]
-        return !refs.some((ref) => ref.objectType === 'Tenant' && (ref.id === tenant.id || ref.businessId === tenant.tid))
+        return !refs.some((ref) => ref.objectType.toUpperCase() === 'TENANT' && (ref.id === tenant.id || ref.businessId === tenant.tid))
       }),
     }))
     get().saveToStorage()
@@ -622,6 +699,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : link,
       ),
       projectTenants: [projectTenant, ...current.projectTenants],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'TENANT',
+        eventType: 'tenant.internalCreatedForProject',
+        severity: 'SUCCESS',
+        summary: `Tenant ${tenant.tid} created for project ${project.pid}.`,
+        primaryObject: tenantRef(tenant),
+        relatedObjects: relatedRefs(projectRef(project), systemRef(system)),
+      }),
     }))
     get().saveToStorage()
     return { ok: true, message: `Tenant ${tenant.tid} created.`, allocationId: projectTenant.id, tenantId: tenant.id }
@@ -1006,6 +1091,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const now = new Date().toISOString()
     const tenantIds: string[] = []
+    const assignmentLocation = project ? projectAssignmentLocation(state, project) : { region: '', timeGroup: '' }
 
     const allocation = createProjectSystemLink(
       projectId,
@@ -1022,6 +1108,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ...candidate,
               linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), projectId])),
               tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
+              timeGroup: appendUniqueSemicolonValue(candidate.timeGroup, assignmentLocation.region || assignmentLocation.timeGroup),
               updatedAt: now,
             }
           : candidate,
@@ -1050,6 +1137,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
     const allocatedSystemForPurposeHistory = system
     const now = new Date().toISOString()
+    const tenantLinksToUnlink = state.projectTenants.filter(
+      (candidate) =>
+        candidate.projectId === allocation.projectId &&
+        candidate.systemId === allocation.systemId &&
+        candidate.allocationStatus !== 'DEALLOCATED',
+    )
 
     set((current) => ({
       projectSystems: current.projectSystems.map((candidate) =>
@@ -1072,14 +1165,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ? releaseReusedInternalSystem(system, allocation.projectId, now, project && allocatedSystemForPurposeHistory ? purposeHistoryContextFromProject(project, allocatedSystemForPurposeHistory) : {})
           : system,
       ),
-      activityEvents: appendActivityEvent(current.activityEvents, now, {
-        category: 'ALLOCATION',
-        eventType: 'allocation.systemDeallocated',
-        severity: 'WARNING',
-        summary: `System ${system ? systemBusinessId(system) : allocation.systemId} deallocated from project ${project?.pid ?? allocation.projectId}.`,
-        primaryObject: allocationRef(allocation),
-        relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
-      }),
+      activityEvents: tenantLinksToUnlink.reduce(
+        (events, link) => {
+          const tenant = current.tenants.find((candidate) => candidate.id === link.tenantId)
+          if (!project || !tenant) return events
+          return appendActivityEvent(events, now, {
+            category: 'TENANT',
+            eventType: 'project.tenantUnlinkedFromDeallocatedSystem',
+            severity: 'WARNING',
+            summary: `Tenant ${tenant.tid} unlinked from project ${project.pid} because system ${system ? systemBusinessId(system) : allocation.systemId} was deallocated.`,
+            primaryObject: projectRef(project),
+            relatedObjects: relatedRefs(tenantRef(tenant), system ? systemRef(system) : null),
+          })
+        },
+        appendActivityEvent(current.activityEvents, now, {
+          category: 'ALLOCATION',
+          eventType: 'allocation.systemDeallocated',
+          severity: 'WARNING',
+          summary: `System ${system ? systemBusinessId(system) : allocation.systemId} deallocated from project ${project?.pid ?? allocation.projectId}.`,
+          primaryObject: allocationRef(allocation),
+          relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
+        }),
+      ),
     }))
     get().saveToStorage()
     return { ok: true, message: 'System deallocated from project.', allocationId }
