@@ -32,7 +32,6 @@ import {
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
-  type SharedFieldMetadata,
   type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
 import {
@@ -67,6 +66,7 @@ import {
   reusedInternalPurposeHistory,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
+  systemApplicationConfigurationSummary,
   systemIdentity,
   systemTimeGroup,
   systemTimeGroupAlert,
@@ -145,28 +145,6 @@ function ProductLogoIcon({ product }: { product: string }) {
 }
 
 const APPLICATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_SUMMARY_FIELDS
-const APPLICATION_FIELD_BY_KEY = new Map(APPLICATION_CONFIGURATION_SUMMARY_FIELDS.map((field) => [field.key, field]))
-const INTEGER_SUMMARY_KEYS = new Set([
-  'licenses',
-  'users',
-  'concurrentSearches',
-  'dailySearches',
-  'monthlySearches',
-  'concurrentAnalyses',
-  'topicAnalyses',
-  'dailyAnalyses',
-  'monthlyAnalyses',
-  'standardMonitors',
-  'fullMonitors',
-  'topicMonitors',
-  'tangles',
-  'tanglesGo',
-  'webloc',
-  'webeye',
-  'ingest',
-  'apiDailyQty',
-  'apiMonthlyQty',
-])
 
 function cloneRecord<T extends InventoryRecord>(record: T): T {
   return JSON.parse(JSON.stringify(record)) as T
@@ -605,7 +583,8 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
-    const value = derivedValue(activeDraft, field.key, projects, tenants, projectSystems)
+    const sourceRecord = field.editable ? activeDraft : activeRecord
+    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const width =
@@ -789,36 +768,12 @@ function InventoryForm<T extends InventoryRecord>({
     return textValue(readRecordValue(activeDraft, 'productType')) || (hostedTenantsForDraft().find((tenant) => textValue(tenant.configuration?.product ?? tenant.productType))?.productType ?? '')
   }
 
-  function tenantConfigurationValue(tenant: Tenant, field: SharedFieldMetadata): unknown {
-    const applicationField = APPLICATION_FIELD_BY_KEY.get(field.key) as TenantConfigurationFieldMetadata | undefined
-    if (applicationField) {
-      if (applicationField.configKey === 'product') return tenant.configuration?.product ?? tenant.productType
-      return tenant.configuration?.[applicationField.configKey] ?? (tenant as unknown as Record<string, unknown>)[field.key]
-    }
-    return (tenant as unknown as Record<string, unknown>)[field.key]
+  function applicationConfigurationSummaryRecord(): Record<string, unknown> {
+    return systemApplicationConfigurationSummary((allocatedSystemForTenantCreation() ?? activeRecord) as System, tenants) as unknown as Record<string, unknown>
   }
 
-  function tenantSummaryValue(field: TenantConfigurationFieldMetadata, hostedTenants: Tenant[]): string {
-    if (hostedTenants.length === 0) return '-'
-    if (field.configKey === 'product') return textValue(readRecordValue(activeDraft, 'productType')) || '-'
-    if (INTEGER_SUMMARY_KEYS.has(field.key)) {
-      return String(
-        hostedTenants.reduce((total, tenant) => {
-          const value = tenantConfigurationValue(tenant, field)
-          return total + (typeof value === 'number' ? value : 0)
-        }, 0),
-      )
-    }
-
-    const values = hostedTenants
-      .flatMap((tenant) => {
-        const value = tenantConfigurationValue(tenant, field)
-        return Array.isArray(value) ? value : [value]
-      })
-      .map((value) => textValue(value).trim())
-      .filter(Boolean)
-
-    return Array.from(new Set(values)).join('; ') || '-'
+  function tenantSummaryValue(field: TenantConfigurationFieldMetadata, summary: Record<string, unknown>): string {
+    return textValue(summary[field.configKey]) || '-'
   }
 
   function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {
@@ -987,6 +942,7 @@ function InventoryForm<T extends InventoryRecord>({
 
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft()
+    const applicationSummary = applicationConfigurationSummaryRecord()
     const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
     const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
     function renderHostedTenantSection(title: string, sectionTenants: Tenant[]) {
@@ -1041,7 +997,7 @@ function InventoryForm<T extends InventoryRecord>({
                 <tr>
                   {APPLICATION_SUMMARY_FIELDS.map((column) => (
                     <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-                      {tenantSummaryValue(column, hostedTenants)}
+                      {tenantSummaryValue(column, applicationSummary)}
                     </td>
                   ))}
                 </tr>

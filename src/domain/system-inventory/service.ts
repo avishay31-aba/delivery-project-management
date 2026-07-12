@@ -177,9 +177,15 @@ export function currentProjectPidsForSystem(
   projects: Project[],
   projectSystems: ProjectSystemLink[] = [],
 ): string[] {
-  return linkedProjectIdsForSystem(record, projectSystems)
-    .map((projectId) => projects.find((project) => project.id === projectId)?.pid ?? projectId)
-    .filter(Boolean)
+  return Array.from(
+    new Set(
+      projectSystems
+        .filter((link) => link.allocationStatus !== 'DEALLOCATED' && link.systemId === record.id)
+        .map((link) => link.projectId)
+        .map((projectId) => projects.find((project) => project.id === projectId)?.pid ?? projectId)
+        .filter(Boolean),
+    ),
+  )
 }
 
 export function linkedProjectDisplay(record: SystemInventoryRecord, projects: Project[], projectSystems: ProjectSystemLink[] = []): string {

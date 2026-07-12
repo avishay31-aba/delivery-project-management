@@ -646,15 +646,23 @@ export function linkedSystemsForProject(
   activeSystemLinks: ProjectSystemLink[],
   opportunity?: Opportunity,
   tenants: Tenant[] = [],
+  projectSystems: ProjectSystemLink[] = activeSystemLinks,
 ): System[] {
   if (!project) return []
   const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
-  referencedSystemIdsForOpportunity(opportunity).forEach((systemId) => linkedSystemIds.add(systemId))
+  const systemsWithProjectLinks = new Set(
+    projectSystems
+      .filter((link) => link.projectId === project.id)
+      .map((link) => link.systemId),
+  )
+  referencedSystemIdsForOpportunity(opportunity).forEach((systemId) => {
+    if (!systemsWithProjectLinks.has(systemId)) linkedSystemIds.add(systemId)
+  })
   const referencedTenantIds = referencedTenantIdsForOpportunity(opportunity)
   tenants.forEach((tenant) => {
     if (!referencedTenantIds.has(tenant.id)) return
     const systemId = tenant.hostedSystemId || tenant.systemId
-    if (systemId) linkedSystemIds.add(systemId)
+    if (systemId && !systemsWithProjectLinks.has(systemId)) linkedSystemIds.add(systemId)
   })
   return systems.filter((system) => linkedSystemIds.has(system.id))
 }
