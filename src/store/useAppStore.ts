@@ -29,6 +29,10 @@ import {
   clearPersistedState,
 } from '@/store/persistence'
 import {
+  publishCommittedStateChange,
+  subscribeToCommittedStateChanges,
+} from '@/store/crossTabSync'
+import {
   createProjectSystemLink,
   createProjectTenantLink,
   deallocateProjectSystemLink,
@@ -70,6 +74,7 @@ import {
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
 type SaveTimestampOptions = { preserveNewState?: boolean }
+let unsubscribeCommittedStateChanges: (() => void) | null = null
 
 function appendActivityEvent(
   events: ActivityEvent[],
@@ -122,6 +127,88 @@ function requirementRef(requirementId: string): ActivityObjectRefInput {
 
 function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {
   return refs.filter((ref): ref is ActivityObjectRefInput => Boolean(ref))
+}
+
+function removeTenantsFromSystemTransaction(
+  state: AppDataState,
+  tenantIds: string[],
+  now: string,
+): Pick<AppDataState, 'tenants' | 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
+  const tenantIdSet = new Set(tenantIds)
+  const tenantsToRemove = state.tenants.filter((tenant) => tenantIdSet.has(tenant.id))
+  if (tenantsToRemove.length === 0) {
+    return {
+      tenants: state.tenants,
+      systems: state.systems,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      activityEvents: state.activityEvents,
+    }
+  }
+
+  const systemIdsByTenantId = new Map(
+    tenantsToRemove.map((tenant) => [
+      tenant.id,
+      [tenant.systemId, tenant.hostedSystemId].filter(Boolean),
+    ]),
+  )
+  const removedSystemIds = new Set(Array.from(systemIdsByTenantId.values()).flat())
+  let activityEvents = state.activityEvents
+
+  tenantsToRemove.forEach((tenant) => {
+    const system = state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
+    const relatedProjects = state.projectTenants
+      .filter((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
+      .map((link) => state.projects.find((project) => project.id === link.projectId))
+      .filter((project): project is AppDataState['projects'][number] => Boolean(project))
+
+    activityEvents = appendActivityEvent(activityEvents, now, {
+      category: 'TENANT',
+      eventType: 'tenant.deletedFromSystem',
+      severity: 'WARNING',
+      summary: `Tenant ${tenant.tid} removed from system.`,
+      primaryObject: tenantRef(tenant),
+      relatedObjects: relatedRefs(system ? systemRef(system) : null, ...relatedProjects.map(projectRef)),
+    })
+  })
+
+  return {
+    tenants: state.tenants.map((tenant) => {
+      if (!tenantIdSet.has(tenant.id)) return tenant
+      return {
+        ...tenant,
+        systemId: '',
+        hostedSystemId: '',
+        hostingSid: '',
+        operationalStatus: 'Deleted',
+        hostedSystemHistory: deletedTenantHostedSystemHistory(tenant, now),
+        updatedAt: now,
+      }
+    }),
+    systems: state.systems.map((system) =>
+      removedSystemIds.has(system.id)
+        ? {
+            ...system,
+            tenantIds: (system.tenantIds ?? []).filter((tenantId) => !tenantIdSet.has(tenantId)),
+            updatedAt: now,
+          }
+        : system,
+    ),
+    projectSystems: state.projectSystems.map((link) =>
+      removedSystemIds.has(link.systemId)
+        ? { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => !tenantIdSet.has(tenantId)) }
+        : link,
+    ),
+    projectTenants: state.projectTenants.map((link) => {
+      const tenantSystemIds = systemIdsByTenantId.get(link.tenantId) ?? []
+      return tenantIdSet.has(link.tenantId) &&
+        tenantSystemIds.includes(link.systemId) &&
+        link.allocationStatus !== 'DEALLOCATED'
+        ? deallocateProjectTenantLink(link, now)
+        : link
+    }),
+    activityEvents,
+  }
 }
 
 function projectAssignmentLocation(state: AppDataState, project: AppDataState['projects'][number]) {
@@ -215,6 +302,13 @@ interface AppStore extends AppDataState {
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
+  saveSystemFormTransaction: (
+    collection: 'production' | 'reused' | 'allocated',
+    id: string,
+    patch: Partial<AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number] | AppDataState['systems'][number]>,
+    tenantRemovalIds?: string[],
+    options?: SaveTimestampOptions,
+  ) => void
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
   saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
   deleteTenantFromSystem: (id: string) => void
@@ -258,6 +352,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const persisted = loadPersistedState()
     const next = persisted ?? createInitialState()
     set({ ...next, hydrated: true })
+    if (!unsubscribeCommittedStateChanges) {
+      unsubscribeCommittedStateChanges = subscribeToCommittedStateChanges((state) => {
+        set({ ...state, hydrated: true })
+      })
+    }
   },
 
   saveToStorage: () => {
@@ -281,6 +380,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     persistState(data)
     set({ lastPersistedAt: new Date().toISOString() })
+    publishCommittedStateChange()
   },
 
   resetToSeed: () => {
@@ -398,6 +498,44 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
+  saveSystemFormTransaction: (collection, id, patch, tenantRemovalIds = [], options) => {
+    const now = new Date().toISOString()
+    set((state) => {
+      const tenantRemovalState = removeTenantsFromSystemTransaction(state, tenantRemovalIds, now)
+      const updatedAtFor = (createdAt: string | undefined) => options?.preserveNewState ? createdAt ?? now : now
+      const productionPatch = patch as Partial<AppDataState['productionSystemInventory'][number]>
+      const reusedPatch = patch as Partial<AppDataState['reusedInternalSystems'][number]>
+      const allocatedPatch = patch as Partial<AppDataState['systems'][number]>
+      return {
+        ...tenantRemovalState,
+        productionSystemInventory:
+          collection === 'production'
+            ? state.productionSystemInventory.map((system) =>
+                system.id === id ? { ...system, ...productionPatch, updatedAt: updatedAtFor(system.createdAt) } : system,
+              )
+            : state.productionSystemInventory,
+        reusedInternalSystems:
+          collection === 'reused'
+            ? state.reusedInternalSystems.map((system) => {
+                if (system.id !== id) return system
+                const { purposeHistory: _purposeHistory, ...safePatch } = reusedPatch
+                const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
+                  ? updateReusedInternalPurpose(system, safePatch.purpose, now)
+                  : { ...system, updatedAt: updatedAtFor(system.createdAt) }
+                return { ...nextSystem, ...safePatch, updatedAt: updatedAtFor(system.createdAt) }
+              })
+            : state.reusedInternalSystems,
+        systems:
+          collection === 'allocated'
+            ? tenantRemovalState.systems.map((system) =>
+                system.id === id ? { ...system, ...allocatedPatch, updatedAt: updatedAtFor(system.createdAt) } : system,
+              )
+            : tenantRemovalState.systems,
+      }
+    })
+    get().saveToStorage()
+  },
+
   updateTenant: (id, patch, options) => {
     set((state) => ({
       tenants: state.tenants.map((t) =>
@@ -453,59 +591,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   deleteTenantFromSystem: (id) => {
-    const state = get()
-    const tenant = state.tenants.find((candidate) => candidate.id === id)
-    const system = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
-    const relatedProjects = tenant
-      ? state.projectTenants
-          .filter((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
-          .map((link) => state.projects.find((project) => project.id === link.projectId))
-          .filter((project): project is AppDataState['projects'][number] => Boolean(project))
-      : []
     const now = new Date().toISOString()
-    set((state) => ({
-      tenants: state.tenants.map((tenant) => {
-        if (tenant.id !== id) return tenant
-        return {
-          ...tenant,
-          systemId: '',
-          hostedSystemId: '',
-          hostingSid: '',
-          operationalStatus: 'Deleted',
-          hostedSystemHistory: deletedTenantHostedSystemHistory(tenant, now),
-          updatedAt: now,
-        }
-      }),
-      systems: state.systems.map((candidate) =>
-        tenant && (candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
-          ? {
-              ...candidate,
-              tenantIds: (candidate.tenantIds ?? []).filter((tenantId) => tenantId !== id),
-              updatedAt: now,
-            }
-          : candidate,
-      ),
-      projectSystems: state.projectSystems.map((link) =>
-        tenant && (link.systemId === tenant.systemId || link.systemId === tenant.hostedSystemId) && link.allocationStatus !== 'DEALLOCATED'
-          ? { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => tenantId !== id) }
-          : link,
-      ),
-      projectTenants: state.projectTenants.map((link) =>
-        tenant && link.tenantId === id && (link.systemId === tenant.systemId || link.systemId === tenant.hostedSystemId) && link.allocationStatus !== 'DEALLOCATED'
-          ? deallocateProjectTenantLink(link, now)
-          : link,
-      ),
-      activityEvents: tenant
-        ? appendActivityEvent(state.activityEvents, now, {
-            category: 'TENANT',
-            eventType: 'tenant.deletedFromSystem',
-            severity: 'WARNING',
-            summary: `Tenant ${tenant.tid} removed from system.`,
-            primaryObject: tenantRef(tenant),
-            relatedObjects: relatedRefs(system ? systemRef(system) : null, ...relatedProjects.map(projectRef)),
-          })
-        : state.activityEvents,
-    }))
+    set((state) => removeTenantsFromSystemTransaction(state, [id], now))
     get().saveToStorage()
   },
 

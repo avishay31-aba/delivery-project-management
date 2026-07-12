@@ -317,7 +317,7 @@ function InventoryForm<T extends InventoryRecord>({
   record: T | undefined
   records: T[]
   metadata: SystemInventoryMetadata
-  onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions) => void
+  onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions, tenantRemovalIds?: string[]) => void
   dashboardPath: string
 }) {
   const navigate = useNavigate()
@@ -333,7 +333,6 @@ function InventoryForm<T extends InventoryRecord>({
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
-  const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
   const rollbackSystemFormTenantCreation = useAppStore((state) => state.rollbackSystemFormTenantCreation)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const {
@@ -359,7 +358,8 @@ function InventoryForm<T extends InventoryRecord>({
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const [pendingTenantCreationIds, setPendingTenantCreationIds] = useState<string[]>([])
-  const isDirty = Boolean(record && draft && !valuesEqual(record, draft))
+  const [pendingTenantRemovalIds, setPendingTenantRemovalIds] = useState<string[]>([])
+  const isDirty = Boolean(record && draft && (!valuesEqual(record, draft) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
@@ -533,7 +533,7 @@ function InventoryForm<T extends InventoryRecord>({
       ? String(location.state.returnTo ?? '')
       : ''
     const nextDraft = sanitizedDraftForSave()
-    const hasBusinessChanges = !valuesEqual(activeRecord, nextDraft) || pendingTenantCreationIds.length > 0
+    const hasBusinessChanges = !valuesEqual(activeRecord, nextDraft) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
     if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -546,8 +546,9 @@ function InventoryForm<T extends InventoryRecord>({
 
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
+    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
     setPendingTenantCreationIds([])
+    setPendingTenantRemovalIds([])
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
     if (!stayOnPage && returnTo) {
@@ -568,8 +569,9 @@ function InventoryForm<T extends InventoryRecord>({
     const nextDraft = sanitizedDraftForSave()
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession })
+    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
     setPendingTenantCreationIds([])
+    setPendingTenantRemovalIds([])
     setMessages(['System inventory record saved.'])
     navigationBlocker.proceed?.()
   }
@@ -577,6 +579,7 @@ function InventoryForm<T extends InventoryRecord>({
   function cancelSystemForm() {
     pendingTenantCreationIds.forEach((tenantId) => rollbackSystemFormTenantCreation(tenantId))
     setPendingTenantCreationIds([])
+    setPendingTenantRemovalIds([])
     resetDraft(cloneRecord(activeRecord))
     setBypassUnsavedPrompt(true)
     window.setTimeout(() => navigate(dashboardPath), 0)
@@ -585,6 +588,7 @@ function InventoryForm<T extends InventoryRecord>({
   function discardSystemChangesAndProceed() {
     pendingTenantCreationIds.forEach((tenantId) => rollbackSystemFormTenantCreation(tenantId))
     setPendingTenantCreationIds([])
+    setPendingTenantRemovalIds([])
     navigationBlocker.proceed?.()
   }
 
@@ -892,8 +896,8 @@ function InventoryForm<T extends InventoryRecord>({
   function deleteHostedTenant(tenant: Tenant) {
     if (isViewMode) return
     if (!window.confirm(`Remove tenant ${tenant.tid} from this system?`)) return
-    deleteTenantFromSystem(tenant.id)
-    setMessages([`Tenant ${tenant.tid} removed from system.`])
+    setPendingTenantRemovalIds((current) => Array.from(new Set([...current, tenant.id])))
+    setMessages([`Tenant ${tenant.tid} marked for removal. Save or Apply Changes to commit.`])
   }
 
   function moveHostedTenant(tenant: Tenant) {
@@ -947,7 +951,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderTenantTab() {
-    const hostedTenants = hostedTenantsForDraft()
+    const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
     const applicationSummary = applicationConfigurationSummaryRecord()
     const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
     const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
@@ -1490,8 +1494,7 @@ export function ProductionSystemInventoryFormPage() {
   const { sid } = useParams<{ sid: string }>()
   const inventoryRecords = useAppStore((state) => state.productionSystemInventory)
   const systems = useAppStore((state) => state.systems)
-  const updateInventoryRecord = useAppStore((state) => state.updateProductionSystemInventoryItem)
-  const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
+  const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source !== SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
   const record = useMemo(() => records.find((system) => system.sid === sid), [records, sid])
@@ -1501,12 +1504,12 @@ export function ProductionSystemInventoryFormPage() {
       record={record}
       records={records}
       metadata={productionSystemMetadata}
-      onSave={(id, patch, options) => {
+      onSave={(id, patch, options, tenantRemovalIds) => {
         if (inventoryRecords.some((system) => system.id === id)) {
-          updateInventoryRecord(id, patch as Partial<ProductionSystemInventoryItem>, options)
+          saveSystemFormTransaction('production', id, patch as Partial<ProductionSystemInventoryItem>, tenantRemovalIds, options)
           return
         }
-        updateAllocatedRecord(id, patch as Partial<System>, options)
+        saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
       }}
       dashboardPath="/systems/production-inventory"
     />
@@ -1517,8 +1520,7 @@ export function ReusedInternalSystemFormPage() {
   const { mid } = useParams<{ mid: string }>()
   const inventoryRecords = useAppStore((state) => state.reusedInternalSystems)
   const systems = useAppStore((state) => state.systems)
-  const updateInventoryRecord = useAppStore((state) => state.updateReusedInternalSystem)
-  const updateAllocatedRecord = useAppStore((state) => state.updateSystem)
+  const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source === SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
   const record = useMemo(() => records.find((system) => system.machineId === mid), [records, mid])
@@ -1528,12 +1530,12 @@ export function ReusedInternalSystemFormPage() {
       record={record}
       records={records}
       metadata={reusedInternalSystemMetadata}
-      onSave={(id, patch, options) => {
+      onSave={(id, patch, options, tenantRemovalIds) => {
         if (inventoryRecords.some((system) => system.id === id)) {
-          updateInventoryRecord(id, patch as Partial<ReusedInternalSystem>, options)
+          saveSystemFormTransaction('reused', id, patch as Partial<ReusedInternalSystem>, tenantRemovalIds, options)
           return
         }
-        updateAllocatedRecord(id, patch as Partial<System>, options)
+        saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
       }}
       dashboardPath="/systems/reused-internal"
     />
