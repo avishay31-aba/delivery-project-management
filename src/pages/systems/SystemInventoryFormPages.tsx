@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronDown,
@@ -23,6 +23,7 @@ import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel } from 
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import {
   HOSTING_OPTIONS,
@@ -362,9 +363,13 @@ function InventoryForm<T extends InventoryRecord>({
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
-  useEffect(() => {
-    resetDraft(record ? cloneRecord(record) : null)
-  }, [record, resetDraft])
+  useReactiveDraftSync({
+    source: record ? cloneRecord(record) : null,
+    draft,
+    resetDraft,
+    clone: (value) => (value ? cloneRecord(value) : value),
+    isEqual: valuesEqual,
+  })
 
   if (!record || !draft) {
     return (
@@ -528,7 +533,8 @@ function InventoryForm<T extends InventoryRecord>({
       ? String(location.state.returnTo ?? '')
       : ''
     const nextDraft = sanitizedDraftForSave()
-    if (!isDirty) {
+    const hasBusinessChanges = !valuesEqual(activeRecord, nextDraft) || pendingTenantCreationIds.length > 0
+    if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
       if (!stayOnPage && returnTo) {

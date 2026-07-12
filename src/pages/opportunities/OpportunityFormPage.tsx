@@ -42,6 +42,7 @@ import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import {
   getAccountSystems,
@@ -917,11 +918,13 @@ export function OpportunityFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
-  useEffect(() => {
-    resetDraft(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null)
-    setSaveMessages([])
-    setHasAttemptedSave(false)
-  }, [resetDraft, savedOpportunity])
+  useReactiveDraftSync({
+    source: savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null,
+    draft,
+    resetDraft,
+    clone: (value) => (value ? cloneOpportunityDraft(value) : value),
+    isEqual: valuesEqual,
+  })
 
   useEffect(() => {
     setProjectChanges([])
@@ -1380,7 +1383,8 @@ export function OpportunityFormPage() {
       return
     }
 
-    if (!isDirty) {
+    const hasBusinessChanges = !valuesEqual(currentSavedOpportunity, currentDraft)
+    if (!hasBusinessChanges) {
       setSaveMessages(['No changes to save.'])
       options.onSaved?.()
       const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state

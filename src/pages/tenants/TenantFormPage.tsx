@@ -10,6 +10,7 @@ import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTe
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
@@ -260,9 +261,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
-  useEffect(() => {
-    resetDraft(savedTenant ? cloneTenant(savedTenant) : null)
-  }, [savedTenant, resetDraft])
+  useReactiveDraftSync({
+    source: savedTenant ? cloneTenant(savedTenant) : null,
+    draft,
+    resetDraft,
+    clone: (value) => (value ? cloneTenant(value) : value),
+    isEqual: valuesEqual,
+  })
 
   useEffect(() => {
     if (!activeMultiSelect) return
@@ -445,7 +450,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (!isDirty) {
+    const hasBusinessChanges = !valuesEqual(persistedTenant, normalizedDraft)
+    if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
       onSuccess?.()

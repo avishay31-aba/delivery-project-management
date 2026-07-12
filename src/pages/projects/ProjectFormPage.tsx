@@ -28,6 +28,7 @@ import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
+import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import {
   allocationModeLabelForProject,
@@ -431,9 +432,13 @@ export function ProjectFormPage() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
-  useEffect(() => {
-    resetDraft(savedProject ? cloneProjectDraft(savedProject) : null)
-  }, [savedProject, resetDraft])
+  useReactiveDraftSync({
+    source: savedProject ? cloneProjectDraft(savedProject) : null,
+    draft,
+    resetDraft,
+    clone: (value) => (value ? cloneProjectDraft(value) : value),
+    isEqual: valuesEqual,
+  })
 
   const currentDraft = draft ?? savedProject
   const metadata = currentDraft ? getProjectFormMetadata(currentDraft.mainType, currentDraft.subType) : null
@@ -672,7 +677,10 @@ export function ProjectFormPage() {
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (!isDirty) {
+    const savePatch = projectSavePatch(projectDraft)
+    const nextCommittedProject = { ...persistedProject, ...savePatch }
+    const hasBusinessChanges = !valuesEqual(persistedProject, nextCommittedProject) || pendingAllocationIds.length > 0
+    if (!hasBusinessChanges) {
       setSaveMessages(['No changes to save.'])
       setSaveMenuOpen(false)
       onSaved?.()
@@ -684,7 +692,7 @@ export function ProjectFormPage() {
     }
 
     startSaveIndicator()
-    updateProject(projectDraft.id, projectSavePatch(projectDraft), { preserveNewState: isNewRecordSession })
+    updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
     setPendingAllocationIds([])
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
