@@ -1,5 +1,5 @@
 import type { Project } from '@/data/seed.types'
-import { generateBusinessId } from '@/domain/business-identity'
+import { reserveBusinessId } from '@/domain/business-identity'
 import {
   WARRANTY_PENDING_ALERT,
   WARRANTY_STATUS_LABELS,
@@ -101,7 +101,7 @@ export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: 
 }
 
 export function nextWarrantyId(warranties: TenantWarranty[]): string {
-  return generateBusinessId('warranty', warranties.map((warranty) => warranty.warrantyId))
+  return reserveBusinessId('warranty', warranties.map((warranty) => warranty.warrantyId))
 }
 
 export function predecessorReference(warrantyId: string, tenantTid: string): string {

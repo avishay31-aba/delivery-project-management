@@ -7,7 +7,7 @@ import type {
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
-import { generateBusinessId, generateBusinessIdFromCounter } from '@/domain/business-identity'
+import { generateBusinessIdFromCounter, reserveBusinessId } from '@/domain/business-identity'
 import {
   createActivityEvent,
   type ActivityObjectRefInput,
@@ -81,7 +81,7 @@ function appendActivityEvent(
   now: string,
   draft: ActivityEventDraft,
 ): ActivityEvent[] {
-  const eventId = generateBusinessId('activity', events.map((event) => event.id))
+  const eventId = reserveBusinessId('activity', events.map((event) => event.id))
   return [
     createActivityEvent({
       ...draft,

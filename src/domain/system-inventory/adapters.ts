@@ -22,7 +22,7 @@ import {
   SYSTEM_SOURCE_REUSED_INTERNAL,
 } from './metadata'
 import { systemIdentity, systemSource } from './service'
-import { generateBusinessId } from '@/domain/business-identity'
+import { reserveBusinessId } from '@/domain/business-identity'
 
 export function systemDisplayName(record: SystemInventoryRecord): string {
   return `${systemIdentity(record)} - ${record.productType || 'System'}`
@@ -79,7 +79,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
 }
 
 function nextPurposeHistoryRecordId(records: ReusedInternalPurposeHistoryRecord[]): string {
-  return generateBusinessId('purposeHistory', records.map((record) => record.recordId))
+  return reserveBusinessId('purposeHistory', records.map((record) => record.recordId))
 }
 
 function closeOpenPurposeHistory(
@@ -126,7 +126,7 @@ export function normalizeReusedInternalPurposeHistory(value: unknown): ReusedInt
     .filter((record): record is Record<string, unknown> => Boolean(record) && typeof record === 'object')
     .map((record, index) => ({
       id: String(record.id ?? `purpose-history-${crypto.randomUUID()}`),
-      recordId: String(record.recordId ?? generateBusinessId('purposeHistory', value.slice(0, index).map((candidate) => String((candidate as Record<string, unknown>)?.recordId ?? '')))),
+      recordId: String(record.recordId ?? reserveBusinessId('purposeHistory', value.slice(0, index).map((candidate) => String((candidate as Record<string, unknown>)?.recordId ?? '')))),
       startDate: String(record.startDate ?? record.allocatedAt ?? ''),
       endDate: record.endDate == null ? null : String(record.endDate),
       purposeType: String(record.purposeType ?? record.purpose ?? ''),

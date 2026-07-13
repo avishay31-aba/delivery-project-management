@@ -1,5 +1,5 @@
 import type { DocumentRecord } from '@/data/seed.types'
-import { generateBusinessId } from '@/domain/business-identity'
+import { reserveBusinessId } from '@/domain/business-identity'
 
 export type DocumentCollection = DocumentRecord[]
 
@@ -18,7 +18,7 @@ export function formatDocumentSize(fileSize: number): string {
 
 export function createDocumentFromFile(file: File, existingDocuments: DocumentCollection = []): DocumentRecord {
   return {
-    id: generateBusinessId('document', existingDocuments.map((document) => document.id)),
+    id: reserveBusinessId('document', existingDocuments.map((document) => document.id)),
     fileName: file.name,
     fileType: file.type || 'application/octet-stream',
     fileSize: file.size,

@@ -1,5 +1,5 @@
 import type { AppDataState, IdCounterKey, IdCounters } from '@/data/seed.types'
-import { BUSINESS_IDENTITY_POLICIES, generateBusinessIdFromCounter } from '@/domain/business-identity'
+import { BUSINESS_IDENTITY_POLICIES, generateBusinessIdFromCounter, primeBusinessIdReservations } from '@/domain/business-identity'
 import type { BusinessEntityType } from '@/domain/business-identity'
 
 const LEGACY_COUNTER_ENTITY: Partial<Record<IdCounterKey, BusinessEntityType>> = {
@@ -156,6 +156,7 @@ export function normalizeIdCounters(
   normalized.pid = normalized.project
   normalized.sid = normalized.productionSystem
   normalized.tid = normalized.tenant
+  primeBusinessIdReservations(normalized)
   return normalized
 }
 

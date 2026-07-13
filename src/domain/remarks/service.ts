@@ -1,6 +1,6 @@
 import type { RemarkDeadlineAlertStatus, RemarkRecord, RemarkType } from './types'
 import { REMARK_AUTHOR_LOCAL_USER, REMARK_TYPE_OPTIONS } from './metadata'
-import { generateBusinessId } from '@/domain/business-identity'
+import { reserveBusinessId } from '@/domain/business-identity'
 
 function textValue(value: unknown): string {
   return value == null ? '' : String(value)
@@ -17,7 +17,7 @@ function todayTimestamp(today = new Date()): number {
 }
 
 export function nextRemarkId(remarks: RemarkRecord[]): string {
-  return generateBusinessId('remark', remarks.map((remark) => remark.remarkId))
+  return reserveBusinessId('remark', remarks.map((remark) => remark.remarkId))
 }
 
 export function createRemarkRecord(
@@ -27,7 +27,7 @@ export function createRemarkRecord(
 ): RemarkRecord {
   return {
     id: `remark-${crypto.randomUUID()}`,
-    remarkId: nextRemarkId(existingRemarks),
+    remarkId: reserveBusinessId('remark', existingRemarks.map((remark) => remark.remarkId)),
     createdAt: now,
     author,
     type: REMARK_TYPE_OPTIONS[0],

@@ -15,6 +15,8 @@ export const BUSINESS_IDENTITY_POLICIES: Record<BusinessEntityType, BusinessIden
   document: { entityType: 'document', prefix: 'DOC', minimumCounter: 0, minDigits: 6 },
 }
 
+const BUSINESS_ID_RESERVATIONS_STORAGE_KEY = 'delivery-erp.business-id-reservations.v1'
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -54,24 +56,90 @@ export function generateBusinessId(entityType: BusinessEntityType, existingIds: 
   return nextId
 }
 
+function browserStorage(): Storage | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function readReservedCounters(): Partial<Record<BusinessEntityType, number>> {
+  const storage = browserStorage()
+  if (!storage) return {}
+  try {
+    const parsed = JSON.parse(storage.getItem(BUSINESS_ID_RESERVATIONS_STORAGE_KEY) ?? '{}') as Partial<Record<BusinessEntityType, number>>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeReservedCounters(counters: Partial<Record<BusinessEntityType, number>>): void {
+  const storage = browserStorage()
+  if (!storage) return
+  try {
+    storage.setItem(BUSINESS_ID_RESERVATIONS_STORAGE_KEY, JSON.stringify(counters))
+  } catch {
+    // Browser storage can be unavailable in restricted contexts. Store counters remain authoritative.
+  }
+}
+
+function maxExistingCounter(entityType: BusinessEntityType, existingIds: Array<string | null | undefined>): number {
+  const policy = businessIdentityPolicy(entityType)
+  const normalizedExistingIds = new Set(existingIds.map(normalizeBusinessId).filter(Boolean))
+  return Array.from(normalizedExistingIds).reduce((max, value) => {
+    const numeric = numericSuffix(value, policy.prefix)
+    return numeric == null ? max : Math.max(max, numeric)
+  }, policy.minimumCounter)
+}
+
+export function primeBusinessIdReservations(counters: Partial<Record<BusinessEntityType, number>>): void {
+  const current = readReservedCounters()
+  const next = { ...current }
+  ;(Object.keys(BUSINESS_IDENTITY_POLICIES) as BusinessEntityType[]).forEach((entityType) => {
+    const counter = counters[entityType]
+    if (typeof counter === 'number' && Number.isFinite(counter)) {
+      next[entityType] = Math.max(current[entityType] ?? 0, counter)
+    }
+  })
+  writeReservedCounters(next)
+}
+
+export function reserveBusinessId(
+  entityType: BusinessEntityType,
+  existingIds: Array<string | null | undefined> = [],
+  minimumCounter?: number,
+): string {
+  const policy = businessIdentityPolicy(entityType)
+  const reservations = readReservedCounters()
+  const baseCounter = Math.max(
+    minimumCounter ?? policy.minimumCounter,
+    reservations[entityType] ?? policy.minimumCounter,
+    maxExistingCounter(entityType, existingIds),
+  )
+  let nextCounter = baseCounter + 1
+  let nextId = formatBusinessId(policy, nextCounter)
+  const normalizedExistingIds = new Set(existingIds.map(normalizeBusinessId).filter(Boolean))
+
+  while (normalizedExistingIds.has(nextId)) {
+    nextCounter += 1
+    nextId = formatBusinessId(policy, nextCounter)
+  }
+
+  writeReservedCounters({ ...reservations, [entityType]: nextCounter })
+  return nextId
+}
+
 export function generateBusinessIdFromCounter(
   entityType: BusinessEntityType,
   counters: IdCounters,
   existingIds: Array<string | null | undefined> = [],
 ): { counters: IdCounters; id: string } {
   const policy = businessIdentityPolicy(entityType)
-  const normalizedExistingIds = new Set(existingIds.map(normalizeBusinessId).filter(Boolean))
-  const existingMaxCounter = Array.from(normalizedExistingIds).reduce((max, value) => {
-    const numeric = numericSuffix(value, policy.prefix)
-    return numeric == null ? max : Math.max(max, numeric)
-  }, policy.minimumCounter)
-  let nextCounter = Math.max(counters[entityType] ?? policy.minimumCounter, existingMaxCounter) + 1
-  let nextId = formatBusinessId(policy, nextCounter)
-
-  while (normalizedExistingIds.has(nextId)) {
-    nextCounter += 1
-    nextId = formatBusinessId(policy, nextCounter)
-  }
+  const nextId = reserveBusinessId(entityType, existingIds, counters[entityType] ?? policy.minimumCounter)
+  const nextCounter = numericSuffix(nextId, policy.prefix) ?? counters[entityType] ?? policy.minimumCounter
 
   return {
     counters: {
