@@ -45,6 +45,8 @@ export function ActivityLogDashboardPage() {
         rows={rows}
         columns={columns}
         enableInlineEditing={false}
+        enableRecordActions={false}
+        initialSorting={[{ id: 'creationDate', desc: true }]}
       />
     </div>
   )

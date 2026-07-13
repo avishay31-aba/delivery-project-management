@@ -37,6 +37,10 @@ export function activityEventsForProject(events: ActivityEvent[], projectIdOrPid
   return activityEventsForObject(events, 'Project', projectIdOrPid)
 }
 
+export function activityEventsForOpportunity(events: ActivityEvent[], opportunityId: string): ActivityEvent[] {
+  return activityEventsForObject(events, 'Opportunity', opportunityId)
+}
+
 export function activityEventsForTenant(events: ActivityEvent[], tenantIdOrTid: string): ActivityEvent[] {
   return activityEventsForObject(events, 'Tenant', tenantIdOrTid)
 }

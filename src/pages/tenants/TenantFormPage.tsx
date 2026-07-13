@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
+import { ActivityTimeline } from '@/components/activity'
 import {
   AlertStatusIcon,
   BusinessObjectLink,
@@ -91,11 +92,12 @@ import {
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
 import { projectReference, systemReference } from '@/domain/business-reference'
+import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
-type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents'
+type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
@@ -108,6 +110,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
+  { id: 'activity', label: 'Activity Log' },
 ]
 
 const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
@@ -241,12 +244,17 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const accounts = useAppStore((state) => state.accounts)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
   const updateSystemMapCenter = useAppStore((state) => state.updateSystemMapCenter)
   const savedTenant = useMemo(() => tenants.find((tenant) => tenant.tid === tid), [tenants, tid])
   const system = useMemo(
     () => systems.find((candidate) => candidate.id === (savedTenant?.hostedSystemId ?? savedTenant?.systemId)),
     [savedTenant, systems],
+  )
+  const tenantActivityEvents = useMemo(
+    () => savedTenant ? activityEventsForTenant(activityEvents, savedTenant.tid || savedTenant.id) : [],
+    [activityEvents, savedTenant],
   )
   const {
     value: draft,
@@ -1198,6 +1206,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'documents') return renderDocumentsTab()
+    if (activeTab === 'activity') {
+      return (
+        <ActivityTimeline
+          events={tenantActivityEvents}
+          emptyText="No activity events are linked to this Tenant yet."
+        />
+      )
+    }
     return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">Usage will be defined in a later phase.</div>
   }
 

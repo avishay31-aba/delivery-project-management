@@ -50,6 +50,7 @@ import {
 } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
+import { ActivityTimeline } from '@/components/activity'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -93,16 +94,17 @@ import {
 import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
+import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
 import { formatDate, formatDateTime } from '@/domain/date-time-presentation'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
-type OpportunityDetailTab = 'requirements' | 'project'
+type OpportunityDetailTab = 'requirements' | 'project' | 'activity'
 type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
 type PendingSave = { stayOnPage?: boolean; onSaved?: () => void }
 type PendingOpportunityTypeChange = { type: OpportunityType; subType: OpportunitySubType }
-type CollapsibleSectionId = 'opportunityHeader' | 'existingSystems' | 'gridA' | 'gridB' | 'gridC' | 'createdProject'
+type CollapsibleSectionId = 'opportunityHeader' | 'existingSystems' | 'gridA' | 'gridB' | 'gridC' | 'createdProject' | 'activity'
 type ExistingActionValue =
   | 'Not selected'
   | 'New tenant'
@@ -120,6 +122,7 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   gridB: false,
   gridC: false,
   createdProject: false,
+  activity: false,
 }
 
 function valuesEqual(first: unknown, second: unknown): boolean {
@@ -899,6 +902,7 @@ export function OpportunityFormPage() {
   const tenants = useAppStore((state) => state.tenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const projects = useAppStore((state) => state.projects)
+  const activityEvents = useAppStore((state) => state.activityEvents)
   const saveOpportunityWithProjectSync = useAppStore((state) => state.saveOpportunityWithProjectSync)
   const storedProjectChanges = useAppStore((state) => {
     const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === opportunityId)
@@ -969,6 +973,10 @@ export function OpportunityFormPage() {
         ? createdProjectsForOpportunity(draft, savedOpportunity, projects)
         : [],
     [draft, projects, savedOpportunity?.opportunityId],
+  )
+  const opportunityActivityEvents = useMemo(
+    () => savedOpportunity ? activityEventsForOpportunity(activityEvents, savedOpportunity.opportunityId || savedOpportunity.id) : [],
+    [activityEvents, savedOpportunity],
   )
   const validationMessages = useMemo(
     () => (draft ? validateOpportunity(draft, { accounts, systems, tenants }) : []),
@@ -2171,6 +2179,19 @@ export function OpportunityFormPage() {
           >
             Related Projects
           </button>
+          <button
+            type="button"
+            className={[
+              'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
+              activeDetailTab === 'activity'
+                ? 'border-sf-brand bg-white text-sf-text'
+                : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+            ].join(' ')}
+            aria-selected={activeDetailTab === 'activity'}
+            onClick={() => switchDetailTab('activity')}
+          >
+            Activity Log
+          </button>
         </div>
 
         <div className="min-h-[60vh]">
@@ -2178,7 +2199,7 @@ export function OpportunityFormPage() {
           <div className="space-y-4 p-3" role="tabpanel" aria-label="Requirements">
             {visibleRequirementTypes.map((kind) => renderRequirementGrid(kind))}
           </div>
-        ) : (
+        ) : activeDetailTab === 'project' ? (
           <div className="space-y-2 p-3" role="tabpanel" aria-label="Related Projects">
             <CollapsibleSection
               title="Related Projects"
@@ -2238,6 +2259,21 @@ export function OpportunityFormPage() {
                   No related projects yet.
                 </div>
               )}
+            </CollapsibleSection>
+          </div>
+        ) : (
+          <div className="space-y-2 p-3" role="tabpanel" aria-label="Activity Log">
+            <CollapsibleSection
+              title="Activity Log"
+              subtitle="Read-only Opportunity activity records from Activity Log."
+              collapsed={collapsedSections.activity}
+              onToggle={() => toggleSection('activity')}
+              className="space-y-2"
+            >
+              <ActivityTimeline
+                events={opportunityActivityEvents}
+                emptyText="No activity events are linked to this Opportunity yet."
+              />
             </CollapsibleSection>
           </div>
         )}

@@ -234,7 +234,7 @@ export function projectTabLabel(tab: ProjectFormTab): string {
     milestones: 'Milestones',
     tasks: 'Tasks',
     documents: 'Documents',
-    activity: 'Activity',
+    activity: 'Activity Log',
   }
   return labels[tab]
 }

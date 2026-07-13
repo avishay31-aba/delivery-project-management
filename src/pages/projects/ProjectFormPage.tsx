@@ -1699,8 +1699,8 @@ export function ProjectFormPage() {
     const sectionId: CollapsibleSectionId = 'activity'
     return (
       <CollapsibleSection
-        title="Activity"
-        subtitle="Read-only Project activity timeline from ActivityLog."
+        title="Activity Log"
+        subtitle="Read-only Project activity records from Activity Log."
         collapsed={collapsedSections[sectionId]}
         onToggle={() => toggleSection(sectionId)}
         className="space-y-3 p-3"

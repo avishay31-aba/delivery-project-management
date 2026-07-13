@@ -384,7 +384,7 @@ function InventoryForm<T extends InventoryRecord>({
 
   const activeRecord = record
   const activeDraft = draft
-  const systemTabs = [...metadata.tabs, { id: 'activity', label: 'Activity' }]
+  const systemTabs = [...metadata.tabs, { id: 'activity', label: 'Activity Log' }]
   const systemActivityEvents = (() => {
     const ids = [systemIdentity(activeRecord), readRecordValue(activeRecord, 'sid'), readRecordValue(activeRecord, 'machineId'), activeRecord.id]
       .map((value) => textValue(value))
@@ -1252,8 +1252,8 @@ function InventoryForm<T extends InventoryRecord>({
     return (
       <div className="space-y-3">
         <div>
-          <h3 className="text-base font-semibold text-sf-text">Activity</h3>
-          <p className="text-sm text-sf-text-muted">Read-only System activity timeline from ActivityLog.</p>
+          <h3 className="text-base font-semibold text-sf-text">Activity Log</h3>
+          <p className="text-sm text-sf-text-muted">Read-only System activity records from Activity Log.</p>
         </div>
         <ActivityTimeline events={systemActivityEvents} emptyText="No activity has been recorded for this system." />
       </div>

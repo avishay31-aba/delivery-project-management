@@ -49,7 +49,7 @@ const CUSTOMER_360_TABS: Array<{ id: Customer360Tab; label: string }> = [
   { id: 'warranties', label: 'Warranties' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'documents', label: 'Documents' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'activity', label: 'Activity Log' },
 ]
 
 function readOnlyValue(label: string, value: string) {

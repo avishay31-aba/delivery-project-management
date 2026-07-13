@@ -73,6 +73,8 @@ interface DataDashboardProps<T extends { id: string }> {
   getRowClassName?: (row: T) => string
   toolbar?: ReactNode
   enableInlineEditing?: boolean
+  enableRecordActions?: boolean
+  initialSorting?: SortingState
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -817,9 +819,11 @@ export function DataDashboard<T extends { id: string }>({
   getRowClassName,
   toolbar,
   enableInlineEditing = true,
+  enableRecordActions = true,
+  initialSorting = [],
 }: DataDashboardProps<T>) {
   const [globalFilter, setGlobalFilter] = useState('')
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>(() => initialSorting)
   const [grouping, setGrouping] = useState<GroupingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => [ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, ...columns.map((column) => column.id)])
@@ -905,17 +909,19 @@ export function DataDashboard<T extends { id: string }>({
   }, [grouping])
 
   const internalColumnOrder = useMemo(
-    () => [ACTION_COLUMN_ID, ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)],
-    [columnOrder],
+    () => enableRecordActions
+      ? [ACTION_COLUMN_ID, ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)]
+      : columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID),
+    [columnOrder, enableRecordActions],
   )
   const internalColumnVisibility = useMemo(
-    () => ({ ...columnVisibility, [ACTION_COLUMN_ID]: true }),
-    [columnVisibility],
+    () => enableRecordActions ? { ...columnVisibility, [ACTION_COLUMN_ID]: true } : columnVisibility,
+    [columnVisibility, enableRecordActions],
   )
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () => [
-      {
+      ...(enableRecordActions ? [{
         id: ACTION_COLUMN_ID,
         header: 'Actions',
         accessorFn: () => '',
@@ -945,7 +951,7 @@ export function DataDashboard<T extends { id: string }>({
             </div>
           )
         },
-      },
+      } satisfies ColumnDef<T>] : []),
       {
         id: ROW_INDICATOR_COLUMN_ID,
         header: '',
@@ -1023,7 +1029,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, dashboardScope, enableInlineEditing, onEdit, onEditRecord, onView],
+    [columns, dashboardScope, enableInlineEditing, enableRecordActions, onEdit, onEditRecord, onView],
   )
 
   const table = useReactTable({
@@ -1037,14 +1043,14 @@ export function DataDashboard<T extends { id: string }>({
     onColumnOrderChange: (updater) =>
       updateDashboardState(setColumnOrder, (current) => {
         const nextColumnOrder = typeof updater === 'function'
-          ? updater([ACTION_COLUMN_ID, ...current])
+          ? updater(enableRecordActions ? [ACTION_COLUMN_ID, ...current] : current)
           : updater
         return nextColumnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)
       }),
     onColumnVisibilityChange: (updater) =>
       updateDashboardState(setColumnVisibility, (current) => {
         const nextColumnVisibility = typeof updater === 'function'
-          ? updater({ ...current, [ACTION_COLUMN_ID]: true })
+          ? updater(enableRecordActions ? { ...current, [ACTION_COLUMN_ID]: true } : current)
           : updater
         const { [ACTION_COLUMN_ID]: _actionVisibility, ...userColumnVisibility } = nextColumnVisibility
         return userColumnVisibility

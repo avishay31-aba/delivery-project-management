@@ -45,8 +45,12 @@ export function formatDate(value: DateTimePresentationValue, options?: DateTimeP
   return formatPart(value, { year: 'numeric', month: '2-digit', day: '2-digit' }, options, true)
 }
 
+export function formatDateOnly(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
+  return formatDate(value, options)
+}
+
 export function formatTime(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
-  return formatPart(value, { hour: '2-digit', minute: '2-digit' }, options)
+  return formatPart(value, { hour: '2-digit', minute: '2-digit', hour12: false }, options)
 }
 
 export function formatDateTime(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
@@ -58,6 +62,10 @@ export function formatDateTime(value: DateTimePresentationValue, options?: DateT
 export function formatDateTimeSeconds(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
   const parsed = parseDateTime(value)
   if (!parsed) return fallbackValue(options)
-  const time = formatPart(parsed, { hour: '2-digit', minute: '2-digit', second: '2-digit' }, options)
+  const time = formatPart(parsed, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }, options)
   return `${formatDate(parsed, options)} ${time}`
+}
+
+export function formatDateTimeWithSeconds(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
+  return formatDateTimeSeconds(value, options)
 }
