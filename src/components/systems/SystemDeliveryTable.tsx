@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { Project, System } from '@/data/seed.types'
+import type { Project, System, Tenant } from '@/data/seed.types'
+import { APPLICATION_CONFIGURATION_SUMMARY_FIELDS } from '@/config/application-configuration-fields'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { projectReference, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
-import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
+import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 
 const PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
   {
@@ -65,6 +66,7 @@ function renderSystemDetails(system: System) {
 
 interface SystemDeliveryTableProps {
   systems: System[]
+  tenants: Tenant[]
   projects: Project[]
   fallbackProjectId?: string
   emptyText: string
@@ -77,6 +79,7 @@ interface SystemDeliveryTableProps {
 
 export function SystemDeliveryTable({
   systems,
+  tenants,
   projects,
   fallbackProjectId,
   emptyText,
@@ -115,7 +118,7 @@ export function SystemDeliveryTable({
                 {label}
               </th>
             ))}
-            <ConfigurationColumnHeaders fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
+            <ConfigurationColumnHeaders fields={APPLICATION_CONFIGURATION_SUMMARY_FIELDS} />
           </tr>
         </thead>
         <tbody>
@@ -126,6 +129,7 @@ export function SystemDeliveryTable({
             const projectLabels = projectIds
               .map((projectId) => projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)?.pid)
               .filter((pid): pid is string => Boolean(pid))
+            const applicationConfigurationSummary = systemApplicationConfigurationSummary(system, tenants) as unknown as Record<string, unknown>
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -181,11 +185,11 @@ export function SystemDeliveryTable({
                     </span>
                   ) : null}
                 </td>
-                <ConfigurationValueCells record={system as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
+                <ConfigurationValueCells record={applicationConfigurationSummary} fields={APPLICATION_CONFIGURATION_SUMMARY_FIELDS} />
               </tr>,
               isExpanded ? (
                 <tr key={`${system.id}-details`}>
-                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10 + TENANT_REQUIREMENT_CONFIGURATION_FIELDS.length}>
+                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10 + APPLICATION_CONFIGURATION_SUMMARY_FIELDS.length}>
                     {renderSystemDetails(system)}
                   </td>
                 </tr>

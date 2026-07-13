@@ -20,7 +20,7 @@ import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel } from '@/components/ui'
-import { configurationColumnGroupLabel } from '@/components/configuration'
+import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
@@ -783,7 +783,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function tenantSummaryValue(field: TenantConfigurationFieldMetadata, summary: Record<string, unknown>): string {
-    return textValue(summary[field.configKey]) || '-'
+    return formatConfigurationCellValue(summary[field.configKey])
   }
 
   function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {

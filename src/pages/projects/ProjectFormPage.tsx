@@ -2025,6 +2025,7 @@ export function ProjectFormPage() {
         >
           <SystemDeliveryTable
             systems={linkedSystems}
+            tenants={tenants}
             projects={projects}
             fallbackProjectId={projectDraft.id}
             emptyText="No systems are linked to this Project yet."

@@ -7,7 +7,7 @@ import {
 } from '@/domain/application-configuration'
 
 export function formatConfigurationCellValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ') || '-'
+  if (Array.isArray(value)) return value.join('; ') || '-'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (value === null || value === undefined || value === '') return '-'
   return String(value)
