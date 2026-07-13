@@ -1,6 +1,7 @@
 import { incrementCounter } from '@/data/id-generator'
 import type { AllocationType, NewTenantRequirement, Project, System, Tenant, TenantConfiguration } from '@/data/seed.types'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { generateBusinessId } from '@/domain/business-identity'
 import {
   applicationConfigurationFromRequirement,
   applicationConfigurationFromTenant,
@@ -208,7 +209,7 @@ export function createTenantConfigurationHistoryRecord(
   if (existingRecords[0] && valuesEqual(existingRecords[0].configuration, configuration)) return null
   return {
       id: `tenant-config-history-${crypto.randomUUID()}`,
-      recordId: `CH-${String(existingRecords.length + 1).padStart(3, '0')}`,
+      recordId: generateBusinessId('configurationHistory', existingRecords.map((record) => record.recordId)),
       timestamp,
       tid,
       recordedBy,

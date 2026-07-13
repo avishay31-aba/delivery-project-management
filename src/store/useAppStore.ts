@@ -7,7 +7,7 @@ import type {
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
-import { generateBusinessId } from '@/domain/business-identity'
+import { generateBusinessId, generateBusinessIdFromCounter } from '@/domain/business-identity'
 import {
   createActivityEvent,
   type ActivityObjectRefInput,
@@ -72,7 +72,7 @@ import {
   tenantConfigurationSaveDraft,
 } from '@/domain/tenant-operations'
 
-type ActivityEventDraft = Omit<ActivityEventInput, 'occurredAt'>
+type ActivityEventDraft = Omit<ActivityEventInput, 'id' | 'occurredAt'>
 type SaveTimestampOptions = { preserveNewState?: boolean }
 let unsubscribeCommittedStateChanges: (() => void) | null = null
 
@@ -81,9 +81,11 @@ function appendActivityEvent(
   now: string,
   draft: ActivityEventDraft,
 ): ActivityEvent[] {
+  const eventId = generateBusinessId('activity', events.map((event) => event.id))
   return [
     createActivityEvent({
       ...draft,
+      id: eventId,
       occurredAt: now,
     }),
     ...events,
@@ -379,7 +381,7 @@ interface AppStore extends AppDataState {
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
   createProductionSystemInventoryItem: () => AppDataState['productionSystemInventory'][number]
-  createReusedInternalSystem: () => AppDataState['reusedInternalSystems'][number]
+  createReusedInternalSystem: (machineId: string) => AppDataState['reusedInternalSystems'][number] | null
   saveOpportunityWithProjectSync: (
     opportunity: Opportunity,
     savedOpportunity: Opportunity,
@@ -938,10 +940,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const defaultAccount = state.accounts[0]
     const defaultSalesManagerId = defaultAccount?.salesManagerId ?? state.salesManagers[0]?.id ?? ''
+    const nextOpportunityId = generateBusinessIdFromCounter(
+      'opportunity',
+      state.idCounters,
+      state.opportunities.map((opportunity) => opportunity.opportunityId),
+    )
 
     const opportunity: AppDataState['opportunities'][number] = {
       id: `opp-${crypto.randomUUID()}`,
-      opportunityId: generateBusinessId('opportunity', state.opportunities.map((opportunity) => opportunity.opportunityId)),
+      opportunityId: nextOpportunityId.id,
       opportunityName: 'New opportunity',
       stage: 'OPEN',
       accountId: defaultAccount?.id ?? '',
@@ -971,7 +978,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       updatedAt: now,
     }
 
-    set((currentState) => ({ opportunities: [opportunity, ...currentState.opportunities] }))
+    set((currentState) => ({ idCounters: nextOpportunityId.counters, opportunities: [opportunity, ...currentState.opportunities] }))
     get().saveToStorage()
     return opportunity
   },
@@ -1020,16 +1027,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return system
   },
 
-  createReusedInternalSystem: () => {
+  createReusedInternalSystem: (machineId) => {
     const state = get()
-    const nextMachineId = incrementCounter(state.idCounters, 'mid')
-    const idCounters = nextMachineId.counters
-    const nextMid = nextMachineId.id
+    const nextMid = machineId.trim()
+    const midExists = [
+      ...state.reusedInternalSystems.map((system) => system.machineId),
+      ...state.systems.map((system) => system.machineId),
+    ].some((existingMid) => String(existingMid ?? '').trim().toLocaleUpperCase() === nextMid.toLocaleUpperCase())
+    if (!nextMid || midExists) return null
     const now = new Date().toISOString()
     const system = createReusedInternalInventorySystem(nextMid, now)
 
     set((currentState) => ({
-      idCounters,
       reusedInternalSystems: [system, ...currentState.reusedInternalSystems],
       activityEvents: appendActivityEvent(currentState.activityEvents, now, {
         category: 'SYSTEM',

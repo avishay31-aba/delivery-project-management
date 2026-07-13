@@ -34,13 +34,39 @@ export type AvailabilityStatus = 'AVAILABLE' | 'OCCUPIED' | 'OBSOLETE'
 export type ReusedInternalSystemStatus = 'Available' | 'Occupied' | 'Obsolete'
 
 export type TenantType = 'CUSTOMER' | 'POC' | 'PENLINK_INTERNAL'
-export type IdCounterKey = 'pid' | 'sid' | 'tid' | 'mid'
+export type IdCounterKey =
+  | 'account'
+  | 'opportunity'
+  | 'project'
+  | 'productionSystem'
+  | 'tenant'
+  | 'warranty'
+  | 'remark'
+  | 'activity'
+  | 'configurationHistory'
+  | 'purposeHistory'
+  | 'document'
+  | 'pid'
+  | 'sid'
+  | 'tid'
+  | 'mid'
 export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
 export type AllocationStatus = 'ALLOCATED' | 'DEALLOCATED'
 export type AllocationType = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
 export type TenantFormType = 'POC' | 'CUSTOMER' | 'INTERNAL'
 
 export interface IdCounters {
+  account: number
+  opportunity: number
+  project: number
+  productionSystem: number
+  tenant: number
+  warranty: number
+  remark: number
+  activity: number
+  configurationHistory: number
+  purposeHistory: number
+  document: number
   pid: number
   sid: number
   tid: number

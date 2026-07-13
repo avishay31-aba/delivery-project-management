@@ -22,6 +22,7 @@ export interface ActivityObjectRefInput {
 }
 
 export interface ActivityEventInput {
+  id: string
   occurredAt: string
   category: ActivityEventCategory
   eventType: string
@@ -101,7 +102,7 @@ export function activityObjectRef(input: ActivityObjectRefInput): ActivityObject
 
 export function createActivityEvent(input: ActivityEventInput): ActivityEvent {
   return {
-    id: `activity-${crypto.randomUUID()}`,
+    id: input.id,
     occurredAt: input.occurredAt,
     ...LOCAL_ACTIVITY_ACTOR,
     source: 'USER',

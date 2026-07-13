@@ -1,5 +1,6 @@
 import { timeGroupForCountry } from '@/config/time-groups'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { generateBusinessId } from '@/domain/business-identity'
 import {
   applicationConfigurationFromTenant,
   applicationConfigurationValue,
@@ -134,7 +135,7 @@ export function systemApplicationConfigurationSummary(system: System, tenants: T
 }
 
 function nextConfigurationHistoryRecordId(records: ConfigurationHistoryRecord[]): string {
-  return `CH-${String(records.length + 1).padStart(3, '0')}`
+  return generateBusinessId('configurationHistory', records.map((record) => record.recordId))
 }
 
 export function createSystemConfigurationHistoryRecord(
@@ -296,7 +297,10 @@ export function reusedInternalPurposeHistory(
       const system = systems.find((candidate) => candidate.id === link.systemId)
       return {
         id: link.id,
-        recordId: `PH-${String(index + 1).padStart(3, '0')}`,
+        recordId: generateBusinessId(
+          'purposeHistory',
+          Array.from({ length: index }, (_, previousIndex) => `PH${String(previousIndex + 1).padStart(6, '0')}`),
+        ),
         startDate: link.allocatedAt,
         endDate: link.deallocatedAt ?? '',
         purposeType: project?.mainType === 'POC' ? 'POC' : 'POC',
@@ -317,7 +321,7 @@ export function reusedInternalPurposeHistory(
       if (knownProjectIds.has(pid)) return
       rows.push({
         id: `${machineId}-${projectId}`,
-        recordId: `PH-${String(rows.length + 1).padStart(3, '0')}`,
+        recordId: generateBusinessId('purposeHistory', rows.map((record) => record.recordId)),
         startDate: record.occupationStartDate ?? '',
         endDate: record.occupationEndDate ?? '',
         purposeType: record.purpose,

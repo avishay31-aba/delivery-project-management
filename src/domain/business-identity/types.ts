@@ -3,9 +3,12 @@ export type BusinessEntityType =
   | 'opportunity'
   | 'project'
   | 'productionSystem'
-  | 'internalReusedSystem'
   | 'tenant'
   | 'warranty'
+  | 'remark'
+  | 'activity'
+  | 'configurationHistory'
+  | 'purposeHistory'
   | 'document'
 
 export interface BusinessIdentityPolicy {

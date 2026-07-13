@@ -1,4 +1,5 @@
 import type { Project } from '@/data/seed.types'
+import { generateBusinessId } from '@/domain/business-identity'
 import {
   WARRANTY_PENDING_ALERT,
   WARRANTY_STATUS_LABELS,
@@ -100,7 +101,7 @@ export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: 
 }
 
 export function nextWarrantyId(warranties: TenantWarranty[]): string {
-  return `W-${String(warranties.length + 1).padStart(3, '0')}`
+  return generateBusinessId('warranty', warranties.map((warranty) => warranty.warrantyId))
 }
 
 export function predecessorReference(warrantyId: string, tenantTid: string): string {
@@ -116,7 +117,7 @@ export function splitWarrantyPredecessors(value: string): string[] {
 
 export function parseWarrantyPredecessorReference(rawValue: string, fallbackTenantId: string): WarrantyPredecessorRef {
   const value = rawValue.trim()
-  const match = /^(W-\d+)(.+)$/.exec(value)
+  const match = /^(W-?\d+)(.+)$/.exec(value)
   return {
     warrantyId: match?.[1] ?? value,
     tenantId: match?.[2] ?? fallbackTenantId,

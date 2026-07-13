@@ -1,4 +1,5 @@
 import type { DocumentRecord } from '@/data/seed.types'
+import { generateBusinessId } from '@/domain/business-identity'
 
 export type DocumentCollection = DocumentRecord[]
 
@@ -15,9 +16,9 @@ export function formatDocumentSize(fileSize: number): string {
   return `${Math.round(fileSize / 1024)} KB`
 }
 
-export function createDocumentFromFile(file: File): DocumentRecord {
+export function createDocumentFromFile(file: File, existingDocuments: DocumentCollection = []): DocumentRecord {
   return {
-    id: `doc-${crypto.randomUUID()}`,
+    id: generateBusinessId('document', existingDocuments.map((document) => document.id)),
     fileName: file.name,
     fileType: file.type || 'application/octet-stream',
     fileSize: file.size,
@@ -27,7 +28,11 @@ export function createDocumentFromFile(file: File): DocumentRecord {
 }
 
 export function addDocuments(collection: DocumentCollection, files: File[]): DocumentCollection {
-  return [...collection, ...files.map(createDocumentFromFile)]
+  const nextCollection = [...collection]
+  files.forEach((file) => {
+    nextCollection.push(createDocumentFromFile(file, nextCollection))
+  })
+  return nextCollection
 }
 
 export function renameDocument(collection: DocumentCollection, documentId: string, fileName: string): DocumentCollection {
@@ -43,7 +48,7 @@ export function removeDocument(collection: DocumentCollection, documentId: strin
 }
 
 export function replaceDocument(collection: DocumentCollection, documentId: string, file: File): DocumentCollection {
-  const replacement = createDocumentFromFile(file)
+  const replacement = createDocumentFromFile(file, collection)
   return collection.map((document) =>
     document.id === documentId
       ? { ...document, ...replacement, id: document.id, uploadedAt: document.uploadedAt, replacedAt: replacement.uploadedAt }

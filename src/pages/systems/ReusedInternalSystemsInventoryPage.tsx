@@ -40,7 +40,13 @@ export function ReusedInternalSystemsInventoryPage() {
             type="button"
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
-              const system = createSystem()
+              const machineId = window.prompt('Enter MID for the new reused internal system')
+              if (!machineId?.trim()) return
+              const system = createSystem(machineId)
+              if (!system) {
+                window.alert('MID is required and must be unique.')
+                return
+              }
               const routePath = systemReference(system).routePath
               if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
             }}
