@@ -35,6 +35,7 @@ import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
   type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
+import { configurationHistoryReadModel } from '@/domain/application-configuration'
 import {
   PERFORMANCE_TIER_OPTIONS,
   VPN_TYPE_OPTIONS,
@@ -1259,7 +1260,7 @@ function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderConfigurationHistorySection() {
-    const records = activeDraft.configurationHistory ?? []
+    const records = configurationHistoryReadModel(activeRecord)
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>

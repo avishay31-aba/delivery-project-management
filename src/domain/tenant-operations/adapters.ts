@@ -185,7 +185,7 @@ export function tenantRequirementFromConfiguration(
 
 export function tenantConfigurationSaveDraft(draft: Tenant, saved: Tenant, system?: System, now = new Date().toISOString()): TenantConfigurationSaveDraft {
   const configuration = tenantConfigurationFromTenant(draft, system)
-  const configurationHistory = [...(draft.configurationHistory ?? [])]
+  const configurationHistory = [...(saved.configurationHistory ?? [])]
 
   if (!valuesEqual(tenantConfigurationFromTenant(saved, system), configuration)) {
     const record = createTenantConfigurationHistoryRecord(configuration, configurationHistory, now, CURRENT_USER_DISPLAY_NAME, draft.tid)

@@ -48,6 +48,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
   applicationConfigurationValue,
+  configurationHistoryReadModel,
 } from '@/domain/application-configuration'
 import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import {
@@ -1217,7 +1218,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderConfigurationHistory() {
-    const records = tenantDraft.configurationHistory ?? []
+    const records = configurationHistoryReadModel(persistedTenant)
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>

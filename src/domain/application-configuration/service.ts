@@ -1,3 +1,4 @@
+import type { ConfigurationHistoryRecord, TenantConfigurationHistoryRecord } from '@/data/seed.types'
 import type { ApplicationConfiguration, ApplicationConfigurationFieldMetadata, SharedFieldMetadata } from './types'
 
 export const APPLICATION_CONFIGURATION_CATEGORY_ORDER = [
@@ -60,6 +61,14 @@ export function applicationConfigurationRecordValue(record: Record<string, unkno
     return configuration[field.key]
   }
   return record[field.key]
+}
+
+export type ApplicationConfigurationHistoryRecord = ConfigurationHistoryRecord | TenantConfigurationHistoryRecord
+
+export function configurationHistoryReadModel<T extends { configurationHistory?: ApplicationConfigurationHistoryRecord[] }>(
+  parent: T | null | undefined,
+): ApplicationConfigurationHistoryRecord[] {
+  return Array.isArray(parent?.configurationHistory) ? parent.configurationHistory : []
 }
 
 type ConfigurationSummaryField = [field: string, label: string]
