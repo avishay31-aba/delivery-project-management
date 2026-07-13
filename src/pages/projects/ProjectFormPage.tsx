@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
@@ -2115,7 +2115,7 @@ export function ProjectFormPage() {
 
       <div className={['sf-form-content-scroll min-h-0 flex-1 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {saveMessages.length > 0 ? (
-        <div className={saveMessages.some((message) => message.includes('required')) ? 'mb-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'mb-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
+        <div className={`mb-3 ${formMessageClassName(saveMessages)}`}>
           {saveMessages.map((message) => (
             <div key={message}>{message}</div>
           ))}

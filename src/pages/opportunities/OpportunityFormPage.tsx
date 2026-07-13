@@ -36,7 +36,18 @@ import type {
   WarrantyRecord,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor, SaveButtonLabel, StatusBadge } from '@/components/ui'
+import {
+  AlertStatusIcon,
+  BusinessIdLink,
+  BusinessObjectLink,
+  FormField,
+  PlaceholderCard,
+  RichTextContent,
+  RichTextEditor,
+  SaveButtonLabel,
+  StatusBadge,
+  formMessageClassName,
+} from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
@@ -1946,7 +1957,7 @@ export function OpportunityFormPage() {
 
       <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {hasAttemptedSave && validationMessages.length > 0 ? (
-        <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className={validationErrors.length > 0 ? formMessageClassName(validationErrors.map((message) => message.message)) : 'rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'}>
           <p className="font-semibold">Opportunity validation</p>
           <ul className="mt-1 list-inside list-disc">
             {validationMessages.map((message) => (
@@ -1959,8 +1970,8 @@ export function OpportunityFormPage() {
       ) : null}
 
       {saveMessages.length > 0 ? (
-        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <p className="font-semibold">Save blocked</p>
+        <div className={formMessageClassName(saveMessages)}>
+          <p className="font-semibold">{saveMessages.some((message) => message === 'No changes to save.' || message.includes('saved')) ? 'Save status' : 'Save blocked'}</p>
           <ul className="mt-1 list-inside list-disc">
             {saveMessages.map((message) => (
               <li key={message}>{message}</li>

@@ -6,7 +6,17 @@ import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
-import { AlertStatusIcon, BusinessObjectLink, FormField, PlaceholderCard, RichTextContent, RichTextEditor, SaveButtonLabel } from '@/components/ui'
+import {
+  AlertStatusIcon,
+  BusinessObjectLink,
+  FormField,
+  PlaceholderCard,
+  RichTextContent,
+  RichTextEditor,
+  SaveButtonLabel,
+  formMessageClassName,
+  validationControlClassName,
+} from '@/components/ui'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -315,6 +325,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const inheritedEngagementCircle = inheritedEngagementCircleForTenant(tenantDraft, opportunity)
   const formType = tenantFormType(tenantDraft)
   const configuration = configurationFromTenant(tenantDraft, activeSystem)
+  const invalidConfigurationFields = new Set<ConfigKey>()
+  messages
+    .filter((message) => message.startsWith('Configuration: '))
+    .forEach((message) => {
+      CONFIGURATION_FIELDS.forEach((field) => {
+        if (message.includes(field.label)) invalidConfigurationFields.add(field.configKey)
+      })
+    })
   const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
   const countryOptions = Array.from(
     new Set(
@@ -935,7 +953,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     )
   }
 
-  function renderMultiSelect(field: TenantConfigurationColumn, selected: string[]) {
+  function renderMultiSelect(field: TenantConfigurationColumn, selected: string[], isInvalid: boolean) {
     const pickerId = `tenant-config:${field.configKey}`
     const isOpen = activeMultiSelect?.id === pickerId
     const selectedText = selected.length > 0 ? selected.join('; ') : 'Select'
@@ -954,7 +972,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <button
           type="button"
           data-multiselect-trigger={pickerId}
-          className="h-7 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm"
+          className={[
+            'h-7 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm',
+            validationControlClassName(isInvalid),
+          ].join(' ')}
           style={{ width: triggerWidth }}
           title={selected.join('; ')}
           onClick={(event) => {
@@ -999,6 +1020,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function renderConfigurationCell(field: TenantConfigurationColumn) {
     const value = configurationValue(configuration, field)
     const isProduct = field.configKey === 'product'
+    const isInvalid = !isViewMode && invalidConfigurationFields.has(field.configKey)
 
     if (isProduct) {
       return <div className="min-h-7 px-1 py-1 text-sm text-sf-text">{textValue(value) || '-'}</div>
@@ -1009,7 +1031,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       return (
         <>
           <select
-            className="h-7 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm"
+            className={[
+              'h-7 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm',
+              validationControlClassName(isInvalid),
+            ].join(' ')}
             value={textValue(value)}
             onChange={(event) => handleConfigurationPicklistChange(field, event.target.value)}
           >
@@ -1023,13 +1048,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     }
 
     if (field.inputType === 'multiselect') {
-      return renderMultiSelect(field, Array.isArray(value) ? value : splitMultiValue(textValue(value)))
+      return renderMultiSelect(field, Array.isArray(value) ? value : splitMultiValue(textValue(value)), isInvalid)
     }
 
     if (field.inputType === 'integer') {
       return (
         <input
-          className="h-7 w-24 rounded border border-sf-border px-2 py-1 text-sm"
+          className={[
+            'h-7 w-24 rounded border border-sf-border px-2 py-1 text-sm',
+            validationControlClassName(isInvalid),
+          ].join(' ')}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -1046,7 +1074,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
     return (
       <input
-        className="h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+        className={[
+          'h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm',
+          validationControlClassName(isInvalid),
+        ].join(' ')}
         value={textValue(value)}
         onChange={(event) => updateConfiguration(field.configKey, event.target.value)}
       />
@@ -1449,7 +1480,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       />
       <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {messages.length > 0 ? (
-        <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+        <div className={formMessageClassName(messages)}>
           {messages.map((message) => <div key={message}>{message}</div>)}
         </div>
       ) : null}

@@ -19,7 +19,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel } from '@/components/ui'
+import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -1389,7 +1389,7 @@ function InventoryForm<T extends InventoryRecord>({
 
       <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
       {messages.length > 0 ? (
-        <div className={messages.some((message) => message.includes('cannot') || message.includes('required') || message.includes('unique')) ? 'rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700' : 'rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700'}>
+        <div className={formMessageClassName(messages)}>
           {messages.map((message) => (
             <div key={message}>{message}</div>
           ))}

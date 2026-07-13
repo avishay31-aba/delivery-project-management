@@ -12,4 +12,5 @@ export { RecordChangeBadge, recordChangeState } from '@/components/ui/RecordChan
 export { RichTextContent, RichTextEditor } from '@/components/ui/RichTextEditor'
 export { ClampedTableCellContent } from '@/components/ui/ClampedTableCellContent'
 export { SaveButtonLabel } from '@/components/ui/SaveButtonLabel'
+export { formMessageClassName, isValidationErrorMessage, validationControlClassName } from '@/components/ui/validationPresentation'
 export type { AlertStatusIconVariant } from '@/components/ui/AlertStatusIcon'

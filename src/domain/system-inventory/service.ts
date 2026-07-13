@@ -112,6 +112,10 @@ export function systemApplicationConfigurationSummary(system: System, tenants: T
       summary.product = system.productType || uniqueValues(hostedTenants.map((tenant) => tenant.productType))[0] || ''
       return
     }
+    if (field.key === 'mapCenter') {
+      summary.mapCenter = system.mapCenter || uniqueValues(hostedTenants.map((tenant) => tenant.mapCenter ?? tenant.configuration?.mapCenter))[0] || ''
+      return
+    }
 
     const values = hostedTenants.map((tenant) => applicationConfigurationValue(applicationConfigurationFromTenant(tenant, system.productType), field))
     if (field.inputType === 'multiselect') {

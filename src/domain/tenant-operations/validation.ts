@@ -1,4 +1,5 @@
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import { validateRequirementA } from '@/domain/tenant-requirement'
 import type { Account, Opportunity, System, Tenant, TenantConfiguration } from '@/data/seed.types'
 import { tenantRequirementFromConfiguration } from './adapters'
@@ -68,11 +69,23 @@ export function validateTenantConfigurationSave(
   opportunity: Opportunity,
   context: { accounts: Account[]; systems: System[]; tenants: Tenant[]; activeSystem?: System },
 ): string[] {
+  const systemConfiguration = context.activeSystem
+    ? systemApplicationConfigurationSummary(context.activeSystem, context.tenants)
+    : null
+  const effectiveConfiguration = {
+    ...configuration,
+    mapCenter: context.activeSystem ? systemConfiguration?.mapCenter || '' : configuration.mapCenter,
+  }
   return validateRequirementA(
-    tenantRequirementFromConfiguration(tenant, configuration, context.activeSystem),
+    tenantRequirementFromConfiguration(tenant, effectiveConfiguration, context.activeSystem),
     opportunity,
     { accounts: context.accounts, systems: context.systems, tenants: context.tenants },
   )
     .filter((message) => message.level === 'error')
-    .map((message) => message.message.replace(/^Grid A row 1: /, 'Configuration: '))
+    .map((message) => {
+      const normalized = message.message.replace(/^Grid A row 1: /, 'Configuration: ')
+      return normalized === 'Configuration: Map Center is required.'
+        ? 'Linked System configuration: Map Center is required.'
+        : normalized
+    })
 }
