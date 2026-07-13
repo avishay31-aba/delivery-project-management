@@ -30,6 +30,9 @@ export interface ActivityEventInput {
   primaryObject: ActivityObjectRefInput
   relatedObjects?: ActivityObjectRefInput[]
   details?: string
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
+  metadata?: Record<string, unknown>
   correlationId?: string
   sequence?: number
 }
@@ -109,6 +112,9 @@ export function createActivityEvent(input: ActivityEventInput): ActivityEvent {
     primaryObject: activityObjectRef(input.primaryObject),
     relatedObjects: (input.relatedObjects ?? []).map(activityObjectRef),
     ...(input.details ? { details: input.details } : {}),
+    ...(input.before ? { before: input.before } : {}),
+    ...(input.after ? { after: input.after } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
     ...(input.correlationId ? { correlationId: input.correlationId } : {}),
     ...(typeof input.sequence === 'number' ? { sequence: input.sequence } : {}),
     schemaVersion: ACTIVITY_EVENT_SCHEMA_VERSION,

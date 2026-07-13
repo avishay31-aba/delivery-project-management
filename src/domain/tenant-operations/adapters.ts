@@ -125,7 +125,11 @@ function tenantAllocationTypeForSystem(system: TenantCreationSource['system']): 
 }
 
 export function tenantConfigurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
-  return applicationConfigurationFromTenant(tenant, system?.productType)
+  const configuration = applicationConfigurationFromTenant(tenant, system?.productType)
+  return {
+    ...configuration,
+    mapCenter: system ? system.mapCenter ?? '' : configuration.mapCenter,
+  }
 }
 
 export function tenantRequirementFromConfiguration(

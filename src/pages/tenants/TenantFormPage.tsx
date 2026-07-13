@@ -49,6 +49,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   applicationConfigurationValue,
 } from '@/domain/application-configuration'
+import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -239,6 +240,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
   const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
+  const updateSystemMapCenter = useAppStore((state) => state.updateSystemMapCenter)
   const savedTenant = useMemo(() => tenants.find((tenant) => tenant.tid === tid), [tenants, tid])
   const system = useMemo(
     () => systems.find((candidate) => candidate.id === (savedTenant?.hostedSystemId ?? savedTenant?.systemId)),
@@ -324,7 +326,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const canManageWarranties = canManageWarrantyCollection(project, linkedOpportunityId)
   const inheritedEngagementCircle = inheritedEngagementCircleForTenant(tenantDraft, opportunity)
   const formType = tenantFormType(tenantDraft)
-  const configuration = configurationFromTenant(tenantDraft, activeSystem)
+  const tenantConfiguration = configurationFromTenant(tenantDraft, activeSystem)
+  const systemConfiguration = activeSystem ? systemApplicationConfigurationSummary(activeSystem, tenants) : null
+  const configuration = {
+    ...tenantConfiguration,
+    mapCenter: activeSystem ? systemConfiguration?.mapCenter ?? '' : tenantConfiguration.mapCenter,
+  }
   const invalidConfigurationFields = new Set<ConfigKey>()
   messages
     .filter((message) => message.startsWith('Configuration: '))
@@ -423,6 +430,30 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       }
     })
     setMessages([])
+  }
+
+  function updateSystemOwnedMapCenter(value: string) {
+    if (isViewMode) return
+    if (!activeSystem) {
+      setMessages(['Linked System configuration: Map Center requires a linked System.'])
+      return
+    }
+
+    const result = updateSystemMapCenter(activeSystem.id, value, { sourceTenantId: tenantDraft.id })
+    if (!result.ok && (result.affectedTenantCount ?? 0) >= 2) {
+      if (!window.confirm(result.message)) {
+        setMessages(['Map Center change canceled.'])
+        return
+      }
+      const confirmedResult = updateSystemMapCenter(activeSystem.id, value, {
+        confirmedMultiTenantChange: true,
+        sourceTenantId: tenantDraft.id,
+      })
+      setMessages([confirmedResult.message])
+      return
+    }
+
+    setMessages([result.message])
   }
 
   function updateTenantType(nextType: TenantFormType) {
@@ -919,6 +950,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       setPendingAddNew({ key: field.configKey, value: '' })
       return
     }
+    if (field.configKey === 'mapCenter') {
+      updateSystemOwnedMapCenter(value)
+      return
+    }
     updateConfiguration(field.configKey, value)
   }
 
@@ -940,7 +975,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             const nextValue = pendingAddNew.value.trim()
             if (!nextValue) return
             setCustomPicklistOptions((current) => addCustomPicklistOption(current, field.configKey, nextValue))
-            updateConfiguration(field.configKey, nextValue)
+            if (field.configKey === 'mapCenter') updateSystemOwnedMapCenter(nextValue)
+            else updateConfiguration(field.configKey, nextValue)
             setPendingAddNew(null)
           }}
         >

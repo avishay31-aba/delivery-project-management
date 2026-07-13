@@ -286,6 +286,59 @@ function appendProjectSaveActivityEvents(
   return nextEvents
 }
 
+function hostedTenantCountForSystemId(state: AppDataState, systemId: string): number {
+  return state.tenants.filter((tenant) => tenant.systemId === systemId || tenant.hostedSystemId === systemId).length
+}
+
+function updateSystemMapCenterTransaction(
+  state: AppDataState,
+  systemId: string,
+  mapCenter: string,
+  now: string,
+  sourceTenantId?: string,
+): Pick<AppDataState, 'systems' | 'activityEvents'> {
+  const system = state.systems.find((candidate) => candidate.id === systemId)
+  if (!system || String(system.mapCenter ?? '') === mapCenter) {
+    return { systems: state.systems, activityEvents: state.activityEvents }
+  }
+
+  const beforeSummary = systemApplicationConfigurationSummary(system, state.tenants)
+  const nextSystem = { ...system, mapCenter, updatedAt: now }
+  const afterSummary = systemApplicationConfigurationSummary(nextSystem, state.tenants)
+  const existingHistory = system.configurationHistory ?? []
+  const sourceTenant = sourceTenantId ? state.tenants.find((tenant) => tenant.id === sourceTenantId) : undefined
+  const historyRecord = createSystemConfigurationHistoryRecord(
+    afterSummary,
+    existingHistory,
+    now,
+    CURRENT_USER_DISPLAY_NAME,
+    sourceTenant?.tid ?? '',
+  )
+  const hostedCount = hostedTenantCountForSystemId(state, systemId)
+
+  return {
+    systems: state.systems.map((candidate) =>
+      candidate.id === systemId
+        ? {
+            ...nextSystem,
+            configurationHistory: historyRecord ? [historyRecord, ...existingHistory] : existingHistory,
+          }
+        : candidate,
+    ),
+    activityEvents: appendActivityEvent(state.activityEvents, now, {
+      category: 'SYSTEM',
+      eventType: 'system.mapCenterChanged',
+      severity: 'INFO',
+      summary: `System ${systemBusinessId(system)} Map Center changed from ${beforeSummary.mapCenter || '-'} to ${afterSummary.mapCenter || '-'}.`,
+      primaryObject: systemRef(system),
+      relatedObjects: relatedRefs(sourceTenant ? tenantRef(sourceTenant) : null),
+      before: { mapCenter: beforeSummary.mapCenter || '' },
+      after: { mapCenter: afterSummary.mapCenter || '' },
+      metadata: { affectedTenantCount: hostedCount },
+    }),
+  }
+}
+
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
@@ -302,6 +355,11 @@ interface AppStore extends AppDataState {
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
+  updateSystemMapCenter: (
+    systemId: string,
+    mapCenter: string,
+    options?: { confirmedMultiTenantChange?: boolean; sourceTenantId?: string },
+  ) => AllocationActionResult & { affectedTenantCount?: number }
   saveSystemFormTransaction: (
     collection: 'production' | 'reused' | 'allocated',
     id: string,
@@ -498,6 +556,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
+  updateSystemMapCenter: (systemId, mapCenter, options) => {
+    const state = get()
+    const system = state.systems.find((candidate) => candidate.id === systemId)
+    if (!system) return { ok: false, message: 'System inventory record not found.' }
+
+    const nextMapCenter = mapCenter.trim()
+    if (String(system.mapCenter ?? '') === nextMapCenter) {
+      return { ok: true, message: 'Map Center unchanged.', affectedTenantCount: hostedTenantCountForSystemId(state, systemId) }
+    }
+
+    const affectedTenantCount = hostedTenantCountForSystemId(state, systemId)
+    if (affectedTenantCount >= 2 && !options?.confirmedMultiTenantChange) {
+      return {
+        ok: false,
+        message: `Map Center is a System-level parameter. This change will affect ${affectedTenantCount} existing Tenants hosted by System ${systemBusinessId(system)}. Do you want to continue?`,
+        affectedTenantCount,
+      }
+    }
+
+    const now = new Date().toISOString()
+    set((current) => updateSystemMapCenterTransaction(current, systemId, nextMapCenter, now, options?.sourceTenantId))
+    get().saveToStorage()
+    return { ok: true, message: 'System Map Center updated.', affectedTenantCount }
+  },
+
   saveSystemFormTransaction: (collection, id, patch, tenantRemovalIds = [], options) => {
     const now = new Date().toISOString()
     set((state) => {
@@ -506,7 +589,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const productionPatch = patch as Partial<AppDataState['productionSystemInventory'][number]>
       const reusedPatch = patch as Partial<AppDataState['reusedInternalSystems'][number]>
       const allocatedPatch = patch as Partial<AppDataState['systems'][number]>
-      return {
+      const { mapCenter: allocatedMapCenter, ...allocatedRestPatch } = allocatedPatch
+      const result = {
         ...tenantRemovalState,
         productionSystemInventory:
           collection === 'production'
@@ -528,10 +612,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
         systems:
           collection === 'allocated'
             ? tenantRemovalState.systems.map((system) =>
-                system.id === id ? { ...system, ...allocatedPatch, updatedAt: updatedAtFor(system.createdAt) } : system,
+                system.id === id ? { ...system, ...allocatedRestPatch, updatedAt: updatedAtFor(system.createdAt) } : system,
               )
             : tenantRemovalState.systems,
       }
+      if (collection !== 'allocated' || typeof allocatedMapCenter !== 'string') return result
+      const mapCenterState = updateSystemMapCenterTransaction(
+        { ...state, ...result },
+        id,
+        allocatedMapCenter,
+        now,
+      )
+      return { ...result, systems: mapCenterState.systems, activityEvents: mapCenterState.activityEvents }
     })
     get().saveToStorage()
   },
