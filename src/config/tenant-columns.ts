@@ -3,7 +3,7 @@ import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, CountryFlag } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
-import { tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
+import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
   objectDefinitionToRuntimeFormModel,
@@ -58,8 +58,8 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     {
       id: 'mapCenter',
       label: 'Map Center',
-      getValue: (row) => row.mapCenter ?? row.country,
-      render: (row) => createElement(CountryFlag, { value: row.mapCenter ?? row.country, country: row.country }),
+      getValue: (row) => inheritedTenantMapCenter(row, systems),
+      render: (row) => createElement(CountryFlag, { value: inheritedTenantMapCenter(row, systems), country: row.country }),
     },
     { id: 'licenses', label: 'Licenses', getValue: (row) => row.licenses ?? '' },
     { id: 'users', label: 'Users', getValue: (row) => row.users ?? '' },

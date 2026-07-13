@@ -1,6 +1,6 @@
-import type { Project, ProjectTenantLink, System, Tenant, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import type { Project, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
-import { isReusedInternalSystem, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
+import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 
 export type TenantOperationalMode =
   | 'Operative'
@@ -40,6 +40,32 @@ export function effectiveTenantOperationalMode(tenant: Tenant, system?: System):
   return isManualTenantOperationalMode(tenant.operationalStatus)
     ? tenant.operationalStatus
     : derivedTenantOperationalMode(system)
+}
+
+export function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {
+  return systems.find((system) => system.id === tenant.hostedSystemId || system.id === tenant.systemId)
+}
+
+export function inheritedTenantMapCenter(tenant: Tenant, systems: System[], tenants: Tenant[] = []): string {
+  const system = systemForTenant(tenant, systems)
+  if (!system) return tenant.mapCenter ?? tenant.configuration?.mapCenter ?? tenant.country ?? ''
+  return systemApplicationConfigurationSummary(system, tenants).mapCenter || system.mapCenter || ''
+}
+
+export function tenantConfigurationPresentationRecord(
+  tenant: Tenant,
+  systems: System[],
+  tenants: Tenant[] = [],
+): Tenant & { configuration?: TenantConfiguration } {
+  const mapCenter = inheritedTenantMapCenter(tenant, systems, tenants)
+  return {
+    ...tenant,
+    mapCenter,
+    configuration: {
+      ...(tenant.configuration ?? {}),
+      mapCenter,
+    } as TenantConfiguration,
+  }
 }
 
 export function tenantHostedSystemHistory(tenant: Tenant): TenantHostedSystemHistory[] {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import { effectiveTenantOperationalMode } from '@/domain/tenant-operations'
+import { effectiveTenantOperationalMode, tenantConfigurationPresentationRecord } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { BusinessIdLink, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
@@ -66,6 +66,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
         <tbody>
           {tenants.map((tenant) => {
             const system = systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
+            const configurationRecord = tenantConfigurationPresentationRecord(tenant, systems, tenants)
             return (
               <tr key={tenant.id} className="hover:bg-sf-surface-alt">
                 {actions ? (
@@ -95,7 +96,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
-                <ConfigurationValueCells record={tenant as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
+                <ConfigurationValueCells record={configurationRecord as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
               </tr>
             )
           })}
