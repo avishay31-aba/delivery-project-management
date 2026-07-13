@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
@@ -36,7 +37,12 @@ function systemUrlColumn<T extends { url?: string }>(options: { replaceable?: bo
 }
 
 export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemInventoryItem>[] = [
-  { id: 'sid', label: 'SID', getValue: (row) => row.sid },
+  {
+    id: 'sid',
+    label: 'SID',
+    getValue: (row) => row.sid,
+    render: (row) => createElement(BusinessIdLink, { objectType: 'PRODUCTION_SYSTEM', businessId: row.sid }, row.sid),
+  },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
   systemUrlColumn<ProductionSystemInventoryItem>(),
@@ -56,7 +62,12 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
 
 export function createReusedInternalSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[]): DashboardColumn<ReusedInternalSystem>[] {
   return [
-  { id: 'machineId', label: 'MID', getValue: (row) => row.machineId },
+  {
+    id: 'machineId',
+    label: 'MID',
+    getValue: (row) => row.machineId,
+    render: (row) => createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId }, row.machineId),
+  },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
   { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: REUSED_STATUS_OPTIONS },
@@ -68,7 +79,16 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
   { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.usedInRegion ?? row.timeGroup ?? '', editable: true, editKey: 'usedInRegion', options: REGION_OPTIONS },
   { id: 'occupationStartDate', label: 'Occupation Start', getValue: (row) => row.occupationStartDate ?? '', editable: true, editKey: 'occupationStartDate' },
   { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => row.occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
-  { id: 'currentProjects', label: 'Current PID', getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; ') },
+  {
+    id: 'currentProjects',
+    label: 'Current PID',
+    getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
+    render: (row) =>
+      createElement(BusinessIdListLinks, {
+        objectType: 'PROJECT',
+        businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
+      }),
+  },
   { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
   { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
@@ -77,13 +97,28 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
 
 export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<AllocatedSystemDashboardRow>[] {
   return [
-    { id: 'sid', label: 'SID', getValue: (row) => row.sid ?? '' },
+    {
+      id: 'sid',
+      label: 'SID',
+      getValue: (row) => row.sid ?? '',
+      render: (row) => createElement(BusinessIdLink, { objectType: 'SYSTEM', businessId: row.sid ?? '' }, row.sid ?? ''),
+    },
     {
       id: 'pid',
       label: 'PID',
       getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
+      render: (row) =>
+        createElement(BusinessIdListLinks, {
+          objectType: 'PROJECT',
+          businessIds: currentProjectPidsForSystem(row, projects),
+        }),
     },
-    { id: 'machineId', label: 'MID', getValue: (row) => row.machineId ?? '' },
+    {
+      id: 'machineId',
+      label: 'MID',
+      getValue: (row) => row.machineId ?? '',
+      render: (row) => createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId ?? '' }, row.machineId ?? ''),
+    },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
     { id: 'allocationType', label: 'Allocation Type', getValue: (row) => row.allocationTypes.join('; ') },
@@ -93,6 +128,11 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       id: 'projects',
       label: 'Linked Projects',
       getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
+      render: (row) =>
+        createElement(BusinessIdListLinks, {
+          objectType: 'PROJECT',
+          businessIds: currentProjectPidsForSystem(row, projects),
+        }),
     },
     {
       id: 'tenantCount',
@@ -103,6 +143,11 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       id: 'tenants',
       label: 'Hosted Tenants',
       getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id || tenant.hostedSystemId === row.id).map((tenant) => tenant.tid)),
+      render: (row) =>
+        createElement(BusinessIdListLinks, {
+          objectType: 'TENANT',
+          businessIds: joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id || tenant.hostedSystemId === row.id).map((tenant) => tenant.tid)),
+        }),
     },
     systemUrlColumn<AllocatedSystemDashboardRow>({ replaceable: true }),
     { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },

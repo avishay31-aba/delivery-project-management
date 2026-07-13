@@ -55,6 +55,7 @@ import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
+import { isRouteViewMode } from '@/utils/route-mode'
 import {
   getAccountSystems,
   getAccountTenants,
@@ -889,7 +890,7 @@ export function OpportunityFormPage() {
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+  const isViewMode = isRouteViewMode(location)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)

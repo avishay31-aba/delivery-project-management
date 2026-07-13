@@ -1,4 +1,6 @@
+import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
+import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, SalesManager, System, Tenant, WarrantyRecord } from '@/data/seed.types'
 import {
@@ -21,7 +23,13 @@ export function createCustomerColumns(
   warrantyRecords: WarrantyRecord[],
 ): DashboardColumn<Account>[] {
   return [
-    { id: 'accountCode', label: CUSTOMER_ACCOUNT_FIELD_LABELS.accountCode, getValue: (row) => row.accountCode, editKey: 'accountCode' },
+    {
+      id: 'accountCode',
+      label: CUSTOMER_ACCOUNT_FIELD_LABELS.accountCode,
+      getValue: (row) => row.accountCode,
+      editKey: 'accountCode',
+      render: (row) => createElement(BusinessIdLink, { objectType: 'CUSTOMER', businessId: row.accountCode }, row.accountCode),
+    },
     { id: 'accountName', label: CUSTOMER_ACCOUNT_FIELD_LABELS.accountName, getValue: (row) => row.accountName, editKey: 'accountName' },
     { id: 'customerType', label: CUSTOMER_ACCOUNT_FIELD_LABELS.customerType, getValue: customerTypeLabel },
     {
@@ -47,11 +55,13 @@ export function createCustomerColumns(
       id: 'sids',
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.sids,
       getValue: (row) => customerSidList(row.id, systems),
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'SYSTEM', businessIds: customerSidList(row.id, systems) }),
     },
     {
       id: 'tids',
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.tids,
       getValue: (row) => customerTidList(row.id, tenants),
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'TENANT', businessIds: customerTidList(row.id, tenants) }),
     },
     {
       id: 'tenantNames',

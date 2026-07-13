@@ -25,6 +25,7 @@ import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
+import { isRouteViewMode } from '@/utils/route-mode'
 import {
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
@@ -323,7 +324,7 @@ function InventoryForm<T extends InventoryRecord>({
 }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+  const isViewMode = isRouteViewMode(location)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)

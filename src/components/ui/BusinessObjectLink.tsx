@@ -20,6 +20,12 @@ interface BusinessIdLinkProps {
   className?: string
 }
 
+interface BusinessIdListLinksProps {
+  objectType: BusinessObjectType | 'CUSTOMER'
+  businessIds: string | string[] | null | undefined
+  className?: string
+}
+
 function fallbackLabel(reference: BusinessObjectReference | null | undefined, children?: ReactNode): ReactNode {
   return children ?? reference?.displayLabel ?? reference?.businessId ?? ''
 }
@@ -50,5 +56,26 @@ export function BusinessIdLink({ objectType, businessId, children, className }: 
     <LinkId to={routePath} className={className}>
       {label}
     </LinkId>
+  )
+}
+
+export function BusinessIdListLinks({ objectType, businessIds, className }: BusinessIdListLinksProps) {
+  const ids = (Array.isArray(businessIds) ? businessIds : String(businessIds ?? '').split(';'))
+    .map((businessId) => businessId.trim())
+    .filter(Boolean)
+
+  if (ids.length === 0) return ''
+
+  return (
+    <>
+      {ids.map((businessId, index) => (
+        <span key={`${businessId}-${index}`}>
+          {index > 0 ? '; ' : null}
+          <BusinessIdLink objectType={objectType} businessId={businessId} className={className}>
+            {businessId}
+          </BusinessIdLink>
+        </span>
+      ))}
+    </>
   )
 }

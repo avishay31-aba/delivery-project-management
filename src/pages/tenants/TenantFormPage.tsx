@@ -22,6 +22,7 @@ import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
+import { isRouteViewMode } from '@/utils/route-mode'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
   AI_OPTIONS,
@@ -232,7 +233,7 @@ export function TenantFormPage() {
   const { tid } = useParams<{ tid: string }>()
 const navigate = useNavigate()
 const location = useLocation()
-const isViewMode = (location.state as { mode?: string } | null)?.mode === 'view'
+const isViewMode = isRouteViewMode(location)
 const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)

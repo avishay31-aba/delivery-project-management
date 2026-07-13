@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, ReactNode, SetStateAction } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Eye,
   Pencil,
@@ -43,6 +44,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import { formatDateTime } from '@/domain/date-time-presentation'
+import { dashboardRecordModeRoutePath } from '@/domain/dashboard-view'
 
 export interface DashboardColumn<T> {
   id: string
@@ -116,6 +118,50 @@ function joinClassNames(...classNames: Array<string | false | undefined>): strin
 
 function RowIndicator({ row }: { row: unknown }) {
   return <RecordChangeBadge record={row as { createdAt?: string; updatedAt?: string }} placeholder />
+}
+
+function DashboardActionLink<T extends { id: string }>({
+  icon,
+  label,
+  to,
+  onFallback,
+  row,
+}: {
+  icon: ReactNode
+  label: string
+  to: string | null
+  onFallback?: (row: T) => void
+  row: T
+}) {
+  const className = 'inline-flex h-7 w-7 items-center justify-center rounded border border-sf-border bg-white text-sf-text hover:bg-sf-surface-alt aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
+  if (to) {
+    return (
+      <Link to={to} className={className} title={label} aria-label={`${label} record`}>
+        {icon}
+      </Link>
+    )
+  }
+  if (onFallback) {
+    return (
+      <button
+        type="button"
+        className={className}
+        title={label}
+        aria-label={`${label} record`}
+        onClick={(event) => {
+          event.stopPropagation()
+          onFallback(row)
+        }}
+      >
+        {icon}
+      </button>
+    )
+  }
+  return (
+    <span className={className} title={`${label} unavailable`} aria-label={`${label} unavailable`} aria-disabled="true">
+      {icon}
+    </span>
+  )
 }
 
 function creationDateValue(row: unknown): string {
@@ -877,38 +923,28 @@ export function DataDashboard<T extends { id: string }>({
         enableGrouping: false,
         enableColumnFilter: false,
         enableHiding: false,
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="inline-flex h-7 items-center gap-1 rounded border border-sf-border bg-white px-2 text-sf-text hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-              title="View"
-              aria-label="View record"
-              disabled={!onView}
-              onClick={(event) => {
-                event.stopPropagation()
-                onView?.(row.original)
-              }}
-            >
-              <Eye className="h-4 w-4" aria-hidden="true" />
-              <span>View</span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-7 items-center gap-1 rounded border border-sf-border bg-white px-2 text-sf-text hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
-              title="Edit"
-              aria-label="Edit record"
-              disabled={!onEditRecord}
-              onClick={(event) => {
-                event.stopPropagation()
-                onEditRecord?.(row.original)
-              }}
-            >
-              <Pencil className="h-4 w-4" aria-hidden="true" />
-              <span>Edit</span>
-            </button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const viewRoute = dashboardRecordModeRoutePath(dashboardScope, row.original, 'view')
+          const editRoute = dashboardRecordModeRoutePath(dashboardScope, row.original, 'edit')
+          return (
+            <div className="flex items-center gap-1">
+              <DashboardActionLink
+                icon={<Eye className="h-4 w-4" aria-hidden="true" />}
+                label="View"
+                to={viewRoute}
+                onFallback={onView}
+                row={row.original}
+              />
+              <DashboardActionLink
+                icon={<Pencil className="h-4 w-4" aria-hidden="true" />}
+                label="Edit"
+                to={editRoute}
+                onFallback={onEditRecord}
+                row={row.original}
+              />
+            </div>
+          )
+        },
       },
       {
         id: ROW_INDICATOR_COLUMN_ID,
@@ -987,7 +1023,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, enableInlineEditing, onEdit, onEditRecord, onView],
+    [columns, dashboardScope, enableInlineEditing, onEdit, onEditRecord, onView],
   )
 
   const table = useReactTable({

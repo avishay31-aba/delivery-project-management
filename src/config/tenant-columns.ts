@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, CountryFlag } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, CountryFlag } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { formatDateTime } from '@/domain/date-time-presentation'
 import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
@@ -36,21 +36,24 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
     { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
     { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
-    { id: 'sid', label: 'SID', getValue: (row) => sidForTenant(row, systems) },
+    {
+      id: 'sid',
+      label: 'SID',
+      getValue: (row) => sidForTenant(row, systems),
+      render: (row) => createElement(BusinessIdLink, { objectType: 'SYSTEM', businessId: sidForTenant(row, systems) }, sidForTenant(row, systems)),
+    },
     { id: 'systemId', label: 'System ID/reference', getValue: (row) => row.systemId },
     {
       id: 'deliveryPid',
       label: 'Delivery PID',
       getValue: (row) => tenantDeliveryPidDisplay(row, projects, projectTenants),
-      render: (row) => {
-        const value = tenantDeliveryPidDisplay(row, projects, projectTenants)
-        return value ? createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: value.split(';')[0]?.trim() ?? value }, value) : ''
-      },
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDeliveryPidDisplay(row, projects, projectTenants) }),
     },
     {
       id: 'pocPid',
       label: 'POC PID',
       getValue: (row) => tenantPocPidDisplay(row, projects, projectTenants),
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantPocPidDisplay(row, projects, projectTenants) }),
     },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },
