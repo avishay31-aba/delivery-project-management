@@ -7,6 +7,7 @@ const productName = 'Delivery ERP'
 const host = '127.0.0.1'
 const preferredPort = 47831
 const maxPortAttempts = 50
+const runtimeRegionalDateFormat = resolveWindowsRegionalDateFormat()
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -40,12 +41,56 @@ function getAssetPath(requestPath) {
   return 'app/index.html'
 }
 
+function normalizeRegionalDateFormat(shortDate) {
+  const normalized = String(shortDate || '').trim().toLowerCase()
+  const firstDayIndex = normalized.indexOf('d')
+  const firstMonthIndex = normalized.indexOf('m')
+  const firstYearIndex = normalized.indexOf('y')
+  if (firstDayIndex === -1 || firstMonthIndex === -1 || firstYearIndex === -1) {
+    return 'system'
+  }
+  if (firstYearIndex < firstMonthIndex && firstMonthIndex < firstDayIndex) {
+    return 'YYYY-MM-DD'
+  }
+  if (firstDayIndex < firstMonthIndex && firstMonthIndex < firstYearIndex) {
+    return 'DD/MM/YYYY'
+  }
+  if (firstMonthIndex < firstDayIndex && firstDayIndex < firstYearIndex) {
+    return 'MM/DD/YYYY'
+  }
+  return 'system'
+}
+
+function resolveWindowsRegionalDateFormat() {
+  if (process.platform !== 'win32') return 'system'
+  try {
+    const output = childProcess.execFileSync(
+      'reg',
+      ['query', 'HKCU\\Control Panel\\International', '/v', 'sShortDate'],
+      { encoding: 'utf8', windowsHide: true, timeout: 2000 },
+    )
+    const match = output.match(/sShortDate\s+REG_SZ\s+([^\r\n]+)/i)
+    return normalizeRegionalDateFormat(match?.[1])
+  } catch {
+    return 'system'
+  }
+}
+
+function injectRuntimeConfig(html) {
+  const config = `<script>window.__DELIVERY_ERP_RUNTIME_CONFIG__=${JSON.stringify({ regionalDateFormat: runtimeRegionalDateFormat })};</script>`
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${config}</head>`)
+  }
+  return `${config}${html}`
+}
+
 function serveAsset(request, response) {
   try {
     const requestPath = normalizeRequestPath(request.url || '/')
     const assetPath = getAssetPath(requestPath)
-    const bytes = Buffer.from(sea.getRawAsset(assetPath))
     const extension = path.extname(assetPath).toLowerCase()
+    const rawBytes = Buffer.from(sea.getRawAsset(assetPath))
+    const bytes = assetPath === 'app/index.html' ? Buffer.from(injectRuntimeConfig(rawBytes.toString('utf8'))) : rawBytes
 
     response.writeHead(200, {
       'Content-Type': contentTypes[extension] || 'application/octet-stream',

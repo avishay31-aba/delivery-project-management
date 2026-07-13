@@ -50,6 +50,7 @@ import {
   isCanonicalDateTime,
 } from '@/domain/date-time-presentation'
 import { dashboardRecordModeRoutePath } from '@/domain/dashboard-view'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 export interface DashboardColumn<T> {
   id: string
@@ -839,6 +840,7 @@ export function DataDashboard<T extends { id: string }>({
   enableRecordActions = true,
   initialSorting = [],
 }: DataDashboardProps<T>) {
+  useDateTimePresentationPreference()
   const hasAuthoritativeCreationDateColumn = columns.some(
     (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
   )

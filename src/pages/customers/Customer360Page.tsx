@@ -14,6 +14,7 @@ import {
 } from '@/domain/customer-account'
 import { formatDocumentSize } from '@/domain/document-collection'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
 import {
@@ -125,6 +126,7 @@ function alertList(alerts: string[]) {
 }
 
 export function Customer360Page() {
+  useDateTimePresentationPreference()
   const { accountCode = '' } = useParams()
   const navigate = useNavigate()
   const accounts = useAppStore((state) => state.accounts)

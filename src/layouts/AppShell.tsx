@@ -5,6 +5,7 @@ import { mainNavigation } from '@/config/navigation'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import { useDraggableDialogs } from '@/hooks/useDraggableDialogs'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 function resolveHeaderTitle(pathname: string): string {
   const match = mainNavigation
@@ -15,6 +16,7 @@ function resolveHeaderTitle(pathname: string): string {
 
 export function AppShell() {
   useDraggableDialogs()
+  const regionalDateFormat = useDateTimePresentationPreference()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const pendingNavigation = useUnsavedChangesGuardStore((state) => state.pendingNavigation)
@@ -52,7 +54,7 @@ export function AppShell() {
         />
       ) : null}
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col" data-regional-date-format={regionalDateFormat}>
         <TopHeader title={headerTitle} />
         <main className="flex-1 overflow-auto p-6">
           <Outlet />

@@ -81,6 +81,7 @@ import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { activityEventsForSystem } from '@/domain/activity-log'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type SaveTimestampOptions = { preserveNewState?: boolean }
@@ -322,6 +323,7 @@ function InventoryForm<T extends InventoryRecord>({
   onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions, tenantRemovalIds?: string[]) => void
   dashboardPath: string
 }) {
+  useDateTimePresentationPreference()
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = isRouteViewMode(location)

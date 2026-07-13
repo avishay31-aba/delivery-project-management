@@ -73,6 +73,7 @@ import {
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
 import { formatDate } from '@/domain/date-time-presentation'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -368,6 +369,7 @@ function RequirementSection({
 }
 
 export function ProjectFormPage() {
+  useDateTimePresentationPreference()
   const { pid } = useParams<{ pid: string }>()
   const navigate = useNavigate()
   const location = useLocation()

@@ -9,6 +9,7 @@ import {
   replaceDocument as replaceDocumentInCollection,
 } from '@/domain/document-collection'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 interface DocumentsPanelProps {
   documents: DocumentRecord[]
@@ -18,6 +19,7 @@ interface DocumentsPanelProps {
 }
 
 export function DocumentsPanel({ documents, emptyText, onChange, readOnly = false }: DocumentsPanelProps) {
+  useDateTimePresentationPreference()
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')

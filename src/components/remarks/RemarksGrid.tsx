@@ -11,6 +11,7 @@ import { alertPresentationForDeadline } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { handleDateInputPaste } from '@/utils/date-input'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 interface RemarksGridProps {
   remarks: RemarkRecord[]
@@ -47,6 +48,7 @@ export function RemarksGrid({
   typeOptions,
   onAddTypeOption,
 }: RemarksGridProps) {
+  useDateTimePresentationPreference()
   const [editingRemarkIds, setEditingRemarkIds] = useState<string[]>([])
 
   function updateRemark(id: string, patch: Partial<RemarkRecord>) {

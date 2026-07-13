@@ -1,6 +1,12 @@
 import { useAppStore } from '@/store/useAppStore'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import {
+  formatDateTime,
+  REGIONAL_DATE_FORMAT_OPTIONS,
+  setRegionalDateFormatPreference,
+  type RegionalDateFormatPreference,
+} from '@/domain/date-time-presentation'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 interface TopHeaderProps {
   title?: string
@@ -10,6 +16,7 @@ export function TopHeader({ title = 'Delivery Project Management' }: TopHeaderPr
   const lastPersistedAt = useAppStore((s) => s.lastPersistedAt)
   const saveToStorage = useAppStore((s) => s.saveToStorage)
   const resetToSeed = useAppStore((s) => s.resetToSeed)
+  const regionalDateFormat = useDateTimePresentationPreference()
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-sf-border bg-sf-header px-6">
@@ -23,6 +30,20 @@ export function TopHeader({ title = 'Delivery Project Management' }: TopHeaderPr
             Saved {formatDateTime(lastPersistedAt)}
           </span>
         )}
+        <label className="hidden items-center gap-2 text-xs text-sf-text-muted lg:flex">
+          Date format
+          <select
+            value={regionalDateFormat}
+            onChange={(event) => setRegionalDateFormatPreference(event.target.value as RegionalDateFormatPreference)}
+            className="h-8 rounded border border-sf-border bg-sf-surface px-2 text-xs font-medium text-sf-text"
+          >
+            {REGIONAL_DATE_FORMAT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => saveToStorage()}

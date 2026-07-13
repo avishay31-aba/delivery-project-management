@@ -96,6 +96,7 @@ import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
 type ConfigKey = keyof TenantConfiguration
@@ -233,6 +234,7 @@ function ReadonlyTable({ headers, rows, emptyText }: { headers: ReactNode[]; row
 }
 
 export function TenantFormPage() {
+  useDateTimePresentationPreference()
   const { tid } = useParams<{ tid: string }>()
 const navigate = useNavigate()
 const location = useLocation()

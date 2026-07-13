@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { activityEventCategoryLabel, type ActivityEvent } from '@/domain/activity-log'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type ActivitySortKey = 'activityId' | 'creationDate' | 'user' | 'eventCategory' | 'description'
 type SortDirection = 'asc' | 'desc'
@@ -53,10 +54,11 @@ export function ActivityTimeline({
   emptyText?: string
   showCategoryFilter?: boolean
 }) {
+  const regionalDateFormat = useDateTimePresentationPreference()
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<ActivitySortKey>('creationDate')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  const rows = useMemo(() => activityRows(events), [events])
+  const rows = useMemo(() => activityRows(events), [events, regionalDateFormat])
   const filteredRows = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase()
     return rows

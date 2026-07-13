@@ -97,6 +97,7 @@ import { accountReference, projectReference, systemReference, tenantReference } 
 import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
 import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
+import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -890,6 +891,7 @@ function RequirementGrid({
 }
 
 export function OpportunityFormPage() {
+  useDateTimePresentationPreference()
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()

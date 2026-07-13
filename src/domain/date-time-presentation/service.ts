@@ -2,28 +2,79 @@ export type DateTimePresentationValue = string | number | Date | null | undefine
 
 export interface DateTimePresentationOptions {
   fallback?: string
-  locale?: string
 }
 
 export type DateTimePresentationKind = 'date' | 'time' | 'datetime' | 'datetime-seconds'
+export type RegionalDateFormatPreference = 'system' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+
+export const REGIONAL_DATE_FORMAT_STORAGE_KEY = 'delivery-erp-regional-date-format'
+export const REGIONAL_DATE_FORMAT_EVENT = 'delivery-erp-regional-date-format-changed'
+
+export const REGIONAL_DATE_FORMAT_OPTIONS: Array<{ value: RegionalDateFormatPreference; label: string }> = [
+  { value: 'system', label: 'System / Workstation Regional Format' },
+  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
+  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
+  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+]
+
+const EXPLICIT_REGIONAL_DATE_FORMATS = new Set<RegionalDateFormatPreference>(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'])
+
+declare global {
+  interface Window {
+    __DELIVERY_ERP_RUNTIME_CONFIG__?: {
+      regionalDateFormat?: RegionalDateFormatPreference
+    }
+  }
+}
 
 function fallbackValue(options?: DateTimePresentationOptions): string {
   return options?.fallback ?? '-'
 }
 
-function userLocale(options?: DateTimePresentationOptions): string | undefined {
-  if (options?.locale) return options.locale
-  if (typeof navigator !== 'undefined') {
-    if (Array.isArray(navigator.languages) && navigator.languages.length > 0) {
-      return navigator.languages[0]
-    }
-    if (navigator.language) return navigator.language
-  }
-  return undefined
+function isRegionalDateFormatPreference(value: unknown): value is RegionalDateFormatPreference {
+  return value === 'system' || EXPLICIT_REGIONAL_DATE_FORMATS.has(value as RegionalDateFormatPreference)
 }
 
-export function userDateTimeLocale(options?: DateTimePresentationOptions): string | undefined {
-  return userLocale(options)
+function runtimeRegionalDateFormat(): RegionalDateFormatPreference {
+  if (typeof window === 'undefined') return 'system'
+  const runtimeValue = window.__DELIVERY_ERP_RUNTIME_CONFIG__?.regionalDateFormat
+  return isRegionalDateFormatPreference(runtimeValue) ? runtimeValue : 'system'
+}
+
+export function regionalDateFormatPreference(): RegionalDateFormatPreference {
+  if (typeof window === 'undefined') return 'system'
+  try {
+    const stored = window.localStorage.getItem(REGIONAL_DATE_FORMAT_STORAGE_KEY)
+    if (isRegionalDateFormatPreference(stored)) return stored
+  } catch {
+    // Ignore unavailable storage; display falls back to runtime/system default.
+  }
+  return runtimeRegionalDateFormat()
+}
+
+export function setRegionalDateFormatPreference(format: RegionalDateFormatPreference): void {
+  if (typeof window === 'undefined') return
+  const nextFormat = isRegionalDateFormatPreference(format) ? format : 'system'
+  try {
+    window.localStorage.setItem(REGIONAL_DATE_FORMAT_STORAGE_KEY, nextFormat)
+  } catch {
+    // Ignore unavailable storage; notify this tab so it still re-renders.
+  }
+  window.dispatchEvent(new CustomEvent(REGIONAL_DATE_FORMAT_EVENT, { detail: nextFormat }))
+}
+
+export function subscribeToRegionalDateFormatPreference(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const handleLocalChange = () => listener()
+  const handleStorageChange = (event: StorageEvent) => {
+    if (event.key === REGIONAL_DATE_FORMAT_STORAGE_KEY) listener()
+  }
+  window.addEventListener(REGIONAL_DATE_FORMAT_EVENT, handleLocalChange)
+  window.addEventListener('storage', handleStorageChange)
+  return () => {
+    window.removeEventListener(REGIONAL_DATE_FORMAT_EVENT, handleLocalChange)
+    window.removeEventListener('storage', handleStorageChange)
+  }
 }
 
 export function userDateTimeZone(): string | undefined {
@@ -57,14 +108,35 @@ function formatPart(
 ): string {
   const parsed = dateOnly ? parseDateOnly(value) : parseDateTime(value)
   if (!parsed) return fallbackValue(presentationOptions)
-  return new Intl.DateTimeFormat(userLocale(presentationOptions), {
+  return new Intl.DateTimeFormat(undefined, {
     ...options,
     timeZone: dateOnly ? undefined : userDateTimeZone(),
   }).format(parsed)
 }
 
+function padDatePart(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function explicitDateParts(value: Date): { year: string; month: string; day: string } {
+  return {
+    year: String(value.getFullYear()),
+    month: padDatePart(value.getMonth() + 1),
+    day: padDatePart(value.getDate()),
+  }
+}
+
 export function formatDate(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
-  return formatPart(value, { year: 'numeric', month: '2-digit', day: '2-digit' }, options, true)
+  const parsed = parseDateOnly(value)
+  if (!parsed) return fallbackValue(options)
+  const preference = regionalDateFormatPreference()
+  if (preference === 'system') {
+    return formatPart(parsed, { year: 'numeric', month: '2-digit', day: '2-digit' }, options, true)
+  }
+  const { year, month, day } = explicitDateParts(parsed)
+  if (preference === 'DD/MM/YYYY') return `${day}/${month}/${year}`
+  if (preference === 'MM/DD/YYYY') return `${month}/${day}/${year}`
+  return `${year}-${month}-${day}`
 }
 
 export function formatDateOnly(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
