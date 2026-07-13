@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
-import type { ActivityEvent } from '@/domain/activity-log'
+import { activityEventCategoryLabel, type ActivityEvent } from '@/domain/activity-log'
 
-type ActivitySortKey = 'activityId' | 'creationDate' | 'user' | 'description'
+type ActivitySortKey = 'activityId' | 'creationDate' | 'user' | 'eventCategory' | 'description'
 type SortDirection = 'asc' | 'desc'
 
 interface ActivityRow {
@@ -10,6 +10,7 @@ interface ActivityRow {
   creationDate: string
   creationDateSort: string
   user: string
+  eventCategory: string
   description: string
 }
 
@@ -17,6 +18,7 @@ const ACTIVITY_COLUMNS: Array<{ key: ActivitySortKey; label: string }> = [
   { key: 'activityId', label: 'Activity ID' },
   { key: 'creationDate', label: 'Creation Date' },
   { key: 'user', label: 'User' },
+  { key: 'eventCategory', label: 'Event Category' },
   { key: 'description', label: 'Description' },
 ]
 
@@ -26,6 +28,7 @@ function activityRows(events: ActivityEvent[]): ActivityRow[] {
     creationDate: formatDateTimeSeconds(event.occurredAt, { fallback: '' }),
     creationDateSort: event.occurredAt,
     user: event.actorName,
+    eventCategory: activityEventCategoryLabel(event),
     description: event.summary,
   }))
 }
@@ -59,7 +62,7 @@ export function ActivityTimeline({
     return rows
       .filter((row) => {
         if (!normalizedSearch) return true
-        return [row.activityId, row.creationDate, row.user, row.description].some((value) =>
+        return [row.activityId, row.creationDate, row.user, row.eventCategory, row.description].some((value) =>
           value.toLocaleLowerCase().includes(normalizedSearch),
         )
       })
@@ -78,7 +81,7 @@ export function ActivityTimeline({
   function exportCsv() {
     const header = ACTIVITY_COLUMNS.map((column) => column.label).join(',')
     const lines = filteredRows.map((row) =>
-      [row.activityId, row.creationDate, row.user, row.description].map(csvValue).join(','),
+      [row.activityId, row.creationDate, row.user, row.eventCategory, row.description].map(csvValue).join(','),
     )
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -140,6 +143,7 @@ export function ActivityTimeline({
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.activityId}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.creationDate}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.user}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.eventCategory}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.description}</td>
               </tr>
             ))}

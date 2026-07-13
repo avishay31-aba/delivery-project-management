@@ -72,6 +72,7 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
+import { formatDate } from '@/domain/date-time-presentation'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -1242,7 +1243,7 @@ export function ProjectFormPage() {
                           {milestone.name}
                         </button>
                       </td>
-                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{milestone.deadline || ''}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{formatDate(milestone.deadline, { fallback: '' })}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(milestone.deadline, status)}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
                       <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">

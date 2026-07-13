@@ -5,14 +5,33 @@ export interface DateTimePresentationOptions {
   locale?: string
 }
 
+export type DateTimePresentationKind = 'date' | 'time' | 'datetime' | 'datetime-seconds'
+
 function fallbackValue(options?: DateTimePresentationOptions): string {
   return options?.fallback ?? '-'
 }
 
 function userLocale(options?: DateTimePresentationOptions): string | undefined {
   if (options?.locale) return options.locale
-  if (typeof navigator !== 'undefined' && navigator.language) return navigator.language
+  if (typeof navigator !== 'undefined') {
+    if (Array.isArray(navigator.languages) && navigator.languages.length > 0) {
+      return navigator.languages[0]
+    }
+    if (navigator.language) return navigator.language
+  }
   return undefined
+}
+
+export function userDateTimeLocale(options?: DateTimePresentationOptions): string | undefined {
+  return userLocale(options)
+}
+
+export function userDateTimeZone(): string | undefined {
+  try {
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone
+  } catch {
+    return undefined
+  }
 }
 
 function parseDateTime(value: DateTimePresentationValue): Date | null {
@@ -38,7 +57,10 @@ function formatPart(
 ): string {
   const parsed = dateOnly ? parseDateOnly(value) : parseDateTime(value)
   if (!parsed) return fallbackValue(presentationOptions)
-  return new Intl.DateTimeFormat(userLocale(presentationOptions), options).format(parsed)
+  return new Intl.DateTimeFormat(userLocale(presentationOptions), {
+    ...options,
+    timeZone: dateOnly ? undefined : userDateTimeZone(),
+  }).format(parsed)
 }
 
 export function formatDate(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
@@ -50,7 +72,7 @@ export function formatDateOnly(value: DateTimePresentationValue, options?: DateT
 }
 
 export function formatTime(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
-  return formatPart(value, { hour: '2-digit', minute: '2-digit', hour12: false }, options)
+  return formatPart(value, { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' }, options)
 }
 
 export function formatDateTime(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
@@ -62,10 +84,29 @@ export function formatDateTime(value: DateTimePresentationValue, options?: DateT
 export function formatDateTimeSeconds(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
   const parsed = parseDateTime(value)
   if (!parsed) return fallbackValue(options)
-  const time = formatPart(parsed, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }, options)
+  const time = formatPart(parsed, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, hourCycle: 'h23' }, options)
   return `${formatDate(parsed, options)} ${time}`
 }
 
 export function formatDateTimeWithSeconds(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
   return formatDateTimeSeconds(value, options)
+}
+
+export function isCanonicalDateOnly(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+export function isCanonicalDateTime(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}/.test(value)
+}
+
+export function formatDateTimePresentation(
+  value: DateTimePresentationValue,
+  kind: DateTimePresentationKind,
+  options?: DateTimePresentationOptions,
+): string {
+  if (kind === 'date') return formatDate(value, options)
+  if (kind === 'time') return formatTime(value, options)
+  if (kind === 'datetime-seconds') return formatDateTimeSeconds(value, options)
+  return formatDateTime(value, options)
 }

@@ -1,5 +1,5 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import type { ActivityEvent } from '@/domain/activity-log'
+import { activityEventCategoryLabel, type ActivityEvent } from '@/domain/activity-log'
 import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 export interface ActivityDashboardRow {
@@ -8,6 +8,7 @@ export interface ActivityDashboardRow {
   creationDate: string
   creationDateSort: string
   user: string
+  eventCategory: string
   description: string
 }
 
@@ -18,6 +19,7 @@ export function activityDashboardRows(events: ActivityEvent[]): ActivityDashboar
     creationDate: formatDateTimeSeconds(event.occurredAt),
     creationDateSort: event.occurredAt,
     user: event.actorName,
+    eventCategory: activityEventCategoryLabel(event),
     description: event.summary,
   }))
 }
@@ -32,6 +34,7 @@ export function createActivityLogColumns(): DashboardColumn<ActivityDashboardRow
       render: (row) => row.creationDate,
     },
     { id: 'user', label: 'User', getValue: (row) => row.user },
+    { id: 'eventCategory', label: 'Event Category', getValue: (row) => row.eventCategory },
     { id: 'description', label: 'Description', getValue: (row) => row.description },
   ]
 }

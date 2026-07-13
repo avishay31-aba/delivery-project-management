@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, CountryFlag } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
@@ -89,6 +89,6 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.warrantyEndDate ?? '', editable: true, editKey: 'warrantyEndDate' },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editable: true, editKey: 'pocStartDate' },
     { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '', editable: true, editKey: 'pocEndDate' },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTime(row.updatedAt) },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
   ]
 }

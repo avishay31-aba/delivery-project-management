@@ -5,6 +5,7 @@ import type {
   ActivityLogDashboardSummary,
   ActivityLogSummary,
 } from './types'
+import { ACTIVITY_EVENT_CATEGORY_LABELS } from './metadata'
 
 function eventMatchesObject(event: ActivityEvent, objectType: string, idOrBusinessId: string): boolean {
   const normalizedObjectType = objectType.toUpperCase()
@@ -55,6 +56,29 @@ export function activityEventsForWarranty(events: ActivityEvent[], warrantyId: s
 
 export function activityEventsByCategory(events: ActivityEvent[], category: ActivityEventCategory): ActivityEvent[] {
   return sortNewestFirst(events.filter((event) => event.category === category))
+}
+
+export function activityEventCategoryLabel(event: ActivityEvent): string {
+  const eventType = event.eventType.toLocaleLowerCase()
+  if (eventType.includes('deallocat')) return 'Deallocation'
+  if (eventType.includes('allocat')) return 'Allocation'
+  if (eventType.includes('config') || eventType.includes('mapcenter')) return 'Configuration'
+  if (eventType.includes('status')) return 'Status Change'
+  if (eventType.includes('document')) return 'Document'
+  if (eventType.includes('warranty')) return 'Warranty'
+  if (eventType.includes('remark')) return 'Remark'
+  if (eventType.includes('relationship') || eventType.includes('link') || eventType.includes('unlink')) return 'Relationship'
+  if (eventType.includes('security')) return 'Security'
+  if (eventType.includes('user')) return 'User Management'
+  if (eventType.includes('admin')) return 'Administration'
+  if (event.category === 'PROJECT') return 'Project'
+  if (event.category === 'SYSTEM') return 'System'
+  if (event.category === 'TENANT') return 'Tenant'
+  if (event.category === 'CUSTOMER') return 'Customer'
+  if (event.category === 'WARRANTY') return 'Warranty'
+  if (event.category === 'ALLOCATION') return 'Allocation'
+  if (event.category === 'DOCUMENT') return 'Document'
+  return ACTIVITY_EVENT_CATEGORY_LABELS[event.category] ?? 'Other'
 }
 
 export function activityEventsByDateRange(

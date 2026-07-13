@@ -4,7 +4,7 @@ import { BusinessIdLink } from '@/components/ui'
 import { getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
 import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, Opportunity, SalesManager, System, Tenant } from '@/data/seed.types'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { getHiddenRequirementTypesWithRows, validateOpportunity } from '@/utils/opportunity-validation'
 
 export function createOpportunityColumns(
@@ -69,6 +69,6 @@ export function createOpportunityColumns(
           ? 'Needs attention'
           : 'Ready',
     },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTime(row.updatedAt) },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
   ]
 }

@@ -8,7 +8,7 @@ import {
   renameDocument,
   replaceDocument as replaceDocumentInCollection,
 } from '@/domain/document-collection'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 interface DocumentsPanelProps {
   documents: DocumentRecord[]
@@ -133,8 +133,8 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                   </td>
                   <td className="border border-sf-border px-1.5 py-1 align-top">{document.fileType}</td>
                   <td className="border border-sf-border px-1.5 py-1 align-top">{formatDocumentSize(document.fileSize)}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.uploadedAt, { fallback: '' })}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTime(document.replacedAt, { fallback: '' })}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTimeSeconds(document.uploadedAt, { fallback: '' })}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTimeSeconds(document.replacedAt, { fallback: '' })}</td>
                 </tr>
               ))}
             </tbody>

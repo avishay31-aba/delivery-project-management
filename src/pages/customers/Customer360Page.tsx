@@ -13,6 +13,7 @@ import {
   customerTypeLabel,
 } from '@/domain/customer-account'
 import { formatDocumentSize } from '@/domain/document-collection'
+import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
 import {
@@ -237,7 +238,7 @@ export function Customer360Page() {
           opportunity.stage,
           opportunity.type,
           opportunity.subType,
-          opportunity.deliveryDate ?? '',
+          formatDate(opportunity.deliveryDate, { fallback: '' }),
         ]),
         'No opportunities found for this customer.',
       )
@@ -260,7 +261,7 @@ export function Customer360Page() {
                 <StatusBadge label={health.healthLabel} variant={badgeVariantForProjectHealthStatus(health.healthStatus)} />
               </span>
             ) : '',
-            project.deliveryDate ?? '',
+            formatDate(project.deliveryDate, { fallback: '' }),
             health?.deliveryDateStatusLabel ?? '',
             health ? <ProgressBar value={health.completionPercent} /> : customerProjectProgress(project),
             health?.currentMilestone ?? '',
@@ -270,7 +271,7 @@ export function Customer360Page() {
                 {health.deadlineRiskLabel}
               </span>
             ) : '',
-            health?.nextDeadline ?? '',
+            formatDate(health?.nextDeadline, { fallback: '' }),
             health?.overdueTaskCount ?? 0,
             alertList(health?.healthAlerts ?? []),
           ]
@@ -320,7 +321,7 @@ export function Customer360Page() {
           row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '',
           row.relatedProjectId ? <BusinessIdLink objectType="PROJECT" businessId={row.relatedProjectId}>{row.relatedProjectId}</BusinessIdLink> : '',
           row.projectName,
-          row.endDate ?? '',
+          formatDate(row.endDate, { fallback: '' }),
           row.daysToExpiration ?? '',
           <span className="inline-flex items-center gap-1.5">
             <AlertStatusIcon variant={alertVariantForWarrantyStatus(row.warrantyStatus, row.tenantHeaderStatus)} label={row.warrantyStatusLabel} />
@@ -366,8 +367,8 @@ export function Customer360Page() {
         document.sourceObjectName,
         document.fileType,
         formatDocumentSize(document.fileSize),
-        document.uploadedAt,
-        document.replacedAt ?? '',
+        formatDateTimeSeconds(document.uploadedAt, { fallback: '' }),
+        formatDateTimeSeconds(document.replacedAt, { fallback: '' }),
         document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : '',
       ]),
       'No documents found across this customer portfolio.',

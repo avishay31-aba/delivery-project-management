@@ -14,7 +14,7 @@ import {
   customerTypeLabel,
   customerWarrantySummary,
 } from '@/domain/customer-account'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 export function createCustomerColumns(
   salesManagers: SalesManager[],
@@ -73,6 +73,6 @@ export function createCustomerColumns(
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.warrantySummary,
       getValue: (row) => customerWarrantySummary(row.id, tenants, warrantyRecords),
     },
-    { id: 'updatedAt', label: CUSTOMER_ACCOUNT_FIELD_LABELS.updatedAt, getValue: (row) => formatDateTime(row.updatedAt) },
+    { id: 'updatedAt', label: CUSTOMER_ACCOUNT_FIELD_LABELS.updatedAt, getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
   ]
 }

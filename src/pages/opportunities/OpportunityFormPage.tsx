@@ -96,7 +96,7 @@ import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
-import { formatDate, formatDateTime } from '@/domain/date-time-presentation'
+import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
@@ -1752,7 +1752,7 @@ export function OpportunityFormPage() {
                         </span>
                       ) : ''}
                     </td>
-                    <td className="border border-sf-border px-2 py-1">{tenant.warrantyEndDate ?? ''}</td>
+                    <td className="border border-sf-border px-2 py-1">{formatDate(tenant.warrantyEndDate, { fallback: '' })}</td>
                   </tr>
                 )
               })}
@@ -2242,8 +2242,8 @@ export function OpportunityFormPage() {
                               variant={badgeVariantForProjectStatus(project.progressStatus)}
                             />
                           </td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTime(project.createdAt)}</td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTime(project.updatedAt)}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTimeSeconds(project.createdAt)}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTimeSeconds(project.updatedAt)}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
                             <BusinessObjectLink reference={projectReference(project)}>
                               Open project

@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
 import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 import {
@@ -123,7 +123,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
     { id: 'allocationType', label: 'Allocation Type', getValue: (row) => row.allocationTypes.join('; ') },
     { id: 'allocationStatus', label: 'Allocation Status', getValue: (row) => row.allocationStatus },
-    { id: 'allocatedAt', label: 'Allocated At', getValue: (row) => formatDateTime(row.allocatedAt) },
+    { id: 'allocatedAt', label: 'Allocated At', getValue: (row) => formatDateTimeSeconds(row.allocatedAt) },
     {
       id: 'projects',
       label: 'Linked Projects',
@@ -157,6 +157,6 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true, options: REGION_OPTIONS },
     { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true, options: REGION_OPTIONS },
     { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editKey: 'operationalStatus', replaceable: true },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTime(row.updatedAt) },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
   ]
 }

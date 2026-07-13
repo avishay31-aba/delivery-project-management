@@ -43,7 +43,12 @@ import {
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
-import { formatDateTime } from '@/domain/date-time-presentation'
+import {
+  formatDate,
+  formatDateTimeSeconds,
+  isCanonicalDateOnly,
+  isCanonicalDateTime,
+} from '@/domain/date-time-presentation'
 import { dashboardRecordModeRoutePath } from '@/domain/dashboard-view'
 
 export interface DashboardColumn<T> {
@@ -167,7 +172,19 @@ function DashboardActionLink<T extends { id: string }>({
 }
 
 function creationDateValue(row: unknown): string {
-  return formatDateTime((row as { createdAt?: string }).createdAt)
+  return formatDateTimeSeconds((row as { createdAt?: string }).createdAt)
+}
+
+function isDatePresentationColumn<T>(column: DashboardColumn<T>): boolean {
+  const key = `${column.id} ${column.label}`.toLocaleLowerCase()
+  return /\b(date|deadline|timestamp)\b/.test(key) || key.includes('created') || key.includes('updated') || key.endsWith(' at')
+}
+
+function formattedDashboardCellValue<T>(column: DashboardColumn<T>, raw: string): string {
+  if (!isDatePresentationColumn(column)) return raw
+  if (isCanonicalDateOnly(raw)) return formatDate(raw, { fallback: raw })
+  if (isCanonicalDateTime(raw)) return formatDateTimeSeconds(raw, { fallback: raw })
+  return raw
 }
 
 function uniqueColumnOptions<T>(rows: T[], sourceColumn?: DashboardColumn<T>): string[] {
@@ -1029,7 +1046,7 @@ export function DataDashboard<T extends { id: string }>({
             )
           }
 
-          const renderedValue = column.render?.(row.original) ?? raw
+          const renderedValue = column.render?.(row.original) ?? formattedDashboardCellValue(column, raw)
 
           return (
             <ClampedTableCellContent title={raw}>
