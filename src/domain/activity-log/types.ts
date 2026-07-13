@@ -24,6 +24,7 @@ export interface ActivityObjectRef {
 
 export interface ActivityEvent {
   id: string
+  technicalId?: string
   occurredAt: string
   actorId: string | null
   actorName: string

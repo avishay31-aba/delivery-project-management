@@ -1,6 +1,7 @@
 import { ACTIVITY_EVENT_SCHEMA_VERSION } from './metadata'
 import { validateActivityEventShape, validateActivityObjectRefShape } from './validation'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { reserveBusinessId } from '@/domain/business-identity'
 import type {
   ActivityEvent,
   ActivityEventCategory,
@@ -38,6 +39,8 @@ export interface ActivityEventInput {
   sequence?: number
 }
 
+const ACTIVITY_BUSINESS_ID_PATTERN = /^ACT\d{6,}$/i
+
 function emptyObjectRef(): ActivityObjectRef {
   return {
     objectType: 'Unknown',
@@ -60,8 +63,12 @@ function normalizeActivityObjectRef(value: unknown): ActivityObjectRef {
 
 export function normalizeActivityEvent(value: unknown): ActivityEvent | null {
   if (!validateActivityEventShape(value)) return null
+  const id = ACTIVITY_BUSINESS_ID_PATTERN.test(value.id)
+    ? value.id
+    : reserveBusinessId('activity')
   return {
-    id: value.id,
+    id,
+    ...(value.technicalId || value.id !== id ? { technicalId: value.technicalId ?? value.id } : {}),
     occurredAt: value.occurredAt,
     actorId: value.actorId,
     actorName: value.actorName,
@@ -103,6 +110,7 @@ export function activityObjectRef(input: ActivityObjectRefInput): ActivityObject
 export function createActivityEvent(input: ActivityEventInput): ActivityEvent {
   return {
     id: input.id,
+    technicalId: `activity-${crypto.randomUUID()}`,
     occurredAt: input.occurredAt,
     ...LOCAL_ACTIVITY_ACTOR,
     source: 'USER',

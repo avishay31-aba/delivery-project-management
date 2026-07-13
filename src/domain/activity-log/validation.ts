@@ -25,6 +25,7 @@ export function validateActivityObjectRefShape(value: unknown): value is Activit
 export function validateActivityEventShape(value: unknown): value is ActivityEvent {
   return isRecord(value) &&
     isString(value.id) &&
+    (value.technicalId === undefined || isString(value.technicalId)) &&
     isString(value.occurredAt) &&
     (value.actorId === null || isString(value.actorId)) &&
     isString(value.actorName) &&

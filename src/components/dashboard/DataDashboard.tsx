@@ -822,19 +822,29 @@ export function DataDashboard<T extends { id: string }>({
   enableRecordActions = true,
   initialSorting = [],
 }: DataDashboardProps<T>) {
+  const hasAuthoritativeCreationDateColumn = columns.some(
+    (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
+  )
+  const sourceColumnIds = useMemo(
+    () => [
+      ROW_INDICATOR_COLUMN_ID,
+      ...(hasAuthoritativeCreationDateColumn ? [] : [CREATION_DATE_COLUMN_ID]),
+      ...columns.map((column) => column.id),
+    ],
+    [columns, hasAuthoritativeCreationDateColumn],
+  )
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>(() => initialSorting)
   const [grouping, setGrouping] = useState<GroupingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => [ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, ...columns.map((column) => column.id)])
+  const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => sourceColumnIds)
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
-    Object.fromEntries([ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, ...columns.map((column) => column.id)].map((columnId) => [columnId, true])),
+    Object.fromEntries(sourceColumnIds.map((columnId) => [columnId, true])),
   )
   const [dashboardUndoStack, setDashboardUndoStack] = useState<SavedDashboardViewState[]>([])
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null)
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
-  const sourceColumnIds = useMemo(() => [ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, ...columns.map((column) => column.id)], [columns])
   const [persistedDashboardViews, setPersistedDashboardViews] = useState(() => loadDashboardViews())
   const [selectedViewId, setSelectedViewId] = useState(FULL_DASHBOARD_VIEW_ID)
   const [pendingViewId, setPendingViewId] = useState<string | null>(null)
@@ -961,7 +971,7 @@ export function DataDashboard<T extends { id: string }>({
         enableColumnFilter: true,
         cell: ({ row }) => <RowIndicator row={row.original} />,
       },
-      {
+      ...(hasAuthoritativeCreationDateColumn ? [] : [{
         id: CREATION_DATE_COLUMN_ID,
         header: 'Creation Date',
         accessorFn: (row) => creationDateValue(row),
@@ -972,7 +982,7 @@ export function DataDashboard<T extends { id: string }>({
           const raw = creationDateValue(row.original)
           return <ClampedTableCellContent title={raw}>{raw}</ClampedTableCellContent>
         },
-      },
+      } satisfies ColumnDef<T>]),
       ...columns.map((column): ColumnDef<T> => ({
         id: column.id,
         header: column.label,
@@ -1029,7 +1039,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, dashboardScope, enableInlineEditing, enableRecordActions, onEdit, onEditRecord, onView],
+    [columns, dashboardScope, enableInlineEditing, enableRecordActions, hasAuthoritativeCreationDateColumn, onEdit, onEditRecord, onView],
   )
 
   const table = useReactTable({
