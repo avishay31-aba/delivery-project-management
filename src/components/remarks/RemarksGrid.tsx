@@ -8,10 +8,10 @@ import {
   type RemarkRecord,
 } from '@/domain/remarks'
 import { alertPresentationForDeadline } from '@/domain/status-presentation'
-import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
 interface RemarksGridProps {
   remarks: RemarkRecord[]
@@ -149,7 +149,9 @@ export function RemarksGrid({
                     )}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.remarkId}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{formatDateTimeSeconds(remark.createdAt)}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
+                    <DateTimeValue value={remark.createdAt} semanticType="datetime" />
+                  </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.author}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? (
@@ -188,7 +190,7 @@ export function RemarksGrid({
                         onChange={(event) => updateRemark(remark.id, { dueDate: event.target.value || null })}
                       />
                     ) : (
-                      formatDate(remark.dueDate, { fallback: '' })
+                      <DateTimeValue value={remark.dueDate} semanticType="date" />
                     )}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">

@@ -1,4 +1,5 @@
 import type { ObjectDefinition, ObjectFieldDefinition } from '@/domain/object-registry'
+import type { DateTimeSemanticType } from '@/domain/date-time-presentation'
 import { resolveObjectRegistryOptions, resolveObjectRegistrySource } from './source-resolver'
 import type {
   RuntimeFormField,
@@ -26,11 +27,17 @@ export function objectFieldToRuntimeFormField(
     section: field.section,
     tab: field.tab,
     options: optionResolution.resolved ? optionResolution.value : undefined,
+    semanticType: semanticTypeForObjectField(field),
     source: field.source,
     picklistSource: field.picklistSource,
     sourceResolution,
     picklistResolution: field.picklistSource ? optionResolution : undefined,
   }
+}
+
+function semanticTypeForObjectField(field: ObjectFieldDefinition): DateTimeSemanticType | undefined {
+  if (field.type === 'date' || field.type === 'time' || field.type === 'datetime') return field.type
+  return undefined
 }
 
 export function objectFieldsToRuntimeFormFields(

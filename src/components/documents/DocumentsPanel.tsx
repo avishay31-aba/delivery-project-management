@@ -8,8 +8,8 @@ import {
   renameDocument,
   replaceDocument as replaceDocumentInCollection,
 } from '@/domain/document-collection'
-import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
 interface DocumentsPanelProps {
   documents: DocumentRecord[]
@@ -135,8 +135,12 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                   </td>
                   <td className="border border-sf-border px-1.5 py-1 align-top">{document.fileType}</td>
                   <td className="border border-sf-border px-1.5 py-1 align-top">{formatDocumentSize(document.fileSize)}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTimeSeconds(document.uploadedAt, { fallback: '' })}</td>
-                  <td className="border border-sf-border px-1.5 py-1 align-top">{formatDateTimeSeconds(document.replacedAt, { fallback: '' })}</td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">
+                    <DateTimeValue value={document.uploadedAt} semanticType="datetime" />
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1 align-top">
+                    <DateTimeValue value={document.replacedAt} semanticType="datetime" />
+                  </td>
                 </tr>
               ))}
             </tbody>

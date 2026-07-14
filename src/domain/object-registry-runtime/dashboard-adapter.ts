@@ -1,5 +1,6 @@
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import type { ObjectFieldDefinition } from '@/domain/object-registry'
+import type { DateTimeSemanticType } from '@/domain/date-time-presentation'
 import { resolveObjectRegistryOptions } from './source-resolver'
 import type {
   RuntimeDashboardSkipReason,
@@ -30,7 +31,13 @@ export function objectFieldToRuntimeDashboardField<T extends object>(
     editKey: editable ? options.editKey ?? field.key as keyof T : undefined,
     editable,
     options: options.options ?? (optionResolution.resolved ? optionResolution.value : undefined),
+    semanticType: semanticTypeForObjectField(field),
   }
+}
+
+function semanticTypeForObjectField(field: ObjectFieldDefinition): DateTimeSemanticType | undefined {
+  if (field.type === 'date' || field.type === 'time' || field.type === 'datetime') return field.type
+  return undefined
 }
 
 export function objectFieldsToRuntimeDashboardColumns<T extends object>(

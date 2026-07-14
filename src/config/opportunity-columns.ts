@@ -4,7 +4,6 @@ import { BusinessIdLink } from '@/components/ui'
 import { getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
 import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, Opportunity, SalesManager, System, Tenant } from '@/data/seed.types'
-import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { getHiddenRequirementTypesWithRows, validateOpportunity } from '@/utils/opportunity-validation'
 
 export function createOpportunityColumns(
@@ -40,7 +39,7 @@ export function createOpportunityColumns(
     { id: 'subType', label: 'Opportunity Sub Type', getValue: (row) => row.subType, editKey: 'subType' },
     { id: 'region', label: 'Region', getValue: (row) => row.region, editKey: 'region', options: REGION_OPTIONS },
     { id: 'country', label: 'Country', getValue: (row) => row.country, editKey: 'country' },
-    { id: 'deliveryDate', label: 'Delivery Date', getValue: (row) => row.deliveryDate ?? '', editKey: 'deliveryDate' },
+    { id: 'deliveryDate', label: 'Delivery Date', getValue: (row) => row.deliveryDate ?? '', editKey: 'deliveryDate', semanticType: 'date' },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editKey: 'pocStartDate' },
     { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '', editKey: 'pocEndDate' },
     {
@@ -69,6 +68,6 @@ export function createOpportunityColumns(
           ? 'Needs attention'
           : 'Ready',
     },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
   ]
 }

@@ -2,7 +2,6 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
-import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { joinUniqueValues, systemIdentity, tenantCountForSystem } from '@/domain/system-inventory'
 
 export function createSystemColumns(
@@ -54,6 +53,6 @@ export function createSystemColumns(
     { id: 'systemClass', label: 'System Class', getValue: (row) => row.systemClass },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
     { id: 'availability', label: 'Availability', getValue: (row) => row.availability },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => formatDateTimeSeconds(row.updatedAt) },
+    { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
   ]
 }

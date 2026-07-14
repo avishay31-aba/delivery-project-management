@@ -4,6 +4,7 @@ import type {
   ObjectMetadataSourceRef,
   ObjectRegistryKey,
 } from '@/domain/object-registry'
+import type { DateTimeSemanticType } from '@/domain/date-time-presentation'
 
 export type RuntimeFieldType = ObjectFieldDefinition['type']
 
@@ -52,6 +53,7 @@ export interface RuntimeFormField {
   section?: string
   tab?: string
   options?: string[]
+  semanticType?: DateTimeSemanticType
   source?: ObjectMetadataSourceRef
   picklistSource?: ObjectMetadataSourceRef
   sourceResolution?: RuntimeSourceResolution
@@ -88,6 +90,7 @@ export interface RuntimeDashboardField<T> {
   editKey?: keyof T
   editable?: boolean
   options?: string[]
+  semanticType?: DateTimeSemanticType
 }
 
 export type RuntimeDashboardSkipReason =

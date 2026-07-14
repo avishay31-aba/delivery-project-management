@@ -1,7 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, StatusBadge } from '@/components/ui'
-import { formatDate } from '@/domain/date-time-presentation'
 import type { RenewalCandidateRow } from '@/domain/warranty-collection'
 import { badgeVariantForRenewalCategory } from '@/domain/status-presentation'
 
@@ -34,7 +33,7 @@ export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
       render: (row) => createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: row.relatedProjectId }, row.relatedProjectId),
     },
     { id: 'warrantyType', label: 'Warranty Type', getValue: (row) => row.warrantyType },
-    { id: 'endDate', label: 'End Date', getValue: (row) => formatDate(row.endDate, { fallback: '' }) },
+    { id: 'endDate', label: 'End Date', getValue: (row) => row.endDate ?? '', semanticType: 'date' },
     { id: 'daysToExpiration', label: 'Days To Expiration', getValue: (row) => text(row.daysToExpiration) },
     { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => row.warrantyStatusLabel },
     { id: 'tenantHeaderStatus', label: 'Tenant Header Status', getValue: (row) => row.tenantHeaderStatusLabel },

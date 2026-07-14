@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { activityEventCategoryLabel, type ActivityEvent } from '@/domain/activity-log'
+import { formatSemanticDateTimeValue } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
 type ActivitySortKey = 'activityId' | 'creationDate' | 'user' | 'eventCategory' | 'description'
 type SortDirection = 'asc' | 'desc'
@@ -26,7 +27,7 @@ const ACTIVITY_COLUMNS: Array<{ key: ActivitySortKey; label: string }> = [
 function activityRows(events: ActivityEvent[]): ActivityRow[] {
   return events.map((event) => ({
     activityId: event.id,
-    creationDate: formatDateTimeSeconds(event.occurredAt, { fallback: '' }),
+    creationDate: event.occurredAt,
     creationDateSort: event.occurredAt,
     user: event.actorName,
     eventCategory: activityEventCategoryLabel(event),
@@ -44,6 +45,10 @@ function compareRows(first: ActivityRow, second: ActivityRow, sortKey: ActivityS
 
 function csvValue(value: string): string {
   return `"${value.replaceAll('"', '""')}"`
+}
+
+function activityCreationDatePresentation(value: string): string {
+  return formatSemanticDateTimeValue(value, 'datetime', { fallback: '' })
 }
 
 export function ActivityTimeline({
@@ -64,7 +69,7 @@ export function ActivityTimeline({
     return rows
       .filter((row) => {
         if (!normalizedSearch) return true
-        return [row.activityId, row.creationDate, row.user, row.eventCategory, row.description].some((value) =>
+        return [row.activityId, activityCreationDatePresentation(row.creationDate), row.user, row.eventCategory, row.description].some((value) =>
           value.toLocaleLowerCase().includes(normalizedSearch),
         )
       })
@@ -83,7 +88,7 @@ export function ActivityTimeline({
   function exportCsv() {
     const header = ACTIVITY_COLUMNS.map((column) => column.label).join(',')
     const lines = filteredRows.map((row) =>
-      [row.activityId, row.creationDate, row.user, row.eventCategory, row.description].map(csvValue).join(','),
+      [row.activityId, activityCreationDatePresentation(row.creationDate), row.user, row.eventCategory, row.description].map(csvValue).join(','),
     )
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -143,7 +148,9 @@ export function ActivityTimeline({
             {filteredRows.map((row) => (
               <tr key={row.activityId} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.activityId}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.creationDate}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
+                  <DateTimeValue value={row.creationDate} semanticType="datetime" />
+                </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.user}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.eventCategory}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.description}</td>

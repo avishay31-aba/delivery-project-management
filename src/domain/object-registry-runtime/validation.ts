@@ -6,7 +6,7 @@ import type {
   RuntimeObjectSummary,
 } from './types'
 
-const RUNTIME_SUPPORTED_FIELD_TYPES = ['text', 'integer', 'date', 'picklist', 'multiselect', 'readonly', 'boolean'] as const
+const RUNTIME_SUPPORTED_FIELD_TYPES = ['text', 'integer', 'date', 'time', 'datetime', 'picklist', 'multiselect', 'readonly', 'boolean'] as const
 
 export function isRuntimeSupportedField(field: ObjectFieldDefinition): boolean {
   return RUNTIME_SUPPORTED_FIELD_TYPES.includes(field.type as typeof RUNTIME_SUPPORTED_FIELD_TYPES[number])

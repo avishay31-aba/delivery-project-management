@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
 import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, PlaceholderCard, ProgressBar, StatusBadge } from '@/components/ui'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { Tenant } from '@/data/seed.types'
 import {
   customerAccount360ReadModel,
@@ -13,7 +14,6 @@ import {
   customerTypeLabel,
 } from '@/domain/customer-account'
 import { formatDocumentSize } from '@/domain/document-collection'
-import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
@@ -240,7 +240,7 @@ export function Customer360Page() {
           opportunity.stage,
           opportunity.type,
           opportunity.subType,
-          formatDate(opportunity.deliveryDate, { fallback: '' }),
+          <DateTimeValue value={opportunity.deliveryDate} semanticType="date" />,
         ]),
         'No opportunities found for this customer.',
       )
@@ -263,7 +263,7 @@ export function Customer360Page() {
                 <StatusBadge label={health.healthLabel} variant={badgeVariantForProjectHealthStatus(health.healthStatus)} />
               </span>
             ) : '',
-            formatDate(project.deliveryDate, { fallback: '' }),
+            <DateTimeValue value={project.deliveryDate} semanticType="date" />,
             health?.deliveryDateStatusLabel ?? '',
             health ? <ProgressBar value={health.completionPercent} /> : customerProjectProgress(project),
             health?.currentMilestone ?? '',
@@ -273,7 +273,7 @@ export function Customer360Page() {
                 {health.deadlineRiskLabel}
               </span>
             ) : '',
-            formatDate(health?.nextDeadline, { fallback: '' }),
+            <DateTimeValue value={health?.nextDeadline} semanticType="date" />,
             health?.overdueTaskCount ?? 0,
             alertList(health?.healthAlerts ?? []),
           ]
@@ -323,7 +323,7 @@ export function Customer360Page() {
           row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '',
           row.relatedProjectId ? <BusinessIdLink objectType="PROJECT" businessId={row.relatedProjectId}>{row.relatedProjectId}</BusinessIdLink> : '',
           row.projectName,
-          formatDate(row.endDate, { fallback: '' }),
+          <DateTimeValue value={row.endDate} semanticType="date" />,
           row.daysToExpiration ?? '',
           <span className="inline-flex items-center gap-1.5">
             <AlertStatusIcon variant={alertVariantForWarrantyStatus(row.warrantyStatus, row.tenantHeaderStatus)} label={row.warrantyStatusLabel} />
@@ -369,8 +369,8 @@ export function Customer360Page() {
         document.sourceObjectName,
         document.fileType,
         formatDocumentSize(document.fileSize),
-        formatDateTimeSeconds(document.uploadedAt, { fallback: '' }),
-        formatDateTimeSeconds(document.replacedAt, { fallback: '' }),
+        <DateTimeValue value={document.uploadedAt} semanticType="datetime" />,
+        <DateTimeValue value={document.replacedAt} semanticType="datetime" />,
         document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : '',
       ]),
       'No documents found across this customer portfolio.',

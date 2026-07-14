@@ -4,6 +4,8 @@ export type ObjectFieldType =
   | 'text'
   | 'integer'
   | 'date'
+  | 'time'
+  | 'datetime'
   | 'picklist'
   | 'multiselect'
   | 'readonly'

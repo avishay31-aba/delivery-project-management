@@ -2,7 +2,6 @@ import { createElement } from 'react'
 import { Check } from 'lucide-react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { AlertStatusIcon, BusinessIdLink } from '@/components/ui'
-import { formatDate } from '@/domain/date-time-presentation'
 import type { WarrantyDashboardRow } from '@/domain/warranty-collection'
 import { alertVariantForWarrantyStatus } from '@/domain/status-presentation'
 
@@ -45,8 +44,8 @@ export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[]
       getValue: (row) => (row.first ? 'Yes' : ''),
       render: (row) => row.first ? createElement(Check, { className: 'mx-auto h-4 w-4 text-black', 'aria-label': 'First warranty' }) : '',
     },
-    { id: 'startDate', label: 'Start Date', getValue: (row) => formatDate(row.startDate, { fallback: '' }) },
-    { id: 'endDate', label: 'End Date', getValue: (row) => formatDate(row.endDate, { fallback: '' }) },
+    { id: 'startDate', label: 'Start Date', getValue: (row) => row.startDate ?? '', semanticType: 'date' },
+    { id: 'endDate', label: 'End Date', getValue: (row) => row.endDate ?? '', semanticType: 'date' },
     { id: 'daysToExpiration', label: 'Days To Expiration', getValue: (row) => row.daysToExpiration },
     { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => row.warrantyStatusLabel },
     { id: 'tenantHeaderStatus', label: 'Tenant Header Status', getValue: (row) => row.tenantHeaderStatusLabel },

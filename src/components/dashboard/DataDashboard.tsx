@@ -44,8 +44,10 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import {
+  formatSemanticDateTimeValue,
   formatDate,
   formatDateTimeSeconds,
+  type DateTimeSemanticType,
   isCanonicalDateOnly,
   isCanonicalDateTime,
 } from '@/domain/date-time-presentation'
@@ -64,6 +66,7 @@ export interface DashboardColumn<T> {
   editable?: boolean
   replaceable?: boolean
   options?: string[]
+  semanticType?: DateTimeSemanticType
 }
 
 
@@ -176,15 +179,19 @@ function creationDateValue(row: unknown): string {
   return formatDateTimeSeconds((row as { createdAt?: string }).createdAt)
 }
 
-function isDatePresentationColumn<T>(column: DashboardColumn<T>): boolean {
+function inferredDatePresentationType<T>(column: DashboardColumn<T>, raw: string): DateTimeSemanticType | undefined {
+  if (column.semanticType) return column.semanticType
   const key = `${column.id} ${column.label}`.toLocaleLowerCase()
-  return /\b(date|deadline|timestamp)\b/.test(key) || key.includes('created') || key.includes('updated') || key.endsWith(' at')
+  if (isCanonicalDateOnly(raw) && (/\b(date|deadline)\b/.test(key) || key.includes('poc start') || key.includes('poc end'))) return 'date'
+  if (isCanonicalDateTime(raw) && (/\b(timestamp)\b/.test(key) || key.includes('created') || key.includes('updated') || key.endsWith(' at'))) return 'datetime'
+  return undefined
 }
 
 function formattedDashboardCellValue<T>(column: DashboardColumn<T>, raw: string): string {
-  if (!isDatePresentationColumn(column)) return raw
-  if (isCanonicalDateOnly(raw)) return formatDate(raw, { fallback: raw })
-  if (isCanonicalDateTime(raw)) return formatDateTimeSeconds(raw, { fallback: raw })
+  const semanticType = inferredDatePresentationType(column, raw)
+  if (semanticType) return formatSemanticDateTimeValue(raw, semanticType, { fallback: raw })
+  if (!column.semanticType && isCanonicalDateOnly(raw)) return formatDate(raw, { fallback: raw })
+  if (!column.semanticType && isCanonicalDateTime(raw)) return formatDateTimeSeconds(raw, { fallback: raw })
   return raw
 }
 
@@ -1150,6 +1157,10 @@ export function DataDashboard<T extends { id: string }>({
   )
   const selectedDashboardView =
     runtimeDashboardViews.find((view) => view.id === selectedViewId) ?? runtimeDashboardViews[0]
+  const dashboardColumnById = useMemo(
+    () => new Map(columns.map((column) => [column.id, column] as const)),
+    [columns],
+  )
   const currentDashboardViewState: SavedDashboardViewState = useMemo(
     () =>
       normalizeDashboardViewState(
@@ -1628,7 +1639,13 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
     const lines = table.getFilteredRowModel().rows.map((row) =>
       visibleColumns
         .map((column) => {
-          const value = String(row.getValue(column.id) ?? '')
+          const sourceColumn = dashboardColumnById.get(column.id)
+          const value =
+            column.id === CREATION_DATE_COLUMN_ID
+              ? creationDateValue(row.original)
+              : sourceColumn
+                ? formattedDashboardCellValue(sourceColumn, String(row.getValue(column.id) ?? ''))
+                : String(row.getValue(column.id) ?? '')
           return `"${value.replaceAll('"', '""')}"`
         })
         .join(','),

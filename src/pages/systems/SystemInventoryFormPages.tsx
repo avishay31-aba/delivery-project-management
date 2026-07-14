@@ -16,6 +16,7 @@ import {
 import { PageHeader } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
@@ -79,7 +80,6 @@ import {
 } from '@/domain/system-inventory'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
-import { formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { activityEventsForSystem } from '@/domain/activity-log'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
@@ -1293,7 +1293,9 @@ function InventoryForm<T extends InventoryRecord>({
                 {records.map((record) => (
                   <tr key={record.id} className="hover:bg-sf-surface-alt">
                     <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordId}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(record.timestamp)}</td>
+                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                      <DateTimeValue value={record.timestamp} semanticType="datetime" />
+                    </td>
                     <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.tid ?? ''}</td>
                     <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordedBy}</td>
                     {APPLICATION_SUMMARY_FIELDS.map((field) => (
@@ -1352,8 +1354,12 @@ function InventoryForm<T extends InventoryRecord>({
                   return (
                     <tr key={row.id} className="hover:bg-sf-surface-alt">
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.recordId}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(row.startDate)}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{formatDateTimeSeconds(row.endDate, { fallback: '' })}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        <DateTimeValue value={row.startDate} semanticType="datetime" />
+                      </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        <DateTimeValue value={row.endDate} semanticType="datetime" />
+                      </td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.purposeType}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
                         {project ? <BusinessObjectLink reference={projectReference(project)}>{row.pid}</BusinessObjectLink> : row.pid}

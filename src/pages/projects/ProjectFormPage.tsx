@@ -22,6 +22,7 @@ import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextCo
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { SystemDeliveryTable } from '@/components/systems'
 import { configurationColumnGroupLabel } from '@/components/configuration'
@@ -72,7 +73,6 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
-import { formatDate } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
@@ -1245,7 +1245,9 @@ export function ProjectFormPage() {
                           {milestone.name}
                         </button>
                       </td>
-                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{formatDate(milestone.deadline, { fallback: '' })}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                        <DateTimeValue value={milestone.deadline} semanticType="date" />
+                      </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(milestone.deadline, status)}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
                       <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">

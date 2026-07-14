@@ -7,6 +7,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
   AlertStatusIcon,
   BusinessObjectLink,
@@ -95,7 +96,6 @@ import { projectReference, systemReference } from '@/domain/business-reference'
 import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
-import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
@@ -1256,7 +1256,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           ]}
           rows={records.map((record: TenantConfigurationHistoryRecord) => [
             record.recordId,
-            formatDateTimeSeconds(record.timestamp),
+            <DateTimeValue value={record.timestamp} semanticType="datetime" />,
             'this',
             record.recordedBy,
             ...CONFIGURATION_FIELDS.map((field) => textValue(configurationValue(record.configuration, field))),
@@ -1287,8 +1287,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               warranty.accountId,
               warranty.relatedProjectId,
               warranty.opportunityId,
-              formatDate(warranty.startDate, { fallback: '' }),
-              formatDate(warranty.endDate, { fallback: '' }),
+              <DateTimeValue value={warranty.startDate} semanticType="date" />,
+              <DateTimeValue value={warranty.endDate} semanticType="date" />,
               warranty.durationDays ?? '',
               warranty.daysBeforeExpiration ?? '',
               displayWarrantyStatus(warranty.warrantyStatus),

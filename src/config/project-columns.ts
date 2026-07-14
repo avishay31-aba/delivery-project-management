@@ -91,9 +91,9 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
         return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })
       },
     },
-    { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project).deliveryDate, editable: true, editKey: 'deliveryDate' },
-    { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project).pocStartDate },
-    { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project).pocEndDate },
+    { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project).deliveryDate, editable: true, editKey: 'deliveryDate', semanticType: 'date' },
+    { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project).pocStartDate, semanticType: 'date' },
+    { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project).pocEndDate, semanticType: 'date' },
     { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
     { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project).hosting },
     {

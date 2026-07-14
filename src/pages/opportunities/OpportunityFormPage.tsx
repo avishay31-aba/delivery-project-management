@@ -51,6 +51,7 @@ import {
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { ActivityTimeline } from '@/components/activity'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -96,7 +97,6 @@ import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
-import { formatDate, formatDateTimeSeconds } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
@@ -692,7 +692,7 @@ function RequirementGrid({
           <option value="">Select warranty</option>
           {tenantWarrantyRecords.map((record) => (
             <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
-              {record.warrantyRecordId} - {record.status} - {formatDate(record.endDate, { fallback: 'No end' })}
+              {record.warrantyRecordId} - {record.status} - <DateTimeValue value={record.endDate} semanticType="date" fallback="No end" />
             </option>
           ))}
         </select>
@@ -1544,7 +1544,7 @@ export function OpportunityFormPage() {
             <option value="">Select warranty</option>
             {accountWarrantyRecords.map((record) => (
               <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
-                {record.warrantyRecordId} - {record.status} - {formatDate(record.endDate, { fallback: 'No end' })}
+                {record.warrantyRecordId} - {record.status} - <DateTimeValue value={record.endDate} semanticType="date" fallback="No end" />
               </option>
             ))}
           </select>
@@ -1754,7 +1754,7 @@ export function OpportunityFormPage() {
                         </span>
                       ) : ''}
                     </td>
-                    <td className="border border-sf-border px-2 py-1">{formatDate(tenant.warrantyEndDate, { fallback: '' })}</td>
+                    <td className="border border-sf-border px-2 py-1"><DateTimeValue value={tenant.warrantyEndDate} semanticType="date" /></td>
                   </tr>
                 )
               })}
@@ -2244,8 +2244,8 @@ export function OpportunityFormPage() {
                               variant={badgeVariantForProjectStatus(project.progressStatus)}
                             />
                           </td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTimeSeconds(project.createdAt)}</td>
-                          <td className="border border-sf-border px-2 py-1 text-sm">{formatDateTimeSeconds(project.updatedAt)}</td>
+                          <td className="border border-sf-border px-2 py-1 text-sm"><DateTimeValue value={project.createdAt} semanticType="datetime" /></td>
+                          <td className="border border-sf-border px-2 py-1 text-sm"><DateTimeValue value={project.updatedAt} semanticType="datetime" /></td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
                             <BusinessObjectLink reference={projectReference(project)}>
                               Open project

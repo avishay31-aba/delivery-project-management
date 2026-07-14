@@ -5,6 +5,7 @@ export interface DateTimePresentationOptions {
 }
 
 export type DateTimePresentationKind = 'date' | 'time' | 'datetime' | 'datetime-seconds'
+export type DateTimeSemanticType = 'date' | 'time' | 'datetime'
 export type RegionalDateFormatPreference = 'system' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 
 export const REGIONAL_DATE_FORMAT_STORAGE_KEY = 'delivery-erp-regional-date-format'
@@ -181,4 +182,15 @@ export function formatDateTimePresentation(
   if (kind === 'time') return formatTime(value, options)
   if (kind === 'datetime-seconds') return formatDateTimeSeconds(value, options)
   return formatDateTime(value, options)
+}
+
+export function formatSemanticDateTimeValue(
+  value: DateTimePresentationValue,
+  semanticType: DateTimeSemanticType | undefined,
+  options?: DateTimePresentationOptions,
+): string {
+  if (semanticType === 'date') return formatDate(value, options)
+  if (semanticType === 'time') return formatTime(value, options)
+  if (semanticType === 'datetime') return formatDateTimeSeconds(value, options)
+  return value == null ? fallbackValue(options) : String(value)
 }
