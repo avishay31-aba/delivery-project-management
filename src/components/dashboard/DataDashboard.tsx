@@ -45,8 +45,6 @@ import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChan
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import {
   formatSemanticDateTimeValue,
-  formatDate,
-  formatDateTimeSeconds,
   type DateTimeSemanticType,
   isCanonicalDateOnly,
   isCanonicalDateTime,
@@ -176,7 +174,7 @@ function DashboardActionLink<T extends { id: string }>({
 }
 
 function creationDateValue(row: unknown): string {
-  return formatDateTimeSeconds((row as { createdAt?: string }).createdAt)
+  return formatSemanticDateTimeValue((row as { createdAt?: string }).createdAt, 'datetime')
 }
 
 function inferredDatePresentationType<T>(column: DashboardColumn<T>, raw: string): DateTimeSemanticType | undefined {
@@ -190,8 +188,8 @@ function inferredDatePresentationType<T>(column: DashboardColumn<T>, raw: string
 function formattedDashboardCellValue<T>(column: DashboardColumn<T>, raw: string): string {
   const semanticType = inferredDatePresentationType(column, raw)
   if (semanticType) return formatSemanticDateTimeValue(raw, semanticType, { fallback: raw })
-  if (!column.semanticType && isCanonicalDateOnly(raw)) return formatDate(raw, { fallback: raw })
-  if (!column.semanticType && isCanonicalDateTime(raw)) return formatDateTimeSeconds(raw, { fallback: raw })
+  if (!column.semanticType && isCanonicalDateOnly(raw)) return formatSemanticDateTimeValue(raw, 'date', { fallback: raw })
+  if (!column.semanticType && isCanonicalDateTime(raw)) return formatSemanticDateTimeValue(raw, 'datetime', { fallback: raw })
   return raw
 }
 
@@ -847,7 +845,7 @@ export function DataDashboard<T extends { id: string }>({
   enableRecordActions = true,
   initialSorting = [],
 }: DataDashboardProps<T>) {
-  useDateTimePresentationPreference()
+  const regionalDateFormat = useDateTimePresentationPreference()
   const hasAuthoritativeCreationDateColumn = columns.some(
     (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
   )
@@ -1065,7 +1063,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, dashboardScope, enableInlineEditing, enableRecordActions, hasAuthoritativeCreationDateColumn, onEdit, onEditRecord, onView],
+    [columns, dashboardScope, enableInlineEditing, enableRecordActions, hasAuthoritativeCreationDateColumn, onEdit, onEditRecord, onView, regionalDateFormat],
   )
 
   const table = useReactTable({

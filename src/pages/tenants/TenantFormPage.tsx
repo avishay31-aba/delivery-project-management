@@ -919,9 +919,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
           {formType === 'POC'
-            ? renderHeaderField('POC Start Date', tenantDraft.pocStartDate ?? opportunity?.pocStartDate ?? '')
-            : renderHeaderField('Delivery Date', project?.deliveryDate ?? '')}
-          {formType === 'POC' ? renderHeaderField('POC End Date', tenantDraft.pocEndDate ?? opportunity?.pocEndDate ?? '') : null}
+            ? renderHeaderField('POC Start Date', <DateTimeValue value={tenantDraft.pocStartDate ?? opportunity?.pocStartDate} semanticType="date" fallback="-" />)
+            : renderHeaderField('Delivery Date', <DateTimeValue value={project?.deliveryDate} semanticType="date" fallback="-" />)}
+          {formType === 'POC' ? renderHeaderField('POC End Date', <DateTimeValue value={tenantDraft.pocEndDate ?? opportunity?.pocEndDate} semanticType="date" fallback="-" />) : null}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Account / End User', tenantDraft.accountName || project?.accountName || '')}

@@ -621,7 +621,7 @@ function InventoryForm<T extends InventoryRecord>({
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
           <div className="sf-readonly-field min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-            {value || '-'}
+            {field.inputType === 'date' ? <DateTimeValue value={value} semanticType="date" fallback="-" /> : value || '-'}
           </div>
         </FormField>
       )

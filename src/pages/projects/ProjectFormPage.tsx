@@ -760,6 +760,15 @@ export function ProjectFormPage() {
           </FormField>
         )
       }
+      if (field.inputType === 'date') {
+        return (
+          <FormField key={field.key} label={label} controlWidthClassName="w-44">
+            <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+              <DateTimeValue value={value} semanticType="date" fallback="-" />
+            </div>
+          </FormField>
+        )
+      }
       return (
         <FormField key={field.key} label={label} controlWidthClassName="w-44">
           <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
