@@ -53,6 +53,13 @@ export function regionalDateFormatPreference(): RegionalDateFormatPreference {
   return runtimeRegionalDateFormat()
 }
 
+export function resolvedRegionalDateFormatPreference(): RegionalDateFormatPreference {
+  const selectedPreference = regionalDateFormatPreference()
+  if (selectedPreference !== 'system') return selectedPreference
+  const runtimePreference = runtimeRegionalDateFormat()
+  return runtimePreference !== 'system' ? runtimePreference : 'system'
+}
+
 export function setRegionalDateFormatPreference(format: RegionalDateFormatPreference): void {
   if (typeof window === 'undefined') return
   const nextFormat = isRegionalDateFormatPreference(format) ? format : 'system'
@@ -130,7 +137,7 @@ function explicitDateParts(value: Date): { year: string; month: string; day: str
 export function formatDate(value: DateTimePresentationValue, options?: DateTimePresentationOptions): string {
   const parsed = parseDateOnly(value)
   if (!parsed) return fallbackValue(options)
-  const preference = regionalDateFormatPreference()
+  const preference = resolvedRegionalDateFormatPreference()
   if (preference === 'system') {
     return formatPart(parsed, { year: 'numeric', month: '2-digit', day: '2-digit' }, options, true)
   }
