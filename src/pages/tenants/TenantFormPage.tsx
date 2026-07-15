@@ -9,6 +9,10 @@ import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
+  EditableChildObjectActionButton,
+  useEditableChildObjectEditor,
+} from '@/components/child-objects'
+import {
   AlertStatusIcon,
   BusinessObjectLink,
   FormField,
@@ -102,7 +106,6 @@ type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documen
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
-type WarrantyDialogDraft = Pick<TenantWarranty, 'id' | 'relatedProjectId' | 'predecessor' | 'startDate' | 'endDate' | 'noWarranty' | 'remark'>
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
@@ -274,8 +277,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [messages, setMessages] = useState<string[]>([])
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
   const [editingWarrantyId, setEditingWarrantyId] = useState<string | null>(null)
-  const [warrantyDialogDraft, setWarrantyDialogDraft] = useState<WarrantyDialogDraft | null>(null)
-  const [warrantyDialogErrors, setWarrantyDialogErrors] = useState<string[]>([])
+  const warrantyEditor = useEditableChildObjectEditor<TenantWarranty>()
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
@@ -372,6 +374,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
   const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(draftComputedWarranties, tenantDraft.tid).label
+  const warrantyDialogDraft = editingWarrantyId ? warrantyEditor.draftFor(editingWarrantyId) ?? null : null
+
+  function warrantyCollectionWithActiveDraft(): TenantWarranty[] {
+    if (!editingWarrantyId || !warrantyDialogDraft) return draftComputedWarranties
+    const source = tenantDraft.warranties ?? []
+    const sourceWithDraft = source.some((warranty) => warranty.id === warrantyDialogDraft.id)
+      ? source.map((warranty) => (warranty.id === warrantyDialogDraft.id ? warrantyDialogDraft : warranty))
+      : [...source, warrantyDialogDraft]
+    return computedWarranties(sourceWithDraft)
+  }
 
   function warrantyOptionsForTenant(selectedTenantId: string, currentWarrantyId: string): Array<{ tenant: Tenant; warranty: TenantWarranty }> {
     if (selectedTenantId === tenantDraft.id) {
@@ -548,41 +560,19 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function openWarrantyDialog(warranty: TenantWarranty) {
     if (isViewMode) return
+    warrantyEditor.beginEdit(warranty)
     setEditingWarrantyId(warranty.id)
-    setWarrantyDialogErrors([])
-    setWarrantyDialogDraft({
-      id: warranty.id,
-      relatedProjectId: warranty.relatedProjectId,
-      predecessor: warranty.predecessor,
-      startDate: warranty.startDate,
-      endDate: warranty.endDate,
-      noWarranty: warranty.noWarranty ?? 'NO',
-      remark: warranty.remark,
-    })
   }
 
   function closeWarrantyDialog() {
+    if (editingWarrantyId) warrantyEditor.cancel(editingWarrantyId)
     setEditingWarrantyId(null)
-    setWarrantyDialogDraft(null)
-    setWarrantyDialogErrors([])
   }
 
-  function updateWarrantyDialogDraft(key: keyof WarrantyDialogDraft, value: string | null) {
+  function updateWarrantyDialogDraft(key: keyof TenantWarranty, value: string | null) {
     if (isViewMode) return
-    setWarrantyDialogDraft((current) => (current ? { ...current, [key]: value } : current))
-    setWarrantyDialogErrors([])
-  }
-
-  function updateWarrantyInline(id: string, patch: Partial<Pick<TenantWarranty, 'relatedProjectId' | 'startDate' | 'endDate'>>) {
-    if (isViewMode) return
-    setDraft((current) => {
-      if (!current) return current
-      const nextWarranties = (current.warranties ?? []).map((warranty) =>
-        warranty.id === id ? { ...warranty, ...patch } : warranty,
-      )
-      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
-    })
-    setMessages([])
+    if (!editingWarrantyId) return
+    warrantyEditor.updateDraft(editingWarrantyId, { [key]: value } as Partial<TenantWarranty>)
   }
 
   function addWarrantyDialogPredecessor() {
@@ -590,15 +580,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (!editingWarrantyId || !warrantyDialogDraft) return
     const selection = predecessorSelections[editingWarrantyId]
     if (!selection?.tenantId || !selection.warrantyId) return
-    const currentWarranty = draftComputedWarranties.find((warranty) => warranty.id === editingWarrantyId)
+    const dialogWarranties = warrantyCollectionWithActiveDraft()
+    const currentWarranty = dialogWarranties.find((warranty) => warranty.id === editingWarrantyId)
     if (currentWarranty && isSelfWarrantyPredecessorSelection(currentWarranty, tenantDraft.id, selection.tenantId, selection.warrantyId)) return
     const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
     const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
     const currentValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
     if (currentValues.includes(predecessorValue)) return
-    setWarrantyDialogDraft({
-      ...warrantyDialogDraft,
+    warrantyEditor.updateDraft(warrantyDialogDraft.id, {
       predecessor: [...currentValues, predecessorValue].join(';'),
     })
     setPredecessorSelections((current) => ({
@@ -610,8 +600,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function removeWarrantyDialogPredecessor(value: string) {
     if (isViewMode) return
     if (!warrantyDialogDraft) return
-    setWarrantyDialogDraft({
-      ...warrantyDialogDraft,
+    warrantyEditor.updateDraft(warrantyDialogDraft.id, {
       predecessor: splitWarrantyPredecessors(warrantyDialogDraft.predecessor).filter((candidate) => candidate !== value).join(';'),
     })
   }
@@ -619,38 +608,33 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function saveWarrantyDialog() {
     if (isViewMode) return
     if (!warrantyDialogDraft) return
-    const errors = validateWarrantyEditDraft(warrantyDialogDraft)
-    if (errors.length > 0) {
-      setWarrantyDialogErrors(errors)
-      return
-    }
-    setDraft((current) => {
-      if (!current) return current
-      const currentWarranties = current.warranties ?? []
-      const currentComputedWarranties = computedWarrantiesForTenant(current, currentWarranties)
-      const currentWarranty = currentComputedWarranties.find((warranty) => warranty.id === warrantyDialogDraft.id)
-      const hasSuccessors = currentWarranty
-        ? successorRefsForWarranty(currentWarranty, currentComputedWarranties, current.tid).length > 0
-        : false
-      const nextWarranties = currentWarranties.map((warranty) =>
-        warranty.id === warrantyDialogDraft.id
-          ? {
-              ...warranty,
-              relatedProjectId: warrantyDialogDraft.relatedProjectId,
-              predecessor: warrantyDialogDraft.predecessor,
-              startDate: warrantyDialogDraft.startDate,
-              endDate: warrantyDialogDraft.endDate,
-              noWarranty: hasSuccessors ? 'NO' : warrantyDialogDraft.noWarranty ?? 'NO',
-              remark: warrantyDialogDraft.remark,
-            }
-          : warranty,
-      )
-      return {
-        ...current,
-        warranties: computedWarrantiesForTenant(current, nextWarranties),
-      }
+    warrantyEditor.save(warrantyDialogDraft.id, {
+      validate: validateWarrantyEditDraft,
+      commit: (committedDraft) => {
+        setDraft((current) => {
+          if (!current) return current
+          const currentWarranties = current.warranties ?? []
+          const currentComputedWarranties = computedWarrantiesForTenant(current, currentWarranties)
+          const currentWarranty = currentComputedWarranties.find((warranty) => warranty.id === committedDraft.id)
+          const hasSuccessors = currentWarranty
+            ? successorRefsForWarranty(currentWarranty, currentComputedWarranties, current.tid).length > 0
+            : false
+          const nextWarranty: TenantWarranty = {
+            ...committedDraft,
+            noWarranty: hasSuccessors ? 'NO' : committedDraft.noWarranty ?? 'NO',
+          }
+          const nextWarranties = currentWarranties.some((warranty) => warranty.id === committedDraft.id)
+            ? currentWarranties.map((warranty) => (warranty.id === committedDraft.id ? nextWarranty : warranty))
+            : [...currentWarranties, nextWarranty]
+          return {
+            ...current,
+            warranties: computedWarrantiesForTenant(current, nextWarranties),
+          }
+        })
+        setMessages([])
+      },
+      onCommitted: () => setEditingWarrantyId(null),
     })
-    closeWarrantyDialog()
   }
 
   function addWarranty() {
@@ -660,13 +644,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       return
     }
 
-    setDraft((current) => {
-      if (!current) return current
-      const warranties = current.warranties ?? []
-      const warranty = createTenantWarranty(current, warranties, project, linkedOpportunityId)
-      const nextWarranties = [...warranties, warranty]
-      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
-    })
+    const warranties = tenantDraft.warranties ?? []
+    const warranty = createTenantWarranty(tenantDraft, warranties, project, linkedOpportunityId)
+    warrantyEditor.beginAdd(warranty)
+    setEditingWarrantyId(warranty.id)
   }
 
   function deleteWarranty(id: string) {
@@ -1305,10 +1286,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       <section className="sf-card space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-sf-text">Warranties</h2>
-          <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add warranty
-          </button>
+          {isViewMode ? null : (
+            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add warranty
+            </button>
+          )}
         </div>
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
           <table className="min-w-full border-collapse text-sm leading-tight">
@@ -1325,8 +1308,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">
                     <div className="flex items-center gap-2">
-                      <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
-                      <button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button>
+                      {isViewMode ? null : (
+                        <>
+                          <button type="button" className="text-sf-brand hover:underline" onClick={() => openWarrantyDialog(warranty)}>Edit</button>
+                          <button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button>
+                        </>
+                      )}
                     </div>
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
@@ -1335,34 +1322,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.accountId}</td>
-                  <td className="border border-sf-border px-1.5 py-1">
-                    <select className="h-8 min-w-44 rounded border border-sf-border px-2 py-1 text-sm" value={warranty.relatedProjectId} onChange={(event) => updateWarrantyInline(warranty.id, { relatedProjectId: event.target.value })}>
-                      <option value="">Select project</option>
-                      {relatedProjects.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {candidate.pid}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">{relatedProjects.find((candidate) => candidate.id === warranty.relatedProjectId)?.pid ?? warranty.relatedProjectId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <input
-                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
-                      type="date"
-                      value={warranty.startDate ?? ''}
-                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { startDate: nextValue }))}
-                      onChange={(event) => updateWarrantyInline(warranty.id, { startDate: event.target.value || null })}
-                    />
+                    <DateTimeValue value={warranty.startDate} semanticType="date" />
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">
-                    <input
-                      className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
-                      type="date"
-                      value={warranty.endDate ?? ''}
-                      onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyInline(warranty.id, { endDate: nextValue }))}
-                      onChange={(event) => updateWarrantyInline(warranty.id, { endDate: event.target.value || null })}
-                    />
+                    <DateTimeValue value={warranty.endDate} semanticType="date" />
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
@@ -1384,12 +1350,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderWarrantyDialog() {
     if (!editingWarrantyId || !warrantyDialogDraft) return null
-    const warranty = draftComputedWarranties.find((candidate) => candidate.id === editingWarrantyId)
+    const dialogWarranties = warrantyCollectionWithActiveDraft()
+    const warranty = dialogWarranties.find((candidate) => candidate.id === editingWarrantyId)
     if (!warranty) return null
+    const warrantyDialogErrors = warrantyEditor.errorsFor(editingWarrantyId)
+    const isWarrantySaving = warrantyEditor.isSaving(editingWarrantyId)
     const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
     const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
     const predecessorValues = splitWarrantyPredecessors(warrantyDialogDraft.predecessor)
-    const hasSuccessors = successorRefsForWarranty(warranty, draftComputedWarranties, tenantDraft.tid).length > 0
+    const hasSuccessors = successorRefsForWarranty(warranty, dialogWarranties, tenantDraft.tid).length > 0
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
@@ -1398,7 +1367,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             <div>
               <h2 id="warranty-dialog-title" className="text-lg font-semibold">Edit warranty {warranty.warrantyId}</h2>
             </div>
-            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
+            <EditableChildObjectActionButton
+              className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-wait disabled:opacity-70"
+              disabled={isWarrantySaving}
+              onClick={closeWarrantyDialog}
+            >
+              Cancel
+            </EditableChildObjectActionButton>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {warrantyDialogErrors.length > 0 ? (
@@ -1408,7 +1383,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             ) : null}
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Related Project ID</span>
-              <select className="h-9 w-full rounded border border-sf-border px-2 py-1" value={warrantyDialogDraft.relatedProjectId} onChange={(event) => updateWarrantyDialogDraft('relatedProjectId', event.target.value)}>
+              <select
+                className={[
+                  'h-9 w-full rounded border px-2 py-1',
+                  warrantyDialogErrors.length > 0 ? 'border-red-500' : 'border-sf-border',
+                ].join(' ')}
+                value={warrantyDialogDraft.relatedProjectId}
+                onChange={(event) => updateWarrantyDialogDraft('relatedProjectId', event.target.value)}
+              >
                 <option value="">Select project</option>
                 {relatedProjects.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
@@ -1511,8 +1493,20 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             </label>
           </div>
           <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={closeWarrantyDialog}>Cancel</button>
-            <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm text-white" onClick={saveWarrantyDialog}>Save</button>
+            <EditableChildObjectActionButton
+              className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:cursor-wait disabled:opacity-70"
+              disabled={isWarrantySaving}
+              onClick={closeWarrantyDialog}
+            >
+              Cancel
+            </EditableChildObjectActionButton>
+            <EditableChildObjectActionButton
+              className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm text-white disabled:cursor-wait disabled:opacity-70"
+              disabled={isWarrantySaving}
+              onClick={saveWarrantyDialog}
+            >
+              {isWarrantySaving ? 'Saving...' : 'Save'}
+            </EditableChildObjectActionButton>
           </div>
         </div>
       </div>,

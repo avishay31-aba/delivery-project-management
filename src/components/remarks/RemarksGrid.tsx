@@ -1,5 +1,10 @@
-import { useState } from 'react'
-import { Edit2, Plus, Trash2 } from 'lucide-react'
+import { useEffect } from 'react'
+import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
+import {
+  EditableChildObjectActionButton,
+  editableChildObjectPermissions,
+  useEditableChildObjectEditor,
+} from '@/components/child-objects'
 import { RichTextContent, RichTextEditor } from '@/components/ui'
 import {
   createRemarkRecord,
@@ -23,6 +28,10 @@ interface RemarksGridProps {
 
 function isAddNewOption(value: string): boolean {
   return value === 'Add new...'
+}
+
+function plainTextContent(value: string): string {
+  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
 
 function renderDeadlineAlert(dueDate: string | null | undefined) {
@@ -49,36 +58,37 @@ export function RemarksGrid({
   onAddTypeOption,
 }: RemarksGridProps) {
   useDateTimePresentationPreference()
-  const [editingRemarkIds, setEditingRemarkIds] = useState<string[]>([])
+  const editor = useEditableChildObjectEditor<RemarkRecord>()
+  const permissions = editableChildObjectPermissions({ readOnly })
+  const committedRemarkIds = remarks.map((remark) => remark.id).join('|')
+  const renderedRemarks = [
+    ...remarks,
+    ...editor.newDrafts.filter((draft) => !remarks.some((remark) => remark.id === draft.id)),
+  ]
 
-  function updateRemark(id: string, patch: Partial<RemarkRecord>) {
+  useEffect(() => {
+    editor.reset()
+  }, [committedRemarkIds])
+
+  function commitRemark(draft: RemarkRecord, isNew: boolean) {
     const now = new Date().toISOString()
+    const committedRemark = isNew
+      ? draft
+      : { ...draft, updatedAt: now, updatedBy: CURRENT_USER_DISPLAY_NAME }
     onChange(
-      remarks.map((remark) =>
-        remark.id === id
-          ? { ...remark, ...patch, updatedAt: now, updatedBy: CURRENT_USER_DISPLAY_NAME }
-          : remark,
-      ),
+      isNew
+        ? [...remarks, committedRemark]
+        : remarks.map((remark) => (remark.id === draft.id ? committedRemark : remark)),
     )
   }
 
   function addRemark() {
     const remark = createRemarkRecord(remarks)
-    onChange([...remarks, remark])
-    setEditingRemarkIds((current) => [...current, remark.id])
+    editor.beginAdd(remark)
   }
 
   function deleteRemark(id: string) {
     onChange(remarks.filter((remark) => remark.id !== id))
-    setEditingRemarkIds((current) => current.filter((remarkId) => remarkId !== id))
-  }
-
-  function setEditing(id: string, editing: boolean) {
-    setEditingRemarkIds((current) =>
-      editing
-        ? Array.from(new Set([...current, id]))
-        : current.filter((remarkId) => remarkId !== id),
-    )
   }
 
   function handleTypeChange(id: string, value: string) {
@@ -87,18 +97,32 @@ export function RemarksGrid({
       const trimmed = nextValue?.trim()
       if (!trimmed) return
       onAddTypeOption?.(trimmed)
-      updateRemark(id, { type: trimmed })
+      editor.updateDraft(id, { type: trimmed })
       return
     }
 
-    updateRemark(id, { type: value })
+    editor.updateDraft(id, { type: value })
+  }
+
+  function validateRemark(draft: RemarkRecord): string[] {
+    const errors: string[] = []
+    if (!draft.type.trim()) errors.push('Type is required.')
+    if (!plainTextContent(draft.content)) errors.push('Content is required.')
+    return errors
+  }
+
+  function saveRemark(id: string) {
+    editor.save(id, {
+      validate: validateRemark,
+      commit: commitRemark,
+    })
   }
 
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-sf-text">Remarks</h3>
-        {readOnly ? null : (
+        {permissions.canAdd ? (
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
@@ -107,7 +131,7 @@ export function RemarksGrid({
             <Plus className="h-4 w-4" aria-hidden="true" />
             Add remark
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="sf-scroll-x rounded border border-sf-border bg-white">
@@ -122,42 +146,76 @@ export function RemarksGrid({
             </tr>
           </thead>
           <tbody>
-            {remarks.map((remark) => {
-              const isEditing = !readOnly && editingRemarkIds.includes(remark.id)
+            {renderedRemarks.map((remark) => {
+              const draft = editor.draftFor(remark.id)
+              const rowRemark = draft ?? remark
+              const isEditing = permissions.canEdit && Boolean(draft)
+              const errors = editor.errorsFor(remark.id)
+              const isSaving = editor.isSaving(remark.id)
               return (
                 <tr key={remark.id} className="hover:bg-sf-surface-alt">
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
                     {readOnly ? null : (
                       <div className="flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-                          onClick={() => setEditing(remark.id, !isEditing)}
-                        >
-                          <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          {isEditing ? 'Done' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                          onClick={() => deleteRemark(remark.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                          Delete
-                        </button>
+                        {isEditing ? (
+                          <>
+                            <EditableChildObjectActionButton
+                              className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
+                              disabled={isSaving}
+                              onClick={() => saveRemark(remark.id)}
+                            >
+                              <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                              {isSaving ? 'Saving...' : 'Save'}
+                            </EditableChildObjectActionButton>
+                            <EditableChildObjectActionButton
+                              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                              disabled={isSaving}
+                              onClick={() => editor.cancel(remark.id)}
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                              Cancel
+                            </EditableChildObjectActionButton>
+                          </>
+                        ) : (
+                          <>
+                            {permissions.canEdit ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                                onClick={() => editor.beginEdit(remark)}
+                              >
+                                <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                Edit
+                              </button>
+                            ) : null}
+                            {permissions.canDelete ? (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                                onClick={() => deleteRemark(remark.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                Delete
+                              </button>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.remarkId}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{rowRemark.remarkId}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    <DateTimeValue value={remark.createdAt} semanticType="datetime" />
+                    <DateTimeValue value={rowRemark.createdAt} semanticType="datetime" />
                   </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{remark.author}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{rowRemark.author}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? (
                       <select
-                        className="h-8 w-56 rounded border border-sf-border px-2 py-1 text-sm"
-                        value={remark.type}
+                        className={[
+                          'h-8 w-56 rounded border px-2 py-1 text-sm',
+                          errors.some((error) => error.includes('Type')) ? 'border-red-500' : 'border-sf-border',
+                        ].join(' ')}
+                        value={rowRemark.type}
                         onChange={(event) => handleTypeChange(remark.id, event.target.value)}
                       >
                         {typeOptions.map((option) => (
@@ -165,41 +223,48 @@ export function RemarksGrid({
                         ))}
                       </select>
                     ) : (
-                      remark.type
+                      rowRemark.type
                     )}
                   </td>
                   <td className="min-w-80 max-w-[36rem] border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? (
-                      <RichTextEditor
-                        value={remark.content}
-                        onChange={(value) => updateRemark(remark.id, { content: value })}
-                        minHeightClassName="min-h-16"
-                        toolbarMode="focus"
-                      />
+                      <div className={errors.some((error) => error.includes('Content')) ? 'rounded border border-red-500' : undefined}>
+                        <RichTextEditor
+                          value={rowRemark.content}
+                          onChange={(value) => editor.updateDraft(remark.id, { content: value })}
+                          minHeightClassName="min-h-16"
+                          toolbarMode="focus"
+                        />
+                      </div>
                     ) : (
-                      <RichTextContent value={remark.content} />
+                      <RichTextContent value={rowRemark.content} />
                     )}
+                    {isEditing && errors.length > 0 ? (
+                      <div className="mt-1 space-y-0.5 text-xs text-red-700">
+                        {errors.map((error) => <div key={error}>{error}</div>)}
+                      </div>
+                    ) : null}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? (
                       <input
                         className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
                         type="date"
-                        value={remark.dueDate ?? ''}
-                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateRemark(remark.id, { dueDate: nextValue }))}
-                        onChange={(event) => updateRemark(remark.id, { dueDate: event.target.value || null })}
+                        value={rowRemark.dueDate ?? ''}
+                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => editor.updateDraft(remark.id, { dueDate: nextValue }))}
+                        onChange={(event) => editor.updateDraft(remark.id, { dueDate: event.target.value || null })}
                       />
                     ) : (
-                      <DateTimeValue value={remark.dueDate} semanticType="date" />
+                      <DateTimeValue value={rowRemark.dueDate} semanticType="date" />
                     )}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {renderDeadlineAlert(remark.dueDate)}
+                    {renderDeadlineAlert(rowRemark.dueDate)}
                   </td>
                 </tr>
               )
             })}
-            {remarks.length === 0 ? (
+            {renderedRemarks.length === 0 ? (
               <tr>
                 <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={8}>
                   No remarks yet.
