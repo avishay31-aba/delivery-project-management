@@ -14,6 +14,10 @@ export function projectSavePatch(project: Project): Partial<Project> {
     deliveryDate: project.deliveryDate,
     pocStartDate: project.pocStartDate ?? null,
     pocEndDate: project.pocEndDate ?? null,
+    region: project.region ?? '',
+    country: project.country ?? '',
+    state: project.state ?? '',
+    timeGroup: project.timeGroup ?? '',
     milestoneTemplateId: project.milestoneTemplateId,
     milestones: project.milestones,
     tasks: project.tasks,
@@ -26,8 +30,7 @@ export function projectStatusFromTaskCompletion(project: Pick<Project, 'progress
   if (project.progressStatus === 'ARCHIVED') return 'ARCHIVED'
   const tasks = project.tasks ?? []
   if (tasks.length > 0 && tasks.every((task) => task.status === 'DONE')) return 'DONE'
-  if (tasks.some((task) => task.status !== 'DONE') && project.progressStatus === 'DONE') return 'OPEN'
-  return project.progressStatus
+  return 'OPEN'
 }
 
 export function applyProjectLifecycleStatus(project: Project): Project {
@@ -45,6 +48,7 @@ export function normalizeProjectLifecycleProject(project: Project): Project {
     projectSource: projectSourceFor(project),
     pocStartDate: project.pocStartDate ?? null,
     pocEndDate: project.pocEndDate ?? null,
+    progressStatus: projectStatusFromTaskCompletion(project),
   }
 }
 
@@ -61,6 +65,10 @@ export function createStandaloneProject(nextPid: string, now: string): Project {
     pocStartDate: null,
     pocEndDate: null,
     progressStatus: 'OPEN',
+    region: '',
+    country: '',
+    state: '',
+    timeGroup: '',
     dealOwner: '',
     opportunityName: '',
     canceledAt: null,

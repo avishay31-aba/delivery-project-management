@@ -2,6 +2,7 @@ import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/mileston
 import { getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
 import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
+import { projectTimeZoneDisplayValue, resolveGeographicTimeZone } from '@/domain/geographic-time-zone'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -78,6 +79,22 @@ function linkedOwnerForProject(
   salesManagers: ProjectDeliveryDashboardContext['salesManagers'],
 ): string {
   return salesManagers.find((manager) => manager.id === account?.salesManagerId)?.name ?? project.dealOwner
+}
+
+function projectLocationContext(
+  project: Project,
+  linkedOpportunity: Opportunity | undefined,
+  account: ReturnType<typeof linkedAccountForProject> | ProjectLifecycleContext['account'],
+) {
+  const country = linkedOpportunity?.country ?? account?.country ?? project.country ?? ''
+  const state = linkedOpportunity?.state ?? account?.state ?? project.state ?? ''
+  return {
+    region: linkedOpportunity?.region ?? account?.region ?? project.region ?? '',
+    country,
+    state,
+    timeZone: projectTimeZoneDisplayValue(country, state, project.deliveryDate),
+    timeGroup: linkedOpportunity?.timeGroup ?? account?.timeGroup ?? project.timeGroup ?? '',
+  }
 }
 
 function uniqueText(values: unknown[]): string[] {
@@ -222,7 +239,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const progress = deriveProjectProgress(context.project)
   const configuration = projectConfigurationSummary(context, opportunity)
   const health = projectHealthReadModel(context)
-  const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
+  const location = projectLocationContext(context.project, opportunity, account)
+  const completed = context.project.progressStatus === 'DONE'
   const projectAlerts = [
     ...health.healthAlerts,
     !completed && isPastDate(context.project.pocStartDate ?? opportunity?.pocStartDate) ? 'POC start date overdue' : null,
@@ -234,8 +252,8 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     projectName: context.project.opportunityName,
     endUser: account?.accountName ?? context.project.accountName,
     payingCustomer: account?.accountName ?? context.project.accountName,
-    region: opportunity?.region ?? account?.region ?? '',
-    country: opportunity?.country ?? account?.country ?? '',
+    region: location.region,
+    country: location.country,
     status: context.project.progressStatus,
     statusLabel: projectStatusLabel(context.project.progressStatus),
     deliveryDate: context.project.deliveryDate ?? '',
@@ -266,7 +284,6 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
 
 export function projectStatusLabel(status: string): string {
   if (status === 'DONE') return 'Done'
-  if (status === 'IN_PROGRESS') return 'In Progress'
   if (status === 'ARCHIVED') return 'Archived'
   return 'Open'
 }
@@ -321,7 +338,7 @@ export function projectHealthReadModel(
   today = new Date(),
 ): ProjectHealthReadModel {
   const progress = deriveProjectProgress(context.project)
-  const completed = context.project.progressStatus === 'DONE' || progress.percent >= 100
+  const completed = context.project.progressStatus === 'DONE'
   const deadlineSummary = completed ? EMPTY_PROJECT_DEADLINE_SUMMARY : projectDeadlineSummary(context.project, today)
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
   const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
@@ -456,13 +473,13 @@ export function projectHeaderFieldValue(
     case 'accountName':
       return context.account?.accountName ?? project.accountName
     case 'region':
-      return context.linkedOpportunity?.region ?? context.account?.region ?? ''
+      return projectLocationContext(project, context.linkedOpportunity, context.account).region
     case 'country':
-      return context.linkedOpportunity?.country ?? context.account?.country ?? ''
+      return projectLocationContext(project, context.linkedOpportunity, context.account).country
     case 'state':
-      return context.linkedOpportunity?.state ?? context.account?.state ?? ''
+      return projectLocationContext(project, context.linkedOpportunity, context.account).state
     case 'timeZone':
-      return context.linkedOpportunity?.timeZone ?? context.account?.timeZone ?? ''
+      return projectLocationContext(project, context.linkedOpportunity, context.account).timeZone
     case 'timeGroup':
       return context.linkedOpportunity?.timeGroup ?? context.account?.timeGroup ?? ''
     case 'pocStartDate':
@@ -487,6 +504,11 @@ export function projectHeaderFieldValue(
     default:
       return textValue(project[key as keyof Project])
   }
+}
+
+export function projectTimeZoneResolution(project: Project, context: ProjectLifecycleContext = {}) {
+  const location = projectLocationContext(project, context.linkedOpportunity, context.account)
+  return resolveGeographicTimeZone(location.country, location.state, project.deliveryDate)
 }
 
 export function isProjectHeaderFieldChanged(

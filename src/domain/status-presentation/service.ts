@@ -4,7 +4,6 @@ import {
   Check,
   CheckCircle2,
   CircleCheck,
-  CirclePlay,
   Info,
   LockKeyhole,
   OctagonAlert,
@@ -35,7 +34,6 @@ const DEFAULT_PRESENTATION: StatusPresentation = {
 const BADGE_PRESENTATIONS: Record<StatusBadgeVariant, StatusPresentation> = {
   default: { ...DEFAULT_PRESENTATION, key: 'default', label: 'Default', badgeClassName: 'bg-gray-100 text-gray-800' },
   open: { ...DEFAULT_PRESENTATION, key: 'open', label: 'Open', icon: Square, iconClassName: 'fill-emerald-100 stroke-0 text-emerald-100', badgeClassName: 'bg-gray-200 text-gray-800' },
-  in_progress: { ...DEFAULT_PRESENTATION, key: 'in_progress', label: 'In Progress', icon: CirclePlay, iconClassName: 'text-amber-500', badgeClassName: 'bg-blue-100 text-sf-brand-dark' },
   done: { ...DEFAULT_PRESENTATION, key: 'done', label: 'Done', icon: Check, iconClassName: 'text-blue-800', badgeClassName: 'bg-green-100 text-sf-success' },
   warning: { ...DEFAULT_PRESENTATION, key: 'warning', label: 'Warning', icon: AlertTriangle, iconClassName: 'text-amber-600', badgeClassName: 'bg-orange-100 text-orange-800' },
   error: { ...DEFAULT_PRESENTATION, key: 'error', label: 'Error', icon: OctagonAlert, iconClassName: 'text-red-700', badgeClassName: 'bg-red-100 text-sf-error' },
@@ -62,7 +60,6 @@ const OPERATIONAL_PRESENTATIONS: Record<string, StatusPresentation> = {
 
 const PROJECT_PRESENTATIONS: Record<string, StatusPresentation> = {
   open: { ...BADGE_PRESENTATIONS.open, key: 'open', kind: 'project', label: 'Open', tooltip: 'Project status: Open' },
-  in_progress: { ...BADGE_PRESENTATIONS.in_progress, key: 'in_progress', kind: 'project', label: 'In Progress', tooltip: 'Project status: In Progress' },
   done: { ...BADGE_PRESENTATIONS.done, key: 'done', kind: 'project', label: 'Done', tooltip: 'Project status: Done' },
   archived: { ...BADGE_PRESENTATIONS.default, key: 'archived', kind: 'project', label: 'Archived', icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: 'Project status: Archived' },
 }
@@ -126,7 +123,6 @@ export function productMismatchPresentation(): StatusPresentation {
 
 export function badgeVariantForProjectStatus(status: string): StatusBadgeVariant {
   if (status === 'DONE') return 'done'
-  if (status === 'IN_PROGRESS') return 'in_progress'
   if (status === 'ARCHIVED') return 'default'
   return 'open'
 }

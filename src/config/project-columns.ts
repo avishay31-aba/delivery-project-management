@@ -83,9 +83,6 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       id: 'status',
       label: 'Status',
       getValue: (project) => projectRow(project).statusLabel,
-      editable: true,
-      editKey: 'progressStatus',
-      options: ['OPEN', 'DONE'],
       render: (project) => {
         const row = projectRow(project)
         return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })

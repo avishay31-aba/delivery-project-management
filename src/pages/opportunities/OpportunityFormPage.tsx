@@ -1007,7 +1007,7 @@ export function OpportunityFormPage() {
   const currentSavedOpportunity = savedOpportunity
 
   function opportunityProjectMilestoneSummary() {
-    const activeProject = createdProjects.find((project) => project.progressStatus !== 'DONE') ?? createdProjects[0]
+    const activeProject = createdProjects.find((project) => project.progressStatus !== 'DONE' && project.progressStatus !== 'ARCHIVED') ?? createdProjects[0]
     if (!activeProject) return { current: '', next: '' }
     const progress = deriveProjectProgress(activeProject)
     const nextMilestone = orderedProjectMilestones(activeProject).find(
@@ -1698,7 +1698,7 @@ export function OpportunityFormPage() {
 
   function renderProjectChangeBadge(changeStatus: ProjectLifecycleChange['changeStatus'] | null) {
     if (!changeStatus) return null
-    return <StatusBadge label={changeStatus} variant={changeStatus === 'New' ? 'done' : 'in_progress'} />
+    return <StatusBadge label={changeStatus} variant={changeStatus === 'New' ? 'done' : 'warning'} />
   }
 
   function renderExistingTenantsAndSystemsSection() {

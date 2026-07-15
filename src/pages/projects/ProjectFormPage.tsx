@@ -69,6 +69,7 @@ import {
   projectPatchFromOpportunitySelection,
   projectSavePatch,
   projectStatusLabel,
+  projectTimeZoneValidationFieldKeys,
   systemProductMismatchForProject,
   validateProjectSave,
 } from '@/domain/project-lifecycle'
@@ -474,6 +475,11 @@ export function ProjectFormPage() {
   if (currentDraft && !currentDraft.opportunityName.trim()) {
     missingFields.add('opportunityName')
   }
+  if (currentDraft) {
+    projectTimeZoneValidationFieldKeys(currentDraft, { linkedOpportunity, account, salesManager }).forEach((fieldKey) => {
+      missingFields.add(fieldKey)
+    })
+  }
 
   useEffect(() => {
     setDraft((current) => {
@@ -671,7 +677,7 @@ export function ProjectFormPage() {
 
   function saveProject(stayOnPage: boolean, onSaved?: () => void) {
     if (isViewMode) return
-    const messages = validateProjectSave(projectDraft)
+    const messages = validateProjectSave(projectDraft, { linkedOpportunity, account, salesManager })
     if (messages.length > 0) {
       setSaveMessages(messages)
       navigationBlocker.reset?.()

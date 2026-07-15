@@ -775,7 +775,7 @@
       "deliveryDate": "2026-07-28",
       "pocStartDate": "2026-07-08",
       "pocEndDate": "2026-07-28",
-      "progressStatus": "IN_PROGRESS",
+      "progressStatus": "OPEN",
       "dealOwner": "Maya Cohen",
       "opportunityName": "Northbridge POC Deployment",
       "canceledAt": null,
@@ -988,7 +988,7 @@
       "mainType": "DELIVERY",
       "subType": "UPSELL",
       "deliveryDate": "2026-07-27",
-      "progressStatus": "IN_PROGRESS",
+      "progressStatus": "OPEN",
       "dealOwner": "Noah Stein",
       "opportunityName": "Cedar County Upsell Analytics",
       "canceledAt": null,
@@ -2391,7 +2391,7 @@
           "projectName": "Northbridge POC Deployment",
           "accountName": "Northbridge Public Safety",
           "product": "Tangles",
-          "projectStatus": "IN_PROGRESS"
+          "projectStatus": "OPEN"
         }
       ],
       "tenantCount": 0,

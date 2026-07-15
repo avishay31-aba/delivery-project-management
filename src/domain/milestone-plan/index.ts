@@ -79,9 +79,8 @@ export function projectMilestoneStatus(project: MilestonePlan, milestoneId: stri
   const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
   if (tasks.length === 0) return 'OPEN'
   const doneCount = tasks.filter((task) => task.status === 'DONE').length
-  if (doneCount === 0) return 'OPEN'
   if (doneCount === tasks.length) return 'DONE'
-  return 'IN_PROGRESS'
+  return 'OPEN'
 }
 
 export function projectMilestoneTaskProgress(project: MilestonePlan, milestoneId: string): number {
@@ -225,7 +224,7 @@ export function deriveProjectProgress(project: MilestonePlan): ProjectProgressSu
 
   const statuses = milestones.map((milestone) => projectMilestoneStatus(project, milestone.id))
   const lastDoneIndex = statuses.reduce((lastIndex, status, index) => (status === 'DONE' ? index : lastIndex), -1)
-  const currentIndex = statuses.findIndex((status) => status === 'OPEN' || status === 'IN_PROGRESS')
+  const currentIndex = statuses.findIndex((status) => status === 'OPEN')
   const doneCount = statuses.filter((status) => status === 'DONE').length
 
   return {

@@ -96,7 +96,7 @@ export function customerWarrantyRowsForTenants(tenants: Tenant[], warrantyRows: 
 }
 
 export function customerOpenProjects(projects: Project[]): Project[] {
-  return projects.filter((project) => project.progressStatus !== 'DONE')
+  return projects.filter((project) => project.progressStatus !== 'DONE' && project.progressStatus !== 'ARCHIVED')
 }
 
 export function customerDocumentReadModels(projects: Project[], systems: System[], tenants: Tenant[]): CustomerDocumentReadModel[] {

@@ -11,7 +11,7 @@ export type StatusPresentationKind =
   | 'recordChange'
   | 'progress'
 
-export type StatusBadgeVariant = 'default' | 'open' | 'in_progress' | 'done' | 'warning' | 'error'
+export type StatusBadgeVariant = 'default' | 'open' | 'done' | 'warning' | 'error'
 export type AlertPresentationVariant = 'danger' | 'warning' | 'info' | 'success'
 
 export interface StatusPresentation {

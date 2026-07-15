@@ -63,7 +63,7 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
-import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue } from '@/domain/project-lifecycle'
+import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import {
   deletedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
@@ -238,6 +238,10 @@ function appendProjectSaveActivityEvents(
   now: string,
   previousProject: AppDataState['projects'][number],
   nextProject: AppDataState['projects'][number],
+  context: {
+    linkedOpportunity?: AppDataState['opportunities'][number]
+    account?: AppDataState['accounts'][number]
+  } = {},
 ): ActivityEvent[] {
   let nextEvents = events
   const projectReference = projectRef(nextProject)
@@ -276,12 +280,37 @@ function appendProjectSaveActivityEvents(
   })
 
   if (previousProject.progressStatus !== nextProject.progressStatus) {
+    const statusSummary = previousProject.progressStatus === 'OPEN' && nextProject.progressStatus === 'DONE'
+      ? `All Tasks were completed and Project ${nextProject.pid} status changed to DONE.`
+      : previousProject.progressStatus === 'DONE' && nextProject.progressStatus === 'OPEN'
+        ? `One or more Tasks were reopened and Project ${nextProject.pid} status changed to OPEN.`
+        : `Project ${nextProject.pid} status changed from ${previousProject.progressStatus} to ${nextProject.progressStatus}.`
     nextEvents = appendActivityEvent(nextEvents, now, {
       category: 'PROJECT',
       eventType: 'project.statusChanged',
       severity: nextProject.progressStatus === 'DONE' ? 'SUCCESS' : 'INFO',
-      summary: `Project ${nextProject.pid} status changed from ${previousProject.progressStatus} to ${nextProject.progressStatus}.`,
+      summary: statusSummary,
       primaryObject: projectReference,
+    })
+  }
+
+  const previousTimeZone = projectTimeZoneResolution(previousProject, context)
+  const nextTimeZone = projectTimeZoneResolution(nextProject, context)
+  const locationFieldsChanged =
+    projectHeaderFieldValue(previousProject, 'country', context) !== projectHeaderFieldValue(nextProject, 'country', context) ||
+    projectHeaderFieldValue(previousProject, 'state', context) !== projectHeaderFieldValue(nextProject, 'state', context) ||
+    previousProject.deliveryDate !== nextProject.deliveryDate
+  if (locationFieldsChanged && previousTimeZone.utcOffset !== nextTimeZone.utcOffset) {
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category: 'PROJECT',
+      eventType: 'project.timeZoneChanged',
+      severity: nextTimeZone.status === 'RESOLVED' ? 'INFO' : 'WARNING',
+      summary: nextTimeZone.status === 'RESOLVED'
+        ? `Project ${nextProject.pid} Time Zone changed from ${previousTimeZone.utcOffset || 'unresolved'} to ${nextTimeZone.utcOffset}.`
+        : `Project ${nextProject.pid} Time Zone is unresolved: ${nextTimeZone.message}`,
+      primaryObject: projectReference,
+      before: { timeZone: previousTimeZone.utcOffset || '', ianaTimeZone: previousTimeZone.ianaTimeZone || '' },
+      after: { timeZone: nextTimeZone.utcOffset || '', ianaTimeZone: nextTimeZone.ianaTimeZone || '' },
     })
   }
 
@@ -504,7 +533,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         projects,
         activityEvents:
           previousProject && updatedProject
-            ? appendProjectSaveActivityEvents(state.activityEvents, now, previousProject, updatedProject)
+            ? appendProjectSaveActivityEvents(state.activityEvents, now, previousProject, updatedProject, {
+                linkedOpportunity: state.opportunities.find((opportunity) => opportunity.opportunityId === updatedProject?.opportunityId),
+                account: state.accounts.find((candidate) => candidate.accountName === updatedProject?.accountName),
+              })
             : state.activityEvents,
         reusedInternalSystems:
           sourceMachineIds.size > 0
