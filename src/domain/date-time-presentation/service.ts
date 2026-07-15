@@ -43,19 +43,10 @@ function runtimeRegionalDateFormat(): RegionalDateFormatPreference {
 }
 
 export function regionalDateFormatPreference(): RegionalDateFormatPreference {
-  if (typeof window === 'undefined') return 'system'
-  try {
-    const stored = window.localStorage.getItem(REGIONAL_DATE_FORMAT_STORAGE_KEY)
-    if (isRegionalDateFormatPreference(stored)) return stored
-  } catch {
-    // Ignore unavailable storage; display falls back to runtime/system default.
-  }
-  return runtimeRegionalDateFormat()
+  return resolvedRegionalDateFormatPreference()
 }
 
 export function resolvedRegionalDateFormatPreference(): RegionalDateFormatPreference {
-  const selectedPreference = regionalDateFormatPreference()
-  if (selectedPreference !== 'system') return selectedPreference
   const runtimePreference = runtimeRegionalDateFormat()
   return runtimePreference !== 'system' ? runtimePreference : 'system'
 }
