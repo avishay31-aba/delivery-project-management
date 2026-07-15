@@ -93,6 +93,7 @@ import {
   tenantDeliveryPidDisplay,
   tenantFormType,
   tenantPocPidDisplay,
+  tenantTimeZoneDisplayValue,
   TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
   validateTenantConfigurationSave,
@@ -935,7 +936,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('Region', opportunity?.region ?? activeSystem?.region ?? '')}
           {renderHeaderField('Country', tenantDraft.country || opportunity?.country || activeSystem?.country || '')}
           {renderHeaderField('State', opportunity?.state ?? activeSystem?.state ?? '')}
-          {renderHeaderField('Time Zone', opportunity?.timeZone ?? '')}
+          {renderHeaderField('Time Zone', tenantTimeZoneDisplayValue(tenantDraft, opportunity, activeSystem))}
           {renderHeaderField('Time Group', tenantDraft.timeGroup || opportunity?.timeGroup || activeSystem?.timeGroup || '')}
         </div>
         <div className="flex flex-wrap items-start gap-3">

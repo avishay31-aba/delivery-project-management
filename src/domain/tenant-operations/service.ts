@@ -1,5 +1,6 @@
-import type { Project, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import type { Opportunity, Project, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
+import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 
 export type TenantOperationalMode =
@@ -125,6 +126,17 @@ export function tenantPocPidDisplay(
     .filter((project) => project.mainType === 'POC')
     .map((project) => project.pid)
     .join('; ')
+}
+
+export function tenantTimeZoneDisplayValue(
+  tenant: Tenant,
+  opportunity?: Opportunity,
+  system?: System,
+): string {
+  const country = tenant.country || opportunity?.country || system?.country || ''
+  const state = opportunity?.state || system?.state || ''
+  const referenceDate = opportunity?.deliveryDate ?? opportunity?.pocStartDate ?? null
+  return geographicTimeZoneDisplayValue(country, state, referenceDate)
 }
 
 export function deletedTenantHostedSystemHistory(tenant: Tenant, deletedAt: string): TenantHostedSystemHistory[] {

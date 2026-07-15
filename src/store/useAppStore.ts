@@ -64,6 +64,7 @@ import {
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
 import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
+import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import {
   deletedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
@@ -219,7 +220,16 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   const context = { linkedOpportunity, account }
   return {
     region: projectHeaderFieldValue(project, 'region', context),
+    timeZone: projectHeaderFieldValue(project, 'timeZone', context),
     timeGroup: projectHeaderFieldValue(project, 'timeGroup', context),
+  }
+}
+
+function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['projects'][number]) {
+  const location = projectAssignmentLocation(state, project)
+  return {
+    ...project,
+    timeZone: location.timeZone,
   }
 }
 
@@ -486,9 +496,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         if (project.id !== id) return project
         previousProject = project
         updatedProject = applyProjectLifecycleStatus({
-          ...project,
-          ...patch,
-          updatedAt: options?.preserveNewState ? project.createdAt : now,
+          ...projectWithDerivedTimeZone(state, {
+            ...project,
+            ...patch,
+            updatedAt: options?.preserveNewState ? project.createdAt : now,
+          }),
         })
         return updatedProject
       })
@@ -927,9 +939,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateAccount: (id, patch) => {
     set((state) => ({
-      accounts: state.accounts.map((account) =>
-        account.id === id ? { ...account, ...patch, updatedAt: new Date().toISOString() } : account,
-      ),
+      accounts: state.accounts.map((account) => {
+        if (account.id !== id) return account
+        const nextAccount = { ...account, ...patch, updatedAt: new Date().toISOString() }
+        return applyGeographicTimeZone(nextAccount)
+      }),
     }))
     get().saveToStorage()
   },
@@ -960,9 +974,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateOpportunity: (id, patch, options) => {
     set((state) => ({
-      opportunities: state.opportunities.map((opportunity) =>
-        opportunity.id === id ? { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : new Date().toISOString() } : opportunity,
-      ),
+      opportunities: state.opportunities.map((opportunity) => {
+        if (opportunity.id !== id) return opportunity
+        const nextOpportunity = { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : new Date().toISOString() }
+        return applyGeographicTimeZone(nextOpportunity, nextOpportunity.deliveryDate ?? nextOpportunity.pocStartDate)
+      }),
     }))
     get().saveToStorage()
   },
@@ -978,7 +994,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       state.opportunities.map((opportunity) => opportunity.opportunityId),
     )
 
-    const opportunity: AppDataState['opportunities'][number] = {
+    const opportunity: AppDataState['opportunities'][number] = applyGeographicTimeZone({
       id: `opp-${crypto.randomUUID()}`,
       opportunityId: nextOpportunityId.id,
       opportunityName: 'New opportunity',
@@ -996,7 +1012,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       region: defaultAccount?.region ?? '',
       country: defaultAccount?.country ?? '',
       state: defaultAccount?.state ?? '',
-      timeZone: defaultAccount?.timeZone ?? '',
+      timeZone: '',
       timeGroup: defaultAccount?.timeGroup ?? '',
       currentMilestone: 'Not started',
       projectAlerts: [],
@@ -1008,7 +1024,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       wonAt: null,
       createdAt: now,
       updatedAt: now,
-    }
+    })
 
     set((currentState) => ({ idCounters: nextOpportunityId.counters, opportunities: [opportunity, ...currentState.opportunities] }))
     get().saveToStorage()
@@ -1019,7 +1035,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const { counters: idCounters, id: nextPid } = incrementCounter(state.idCounters, 'pid')
     const now = new Date().toISOString()
-    const project = createStandaloneProject(nextPid, now)
+    const project = projectWithDerivedTimeZone(state, createStandaloneProject(nextPid, now))
 
     set((s) => ({
       idCounters,
@@ -1103,19 +1119,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
       options,
     )
 
-    set((currentState) => ({
-      idCounters: result.idCounters,
-      projects: result.projects,
-      projectLifecycleChangesByOpportunityId: {
-        ...currentState.projectLifecycleChangesByOpportunityId,
-        [result.opportunity.id]: result.projectChanges,
-      },
-      opportunities: currentState.opportunities.map((candidate) =>
-        candidate.id === savedOpportunity.id ? result.opportunity : candidate,
-      ),
-    }))
+    set((currentState) => {
+      const opportunities = currentState.opportunities.map((candidate) =>
+        candidate.id === savedOpportunity.id
+          ? applyGeographicTimeZone(result.opportunity, result.opportunity.deliveryDate ?? result.opportunity.pocStartDate)
+          : candidate
+      )
+      const committedState = { ...currentState, opportunities }
+      const projects = result.projects.map((project) => projectWithDerivedTimeZone(committedState, project))
+      return {
+        idCounters: result.idCounters,
+        projects,
+        projectLifecycleChangesByOpportunityId: {
+          ...currentState.projectLifecycleChangesByOpportunityId,
+          [result.opportunity.id]: result.projectChanges,
+        },
+        opportunities,
+      }
+    })
     get().saveToStorage()
-    return { opportunity: result.opportunity, projectChanges: result.projectChanges }
+    return {
+      opportunity: applyGeographicTimeZone(result.opportunity, result.opportunity.deliveryDate ?? result.opportunity.pocStartDate),
+      projectChanges: result.projectChanges,
+    }
   },
 
   createSystem: () => {

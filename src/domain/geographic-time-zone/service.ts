@@ -9,6 +9,12 @@ export interface TimeZoneResolution {
   message: string
 }
 
+export interface GeographicTimeZoneFields {
+  country?: string | null
+  state?: string | null
+  timeZone?: string | null
+}
+
 const COUNTRY_ALIASES: Record<string, string> = {
   usa: 'United States',
   us: 'United States',
@@ -151,7 +157,7 @@ export function resolveGeographicTimeZone(
       state,
       ianaTimeZone: '',
       utcOffset: '',
-      message: 'Country is required to determine the Project Time Zone.',
+      message: 'Country is required to determine the Time Zone.',
     }
   }
 
@@ -166,7 +172,7 @@ export function resolveGeographicTimeZone(
         state: '',
         ianaTimeZone: '',
         utcOffset: '',
-        message: `State is required to determine the Project Time Zone for ${country}.`,
+        message: `State is required to determine the Time Zone for ${country}.`,
       }
     }
     if (!ianaTimeZone) {
@@ -211,11 +217,29 @@ export function resolveGeographicTimeZone(
   }
 }
 
-export function projectTimeZoneDisplayValue(
+export function geographicTimeZoneDisplayValue(
   country: string | null | undefined,
   state: string | null | undefined,
   referenceDateValue?: string | null,
 ): string {
   const resolution = resolveGeographicTimeZone(country, state, referenceDateValue)
   return resolution.status === 'RESOLVED' ? resolution.utcOffset : ''
+}
+
+export function applyGeographicTimeZone<T extends GeographicTimeZoneFields>(
+  record: T,
+  referenceDateValue?: string | null,
+): T {
+  return {
+    ...record,
+    timeZone: geographicTimeZoneDisplayValue(record.country, record.state, referenceDateValue),
+  }
+}
+
+export function projectTimeZoneDisplayValue(
+  country: string | null | undefined,
+  state: string | null | undefined,
+  referenceDateValue?: string | null,
+): string {
+  return geographicTimeZoneDisplayValue(country, state, referenceDateValue)
 }

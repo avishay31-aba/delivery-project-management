@@ -39,7 +39,7 @@ export function createCustomerColumns(
     { id: 'region', label: CUSTOMER_ACCOUNT_FIELD_LABELS.region, getValue: (row) => row.region, editKey: 'region', options: REGION_OPTIONS },
     { id: 'country', label: CUSTOMER_ACCOUNT_FIELD_LABELS.country, getValue: (row) => row.country, editKey: 'country' },
     { id: 'state', label: CUSTOMER_ACCOUNT_FIELD_LABELS.state, getValue: (row) => row.state, editKey: 'state' },
-    { id: 'timeZone', label: CUSTOMER_ACCOUNT_FIELD_LABELS.timeZone, getValue: (row) => row.timeZone, editKey: 'timeZone' },
+    { id: 'timeZone', label: CUSTOMER_ACCOUNT_FIELD_LABELS.timeZone, getValue: (row) => row.timeZone },
     {
       id: 'systemCount',
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.systemCount,
