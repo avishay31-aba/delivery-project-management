@@ -160,7 +160,7 @@ export function RemarksGrid({
                         {isEditing ? (
                           <>
                             <EditableChildObjectActionButton
-                              className="inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70"
+                              variant="primary"
                               disabled={isSaving}
                               onClick={() => saveRemark(remark.id)}
                             >
@@ -168,7 +168,6 @@ export function RemarksGrid({
                               {isSaving ? 'Saving...' : 'Save'}
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
-                              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
                               disabled={isSaving}
                               onClick={() => editor.cancel(remark.id)}
                             >
@@ -179,24 +178,21 @@ export function RemarksGrid({
                         ) : (
                           <>
                             {permissions.canEdit ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                              <EditableChildObjectActionButton
                                 onClick={() => editor.beginEdit(remark)}
                               >
                                 <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
                                 Edit
-                              </button>
+                              </EditableChildObjectActionButton>
                             ) : null}
                             {permissions.canDelete ? (
-                              <button
-                                type="button"
-                                className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                              <EditableChildObjectActionButton
+                                variant="danger"
                                 onClick={() => deleteRemark(remark.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                                 Delete
-                              </button>
+                              </EditableChildObjectActionButton>
                             ) : null}
                           </>
                         )}

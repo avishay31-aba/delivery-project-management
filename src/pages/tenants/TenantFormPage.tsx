@@ -1,7 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, Edit2, Plus, Save, Settings2, Trash2, X } from 'lucide-react'
 import { PageHeader } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -1341,28 +1341,39 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                         isEditingWarranty ? (
                           <>
                             <EditableChildObjectActionButton
-                              className="text-sf-brand hover:underline disabled:cursor-wait disabled:opacity-70"
+                              variant="primary"
                               disabled={isSavingWarranty}
                               onClick={() => saveWarranty(warranty.id)}
                             >
+                              <Save className="h-3.5 w-3.5" aria-hidden="true" />
                               {isSavingWarranty ? 'Saving...' : 'Save'}
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
-                              className="text-sf-text hover:underline disabled:cursor-wait disabled:opacity-70"
                               disabled={isSavingWarranty}
                               onClick={() => warrantyEditor.cancel(warranty.id)}
                             >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
                               Cancel
                             </EditableChildObjectActionButton>
-                            <button type="button" className="text-sf-brand hover:underline" onClick={() => openAdvancedWarrantyDialog(warranty)}>
+                            <EditableChildObjectActionButton onClick={() => openAdvancedWarrantyDialog(warranty)}>
+                              <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
                               Advanced Edit
-                            </button>
+                            </EditableChildObjectActionButton>
                           </>
                         ) : (
                           <>
-                            <button type="button" className="text-sf-brand hover:underline" onClick={() => editWarranty(warranty)}>Inline Edit</button>
-                            <button type="button" className="text-sf-brand hover:underline" onClick={() => openAdvancedWarrantyDialog(warranty)}>Advanced Edit</button>
-                            <button type="button" className="text-red-700 hover:underline" onClick={() => deleteWarranty(warranty.id)}>Delete</button>
+                            <EditableChildObjectActionButton onClick={() => editWarranty(warranty)}>
+                              <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Inline Edit
+                            </EditableChildObjectActionButton>
+                            <EditableChildObjectActionButton onClick={() => openAdvancedWarrantyDialog(warranty)}>
+                              <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Advanced Edit
+                            </EditableChildObjectActionButton>
+                            <EditableChildObjectActionButton variant="danger" onClick={() => deleteWarranty(warranty.id)}>
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Delete
+                            </EditableChildObjectActionButton>
                           </>
                         )
                       )}

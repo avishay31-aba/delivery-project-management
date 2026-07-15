@@ -165,9 +165,10 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
 
 interface EditableChildObjectActionButtonProps {
   children: ReactNode
-  className: string
+  className?: string
   disabled?: boolean
   onClick: () => void
+  variant?: 'primary' | 'secondary' | 'danger'
 }
 
 export function EditableChildObjectActionButton({
@@ -175,8 +176,15 @@ export function EditableChildObjectActionButton({
   className,
   disabled = false,
   onClick,
+  variant = 'secondary',
 }: EditableChildObjectActionButtonProps) {
   const handledPointerDownRef = useRef(false)
+  const variantClassName =
+    variant === 'primary'
+      ? 'inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70'
+      : variant === 'danger'
+        ? 'inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70'
+        : 'inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt disabled:cursor-wait disabled:opacity-70'
 
   function keepEditorStable(event: PointerEvent<HTMLButtonElement>) {
     if (disabled) return
@@ -196,7 +204,7 @@ export function EditableChildObjectActionButton({
   return (
     <button
       type="button"
-      className={className}
+      className={className ?? variantClassName}
       disabled={disabled}
       onPointerDown={keepEditorStable}
       onClick={handleClick}

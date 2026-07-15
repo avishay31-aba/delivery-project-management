@@ -10,6 +10,7 @@ import {
 } from '@/domain/document-collection'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { EditableChildObjectActionButton } from '@/components/child-objects'
 
 interface DocumentsPanelProps {
   documents: DocumentRecord[]
@@ -102,18 +103,18 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                       ) : null}
                       {readOnly ? null : (
                         <>
-                        <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => startEdit(document)}>
+                        <EditableChildObjectActionButton onClick={() => startEdit(document)}>
                           <Edit3 className="h-4 w-4" aria-hidden="true" />
                           Edit
-                        </button>
-                        <button type="button" className="inline-flex items-center gap-1 text-sf-brand hover:underline" onClick={() => requestReplace(document.id)}>
+                        </EditableChildObjectActionButton>
+                        <EditableChildObjectActionButton onClick={() => requestReplace(document.id)}>
                           <RefreshCw className="h-4 w-4" aria-hidden="true" />
                           Replace
-                        </button>
-                        <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => removeDocument(document.id)}>
+                        </EditableChildObjectActionButton>
+                        <EditableChildObjectActionButton variant="danger" onClick={() => removeDocument(document.id)}>
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                           Remove
-                        </button>
+                        </EditableChildObjectActionButton>
                         </>
                       )}
                     </div>
@@ -122,9 +123,9 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                     {editingId === document.id ? (
                       <div className="flex flex-wrap items-center gap-1">
                         <input className="h-8 min-w-56 rounded border border-sf-border px-2 py-1 text-sm" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
-                        <button type="button" className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white" onClick={() => saveEdit(document.id)}>
+                        <EditableChildObjectActionButton variant="primary" onClick={() => saveEdit(document.id)}>
                           Save
-                        </button>
+                        </EditableChildObjectActionButton>
                       </div>
                     ) : (
                       <span className="inline-flex items-center gap-1">
