@@ -64,6 +64,12 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     setErrorsById((current) => ({ ...current, [id]: [] }))
   }
 
+  function replaceDraft(record: TRecord) {
+    draftsRef.current = { ...draftsRef.current, [record.id]: record }
+    setDraftsById((current) => ({ ...current, [record.id]: record }))
+    setErrorsById((current) => ({ ...current, [record.id]: [] }))
+  }
+
   function cancel(id: string) {
     const nextDrafts = { ...draftsRef.current }
     delete nextDrafts[id]
@@ -144,6 +150,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     beginAdd,
     beginEdit,
     updateDraft,
+    replaceDraft,
     cancel,
     reset,
     save,
