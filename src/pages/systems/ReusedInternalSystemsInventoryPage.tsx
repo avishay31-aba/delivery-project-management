@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/record'
 import { createReusedInternalSystemColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
+import { systemDashboardRowClassName } from '@/domain/system-inventory'
 
 export function ReusedInternalSystemsInventoryPage() {
   const navigate = useNavigate()
@@ -35,6 +36,7 @@ export function ReusedInternalSystemsInventoryPage() {
         dashboardScope="reusedInternalSystems"
         rows={sortedSystems}
         columns={reusedInternalSystemColumns}
+        getRowClassName={systemDashboardRowClassName}
         toolbar={
           <button
             type="button"

@@ -9,9 +9,11 @@ import {
 import type { ConfigurationHistoryRecord, TenantConfiguration } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import {
+  REUSED_INTERNAL_PURPOSE_AVAILABLE,
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
+  SYSTEM_PURPOSE_POC,
 } from './metadata'
 
 export function isReusedInternalSystem(record: SystemInventoryRecord): boolean {
@@ -28,6 +30,35 @@ export function isAllocatedSystem(record: SystemInventoryRecord): record is Syst
 
 export function isReusedInternalOccupied(status: string | undefined): boolean {
   return status === REUSED_INTERNAL_STATUS_OCCUPIED
+}
+
+export function systemDashboardRowClassName(record: SystemInventoryRecord | AllocatedSystemDashboardRow): string {
+  if (isAllocatedSystem(record)) {
+    return record.purpose === SYSTEM_PURPOSE_POC
+      ? 'bg-blue-50 hover:bg-blue-100'
+      : 'bg-white hover:bg-sf-surface-alt'
+  }
+
+  if (isProductionInventorySystem(record)) return 'bg-white hover:bg-sf-surface-alt'
+
+  if (isReusedInternalSystem(record)) {
+    switch (record.purpose) {
+      case REUSED_INTERNAL_PURPOSE_AVAILABLE:
+        return 'bg-yellow-50 hover:bg-yellow-100'
+      case SYSTEM_PURPOSE_POC:
+        return 'bg-blue-50 hover:bg-blue-100'
+      case 'Demo':
+        return 'bg-red-50 hover:bg-red-100'
+      case 'Training':
+        return 'bg-purple-50 hover:bg-purple-100'
+      case 'Support':
+        return 'bg-slate-50 hover:bg-slate-100'
+      default:
+        return 'bg-white hover:bg-sf-surface-alt'
+    }
+  }
+
+  return 'bg-white hover:bg-sf-surface-alt'
 }
 
 export function systemIdentity(record: SystemInventoryRecord): string {

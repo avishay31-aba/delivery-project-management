@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
-import { allocatedSystemDashboardRows } from '@/domain/system-inventory'
+import { allocatedSystemDashboardRows, systemDashboardRowClassName } from '@/domain/system-inventory'
 import { systemReference } from '@/domain/business-reference'
 
 export function SystemListPage() {
@@ -27,6 +27,7 @@ export function SystemListPage() {
         dashboardScope="systems"
         rows={allocatedSystems}
         columns={systemListColumns}
+        getRowClassName={systemDashboardRowClassName}
         onEdit={(row, columnId, value) => {
           const column = systemListColumns.find((candidate) => candidate.id === columnId)
           if (!column?.editKey) return

@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/record'
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
+import { systemDashboardRowClassName } from '@/domain/system-inventory'
 
 export function ProductionSystemInventoryPage() {
   const navigate = useNavigate()
@@ -29,6 +30,7 @@ export function ProductionSystemInventoryPage() {
         dashboardScope="productionSystemInventory"
         rows={sortedSystems}
         columns={productionSystemInventoryColumns}
+        getRowClassName={systemDashboardRowClassName}
         toolbar={
           <button
             type="button"
