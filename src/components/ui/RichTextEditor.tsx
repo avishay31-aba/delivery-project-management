@@ -1,4 +1,5 @@
-import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
+import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Bold, Highlighter, Italic, List, ListOrdered, Palette, Underline } from 'lucide-react'
 
 interface RichTextEditorProps {
@@ -12,6 +13,13 @@ interface RichTextEditorProps {
 type RichTextCommand = 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList'
 type RichTextColorCommand = 'foreColor' | 'hiliteColor'
 type RichTextPaletteTarget = RichTextColorCommand | null
+type RichTextPalettePlacement = 'bottom' | 'top'
+
+interface RichTextPalettePosition {
+  left: number
+  top: number
+  placement: RichTextPalettePlacement
+}
 
 interface ThemeColorFamily {
   name: string
@@ -42,9 +50,13 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const textColorButtonRef = useRef<HTMLButtonElement | null>(null)
+  const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null)
+  const paletteRef = useRef<HTMLDivElement | null>(null)
   const selectionRangeRef = useRef<Range | null>(null)
   const [focused, setFocused] = useState(false)
   const [openPaletteTarget, setOpenPaletteTarget] = useState<RichTextPaletteTarget>(null)
+  const [palettePosition, setPalettePosition] = useState<RichTextPalettePosition>({ left: 0, top: 0, placement: 'bottom' })
   const [selectedTextColor, setSelectedTextColor] = useState<string | null>(null)
   const [selectedHighlightColor, setSelectedHighlightColor] = useState<string | null>(null)
 
@@ -68,6 +80,7 @@ export function RichTextEditor({
     function closeOnOutsidePointerDown(event: PointerEvent) {
       const target = event.target as Node | null
       if (target && rootRef.current?.contains(target)) return
+      if (target && paletteRef.current?.contains(target)) return
       setOpenPaletteTarget(null)
       if (toolbarMode === 'focus') setFocused(false)
     }
@@ -75,6 +88,42 @@ export function RichTextEditor({
     document.addEventListener('pointerdown', closeOnOutsidePointerDown)
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
   }, [toolbarMode])
+
+  useLayoutEffect(() => {
+    if (!openPaletteTarget) return
+
+    function updatePalettePosition() {
+      const trigger = openPaletteTarget === 'foreColor' ? textColorButtonRef.current : highlightColorButtonRef.current
+      if (!trigger) return
+
+      const viewportPadding = 8
+      const triggerRect = trigger.getBoundingClientRect()
+      const paletteRect = paletteRef.current?.getBoundingClientRect()
+      const paletteWidth = paletteRect?.width || 240
+      const paletteHeight = paletteRect?.height || 244
+      const availableBelow = window.innerHeight - triggerRect.bottom - viewportPadding
+      const availableAbove = triggerRect.top - viewportPadding
+      const placement: RichTextPalettePlacement = availableBelow < paletteHeight && availableAbove > availableBelow ? 'top' : 'bottom'
+      const nextTop = placement === 'top'
+        ? Math.max(viewportPadding, triggerRect.top - paletteHeight - 4)
+        : Math.max(viewportPadding, Math.min(window.innerHeight - viewportPadding - paletteHeight, triggerRect.bottom + 4))
+      const preferredLeft = triggerRect.left
+      const nextLeft = Math.min(
+        Math.max(viewportPadding, preferredLeft),
+        Math.max(viewportPadding, window.innerWidth - viewportPadding - paletteWidth),
+      )
+
+      setPalettePosition({ left: nextLeft, top: nextTop, placement })
+    }
+
+    updatePalettePosition()
+    window.addEventListener('resize', updatePalettePosition)
+    window.addEventListener('scroll', updatePalettePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePalettePosition)
+      window.removeEventListener('scroll', updatePalettePosition, true)
+    }
+  }, [openPaletteTarget])
 
   function emitChange() {
     onChange(normalizeRichTextValue(editorRef.current?.innerHTML ?? ''))
@@ -170,11 +219,14 @@ export function RichTextEditor({
     if (openPaletteTarget !== target) return null
     const automaticLabel = target === 'foreColor' ? 'Automatic' : 'No Color'
 
-    return (
+    return createPortal(
       <div
-        className="absolute left-0 top-full z-40 mt-1 w-60 rounded border border-sf-border bg-white p-2 shadow-lg"
+        ref={paletteRef}
+        className="fixed z-50 w-60 rounded border border-sf-border bg-white p-2 shadow-lg"
+        style={{ left: palettePosition.left, top: palettePosition.top }}
         role="dialog"
         aria-label={target === 'foreColor' ? 'Text color palette' : 'Highlight color palette'}
+        data-placement={palettePosition.placement}
         onPointerDown={keepEditorSelection}
       >
         <button
@@ -214,7 +266,8 @@ export function RichTextEditor({
             </div>
           ))}
         </div>
-      </div>
+      </div>,
+      document.body,
     )
   }
 
@@ -240,6 +293,7 @@ export function RichTextEditor({
         </button>
         <span className="relative inline-flex">
           <button
+            ref={textColorButtonRef}
             type="button"
             className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt"
             aria-label="Text color"
@@ -253,6 +307,7 @@ export function RichTextEditor({
         </span>
         <span className="relative inline-flex">
           <button
+            ref={highlightColorButtonRef}
             type="button"
             className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt"
             aria-label="Highlight color"
