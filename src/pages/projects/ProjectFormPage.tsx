@@ -25,6 +25,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { SystemDeliveryTable } from '@/components/systems'
+import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -1518,7 +1519,10 @@ export function ProjectFormPage() {
                           <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateMilestoneTaskDraft(index, { comment: value })} minHeightClassName="min-h-16" />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1">
-                          <button type="button" className="text-red-700 hover:underline" onClick={() => deleteMilestoneTaskDraft(index)}>Delete</button>
+                          <EditableChildObjectActionButton variant="danger" onClick={() => deleteMilestoneTaskDraft(index)}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Delete
+                          </EditableChildObjectActionButton>
                         </td>
                       </tr>
                     ))}
@@ -1663,10 +1667,10 @@ export function ProjectFormPage() {
                       <RichTextEditor value={task.comment ?? ''} onChange={(value) => updateTask(task.id, { comment: value })} minHeightClassName="min-h-16" />
                     </td>
                     <td className="whitespace-nowrap border border-sf-border px-1 py-1">
-                      <button type="button" className="inline-flex items-center gap-1 text-red-700 hover:underline" onClick={() => deleteTaskFromMilestone(task.id)}>
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      <EditableChildObjectActionButton variant="danger" onClick={() => deleteTaskFromMilestone(task.id)}>
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         Delete
-                      </button>
+                      </EditableChildObjectActionButton>
                     </td>
                   </tr>
                 ))}
@@ -2058,25 +2062,24 @@ export function ProjectFormPage() {
               const link = activeSystemLinkBySystemId.get(system.id)
               return (
                 <>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                  <EditableChildObjectActionButton
                     onClick={() => {
                       const routePath = systemReference(system).routePath
                       if (routePath) navigate(routePath, { state: { mode: isViewMode ? 'view' : 'edit' } })
                     }}
                   >
                     {isViewMode ? 'View' : 'Edit'}
-                  </button>
+                  </EditableChildObjectActionButton>
                   {link && !isViewMode ? (
-                    <button
-                      type="button"
-                      className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                      onClick={() => deallocateSystem(link)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      Deallocate
-                    </button>
+                    <span className="ml-1 inline-flex">
+                      <EditableChildObjectActionButton
+                        variant="danger"
+                        onClick={() => deallocateSystem(link)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Deallocate
+                      </EditableChildObjectActionButton>
+                    </span>
                   ) : null}
                 </>
               )

@@ -1,6 +1,7 @@
 import { Edit2, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { createOwnerRecord, type OwnerRecord } from '@/domain/owners'
+import { EditableChildObjectActionButton } from '@/components/child-objects'
 
 interface OwnerGridProps {
   owners: OwnerRecord[]
@@ -84,22 +85,19 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
                   {readOnly ? null : (
                     <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
                       <div className="flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+                        <EditableChildObjectActionButton
                           onClick={() => setEditing(owner.id, !isEditing)}
                         >
                           <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
                           {isEditing ? 'Done' : 'Edit'}
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                        </EditableChildObjectActionButton>
+                        <EditableChildObjectActionButton
+                          variant="danger"
                           onClick={() => deleteOwner(owner.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           Delete
-                        </button>
+                        </EditableChildObjectActionButton>
                       </div>
                     </td>
                   )}

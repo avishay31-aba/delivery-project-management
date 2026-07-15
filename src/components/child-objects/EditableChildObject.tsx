@@ -181,10 +181,10 @@ export function EditableChildObjectActionButton({
   const handledPointerDownRef = useRef(false)
   const variantClassName =
     variant === 'primary'
-      ? 'inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70'
+      ? 'inline-flex items-center gap-1 rounded border border-sf-brand bg-transparent px-2 py-1 text-xs text-sf-brand hover:border-blue-700 hover:text-blue-700 disabled:cursor-wait disabled:opacity-70'
       : variant === 'danger'
-        ? 'inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70'
-        : 'inline-flex items-center gap-1 rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt disabled:cursor-wait disabled:opacity-70'
+        ? 'inline-flex items-center gap-1 rounded border border-red-200 bg-transparent px-2 py-1 text-xs text-red-700 hover:border-red-400 hover:text-red-800 disabled:cursor-wait disabled:opacity-70'
+        : 'inline-flex items-center gap-1 rounded border border-sf-border bg-transparent px-2 py-1 text-xs text-sf-text hover:border-sf-text-muted disabled:cursor-wait disabled:opacity-70'
 
   function keepEditorStable(event: PointerEvent<HTMLButtonElement>) {
     if (disabled) return

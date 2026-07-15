@@ -1603,13 +1603,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <EditableChildObjectActionButton
-              className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm"
               onClick={closeAdvancedWarrantyDialog}
             >
               Cancel
             </EditableChildObjectActionButton>
             <EditableChildObjectActionButton
-              className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm text-white"
+              variant="primary"
               onClick={saveAdvancedWarrantyDialog}
             >
               Save
