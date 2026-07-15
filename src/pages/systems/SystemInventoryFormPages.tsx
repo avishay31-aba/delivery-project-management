@@ -20,7 +20,7 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { BusinessObjectLink, FormField, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -251,15 +251,6 @@ function OperationalStatusBadge({ value }: { value: string }) {
       <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
       {presentation.label}
     </span>
-  )
-}
-
-function LargeStatusIcon({ status }: { status: string }) {
-  const presentation = operationalStatusPresentation(status)
-  const Icon = presentation.icon
-
-  return (
-    <Icon className={['h-9 w-9 stroke-[3]', presentation.iconClassName].join(' ')} aria-label={presentation.tooltip} />
   )
 }
 
@@ -1389,7 +1380,7 @@ function InventoryForm<T extends InventoryRecord>({
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
-            <LargeStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
+            <OperationalStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
             <span>{`${metadata.titleLabel} ${systemIdentity(activeDraft)}`}</span>
           </span>
         }

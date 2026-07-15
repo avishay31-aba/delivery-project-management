@@ -16,6 +16,7 @@ import {
   AlertStatusIcon,
   BusinessObjectLink,
   FormField,
+  OperationalStatusIcon,
   PlaceholderCard,
   RichTextContent,
   RichTextEditor,
@@ -1630,7 +1631,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         />
       ) : null}
       <PageHeader
-        title={`Tenant ${tenantDraft.tid}`}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <OperationalStatusIcon status={effectiveTenantOperationalMode(tenantDraft, activeSystem)} />
+            <span>{`Tenant ${tenantDraft.tid}`}</span>
+          </span>
+        }
         subtitle={`${formType === 'POC' ? 'Tenant form-POC' : 'Tenant form-Customer'} foundation`}
         actions={renderActionButtons()}
       />
