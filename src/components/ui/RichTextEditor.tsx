@@ -14,6 +14,7 @@ type RichTextCommand = 'bold' | 'italic' | 'underline' | 'insertUnorderedList' |
 type RichTextColorCommand = 'foreColor' | 'hiliteColor'
 type RichTextPaletteTarget = RichTextColorCommand | null
 type RichTextPalettePlacement = 'bottom' | 'top'
+type RichTextColorValue = string | null
 
 interface RichTextPalettePosition {
   left: number
@@ -39,6 +40,22 @@ const RICH_TEXT_THEME_PALETTE: ThemeColorFamily[] = [
 function normalizeRichTextValue(value: string): string {
   const normalized = value.trim()
   return normalized === '<br>' || normalized === '<div><br></div>' ? '' : value
+}
+
+function clearBackgroundFormatting(node: Node) {
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    node.childNodes.forEach(clearBackgroundFormatting)
+    return
+  }
+
+  const element = node as HTMLElement
+  element.style.backgroundColor = ''
+  element.style.removeProperty('background-color')
+  element.style.removeProperty('background')
+  if (!element.getAttribute('style')?.trim()) {
+    element.removeAttribute('style')
+  }
+  element.childNodes.forEach(clearBackgroundFormatting)
 }
 
 export function RichTextEditor({
@@ -157,40 +174,54 @@ export function RichTextEditor({
     emitChange()
   }
 
-  function applyColor(command: RichTextColorCommand, value: string) {
+  function applyColor(command: RichTextColorCommand, value: RichTextColorValue) {
     setFocused(true)
     restoreSelection()
     const editor = editorRef.current
     const selection = window.getSelection()
     const selectionRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
-    const range = editor && selectionRange && editor.contains(selectionRange.commonAncestorContainer) && !selectionRange.collapsed
-      ? selectionRange
-      : editor && editor.textContent?.trim()
-        ? document.createRange()
-        : null
+    const hasEditorSelection = Boolean(editor && selectionRange && editor.contains(selectionRange.commonAncestorContainer))
+    const range = hasEditorSelection ? selectionRange : null
 
-    if (editor && range) {
+    if (editor && range && !range.collapsed) {
       if (range.commonAncestorContainer !== editor && !editor.contains(range.commonAncestorContainer)) {
         range.selectNodeContents(editor)
       }
-      if (range.collapsed) range.selectNodeContents(editor)
-      const colorSpan = document.createElement('span')
-      if (command === 'hiliteColor') {
-        colorSpan.style.backgroundColor = value
-      } else {
-        colorSpan.style.color = value
+      const contents = range.extractContents()
+      if (command === 'hiliteColor' && value === null) {
+        clearBackgroundFormatting(contents)
+        const insertedNodes = Array.from(contents.childNodes)
+        range.insertNode(contents)
+        const nextRange = document.createRange()
+        if (insertedNodes.length > 0) {
+          nextRange.setStartBefore(insertedNodes[0])
+          nextRange.setEndAfter(insertedNodes[insertedNodes.length - 1])
+        } else {
+          nextRange.setStart(range.startContainer, range.startOffset)
+          nextRange.collapse(true)
+        }
+        selection?.removeAllRanges()
+        selection?.addRange(nextRange)
+        selectionRangeRef.current = nextRange.cloneRange()
+      } else if (value) {
+        const colorSpan = document.createElement('span')
+        if (command === 'hiliteColor') {
+          colorSpan.style.backgroundColor = value
+        } else {
+          colorSpan.style.color = value
+        }
+        colorSpan.appendChild(contents)
+        range.insertNode(colorSpan)
+        selection?.removeAllRanges()
+        const nextRange = document.createRange()
+        nextRange.selectNodeContents(colorSpan)
+        selection?.addRange(nextRange)
+        selectionRangeRef.current = nextRange.cloneRange()
       }
-      colorSpan.appendChild(range.extractContents())
-      range.insertNode(colorSpan)
-      selection?.removeAllRanges()
-      const nextRange = document.createRange()
-      nextRange.selectNodeContents(colorSpan)
-      nextRange.collapse(false)
-      selection?.addRange(nextRange)
-      selectionRangeRef.current = nextRange.cloneRange()
-    } else {
-      const applied = document.execCommand(command, false, value)
-      if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, value)
+    } else if (editor && range) {
+      const commandValue = value ?? 'transparent'
+      const applied = document.execCommand(command, false, commandValue)
+      if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, commandValue)
     }
     if (command === 'hiliteColor') setSelectedHighlightColor(value)
     if (command === 'foreColor') setSelectedTextColor(value)
@@ -200,10 +231,11 @@ export function RichTextEditor({
   }
 
   function applyAutomaticColor(command: RichTextColorCommand) {
-    const automaticValue = command === 'foreColor' ? '#1f2937' : 'transparent'
-    applyColor(command, automaticValue)
-    if (command === 'foreColor') setSelectedTextColor(null)
-    if (command === 'hiliteColor') setSelectedHighlightColor(null)
+    if (command === 'foreColor') {
+      applyColor(command, '#000000')
+      return
+    }
+    applyColor(command, null)
   }
 
   function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
@@ -225,7 +257,7 @@ export function RichTextEditor({
         className="fixed z-50 w-60 rounded border border-sf-border bg-white p-2 shadow-lg"
         style={{ left: palettePosition.left, top: palettePosition.top }}
         role="dialog"
-        aria-label={target === 'foreColor' ? 'Text color palette' : 'Highlight color palette'}
+        aria-label={target === 'foreColor' ? 'Text color palette' : 'Text background palette'}
         data-placement={palettePosition.placement}
         onPointerDown={keepEditorSelection}
       >
@@ -310,8 +342,8 @@ export function RichTextEditor({
             ref={highlightColorButtonRef}
             type="button"
             className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt"
-            aria-label="Highlight color"
-            title="Highlight"
+            aria-label="Text background"
+            title="Text background"
             onPointerDown={keepEditorSelection}
             onClick={() => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor'))}
           >
