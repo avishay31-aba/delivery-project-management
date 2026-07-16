@@ -1,5 +1,5 @@
 import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { Bold, Highlighter, Italic, List, ListOrdered, Palette, Underline } from 'lucide-react'
 
 interface RichTextEditorProps {
@@ -269,25 +269,28 @@ export function RichTextEditor({
 
   function setImmediateCommandState(command: RichTextCommand) {
     if (command === 'bold') {
-      setActiveFormatting((current) => ({ ...current, bold: !current.bold }))
+      const active = document.queryCommandState('bold')
+      flushSync(() => setActiveFormatting((current) => ({ ...current, bold: active })))
       return
     }
     if (command === 'italic') {
-      setActiveFormatting((current) => ({ ...current, italic: !current.italic }))
+      const active = document.queryCommandState('italic')
+      flushSync(() => setActiveFormatting((current) => ({ ...current, italic: active })))
       return
     }
     if (command === 'underline') {
-      setActiveFormatting((current) => ({ ...current, underline: !current.underline }))
+      const active = document.queryCommandState('underline')
+      flushSync(() => setActiveFormatting((current) => ({ ...current, underline: active })))
     }
   }
 
   function setImmediateColorState(command: RichTextColorCommand, value: RichTextColorValue) {
     const color = normalizeToolbarColor(value, command === 'foreColor')
     if (command === 'foreColor') {
-      setActiveFormatting((current) => ({ ...current, textColor: color }))
+      flushSync(() => setActiveFormatting((current) => ({ ...current, textColor: color })))
       return
     }
-    setActiveFormatting((current) => ({ ...current, highlightColor: color }))
+    flushSync(() => setActiveFormatting((current) => ({ ...current, highlightColor: color })))
   }
 
   function scheduleActiveFormattingSync() {
