@@ -267,6 +267,29 @@ export function RichTextEditor({
     })
   }
 
+  function setImmediateCommandState(command: RichTextCommand) {
+    if (command === 'bold') {
+      setActiveFormatting((current) => ({ ...current, bold: !current.bold }))
+      return
+    }
+    if (command === 'italic') {
+      setActiveFormatting((current) => ({ ...current, italic: !current.italic }))
+      return
+    }
+    if (command === 'underline') {
+      setActiveFormatting((current) => ({ ...current, underline: !current.underline }))
+    }
+  }
+
+  function setImmediateColorState(command: RichTextColorCommand, value: RichTextColorValue) {
+    const color = normalizeToolbarColor(value, command === 'foreColor')
+    if (command === 'foreColor') {
+      setActiveFormatting((current) => ({ ...current, textColor: color }))
+      return
+    }
+    setActiveFormatting((current) => ({ ...current, highlightColor: color }))
+  }
+
   function scheduleActiveFormattingSync() {
     window.requestAnimationFrame(syncActiveFormatting)
   }
@@ -285,8 +308,8 @@ export function RichTextEditor({
     setFocused(true)
     restoreSelection()
     document.execCommand(command, false, value)
+    setImmediateCommandState(command)
     rememberSelection()
-    syncActiveFormatting()
     emitChange()
   }
 
@@ -367,8 +390,8 @@ export function RichTextEditor({
         if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, value)
       }
     }
+    setImmediateColorState(command, value)
     rememberSelection()
-    syncActiveFormatting()
     if (shouldEmitChange) emitChange()
     setOpenPaletteTarget(null)
   }
