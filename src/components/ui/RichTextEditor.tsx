@@ -1,4 +1,4 @@
-import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { Bold, Highlighter, Italic, List, ListOrdered, Palette, Underline } from 'lucide-react'
 
@@ -28,6 +28,11 @@ interface RichTextPalettePosition {
   left: number
   top: number
   placement: RichTextPalettePlacement
+}
+
+interface PendingTypingFormatting {
+  formatting: RichTextActiveFormatting
+  rangeSignature: string
 }
 
 interface ThemeColorFamily {
@@ -64,6 +69,9 @@ function cleanupCaretResetMarkers(editor: HTMLElement) {
   editor.querySelectorAll(`span[${RICH_TEXT_CARET_RESET_ATTRIBUTE}]`).forEach((marker) => {
     marker.innerHTML = marker.innerHTML.replaceAll(ZERO_WIDTH_SPACE, '')
     marker.replaceWith(...Array.from(marker.childNodes))
+  })
+  editor.querySelectorAll('span').forEach((span) => {
+    if (!span.textContent && span.childNodes.length === 0) span.remove()
   })
 }
 
@@ -145,6 +153,60 @@ function isUnderlinedElement(element: HTMLElement, editor: HTMLElement): boolean
   return hasAncestor(element, editor, 'u') || textDecoration.split(' ').includes('underline')
 }
 
+function rangeContainerSignature(node: Node, editor: HTMLElement): string {
+  const path: number[] = []
+  let current: Node | null = node
+  while (current && current !== editor) {
+    const parent: Node | null = current.parentNode
+    if (!parent) break
+    path.unshift(Array.prototype.indexOf.call(parent.childNodes, current))
+    current = parent
+  }
+  return path.join('.')
+}
+
+function rangeSignature(range: Range, editor: HTMLElement): string {
+  return [
+    rangeContainerSignature(range.startContainer, editor),
+    range.startOffset,
+    rangeContainerSignature(range.endContainer, editor),
+    range.endOffset,
+    range.collapsed ? 'collapsed' : 'selected',
+  ].join(':')
+}
+
+function makeFormattedTypingNode(text: string, formatting: RichTextActiveFormatting): Node {
+  let node: Node = document.createTextNode(text)
+  const textColor = normalizeToolbarColor(formatting.textColor, true)
+  const highlightColor = normalizeToolbarColor(formatting.highlightColor)
+  const hasHighlightColor = Boolean(highlightColor && highlightColor !== '#ffffff')
+
+  if (textColor || hasHighlightColor) {
+    const span = document.createElement('span')
+    if (textColor) span.style.color = textColor
+    if (hasHighlightColor && highlightColor) span.style.backgroundColor = highlightColor
+    span.appendChild(node)
+    node = span
+  }
+  if (formatting.underline) {
+    const underline = document.createElement('u')
+    underline.appendChild(node)
+    node = underline
+  }
+  if (formatting.italic) {
+    const italic = document.createElement('i')
+    italic.appendChild(node)
+    node = italic
+  }
+  if (formatting.bold) {
+    const bold = document.createElement('b')
+    bold.appendChild(node)
+    node = bold
+  }
+
+  return node
+}
+
 export function RichTextEditor({
   value,
   onChange,
@@ -158,6 +220,8 @@ export function RichTextEditor({
   const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null)
   const paletteRef = useRef<HTMLDivElement | null>(null)
   const selectionRangeRef = useRef<Range | null>(null)
+  const pendingTypingFormattingRef = useRef<PendingTypingFormatting | null>(null)
+  const activeFormattingRef = useRef<RichTextActiveFormatting>(EMPTY_ACTIVE_FORMATTING)
   const [focused, setFocused] = useState(false)
   const [openPaletteTarget, setOpenPaletteTarget] = useState<RichTextPaletteTarget>(null)
   const [palettePosition, setPalettePosition] = useState<RichTextPalettePosition>({ left: 0, top: 0, placement: 'bottom' })
@@ -235,6 +299,29 @@ export function RichTextEditor({
     onChange(normalizeRichTextValue(editor?.innerHTML ?? ''))
   }
 
+  function setActiveFormattingState(next: RichTextActiveFormatting) {
+    activeFormattingRef.current = next
+    flushSync(() => setActiveFormatting(next))
+  }
+
+  function setPendingTypingFormatting(next: RichTextActiveFormatting, range: Range) {
+    const editor = editorRef.current
+    if (!editor) return
+    pendingTypingFormattingRef.current = {
+      formatting: next,
+      rangeSignature: rangeSignature(range, editor),
+    }
+    setActiveFormattingState(next)
+  }
+
+  function clearPendingTypingFormatting() {
+    pendingTypingFormattingRef.current = null
+  }
+
+  function rangeBelongsToEditor(range: Range | null, editor: HTMLElement): range is Range {
+    return Boolean(range && editor.contains(range.commonAncestorContainer))
+  }
+
   function rememberSelection() {
     const editor = editorRef.current
     const selection = window.getSelection()
@@ -245,56 +332,66 @@ export function RichTextEditor({
     }
   }
 
-  function syncActiveFormatting() {
-    const editor = editorRef.current
-    const selection = window.getSelection()
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
-    if (!editor || !range || !editor.contains(range.commonAncestorContainer)) {
-      setActiveFormatting(EMPTY_ACTIVE_FORMATTING)
-      return
-    }
-
+  function deriveActiveFormatting(range: Range, editor: HTMLElement): RichTextActiveFormatting {
     const element = selectionElement(range, editor)
     const computed = window.getComputedStyle(element)
     const highlightedAncestor = backgroundAncestorForRange(range, editor)
     const highlightColor = highlightedAncestor ? window.getComputedStyle(highlightedAncestor).backgroundColor : computed.backgroundColor
-    setActiveFormatting({
+    const normalizedHighlightColor = highlightedAncestor ? normalizeToolbarColor(highlightColor) : null
+    return {
       bold: isBoldElement(element, editor),
       italic: isItalicElement(element, editor),
       underline: isUnderlinedElement(element, editor),
       textColor: normalizeToolbarColor(computed.color, true),
-      highlightColor: normalizeToolbarColor(highlightColor),
-    })
-  }
-
-  function setImmediateCommandState(command: RichTextCommand) {
-    if (command === 'bold') {
-      const active = document.queryCommandState('bold')
-      flushSync(() => setActiveFormatting((current) => ({ ...current, bold: active })))
-      return
-    }
-    if (command === 'italic') {
-      const active = document.queryCommandState('italic')
-      flushSync(() => setActiveFormatting((current) => ({ ...current, italic: active })))
-      return
-    }
-    if (command === 'underline') {
-      const active = document.queryCommandState('underline')
-      flushSync(() => setActiveFormatting((current) => ({ ...current, underline: active })))
+      highlightColor: normalizedHighlightColor === '#ffffff' ? null : normalizedHighlightColor,
     }
   }
 
-  function setImmediateColorState(command: RichTextColorCommand, value: RichTextColorValue) {
-    const color = normalizeToolbarColor(value, command === 'foreColor')
-    if (command === 'foreColor') {
-      flushSync(() => setActiveFormatting((current) => ({ ...current, textColor: color })))
-      return
-    }
-    flushSync(() => setActiveFormatting((current) => ({ ...current, highlightColor: color })))
+  function currentEditorRange(): Range | null {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
+    return editor && rangeBelongsToEditor(range, editor) ? range : null
   }
 
-  function scheduleActiveFormattingSync() {
-    window.requestAnimationFrame(syncActiveFormatting)
+  function syncActiveFormatting() {
+    const editor = editorRef.current
+    const range = currentEditorRange()
+    if (!editor || !range) {
+      clearPendingTypingFormatting()
+      setActiveFormattingState(EMPTY_ACTIVE_FORMATTING)
+      return
+    }
+
+    if (!range.collapsed) {
+      clearPendingTypingFormatting()
+      setActiveFormattingState(deriveActiveFormatting(range, editor))
+      return
+    }
+
+    const pending = pendingTypingFormattingRef.current
+    if (pending && pending.rangeSignature === rangeSignature(range, editor)) {
+      setActiveFormattingState(pending.formatting)
+      return
+    }
+
+    clearPendingTypingFormatting()
+    setActiveFormattingState(deriveActiveFormatting(range, editor))
+  }
+
+  function syncSelectionDerivedFormatting() {
+    const editor = editorRef.current
+    const range = currentEditorRange()
+    clearPendingTypingFormatting()
+    if (!editor || !range) {
+      setActiveFormattingState(EMPTY_ACTIVE_FORMATTING)
+      return
+    }
+    setActiveFormattingState(deriveActiveFormatting(range, editor))
+  }
+
+  function scheduleSelectionDerivedFormattingSync() {
+    window.requestAnimationFrame(syncSelectionDerivedFormatting)
   }
 
   function restoreSelection() {
@@ -310,10 +407,24 @@ export function RichTextEditor({
   function apply(command: RichTextCommand, value?: string) {
     setFocused(true)
     restoreSelection()
+    const editor = editorRef.current
+    const range = currentEditorRange()
+    if (!editor || !range) return
+
+    if (range.collapsed && (command === 'bold' || command === 'italic' || command === 'underline')) {
+      const next = { ...activeFormattingRef.current }
+      if (command === 'bold') next.bold = !next.bold
+      if (command === 'italic') next.italic = !next.italic
+      if (command === 'underline') next.underline = !next.underline
+      setPendingTypingFormatting(next, range)
+      return
+    }
+
+    clearPendingTypingFormatting()
     document.execCommand(command, false, value)
-    setImmediateCommandState(command)
     rememberSelection()
     emitChange()
+    syncActiveFormatting()
   }
 
   function applyColor(command: RichTextColorCommand, value: RichTextColorValue) {
@@ -322,11 +433,10 @@ export function RichTextEditor({
     let shouldEmitChange = true
     const editor = editorRef.current
     const selection = window.getSelection()
-    const selectionRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
-    const hasEditorSelection = Boolean(editor && selectionRange && editor.contains(selectionRange.commonAncestorContainer))
-    const range = hasEditorSelection ? selectionRange : null
+    let range = currentEditorRange()
 
     if (editor && range && !range.collapsed) {
+      clearPendingTypingFormatting()
       if (range.commonAncestorContainer !== editor && !editor.contains(range.commonAncestorContainer)) {
         range.selectNodeContents(editor)
       }
@@ -372,30 +482,25 @@ export function RichTextEditor({
       if (command === 'hiliteColor' && value === null) {
         const highlightedAncestor = backgroundAncestorForRange(range, editor)
         if (highlightedAncestor) {
-          const resetMarker = document.createElement('span')
-          resetMarker.setAttribute(RICH_TEXT_CARET_RESET_ATTRIBUTE, 'true')
-          resetMarker.textContent = ZERO_WIDTH_SPACE
-          highlightedAncestor.after(resetMarker)
           const nextRange = document.createRange()
-          nextRange.setStart(resetMarker.firstChild ?? resetMarker, resetMarker.firstChild ? ZERO_WIDTH_SPACE.length : 0)
+          nextRange.setStartAfter(highlightedAncestor)
           nextRange.collapse(true)
-          editor.focus()
           selection?.removeAllRanges()
           selection?.addRange(nextRange)
           selectionRangeRef.current = nextRange.cloneRange()
-          shouldEmitChange = false
-        } else {
-          document.execCommand('removeFormat', false)
-          shouldEmitChange = false
+          range = nextRange
         }
-      } else if (value) {
-        const applied = document.execCommand(command, false, value)
-        if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, value)
       }
+      const next = {
+        ...activeFormattingRef.current,
+        [command === 'foreColor' ? 'textColor' : 'highlightColor']: normalizeToolbarColor(value, command === 'foreColor'),
+      }
+      setPendingTypingFormatting(next, range)
+      shouldEmitChange = false
     }
-    setImmediateColorState(command, value)
     rememberSelection()
     if (shouldEmitChange) emitChange()
+    syncActiveFormatting()
     setOpenPaletteTarget(null)
   }
 
@@ -405,6 +510,98 @@ export function RichTextEditor({
       return
     }
     applyColor(command, null)
+  }
+
+  function insertPendingTypingText(text: string): boolean {
+    const pending = pendingTypingFormattingRef.current
+    if (!pending) return false
+    const editor = editorRef.current
+    const range = currentEditorRange()
+    if (!editor || !range || !range.collapsed || pending.rangeSignature !== rangeSignature(range, editor)) {
+      return false
+    }
+
+    const formattedNode = makeFormattedTypingNode(text, pending.formatting)
+    const insertionRange = range.cloneRange()
+    const highlightedAncestor = pending.formatting.highlightColor === null ? backgroundAncestorForRange(range, editor) : null
+    if (highlightedAncestor) {
+      insertionRange.setStartAfter(highlightedAncestor)
+      insertionRange.collapse(true)
+    }
+    insertionRange.insertNode(formattedNode)
+
+    const nextRange = document.createRange()
+    nextRange.setStartAfter(formattedNode)
+    nextRange.collapse(true)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(nextRange)
+    selectionRangeRef.current = nextRange.cloneRange()
+    pendingTypingFormattingRef.current = {
+      formatting: pending.formatting,
+      rangeSignature: rangeSignature(nextRange, editor),
+    }
+    setActiveFormattingState(pending.formatting)
+    emitChange()
+    return true
+  }
+
+  function formatRecentlyInsertedText(text: string): boolean {
+    const pending = pendingTypingFormattingRef.current
+    const editor = editorRef.current
+    const selection = window.getSelection()
+    if (!pending || !editor || !selection || selection.rangeCount === 0 || text.length === 0) return false
+
+    const range = selection.getRangeAt(0)
+    if (!range.collapsed || !editor.contains(range.commonAncestorContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) return false
+    const textNode = range.startContainer
+    if (range.startOffset < text.length) return false
+
+    const insertedRange = document.createRange()
+    insertedRange.setStart(textNode, range.startOffset - text.length)
+    insertedRange.setEnd(textNode, range.startOffset)
+    const insertedText = insertedRange.toString()
+    if (insertedText !== text) return false
+
+    const highlightedAncestor = pending.formatting.highlightColor === null ? backgroundAncestorForRange(insertedRange, editor) : null
+    insertedRange.deleteContents()
+    const formattedNode = makeFormattedTypingNode(text, pending.formatting)
+    if (highlightedAncestor) {
+      const escapedRange = document.createRange()
+      escapedRange.setStartAfter(highlightedAncestor)
+      escapedRange.collapse(true)
+      escapedRange.insertNode(formattedNode)
+    } else {
+      insertedRange.insertNode(formattedNode)
+    }
+    const nextRange = document.createRange()
+    nextRange.setStartAfter(formattedNode)
+    nextRange.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(nextRange)
+    selectionRangeRef.current = nextRange.cloneRange()
+    pendingTypingFormattingRef.current = {
+      formatting: pending.formatting,
+      rangeSignature: rangeSignature(nextRange, editor),
+    }
+    setActiveFormattingState(pending.formatting)
+    return true
+  }
+
+  function handleBeforeInput(event: FormEvent<HTMLDivElement>) {
+    const nativeEvent = event.nativeEvent as InputEvent
+    if (!pendingTypingFormattingRef.current || nativeEvent.inputType !== 'insertText' || !nativeEvent.data) return
+
+    if (insertPendingTypingText(nativeEvent.data)) {
+      event.preventDefault()
+    }
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!pendingTypingFormattingRef.current || event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return
+    if (insertPendingTypingText(event.key)) {
+      event.preventDefault()
+    }
   }
 
   function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
@@ -571,10 +768,17 @@ export function RichTextEditor({
         contentEditable
         role="textbox"
         suppressContentEditableWarning
+        onBeforeInput={handleBeforeInput}
+        onKeyDown={handleKeyDown}
         onInput={(event) => {
+          const nativeEvent = event.nativeEvent as InputEvent
+          const appliedPendingFormat = nativeEvent.inputType === 'insertText'
+            && Boolean(nativeEvent.data)
+            && formatRecentlyInsertedText(nativeEvent.data ?? '')
+          if (!appliedPendingFormat) clearPendingTypingFormatting()
           cleanupCaretResetMarkers(event.currentTarget)
           rememberSelection()
-          syncActiveFormatting()
+          if (!appliedPendingFormat) syncActiveFormatting()
           onChange(normalizeRichTextValue(event.currentTarget.innerHTML))
         }}
         onFocus={() => {
@@ -586,13 +790,13 @@ export function RichTextEditor({
           rememberSelection()
           syncActiveFormatting()
         }}
-        onMouseDown={scheduleActiveFormattingSync}
+        onMouseDown={scheduleSelectionDerivedFormattingSync}
         onMouseUp={() => {
           rememberSelection()
-          syncActiveFormatting()
+          syncSelectionDerivedFormatting()
         }}
-        onClick={scheduleActiveFormattingSync}
-        onContextMenu={scheduleActiveFormattingSync}
+        onClick={scheduleSelectionDerivedFormattingSync}
+        onContextMenu={scheduleSelectionDerivedFormattingSync}
       />
     </div>
   )
