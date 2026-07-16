@@ -295,9 +295,20 @@ export function RichTextEditor({
   }
 
   function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
+    if (event.button !== 0) return
     event.preventDefault()
     setFocused(true)
     rememberSelection()
+  }
+
+  function blockNonPrimaryToolbarMouse(event: ReactMouseEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  function runToolbarAction(event: ReactMouseEvent, action: () => void) {
+    if (event.button !== 0) return
+    action()
   }
 
   const showToolbar = toolbarMode === 'always' || focused
@@ -324,7 +335,9 @@ export function RichTextEditor({
             'mb-2 w-full rounded border px-2 py-1 text-left text-xs font-medium',
             !activePaletteColor ? 'border-sf-brand text-sf-brand' : 'border-sf-border text-sf-text hover:border-sf-text-muted',
           ].join(' ')}
-          onClick={() => applyAutomaticColor(target)}
+          onAuxClick={blockNonPrimaryToolbarMouse}
+          onContextMenu={blockNonPrimaryToolbarMouse}
+          onClick={(event) => runToolbarAction(event, () => applyAutomaticColor(target))}
         >
           {automaticLabel}
         </button>
@@ -347,7 +360,9 @@ export function RichTextEditor({
                       aria-label={`${family.name} ${shade}`}
                       aria-pressed={selected}
                       title={`${family.name} ${shade}`}
-                      onClick={() => applyColor(target, shade)}
+                      onAuxClick={blockNonPrimaryToolbarMouse}
+                      onContextMenu={blockNonPrimaryToolbarMouse}
+                      onClick={(event) => runToolbarAction(event, () => applyColor(target, shade))}
                     />
                   )
                 })}
@@ -365,19 +380,19 @@ export function RichTextEditor({
       <div
         className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
       >
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('bold')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('bold'))}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('italic')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('italic'))}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('underline')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('underline'))}>
           <Underline className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('insertUnorderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertUnorderedList'))}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('insertOrderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertOrderedList'))}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="relative inline-flex">
@@ -389,7 +404,9 @@ export function RichTextEditor({
             title="Text color"
             onPointerDown={keepEditorSelection}
             onMouseDown={keepEditorSelection}
-            onClick={() => setOpenPaletteTarget((current) => (current === 'foreColor' ? null : 'foreColor'))}
+            onAuxClick={blockNonPrimaryToolbarMouse}
+            onContextMenu={blockNonPrimaryToolbarMouse}
+            onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'foreColor' ? null : 'foreColor')))}
           >
             <Palette className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -404,7 +421,9 @@ export function RichTextEditor({
             title="Text background"
             onPointerDown={keepEditorSelection}
             onMouseDown={keepEditorSelection}
-            onClick={() => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor'))}
+            onAuxClick={blockNonPrimaryToolbarMouse}
+            onContextMenu={blockNonPrimaryToolbarMouse}
+            onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor')))}
           >
             <Highlighter className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
