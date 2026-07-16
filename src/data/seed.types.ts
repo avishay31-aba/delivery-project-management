@@ -4,7 +4,7 @@ import type { ActivityEvent } from '@/domain/activity-log'
 
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
 export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL'
-export type ProgressStatus = 'OPEN' | 'DONE' | 'ARCHIVED'
+export type ProgressStatus = 'OPEN' | 'DONE'
 export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
 export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
@@ -154,7 +154,7 @@ export interface ProjectTask {
   name: string
   department: string
   resource: string
-  status: Exclude<ProgressStatus, 'ARCHIVED'>
+  status: ProgressStatus
   order: number
   deadline?: string | null
   comment?: string

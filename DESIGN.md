@@ -201,7 +201,7 @@ erDiagram
 | **main_type** | `POC` \| `DELIVERY` \| `RENEWAL` |
 | **sub_type** | `NONE` \| `NEW` \| `UPSELL` \| `STANDARD` \| `DOWN_SELL` |
 | **Opportunity** | 1:1 link; read-only fields derived from SF |
-| **Progress** | `OPEN` \| `IN_PROGRESS` \| `DONE` (from tasks) |
+| **Progress** | `OPEN` \| `DONE` (derived from tasks) |
 | **Delivery date** | From opportunity; editable by authorized roles on delivery projects |
 
 #### System
@@ -599,7 +599,7 @@ Exact milestone/task names are seeded from the Excel template sheet during imple
 ```sql
 CREATE TYPE project_main_type AS ENUM ('POC', 'DELIVERY', 'RENEWAL');
 CREATE TYPE project_sub_type AS ENUM ('NONE', 'NEW', 'UPSELL', 'STANDARD', 'DOWN_SELL');
-CREATE TYPE progress_status AS ENUM ('OPEN', 'IN_PROGRESS', 'DONE');
+CREATE TYPE progress_status AS ENUM ('OPEN', 'DONE');
 CREATE TYPE system_pool_type AS ENUM (
   'PRODUCTION_INVENTORY', 'POC_DEMO_TRAINING', 'DELIVERY_ASSIGNED', 'POC_ASSIGNED'
 );

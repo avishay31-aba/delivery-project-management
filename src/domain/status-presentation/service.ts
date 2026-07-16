@@ -123,7 +123,6 @@ export function productMismatchPresentation(): StatusPresentation {
 
 export function badgeVariantForProjectStatus(status: string): StatusBadgeVariant {
   if (status === 'DONE') return 'done'
-  if (status === 'ARCHIVED') return 'default'
   return 'open'
 }
 

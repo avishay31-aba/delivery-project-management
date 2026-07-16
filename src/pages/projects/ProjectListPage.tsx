@@ -25,7 +25,7 @@ const projectListColumns = useMemo(
   () => createProjectListColumns({ accounts, opportunities, salesManagers, systems, tenants, projectSystems, projectTenants }),
   [accounts, opportunities, projectSystems, projectTenants, salesManagers, systems, tenants],
 )
-const activeProjects = useMemo(() => projects.filter((project) => project.progressStatus !== 'ARCHIVED'), [projects])
+const activeProjects = useMemo(() => projects.filter((project) => !project.archivedAt), [projects])
 
 return (
 <div>

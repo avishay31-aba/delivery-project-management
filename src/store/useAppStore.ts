@@ -391,7 +391,7 @@ interface AppStore extends AppDataState {
   resetToSeed: () => void
   hydrated: boolean
 
-  updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>, options?: SaveTimestampOptions) => void
+  updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>, options?: SaveTimestampOptions) => AppDataState['projects'][number] | undefined
   archiveProject: (id: string, reason: string) => void
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
@@ -489,6 +489,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateProject: (id, patch, options) => {
     const now = new Date().toISOString()
+    let committedProject: AppDataState['projects'][number] | undefined
     set((state) => {
       let updatedProject: AppDataState['projects'][number] | undefined
       let previousProject: AppDataState['projects'][number] | undefined
@@ -504,6 +505,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         })
         return updatedProject
       })
+      committedProject = updatedProject
       const sourceMachineIds =
         updatedProject?.mainType === 'POC' && updatedProject.progressStatus === 'DONE'
           ? new Set(
@@ -561,6 +563,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     })
     get().saveToStorage()
+    return committedProject
   },
 
   archiveProject: (id, reason) => {
@@ -572,7 +575,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
           candidate.id === id
             ? {
                 ...candidate,
-                progressStatus: 'ARCHIVED',
                 archivedAt: now,
                 deletionReason: reason.trim(),
                 updatedAt: now,

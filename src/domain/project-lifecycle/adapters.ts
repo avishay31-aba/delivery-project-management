@@ -26,8 +26,7 @@ export function projectSavePatch(project: Project): Partial<Project> {
   }
 }
 
-export function projectStatusFromTaskCompletion(project: Pick<Project, 'progressStatus' | 'tasks'>): Project['progressStatus'] {
-  if (project.progressStatus === 'ARCHIVED') return 'ARCHIVED'
+export function projectStatusFromTaskCompletion(project: Pick<Project, 'tasks'>): Project['progressStatus'] {
   const tasks = project.tasks ?? []
   if (tasks.length > 0 && tasks.every((task) => task.status === 'DONE')) return 'DONE'
   return 'OPEN'

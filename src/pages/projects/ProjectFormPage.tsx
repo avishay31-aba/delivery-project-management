@@ -66,6 +66,7 @@ import {
   projectRequirementReadonlyCellValue,
   projectRequirementRows,
   projectRequirementTitle,
+  applyProjectLifecycleStatus,
   projectHeaderFieldValue,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
@@ -703,7 +704,10 @@ export function ProjectFormPage() {
     }
 
     startSaveIndicator()
-    updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
+    const committedProject = updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
+    if (committedProject) {
+      resetDraft(cloneProjectDraft(committedProject))
+    }
     setPendingAllocationIds([])
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
@@ -1054,7 +1058,7 @@ export function ProjectFormPage() {
         ],
         tasks: [...(current.tasks ?? []), ...initialTasks],
       }
-      return updateMilestoneOrderInPlan(nextProject, milestoneId, newMilestoneOrder)
+      return applyProjectLifecycleStatus(updateMilestoneOrderInPlan(nextProject, milestoneId, newMilestoneOrder))
     })
     setSaveMessages([])
     setIsAddMilestoneDialogOpen(false)
@@ -1064,7 +1068,7 @@ export function ProjectFormPage() {
     const existingTasks = (projectDraft.tasks ?? []).filter((task) => task.milestoneId === milestoneId)
     const order = existingTasks.reduce((maxOrder, task) => Math.max(maxOrder, task.order), 0) + 1
     const task = createMilestoneTask(milestoneId, { name: '', department: '', resource: '', status: 'OPEN', deadline: null, comment: '' }, order)
-    setDraft((current) => (current ? { ...current, tasks: [...(current.tasks ?? []), task] } : current))
+    setDraft((current) => (current ? applyProjectLifecycleStatus({ ...current, tasks: [...(current.tasks ?? []), task] }) : current))
     setSaveMessages([])
   }
 
@@ -1075,13 +1079,13 @@ export function ProjectFormPage() {
         ...current,
         tasks: (current.tasks ?? []).filter((task) => task.id !== taskId),
       }
-      return {
+      return applyProjectLifecycleStatus({
         ...nextProject,
         milestones: (nextProject.milestones ?? []).map((milestone) => ({
           ...milestone,
           status: projectMilestoneStatus(nextProject, milestone.id),
         })),
-      }
+      })
     })
     setSaveMessages([])
   }
@@ -1127,7 +1131,7 @@ export function ProjectFormPage() {
 
   function updateTaskCompletion(taskId: string, completed: boolean) {
     if (isViewMode) return
-    setDraft((current) => (current ? updateTaskInPlan(current, taskId, { status: completed ? 'DONE' : 'OPEN' }) : current))
+    setDraft((current) => (current ? applyProjectLifecycleStatus(updateTaskInPlan(current, taskId, { status: completed ? 'DONE' : 'OPEN' })) : current))
     setSaveMessages([])
   }
 
@@ -1138,17 +1142,17 @@ export function ProjectFormPage() {
       const taskIds = (current.tasks ?? [])
         .filter((task) => task.milestoneId === milestoneId)
         .map((task) => task.id)
-      return taskIds.reduce(
+      return applyProjectLifecycleStatus(taskIds.reduce(
         (nextProject, taskId) => updateTaskInPlan(nextProject, taskId, { status: completed ? 'DONE' : 'OPEN' }),
         current,
-      )
+      ))
     })
     setSaveMessages([])
   }
 
   function resetAllTasksOpen() {
     if (isViewMode) return
-    setDraft((current) => (current ? resetAllTasksOpenInPlan(current) : current))
+    setDraft((current) => (current ? applyProjectLifecycleStatus(resetAllTasksOpenInPlan(current)) : current))
     setSaveMessages([])
   }
 
