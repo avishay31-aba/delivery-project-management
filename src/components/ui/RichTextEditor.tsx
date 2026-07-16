@@ -16,6 +16,14 @@ type RichTextPaletteTarget = RichTextColorCommand | null
 type RichTextPalettePlacement = 'bottom' | 'top'
 type RichTextColorValue = string | null
 
+interface RichTextActiveFormatting {
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  textColor: string | null
+  highlightColor: string | null
+}
+
 interface RichTextPalettePosition {
   left: number
   top: number
@@ -39,6 +47,13 @@ const RICH_TEXT_THEME_PALETTE: ThemeColorFamily[] = [
 
 const RICH_TEXT_CARET_RESET_ATTRIBUTE = 'data-rich-text-caret-reset'
 const ZERO_WIDTH_SPACE = '\u200B'
+const EMPTY_ACTIVE_FORMATTING: RichTextActiveFormatting = {
+  bold: false,
+  italic: false,
+  underline: false,
+  textColor: null,
+  highlightColor: null,
+}
 
 function normalizeRichTextValue(value: string): string {
   const normalized = value.trim()
@@ -84,6 +99,52 @@ function backgroundAncestorForRange(range: Range, editor: HTMLElement): HTMLElem
   return null
 }
 
+function rgbToHex(value: string): string | null {
+  const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i)
+  if (!match) return value.startsWith('#') ? value.toLowerCase() : null
+  const alpha = match[4] ? Number(match[4]) : 1
+  if (alpha === 0) return null
+  return `#${[match[1], match[2], match[3]]
+    .map((part) => Number(part).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
+function normalizeToolbarColor(value: string | null | undefined, automaticIsDefault = false): string | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  if (!normalized || normalized === 'transparent' || normalized === 'rgba(0, 0, 0, 0)') return null
+  const hex = rgbToHex(normalized) ?? normalized
+  if (automaticIsDefault && (hex === '#000000' || hex === '#181818' || hex === 'black')) return null
+  return hex
+}
+
+function selectionElement(range: Range, editor: HTMLElement): HTMLElement {
+  const node = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer
+    : range.startContainer.parentNode
+  return node instanceof HTMLElement && editor.contains(node) ? node : editor
+}
+
+function hasAncestor(element: HTMLElement, editor: HTMLElement, selectors: string): boolean {
+  const match = element.closest(selectors)
+  return Boolean(match && editor.contains(match))
+}
+
+function isBoldElement(element: HTMLElement, editor: HTMLElement): boolean {
+  const fontWeight = window.getComputedStyle(element).fontWeight
+  return hasAncestor(element, editor, 'b,strong') || Number(fontWeight) >= 600 || fontWeight === 'bold'
+}
+
+function isItalicElement(element: HTMLElement, editor: HTMLElement): boolean {
+  const fontStyle = window.getComputedStyle(element).fontStyle
+  return hasAncestor(element, editor, 'i,em') || fontStyle === 'italic' || fontStyle === 'oblique'
+}
+
+function isUnderlinedElement(element: HTMLElement, editor: HTMLElement): boolean {
+  const textDecoration = window.getComputedStyle(element).textDecorationLine
+  return hasAncestor(element, editor, 'u') || textDecoration.split(' ').includes('underline')
+}
+
 export function RichTextEditor({
   value,
   onChange,
@@ -100,8 +161,7 @@ export function RichTextEditor({
   const [focused, setFocused] = useState(false)
   const [openPaletteTarget, setOpenPaletteTarget] = useState<RichTextPaletteTarget>(null)
   const [palettePosition, setPalettePosition] = useState<RichTextPalettePosition>({ left: 0, top: 0, placement: 'bottom' })
-  const [selectedTextColor, setSelectedTextColor] = useState<string | null>(null)
-  const [selectedHighlightColor, setSelectedHighlightColor] = useState<string | null>(null)
+  const [activeFormatting, setActiveFormatting] = useState<RichTextActiveFormatting>(EMPTY_ACTIVE_FORMATTING)
 
   useEffect(() => {
     const editor = editorRef.current
@@ -113,6 +173,7 @@ export function RichTextEditor({
   useEffect(() => {
     function updateSelectionFromDocument() {
       rememberSelection()
+      syncActiveFormatting()
     }
 
     document.addEventListener('selectionchange', updateSelectionFromDocument)
@@ -184,6 +245,32 @@ export function RichTextEditor({
     }
   }
 
+  function syncActiveFormatting() {
+    const editor = editorRef.current
+    const selection = window.getSelection()
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
+    if (!editor || !range || !editor.contains(range.commonAncestorContainer)) {
+      setActiveFormatting(EMPTY_ACTIVE_FORMATTING)
+      return
+    }
+
+    const element = selectionElement(range, editor)
+    const computed = window.getComputedStyle(element)
+    const highlightedAncestor = backgroundAncestorForRange(range, editor)
+    const highlightColor = highlightedAncestor ? window.getComputedStyle(highlightedAncestor).backgroundColor : computed.backgroundColor
+    setActiveFormatting({
+      bold: isBoldElement(element, editor),
+      italic: isItalicElement(element, editor),
+      underline: isUnderlinedElement(element, editor),
+      textColor: normalizeToolbarColor(computed.color, true),
+      highlightColor: normalizeToolbarColor(highlightColor),
+    })
+  }
+
+  function scheduleActiveFormattingSync() {
+    window.requestAnimationFrame(syncActiveFormatting)
+  }
+
   function restoreSelection() {
     const editor = editorRef.current
     editor?.focus()
@@ -199,6 +286,7 @@ export function RichTextEditor({
     restoreSelection()
     document.execCommand(command, false, value)
     rememberSelection()
+    syncActiveFormatting()
     emitChange()
   }
 
@@ -279,9 +367,8 @@ export function RichTextEditor({
         if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, value)
       }
     }
-    if (command === 'hiliteColor') setSelectedHighlightColor(value)
-    if (command === 'foreColor') setSelectedTextColor(value)
     rememberSelection()
+    syncActiveFormatting()
     if (shouldEmitChange) emitChange()
     setOpenPaletteTarget(null)
   }
@@ -312,7 +399,16 @@ export function RichTextEditor({
   }
 
   const showToolbar = toolbarMode === 'always' || focused
-  const activePaletteColor = openPaletteTarget === 'foreColor' ? selectedTextColor : selectedHighlightColor
+  const activePaletteColor = openPaletteTarget === 'foreColor' ? activeFormatting.textColor : activeFormatting.highlightColor
+
+  function toolbarButtonClass(active = false) {
+    return [
+      'rounded border p-1',
+      active
+        ? 'border-sf-brand bg-sf-brand/10 text-sf-brand'
+        : 'border-sf-border bg-white hover:bg-sf-surface-alt',
+    ].join(' ')
+  }
 
   function renderPalette(target: RichTextColorCommand) {
     if (openPaletteTarget !== target) return null
@@ -380,26 +476,26 @@ export function RichTextEditor({
       <div
         className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
       >
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('bold'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.bold)} aria-label="Bold" aria-pressed={activeFormatting.bold} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('bold'))}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('italic'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.italic)} aria-label="Italic" aria-pressed={activeFormatting.italic} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('italic'))}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('underline'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.underline)} aria-label="Underline" aria-pressed={activeFormatting.underline} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('underline'))}>
           <Underline className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertUnorderedList'))}>
+        <button type="button" className={toolbarButtonClass()} aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertUnorderedList'))}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertOrderedList'))}>
+        <button type="button" className={toolbarButtonClass()} aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertOrderedList'))}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="relative inline-flex">
           <button
             ref={textColorButtonRef}
             type="button"
-            className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt"
+            className={`${toolbarButtonClass()} relative inline-flex`}
             aria-label="Text color"
             title="Text color"
             onPointerDown={keepEditorSelection}
@@ -409,6 +505,11 @@ export function RichTextEditor({
             onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'foreColor' ? null : 'foreColor')))}
           >
             <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+            <span
+              className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full"
+              style={{ backgroundColor: activeFormatting.textColor ?? '#181818' }}
+              aria-hidden="true"
+            />
           </button>
           {renderPalette('foreColor')}
         </span>
@@ -416,7 +517,7 @@ export function RichTextEditor({
           <button
             ref={highlightColorButtonRef}
             type="button"
-            className="inline-flex rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt"
+            className={`${toolbarButtonClass()} relative inline-flex`}
             aria-label="Text background"
             title="Text background"
             onPointerDown={keepEditorSelection}
@@ -426,6 +527,14 @@ export function RichTextEditor({
             onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor')))}
           >
             <Highlighter className="h-3.5 w-3.5" aria-hidden="true" />
+            <span
+              className={[
+                'pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full',
+                activeFormatting.highlightColor ? '' : 'border-t border-dashed border-sf-text-muted bg-transparent',
+              ].join(' ')}
+              style={{ backgroundColor: activeFormatting.highlightColor ?? 'transparent' }}
+              aria-hidden="true"
+            />
           </button>
           {renderPalette('hiliteColor')}
         </span>
@@ -439,14 +548,25 @@ export function RichTextEditor({
         onInput={(event) => {
           cleanupCaretResetMarkers(event.currentTarget)
           rememberSelection()
+          syncActiveFormatting()
           onChange(normalizeRichTextValue(event.currentTarget.innerHTML))
         }}
         onFocus={() => {
           setFocused(true)
           rememberSelection()
+          syncActiveFormatting()
         }}
-        onKeyUp={rememberSelection}
-        onMouseUp={rememberSelection}
+        onKeyUp={() => {
+          rememberSelection()
+          syncActiveFormatting()
+        }}
+        onMouseDown={scheduleActiveFormattingSync}
+        onMouseUp={() => {
+          rememberSelection()
+          syncActiveFormatting()
+        }}
+        onClick={scheduleActiveFormattingSync}
+        onContextMenu={scheduleActiveFormattingSync}
       />
     </div>
   )
