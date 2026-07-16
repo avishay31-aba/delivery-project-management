@@ -37,9 +37,19 @@ const RICH_TEXT_THEME_PALETTE: ThemeColorFamily[] = [
   { name: 'Purple', shades: ['#f3e8ff', '#e9d5ff', '#c084fc', '#9333ea', '#581c87'] },
 ]
 
+const RICH_TEXT_CARET_RESET_ATTRIBUTE = 'data-rich-text-caret-reset'
+const ZERO_WIDTH_SPACE = '\u200B'
+
 function normalizeRichTextValue(value: string): string {
   const normalized = value.trim()
   return normalized === '<br>' || normalized === '<div><br></div>' ? '' : value
+}
+
+function cleanupCaretResetMarkers(editor: HTMLElement) {
+  editor.querySelectorAll(`span[${RICH_TEXT_CARET_RESET_ATTRIBUTE}]`).forEach((marker) => {
+    marker.innerHTML = marker.innerHTML.replaceAll(ZERO_WIDTH_SPACE, '')
+    marker.replaceWith(...Array.from(marker.childNodes))
+  })
 }
 
 function clearBackgroundFormatting(node: Node) {
@@ -56,6 +66,22 @@ function clearBackgroundFormatting(node: Node) {
     element.removeAttribute('style')
   }
   element.childNodes.forEach(clearBackgroundFormatting)
+}
+
+function backgroundAncestorForRange(range: Range, editor: HTMLElement): HTMLElement | null {
+  let node: Node | null = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer
+    : range.startContainer.parentNode
+
+  while (node && node !== editor) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement
+      if (element.style.backgroundColor || element.style.background) return element
+    }
+    node = node.parentNode
+  }
+
+  return null
 }
 
 export function RichTextEditor({
@@ -143,7 +169,9 @@ export function RichTextEditor({
   }, [openPaletteTarget])
 
   function emitChange() {
-    onChange(normalizeRichTextValue(editorRef.current?.innerHTML ?? ''))
+    const editor = editorRef.current
+    if (editor) cleanupCaretResetMarkers(editor)
+    onChange(normalizeRichTextValue(editor?.innerHTML ?? ''))
   }
 
   function rememberSelection() {
@@ -177,6 +205,7 @@ export function RichTextEditor({
   function applyColor(command: RichTextColorCommand, value: RichTextColorValue) {
     setFocused(true)
     restoreSelection()
+    let shouldEmitChange = true
     const editor = editorRef.current
     const selection = window.getSelection()
     const selectionRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
@@ -187,11 +216,18 @@ export function RichTextEditor({
       if (range.commonAncestorContainer !== editor && !editor.contains(range.commonAncestorContainer)) {
         range.selectNodeContents(editor)
       }
+      const highlightedAncestor = command === 'hiliteColor' && value === null
+        ? backgroundAncestorForRange(range, editor)
+        : null
       const contents = range.extractContents()
       if (command === 'hiliteColor' && value === null) {
         clearBackgroundFormatting(contents)
         const insertedNodes = Array.from(contents.childNodes)
-        range.insertNode(contents)
+        if (highlightedAncestor && !highlightedAncestor.textContent) {
+          highlightedAncestor.replaceWith(contents)
+        } else {
+          range.insertNode(contents)
+        }
         const nextRange = document.createRange()
         if (insertedNodes.length > 0) {
           nextRange.setStartBefore(insertedNodes[0])
@@ -219,14 +255,34 @@ export function RichTextEditor({
         selectionRangeRef.current = nextRange.cloneRange()
       }
     } else if (editor && range) {
-      const commandValue = value ?? 'transparent'
-      const applied = document.execCommand(command, false, commandValue)
-      if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, commandValue)
+      if (command === 'hiliteColor' && value === null) {
+        const highlightedAncestor = backgroundAncestorForRange(range, editor)
+        if (highlightedAncestor) {
+          const resetMarker = document.createElement('span')
+          resetMarker.setAttribute(RICH_TEXT_CARET_RESET_ATTRIBUTE, 'true')
+          resetMarker.textContent = ZERO_WIDTH_SPACE
+          highlightedAncestor.after(resetMarker)
+          const nextRange = document.createRange()
+          nextRange.setStart(resetMarker.firstChild ?? resetMarker, resetMarker.firstChild ? ZERO_WIDTH_SPACE.length : 0)
+          nextRange.collapse(true)
+          editor.focus()
+          selection?.removeAllRanges()
+          selection?.addRange(nextRange)
+          selectionRangeRef.current = nextRange.cloneRange()
+          shouldEmitChange = false
+        } else {
+          document.execCommand('removeFormat', false)
+          shouldEmitChange = false
+        }
+      } else if (value) {
+        const applied = document.execCommand(command, false, value)
+        if (command === 'hiliteColor' && !applied) document.execCommand('backColor', false, value)
+      }
     }
     if (command === 'hiliteColor') setSelectedHighlightColor(value)
     if (command === 'foreColor') setSelectedTextColor(value)
     rememberSelection()
-    emitChange()
+    if (shouldEmitChange) emitChange()
     setOpenPaletteTarget(null)
   }
 
@@ -260,6 +316,7 @@ export function RichTextEditor({
         aria-label={target === 'foreColor' ? 'Text color palette' : 'Text background palette'}
         data-placement={palettePosition.placement}
         onPointerDown={keepEditorSelection}
+        onMouseDown={keepEditorSelection}
       >
         <button
           type="button"
@@ -308,19 +365,19 @@ export function RichTextEditor({
       <div
         className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
       >
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onPointerDown={keepEditorSelection} onClick={() => apply('bold')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bold" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('bold')}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onPointerDown={keepEditorSelection} onClick={() => apply('italic')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Italic" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('italic')}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onPointerDown={keepEditorSelection} onClick={() => apply('underline')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Underline" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('underline')}>
           <Underline className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onPointerDown={keepEditorSelection} onClick={() => apply('insertUnorderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('insertUnorderedList')}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onPointerDown={keepEditorSelection} onClick={() => apply('insertOrderedList')}>
+        <button type="button" className="rounded border border-sf-border bg-white p-1 hover:bg-sf-surface-alt" aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onClick={() => apply('insertOrderedList')}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="relative inline-flex">
@@ -331,6 +388,7 @@ export function RichTextEditor({
             aria-label="Text color"
             title="Text color"
             onPointerDown={keepEditorSelection}
+            onMouseDown={keepEditorSelection}
             onClick={() => setOpenPaletteTarget((current) => (current === 'foreColor' ? null : 'foreColor'))}
           >
             <Palette className="h-3.5 w-3.5" aria-hidden="true" />
@@ -345,6 +403,7 @@ export function RichTextEditor({
             aria-label="Text background"
             title="Text background"
             onPointerDown={keepEditorSelection}
+            onMouseDown={keepEditorSelection}
             onClick={() => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor'))}
           >
             <Highlighter className="h-3.5 w-3.5" aria-hidden="true" />
@@ -359,6 +418,7 @@ export function RichTextEditor({
         role="textbox"
         suppressContentEditableWarning
         onInput={(event) => {
+          cleanupCaretResetMarkers(event.currentTarget)
           rememberSelection()
           onChange(normalizeRichTextValue(event.currentTarget.innerHTML))
         }}
