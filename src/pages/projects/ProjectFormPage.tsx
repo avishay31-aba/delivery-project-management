@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { BusinessObjectLink, FormField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, HeaderReadonlyValue, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
@@ -764,7 +764,7 @@ export function ProjectFormPage() {
       if (field.inputType === 'richText') {
         return (
           <FormField key={field.key} label={label} controlWidthClassName="w-[32rem] max-w-full">
-            <div className="min-h-16 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+            <div className="min-h-16 px-2 py-1 text-sm text-sf-text">
               <RichTextContent value={value} />
             </div>
           </FormField>
@@ -773,17 +773,17 @@ export function ProjectFormPage() {
       if (field.inputType === 'date') {
         return (
           <FormField key={field.key} label={label} controlWidthClassName="w-44">
-            <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+            <HeaderReadonlyValue>
               <DateTimeValue value={value} semanticType="date" fallback="-" />
-            </div>
+            </HeaderReadonlyValue>
           </FormField>
         )
       }
       return (
         <FormField key={field.key} label={label} controlWidthClassName="w-44">
-          <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+          <HeaderReadonlyValue>
             {field.key === 'progressStatus' ? <ProjectStatusBadge status={projectDraft.progressStatus} /> : value || '-'}
-          </div>
+          </HeaderReadonlyValue>
         </FormField>
       )
     }
