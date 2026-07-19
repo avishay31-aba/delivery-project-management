@@ -226,6 +226,7 @@ function tenantConfigurationPatch(
   return {
     patch: {
       tenantFormType: tenantFormType(draft),
+      sourceRequirementId: draft.sourceRequirementId,
       hostedSystemId: system?.id ?? draft.systemId,
       hostingSid: system?.sid ?? draft.hostingSid ?? '',
       configuration,

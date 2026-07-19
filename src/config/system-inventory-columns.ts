@@ -80,7 +80,7 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
   { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => row.occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
   {
     id: 'currentProjects',
-    label: 'Current PID',
+    label: 'Linked Projects',
     getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
     render: (row) =>
       createElement(BusinessIdListLinks, {

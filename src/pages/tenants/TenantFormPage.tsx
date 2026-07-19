@@ -14,6 +14,7 @@ import {
 } from '@/components/child-objects'
 import {
   AlertStatusIcon,
+  BusinessIdListLinks,
   BusinessObjectLink,
   FormField,
   OperationalStatusIcon,
@@ -59,7 +60,7 @@ import {
   applicationConfigurationValue,
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { currentProjectPidsForSystem, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -375,6 +376,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
   const deliveryPidDisplay = tenantDeliveryPidDisplay(tenantDraft, projects, projectTenants)
   const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
+  const linkedProjectPidsForActiveSystem = activeSystem
+    ? currentProjectPidsForSystem(activeSystem, projects, projectSystems)
+    : []
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
@@ -935,7 +939,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('Project Name', project?.opportunityName ?? '')}
           {renderHeaderField('Delivery PID', renderPidLinks(deliveryPidDisplay))}
           {renderHeaderField('POC PID', renderPidLinks(pocPidDisplay))}
-          {renderHeaderField('SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
+          {renderHeaderField('Current SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
+          {renderHeaderField('Linked Projects', <BusinessIdListLinks objectType="PROJECT" businessIds={linkedProjectPidsForActiveSystem} />)}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
           {formType === 'POC'
             ? renderHeaderField('POC Start Date', <DateTimeValue value={tenantDraft.pocStartDate ?? opportunity?.pocStartDate} semanticType="date" fallback="-" />)
