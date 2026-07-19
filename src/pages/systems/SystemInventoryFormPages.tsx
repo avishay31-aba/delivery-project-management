@@ -996,9 +996,11 @@ export function InventoryForm<T extends InventoryRecord>({
           />
         </section>
 
-        <section className="sf-card space-y-2 p-3" aria-labelledby="system-application-summary-section-title">
-          <h3 id="system-application-summary-section-title" className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
-          <div className="sf-scroll-x rounded border border-sf-border bg-white">
+        <section className="sf-card" aria-labelledby="system-application-summary-section-title">
+          <div className="border-b border-sf-border bg-sf-surface-alt px-3 py-2">
+            <h3 id="system-application-summary-section-title" className="whitespace-nowrap text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
+          </div>
+          <div className="sf-scroll-x bg-white">
             <table className="w-max border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
