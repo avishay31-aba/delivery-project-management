@@ -34,6 +34,7 @@ export interface ProjectLifecycleChange {
 export interface OpportunityProjectSyncResult {
   opportunity: Opportunity
   projectChanges: ProjectLifecycleChange[]
+  messages?: string[]
 }
 
 export interface OpportunityValidationContext {

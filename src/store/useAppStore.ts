@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type {
+  AllocationType,
   AppDataState,
   Opportunity,
   OpportunitySubType,
@@ -69,6 +70,7 @@ import {
   deletedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
   resolveTenantCreationSource,
+  systemForTenant,
   tenantCreationDraftFromSource,
   tenantConfigurationSaveDraft,
 } from '@/domain/tenant-operations'
@@ -241,6 +243,139 @@ function appendUniqueSemicolonValue(current: string | null | undefined, value: s
     .filter(Boolean)
   if (nextValue && !values.includes(nextValue)) values.push(nextValue)
   return values.join('; ')
+}
+
+function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): string[] {
+  return Array.from(new Set([
+    ...(opportunity.changeRequestRequirements ?? []).map((requirement) => requirement.tenantId),
+    ...(opportunity.standardRenewalRequirements ?? []).map((requirement) => requirement.tenantId),
+  ].filter(Boolean)))
+}
+
+function relationshipAllocationTypeForSystem(system: AppDataState['systems'][number]): AllocationType {
+  return system.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM'
+}
+
+function validateProjectTenantHostingRelationshipSync(
+  state: AppDataState,
+  tenantIds: string[],
+): string[] {
+  return tenantIds.flatMap((tenantId) => {
+    const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
+    if (!tenant) return [`Selected Tenant ${tenantId} was not found.`]
+    const hostingSystem = systemForTenant(tenant, state.systems)
+    if (!hostingSystem) {
+      return [`Tenant ${tenant.tid} cannot be linked because it has no valid hosting System.`]
+    }
+    return []
+  })
+}
+
+function ensureProjectTenantHostingRelationships(
+  state: AppDataState,
+  project: AppDataState['projects'][number],
+  tenantIds: string[],
+  now: string,
+  source: 'opportunityWon' | 'tenantSave' = 'opportunityWon',
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
+  let systems = state.systems
+  let projectSystems = state.projectSystems
+  let projectTenants = state.projectTenants
+  let activityEvents = state.activityEvents
+  const sourceLabel = source === 'opportunityWon' ? 'Opportunity Won' : 'Tenant Save'
+
+  tenantIds.forEach((tenantId) => {
+    const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
+    if (!tenant) return
+    const hostingSystem = systemForTenant(tenant, systems)
+    if (!hostingSystem) return
+
+    const activeSystemLink = projectSystems.find(
+      (link) =>
+        link.projectId === project.id &&
+        link.systemId === hostingSystem.id &&
+        link.allocationStatus !== 'DEALLOCATED',
+    )
+    const allocationType = activeSystemLink?.allocationType ?? relationshipAllocationTypeForSystem(hostingSystem)
+    if (activeSystemLink) {
+      projectSystems = projectSystems.map((link) =>
+        link.id === activeSystemLink.id
+          ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+          : link,
+      )
+    } else {
+      const allocation = createProjectSystemLink(project.id, hostingSystem.id, allocationType, now, {
+        tenantIds: [tenant.id],
+        sourceMachineId: allocationType === 'REUSED_INTERNAL' ? hostingSystem.machineId : null,
+      })
+      projectSystems = [allocation, ...projectSystems]
+      activityEvents = appendActivityEvent(activityEvents, now, {
+        category: 'ALLOCATION',
+        eventType: source === 'opportunityWon'
+          ? 'allocation.hostingSystemLinkedFromOpportunityWon'
+          : 'allocation.hostingSystemLinkedFromTenantSave',
+        severity: 'SUCCESS',
+        summary: `Hosting system ${systemBusinessId(hostingSystem)} linked to project ${project.pid} from ${sourceLabel}.`,
+        primaryObject: allocationRef(allocation),
+        relatedObjects: relatedRefs(projectRef(project), systemRef(hostingSystem), tenantRef(tenant)),
+      })
+    }
+
+    const activeTenantLink = projectTenants.find(
+      (link) =>
+        link.projectId === project.id &&
+        link.tenantId === tenant.id &&
+        link.allocationStatus !== 'DEALLOCATED',
+    )
+    if (!activeTenantLink) {
+      const projectTenant = createProjectTenantLink(project.id, tenant.id, hostingSystem.id, allocationType, now)
+      projectTenants = [projectTenant, ...projectTenants]
+      activityEvents = appendActivityEvent(activityEvents, now, {
+        category: 'TENANT',
+        eventType: source === 'opportunityWon'
+          ? 'project.tenantLinkedFromOpportunityWon'
+          : 'project.tenantLinkedFromTenantSave',
+        severity: 'SUCCESS',
+        summary: `Tenant ${tenant.tid} linked to project ${project.pid} from ${sourceLabel}.`,
+        primaryObject: projectRef(project),
+        relatedObjects: relatedRefs(tenantRef(tenant), systemRef(hostingSystem)),
+      })
+    }
+
+    const assignmentLocation = projectAssignmentLocation({ ...state, systems, projectSystems, projectTenants }, project)
+    systems = systems.map((system) =>
+      system.id === hostingSystem.id
+        ? {
+            ...system,
+            linkedProjectIds: Array.from(new Set([...(system.linkedProjectIds ?? []), project.id])),
+            tenantIds: Array.from(new Set([...(system.tenantIds ?? []), tenant.id])),
+            timeGroup: appendUniqueSemicolonValue(system.timeGroup, assignmentLocation.region || assignmentLocation.timeGroup),
+            updatedAt: now,
+          }
+        : system,
+    )
+  })
+
+  return { systems, projectSystems, projectTenants, activityEvents }
+}
+
+function ensureTenantCommittedProjectRelationships(
+  state: AppDataState,
+  tenant: AppDataState['tenants'][number],
+  activeSystemId: string | undefined,
+  now: string,
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
+  const activeSystem = state.systems.find((system) => system.id === activeSystemId || system.id === tenant.hostedSystemId || system.id === tenant.systemId)
+  const linkedProject = state.projects.find((project) => project.pid === tenant.deliveryPid)
+  if (!activeSystem || !linkedProject) {
+    return {
+      systems: state.systems,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      activityEvents: state.activityEvents,
+    }
+  }
+  return ensureProjectTenantHostingRelationships(state, linkedProject, [tenant.id], now, 'tenantSave')
 }
 
 function appendProjectSaveActivityEvents(
@@ -708,7 +843,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const tenants = state.tenants.map((tenant) =>
         tenant.id === id ? { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now } : tenant,
       )
-      const systems = state.systems.map((system) => {
+      const committedTenant = tenants.find((tenant) => tenant.id === id) ?? savedTenant
+      const relationshipState = ensureTenantCommittedProjectRelationships(
+        { ...state, tenants },
+        committedTenant,
+        activeSystem?.id,
+        now,
+      )
+      const systems = relationshipState.systems.map((system) => {
         if (!affectedSystemIds.includes(system.id)) return system
         const beforeSummary = systemSummariesBefore.get(system.id)
         const afterSummary = systemApplicationConfigurationSummary(system, tenants)
@@ -725,7 +867,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
         }
       })
 
-      return { tenants, systems }
+      return {
+        tenants,
+        systems,
+        projectSystems: relationshipState.projectSystems,
+        projectTenants: relationshipState.projectTenants,
+        activityEvents: relationshipState.activityEvents,
+      }
     })
     get().saveToStorage()
   },
@@ -1120,6 +1268,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
       },
       options,
     )
+    const shouldSyncWonRelationships = savedOpportunity.stage !== 'WON' && result.opportunity.stage === 'WON'
+    const finalProject = shouldSyncWonRelationships && result.opportunity.finalProjectId
+      ? result.projects.find((project) => project.id === result.opportunity.finalProjectId)
+      : undefined
+    const existingTenantIds = shouldSyncWonRelationships ? existingTenantIdsForOpportunityFinalProject(result.opportunity) : []
+    const relationshipMessages = finalProject
+      ? validateProjectTenantHostingRelationshipSync(state, existingTenantIds)
+      : []
+    if (relationshipMessages.length > 0) {
+      return {
+        opportunity: savedOpportunity,
+        projectChanges: [],
+        messages: relationshipMessages,
+      }
+    }
 
     set((currentState) => {
       const opportunities = currentState.opportunities.map((candidate) =>
@@ -1129,9 +1292,27 @@ export const useAppStore = create<AppStore>((set, get) => ({
       )
       const committedState = { ...currentState, opportunities }
       const projects = result.projects.map((project) => projectWithDerivedTimeZone(committedState, project))
+      const projectForRelationshipSync = finalProject ? projects.find((project) => project.id === finalProject.id) : undefined
+      const relationshipState = projectForRelationshipSync && existingTenantIds.length > 0
+        ? ensureProjectTenantHostingRelationships(
+            { ...currentState, opportunities, projects },
+            projectForRelationshipSync,
+            existingTenantIds,
+            now,
+          )
+        : {
+            systems: currentState.systems,
+            projectSystems: currentState.projectSystems,
+            projectTenants: currentState.projectTenants,
+            activityEvents: currentState.activityEvents,
+          }
       return {
         idCounters: result.idCounters,
         projects,
+        systems: relationshipState.systems,
+        projectSystems: relationshipState.projectSystems,
+        projectTenants: relationshipState.projectTenants,
+        activityEvents: relationshipState.activityEvents,
         projectLifecycleChangesByOpportunityId: {
           ...currentState.projectLifecycleChangesByOpportunityId,
           [result.opportunity.id]: result.projectChanges,

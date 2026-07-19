@@ -1339,6 +1339,12 @@ export function OpportunityFormPage() {
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
+    if (result.messages && result.messages.length > 0) {
+      setSaveMessages(result.messages)
+      setPendingPocSave(null)
+      setPendingWonSave(null)
+      return
+    }
     resetDraft(cloneOpportunityDraft(result.opportunity))
     setProjectChanges(result.projectChanges)
     setSaveMessages([])

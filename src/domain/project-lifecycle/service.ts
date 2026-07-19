@@ -634,20 +634,6 @@ export function activeSystemLinksForProject(projectId: string, projectSystems: P
   return activeProjectSystemLinks(projectSystems).filter((link) => link.projectId === projectId)
 }
 
-function referencedTenantIdsForOpportunity(opportunity: Opportunity | undefined): Set<string> {
-  return new Set([
-    ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.tenantId),
-    ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.tenantId),
-  ].filter(Boolean))
-}
-
-function referencedSystemIdsForOpportunity(opportunity: Opportunity | undefined): Set<string> {
-  return new Set([
-    ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.systemId),
-    ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.systemId),
-  ].filter(Boolean))
-}
-
 export function systemProductMismatchForProject(system: System, opportunity: Opportunity | undefined): boolean {
   const requestedProducts = new Set(
     [
@@ -665,26 +651,12 @@ export function linkedSystemsForProject(
   project: Project | undefined,
   systems: System[],
   activeSystemLinks: ProjectSystemLink[],
-  opportunity?: Opportunity,
-  tenants: Tenant[] = [],
-  projectSystems: ProjectSystemLink[] = activeSystemLinks,
+  _opportunity?: Opportunity,
+  _tenants: Tenant[] = [],
+  _projectSystems: ProjectSystemLink[] = activeSystemLinks,
 ): System[] {
   if (!project) return []
   const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
-  const systemsWithProjectLinks = new Set(
-    projectSystems
-      .filter((link) => link.projectId === project.id)
-      .map((link) => link.systemId),
-  )
-  referencedSystemIdsForOpportunity(opportunity).forEach((systemId) => {
-    if (!systemsWithProjectLinks.has(systemId)) linkedSystemIds.add(systemId)
-  })
-  const referencedTenantIds = referencedTenantIdsForOpportunity(opportunity)
-  tenants.forEach((tenant) => {
-    if (!referencedTenantIds.has(tenant.id)) return
-    const systemId = tenant.hostedSystemId || tenant.systemId
-    if (systemId && !systemsWithProjectLinks.has(systemId)) linkedSystemIds.add(systemId)
-  })
   return systems.filter((system) => linkedSystemIds.has(system.id))
 }
 
@@ -692,7 +664,7 @@ export function linkedTenantsForProject(
   project: Project | undefined,
   projectTenants: ProjectTenantLink[],
   tenants: Tenant[],
-  opportunity?: Opportunity,
+  _opportunity?: Opportunity,
 ): Tenant[] {
   if (!project) return []
   const projectTenantLinksForProject = projectTenants.filter((link) => link.projectId === project.id)
@@ -700,13 +672,6 @@ export function linkedTenantsForProject(
     activeProjectTenantLinks(projectTenantLinksForProject)
       .map((link) => link.tenantId),
   )
-  const tenantsWithProjectLinks = new Set(projectTenantLinksForProject.map((link) => link.tenantId))
-  referencedTenantIdsForOpportunity(opportunity).forEach((tenantId) => {
-    if (!tenantsWithProjectLinks.has(tenantId)) linkedTenantIds.add(tenantId)
-  })
-  tenants
-    .filter((tenant) => tenant.deliveryPid === project.pid && !tenantsWithProjectLinks.has(tenant.id))
-    .forEach((tenant) => linkedTenantIds.add(tenant.id))
   return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
 }
 
