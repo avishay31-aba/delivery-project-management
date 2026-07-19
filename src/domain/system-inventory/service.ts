@@ -215,9 +215,7 @@ export function currentProjectPidsForSystem(
 ): string[] {
   return Array.from(
     new Set(
-      projectSystems
-        .filter((link) => link.allocationStatus !== 'DEALLOCATED' && link.systemId === record.id)
-        .map((link) => link.projectId)
+      linkedProjectIdsForSystem(record, projectSystems)
         .map((projectId) => projects.find((project) => project.id === projectId)?.pid ?? projectId)
         .filter(Boolean),
     ),

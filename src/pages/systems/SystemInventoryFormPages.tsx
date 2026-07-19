@@ -230,7 +230,18 @@ function deriveTimeGroup(record: InventoryRecord, tenants: Tenant[]): string {
   return systemTimeGroup(record, tenants)
 }
 
-function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[], projectSystems: ProjectSystemLink[] = []): string {
+function deriveCurrentSid(record: InventoryRecord, systems: System[]): string {
+  if ('sid' in record && record.sid) return record.sid
+  if (!('machineId' in record) || !record.machineId) return ''
+  return systems
+    .filter((system) => system.machineId === record.machineId && system.sid)
+    .map((system) => system.sid as string)
+    .filter((sid, index, all) => all.indexOf(sid) === index)
+    .join('; ')
+}
+
+function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[], projectSystems: ProjectSystemLink[] = [], systems: System[] = []): string {
+  if (key === 'currentSid') return deriveCurrentSid(record, systems)
   if (key === 'currentPid') return deriveCurrentPid(record, projects, projectSystems)
   if (key === 'linkedProjects') return deriveLinkedProjects(record, projects, projectSystems)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
@@ -301,7 +312,7 @@ function OperationalStatusSelect({
   )
 }
 
-function InventoryForm<T extends InventoryRecord>({
+export function InventoryForm<T extends InventoryRecord>({
   record,
   records,
   metadata,
@@ -509,13 +520,6 @@ function InventoryForm<T extends InventoryRecord>({
     lines.set(field.line, [...(lines.get(field.line) ?? []), field])
   })
   const headerLines = Array.from(lines.entries()).sort(([first], [second]) => first - second)
-  const currentTemporarySids =
-    metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
-      ? allocatedSystems
-          .filter((system) => system.machineId && system.machineId === readRecordValue(activeDraft, 'machineId') && system.sid)
-          .map((system) => system.sid as string)
-      : []
-
   function save(stayOnPage: boolean) {
     if (isViewMode) return
     const nextMessages = validate()
@@ -589,7 +593,7 @@ function InventoryForm<T extends InventoryRecord>({
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
     const sourceRecord = field.editable ? activeDraft : activeRecord
-    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems)
+    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const width =
@@ -1409,15 +1413,6 @@ function InventoryForm<T extends InventoryRecord>({
               {fields.map(renderHeaderField)}
             </div>
           ))}
-          {metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL ? (
-            <div className="flex flex-wrap items-start gap-3">
-              <FormField label="Current SID" controlWidthClassName="w-56">
-                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-                  {currentTemporarySids.length > 0 ? currentTemporarySids.join(', ') : '-'}
-                </div>
-              </FormField>
-            </div>
-          ) : null}
         </div>
       </CollapsibleSection>
 

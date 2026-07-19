@@ -1,10 +1,17 @@
 import type { ProjectSystemLink } from '@/data/seed.types'
+import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import { isReusedInternalOccupied } from '@/domain/system-inventory'
 import { activeProjectSystemLinks } from './service'
 import type { AllocationActionResult, AllocationValidationContext, AllocationValidationInput } from './types'
 
 function failed(message: string): AllocationActionResult {
   return { ok: false, message }
+}
+
+function projectRegionForAllocation(project: NonNullable<AllocationValidationContext['projects'][number]>, context: AllocationValidationContext): string {
+  const linkedOpportunity = context.opportunities?.find((opportunity) => opportunity.id === project.opportunityId || opportunity.opportunityId === project.opportunityId)
+  const account = context.accounts?.find((candidate) => candidate.accountName === project.accountName)
+  return projectHeaderFieldValue(project, 'region', { linkedOpportunity, account }).trim()
 }
 
 export function validateProductionAllocation(
@@ -35,6 +42,11 @@ export function validateReusedInternalAllocation(
   if (project.mainType !== 'POC') return failed('Delivery and Renewal projects cannot allocate Reused Internal Systems.')
   if (!reusedSystem) return failed('Reused internal system not found.')
   if (isReusedInternalOccupied(reusedSystem.status)) return failed('Reused internal system is already occupied.')
+  const currentRegion = String(reusedSystem.usedInRegion ?? '').trim()
+  const projectRegion = projectRegionForAllocation(project, context)
+  if (currentRegion && projectRegion && currentRegion !== projectRegion) {
+    return failed(`Conflict: current system used in region is ${currentRegion} and you are trying to allocate it to a project that its region is ${projectRegion}.`)
+  }
   if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && link.sourceMachineId === reusedSystem.machineId)) {
     return failed('This MID is already allocated to the project.')
   }
