@@ -79,12 +79,10 @@ import {
   predecessorReference,
   splitWarrantyPredecessors,
   successorRefsForWarranty,
-  tenantWarrantyHeaderStatusReadModel,
   isSelfWarrantyPredecessorSelection,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
   warrantyRelatedProjectOptionLabel,
-  warrantyStatusSeverity,
 } from '@/domain/warranty-collection'
 import {
   cloneTenant,
@@ -394,7 +392,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
-  const tenantWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(draftComputedWarranties, tenantDraft.tid).label
   const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
 
   useEffect(() => {
@@ -875,12 +872,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderWarrantyHeaderStatus() {
     const latestStatus = draftComputedWarranties.at(-1)?.warrantyStatus ?? tenantDraft.warrantyStatus
-    return (
-      <span className="inline-flex items-center gap-1.5">
-        <AlertStatusIcon variant={warrantyStatusSeverity(latestStatus)} />
-        <span>{tenantWarrantyHeaderStatus}</span>
-      </span>
-    )
+    return <WarrantyStatusPresentation status={latestStatus} />
   }
 
   function renderTenantTypeField() {
