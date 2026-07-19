@@ -81,6 +81,7 @@ import {
   isSelfWarrantyPredecessorSelection,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
+  warrantyRelatedProjectOptionLabel,
   warrantyStatusSeverity,
 } from '@/domain/warranty-collection'
 import {
@@ -1419,7 +1420,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                           <option value="">Select project</option>
                           {relatedProjects.map((candidate) => (
                             <option key={candidate.id} value={candidate.id}>
-                              {candidate.pid} - {candidate.subType}
+                              {warrantyRelatedProjectOptionLabel(candidate)}
                             </option>
                           ))}
                         </select>
@@ -1428,7 +1429,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                         ) : null}
                       </>
                     ) : (
-                      relatedProjects.find((candidate) => candidate.id === warranty.relatedProjectId)?.pid ?? warranty.relatedProjectId
+                      warrantyRelatedProjectOptionLabel(relatedProjects.find((candidate) => candidate.id === warranty.relatedProjectId)) || warranty.relatedProjectId
                     )}
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.opportunityId}</td>
@@ -1523,7 +1524,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 <option value="">Select project</option>
                 {relatedProjects.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {candidate.opportunityName} - {candidate.pid} - {candidate.subType}
+                    {warrantyRelatedProjectOptionLabel(candidate)}
                   </option>
                 ))}
               </select>

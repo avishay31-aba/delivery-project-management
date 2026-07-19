@@ -22,6 +22,23 @@ import type {
 
 const UNDER_CONTRACT_ROW_STATUSES = new Set<WarrantyStatus>(['PLANNED', 'VALID', 'PENDING', 'EXPIRED'])
 
+function titleCaseBusinessValue(value: string): string {
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+export function warrantyRelatedProjectOptionLabel(project?: Project): string {
+  if (!project) return ''
+  const parts = [project.pid, titleCaseBusinessValue(project.mainType)]
+  if (project.subType && project.subType !== 'NONE') {
+    parts.push(titleCaseBusinessValue(project.subType))
+  }
+  return parts.join(' - ')
+}
+
 export function daysBetween(startDate: string | null, endDate: string | null): number | null {
   if (!startDate || !endDate) return null
   const start = new Date(startDate)
