@@ -20,6 +20,7 @@ import type {
   ProjectDeliveryDateStatus,
   ProjectHealthReadModel,
   ProjectHealthStatus,
+  ProjectMainType,
   ProjectPortfolioHealthSummary,
   ProjectLifecycleContext,
   ProjectRequirementRow,
@@ -280,6 +281,16 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     financialProfile: projectFinancialProfile(context.project, opportunity),
     owner: linkedOwnerForProject(context.project, account, context.salesManagers),
   }
+}
+
+export function projectMainTypeLabel(type: ProjectMainType | string | undefined): string {
+  if (!type) return ''
+  if (type === 'POC') return 'POC'
+  return type
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
 }
 
 export function projectStatusLabel(status: string): string {

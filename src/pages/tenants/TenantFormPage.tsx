@@ -8,13 +8,13 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { projectMainTypeLabel } from '@/domain/project-lifecycle'
 import {
   EditableChildObjectActionButton,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
 import {
   AlertStatusIcon,
-  BusinessIdListLinks,
   BusinessObjectLink,
   FormField,
   OperationalStatusIcon,
@@ -60,7 +60,7 @@ import {
   applicationConfigurationValue,
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { currentProjectPidsForSystem, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -92,7 +92,6 @@ import {
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
-  tenantDeliveryPidDisplay,
   tenantFormType,
   tenantPocPidDisplay,
   tenantRelatedProjects,
@@ -375,11 +374,18 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
-  const deliveryPidDisplay = tenantDeliveryPidDisplay(tenantDraft, projects, projectTenants)
   const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
-  const linkedProjectPidsForActiveSystem = activeSystem
-    ? currentProjectPidsForSystem(activeSystem, projects, projectSystems)
-    : []
+  const originalDeliveryProject = tenantDraft.deliveryPid
+    ? projects.find((candidate) => candidate.pid === tenantDraft.deliveryPid && candidate.mainType !== 'POC')
+    : undefined
+  const headerPocProject = pocPidDisplay
+    ? projects.find((candidate) => candidate.pid === pocPidDisplay.split(';')[0]?.trim() && candidate.mainType === 'POC')
+    : tenantDraft.deliveryPid
+      ? projects.find((candidate) => candidate.pid === tenantDraft.deliveryPid && candidate.mainType === 'POC')
+      : undefined
+  const headerProject = formType === 'POC' ? headerPocProject : originalDeliveryProject
+  const headerDeliveryPid = formType === 'POC' ? '' : tenantDraft.deliveryPid ?? ''
+  const headerPocPid = formType === 'POC' ? headerPocProject?.pid ?? pocPidDisplay : ''
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
@@ -900,9 +906,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     )
   }
 
-  function renderHostingSidField() {
+  function renderCurrentSidField() {
+    if (activeSystem) {
+      return renderHeaderField(
+        'Current SID',
+        <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink>,
+      )
+    }
+
     return (
-      <FormField label="Hosting SID" controlWidthClassName="w-52">
+      <FormField label="Current SID" controlWidthClassName="w-52">
         {tenantDraft.systemId ? (
           <div className="min-h-8 px-2 py-1 text-sm text-sf-text">{hosting.sid || '-'}</div>
         ) : (
@@ -924,29 +937,23 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderHeader() {
-    const commonFields = [
-      renderTenantTypeField(),
-      renderOperationalModeField(),
-      formType === 'CUSTOMER' ? renderHeaderField('License Number', licenseNumber(deliveryPidDisplay, hosting.sid, tenantDraft.tid), 'w-64') : null,
-      formType === 'CUSTOMER' ? renderHeaderField('Warranty status', renderWarrantyHeaderStatus()) : null,
-      renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : ''),
-    ].filter(Boolean)
-
     return (
       <section className="sf-card space-y-3 p-3">
-        <div className="flex flex-wrap items-start gap-3">{commonFields}</div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderHeaderField('Project Type', project?.mainType ?? '')}
-          {renderHeaderField('Project Name', project?.opportunityName ?? '')}
-          {renderHeaderField('Delivery PID', renderPidLinks(deliveryPidDisplay))}
-          {renderHeaderField('POC PID', renderPidLinks(pocPidDisplay))}
-          {renderHeaderField('Current SID', activeSystem ? <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink> : hosting.sid)}
-          {renderHeaderField('Linked Projects', <BusinessIdListLinks objectType="PROJECT" businessIds={linkedProjectPidsForActiveSystem} />)}
+          {renderTenantTypeField()}
+          {renderOperationalModeField()}
+          {renderHeaderField('License Number', formType === 'CUSTOMER' ? licenseNumber(headerDeliveryPid, hosting.sid, tenantDraft.tid) : '', 'w-64')}
+          {renderHeaderField('Delivery Date', <DateTimeValue value={headerProject?.deliveryDate} semanticType="date" fallback="-" />)}
+          {renderHeaderField('Warranty Status', renderWarrantyHeaderStatus())}
+          {renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : '')}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {renderHeaderField('Delivery PID', renderPidLinks(headerDeliveryPid))}
+          {renderHeaderField('POC ID', renderPidLinks(headerPocPid))}
+          {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
+          {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
+          {renderCurrentSidField()}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
-          {formType === 'POC'
-            ? renderHeaderField('POC Start Date', <DateTimeValue value={tenantDraft.pocStartDate ?? opportunity?.pocStartDate} semanticType="date" fallback="-" />)
-            : renderHeaderField('Delivery Date', <DateTimeValue value={project?.deliveryDate} semanticType="date" fallback="-" />)}
-          {formType === 'POC' ? renderHeaderField('POC End Date', <DateTimeValue value={tenantDraft.pocEndDate ?? opportunity?.pocEndDate} semanticType="date" fallback="-" />) : null}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Account / End User', tenantDraft.accountName || project?.accountName || '')}
@@ -955,11 +962,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('State', opportunity?.state ?? activeSystem?.state ?? '')}
           {renderHeaderField('Time Zone', tenantTimeZoneDisplayValue(tenantDraft, opportunity, activeSystem))}
           {renderHeaderField('Time Group', tenantDraft.timeGroup || opportunity?.timeGroup || activeSystem?.timeGroup || '')}
-        </div>
-        <div className="flex flex-wrap items-start gap-3">
-          {renderHostingSidField()}
-          {renderHeaderField('Hosting System Operational status', hosting.operationalStatus)}
-          {renderHeaderField('Hosting System version', hosting.versionNumber)}
         </div>
       </section>
     )
