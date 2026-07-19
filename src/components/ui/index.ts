@@ -4,6 +4,7 @@ export { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, LinkedProjects
 export { PlaceholderCard } from '@/components/ui/PlaceholderCard'
 export { FormField } from '@/components/ui/FormField'
 export { HeaderReadonlyValue } from '@/components/ui/HeaderReadonlyValue'
+export { MetadataHeaderField, effectiveHeaderFieldCanEdit } from '@/components/ui/MetadataHeaderField'
 export { ReadonlyField } from '@/components/ui/ReadonlyField'
 export { ReadonlyGrid } from '@/components/ui/ReadonlyGrid'
 export { AlertStatusIcon } from '@/components/ui/AlertStatusIcon'

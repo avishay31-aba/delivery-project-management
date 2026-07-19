@@ -40,6 +40,7 @@ import {
   BusinessIdLink,
   BusinessObjectLink,
   FormField,
+  MetadataHeaderField,
   PlaceholderCard,
   RichTextContent,
   RichTextEditor,
@@ -1446,115 +1447,164 @@ export function OpportunityFormPage() {
   function renderHeaderField(field: OpportunityHeaderField) {
     if (field.key === 'type') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('type'), true, headerMissing(field.key))}
-            value={currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type}
-            onChange={(event) => updateType(event.target.value as OpportunityType)}
-          >
-            {OPPORTUNITY_TYPE_OPTIONS.map((type) => (
-              <option key={type} value={type}>
-                {type === 'DELIVERY' ? 'Delivery' : 'Renewal'}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('type'), true, headerMissing(field.key))}
+              value={currentDraft.type === 'POC' ? 'DELIVERY' : currentDraft.type}
+              onChange={(event) => updateType(event.target.value as OpportunityType)}
+            >
+              {OPPORTUNITY_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>
+                  {type === 'DELIVERY' ? 'Delivery' : 'Renewal'}
+                </option>
+              ))}
+            </select>
+          }
+          readOnlyValue={currentDraft.type === 'POC' ? 'Delivery' : currentDraft.type === 'DELIVERY' ? 'Delivery' : 'Renewal'}
+        />
       )
     }
 
     if (field.key === 'subType') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('subType'), true, headerMissing(field.key))}
-            value={currentDraft.subType}
-            onChange={(event) =>
-              requestOpportunityTypeChange({
-                type: currentDraft.type,
-                subType: event.target.value as OpportunitySubType,
-              })
-            }
-          >
-            {opportunitySubTypeOptions(currentDraft.type).map((subType) => (
-              <option key={subType} value={subType}>
-                {subType}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('subType'), true, headerMissing(field.key))}
+              value={currentDraft.subType}
+              onChange={(event) =>
+                requestOpportunityTypeChange({
+                  type: currentDraft.type,
+                  subType: event.target.value as OpportunitySubType,
+                })
+              }
+            >
+              {opportunitySubTypeOptions(currentDraft.type).map((subType) => (
+                <option key={subType} value={subType}>
+                  {subType}
+                </option>
+              ))}
+            </select>
+          }
+          readOnlyValue={currentDraft.subType || '-'}
+        />
       )
     }
 
     if (field.key === 'accountId') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('accountId'), true, headerMissing(field.key))}
-            value={currentDraft.accountId}
-            onChange={(event) => updateAccount(event.target.value)}
-          >
-            {accounts.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.accountName}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('accountId'), true, headerMissing(field.key))}
+              value={currentDraft.accountId}
+              onChange={(event) => updateAccount(event.target.value)}
+            >
+              {accounts.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.accountName}
+                </option>
+              ))}
+            </select>
+          }
+          readOnlyValue={accounts.find((candidate) => candidate.id === currentDraft.accountId)?.accountName || '-'}
+        />
       )
     }
 
     if (field.key === 'salesManagerId') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('salesManagerId'), true, headerMissing(field.key))}
-            value={currentDraft.salesManagerId}
-            onChange={(event) => patchDraft({ salesManagerId: event.target.value })}
-          >
-            {salesManagers.map((manager) => (
-              <option key={manager.id} value={manager.id}>
-                {manager.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('salesManagerId'), true, headerMissing(field.key))}
+              value={currentDraft.salesManagerId}
+              onChange={(event) => patchDraft({ salesManagerId: event.target.value })}
+            >
+              {salesManagers.map((manager) => (
+                <option key={manager.id} value={manager.id}>
+                  {manager.name}
+                </option>
+              ))}
+            </select>
+          }
+          readOnlyValue={salesManagers.find((manager) => manager.id === currentDraft.salesManagerId)?.name || '-'}
+        />
       )
     }
 
     if (field.key === 'dealPackage') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('dealPackage'), true, headerMissing(field.key))}
-            value={currentDraft.dealPackage ?? 'Silver'}
-            onChange={(event) => patchDraft({ dealPackage: event.target.value as OpportunityDealPackage })}
-          >
-            <option value="Silver">Silver</option>
-            <option value="Gold">Gold</option>
-            <option value="Platinum">Platinum</option>
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('dealPackage'), true, headerMissing(field.key))}
+              value={currentDraft.dealPackage ?? 'Silver'}
+              onChange={(event) => patchDraft({ dealPackage: event.target.value as OpportunityDealPackage })}
+            >
+              <option value="Silver">Silver</option>
+              <option value="Gold">Gold</option>
+              <option value="Platinum">Platinum</option>
+            </select>
+          }
+          readOnlyValue={currentDraft.dealPackage ?? 'Silver'}
+        />
       )
     }
 
     if (field.key === 'warrantyRecordId') {
       const tenantIds = new Set(accountTenants.map((tenant) => tenant.id))
       const accountWarrantyRecords = warrantyRecords.filter((record) => tenantIds.has(record.tenantId))
+      const selectedWarranty = accountWarrantyRecords.find((record) => record.warrantyRecordId === currentDraft.warrantyRecordId)
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={headerFieldWidthClass(field.key)} required={headerRequired(field.key)}>
-          <select
-            className={headerControlClassName(headerChanged('warrantyRecordId'), true, headerMissing(field.key))}
-            value={currentDraft.warrantyRecordId ?? ''}
-            onChange={(event) => patchDraft({ warrantyRecordId: event.target.value })}
-          >
-            <option value="">Select warranty</option>
-            {accountWarrantyRecords.map((record) => (
-              <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
-                {record.warrantyRecordId} - {record.status} - <DateTimeValue value={record.endDate} semanticType="date" fallback="No end" />
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={headerFieldWidthClass(field.key)}
+          required={headerRequired(field.key)}
+          businessEditable={field.editable}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('warrantyRecordId'), true, headerMissing(field.key))}
+              value={currentDraft.warrantyRecordId ?? ''}
+              onChange={(event) => patchDraft({ warrantyRecordId: event.target.value })}
+            >
+              <option value="">Select warranty</option>
+              {accountWarrantyRecords.map((record) => (
+                <option key={record.warrantyRecordId} value={record.warrantyRecordId}>
+                  {record.warrantyRecordId} - {record.status}
+                </option>
+              ))}
+            </select>
+          }
+          readOnlyValue={selectedWarranty ? `${selectedWarranty.warrantyRecordId} - ${selectedWarranty.status}` : '-'}
+        />
       )
     }
 
@@ -1565,62 +1615,71 @@ export function OpportunityFormPage() {
 
     if (field.key === 'salesComments') {
       return (
-        <FormField
+        <MetadataHeaderField
           key={field.key}
           label={field.label}
           controlWidthClassName="w-[32rem] max-w-full"
           required={headerRequired(field.key)}
-        >
-          {field.editable ? (
+          businessEditable={field.editable}
+          editor={
             <RichTextEditor
               value={currentDraft.salesComments ?? ''}
               onChange={(value) => patchDraft({ salesComments: value })}
               minHeightClassName="min-h-16"
               toolbarMode="focus"
             />
-          ) : (
-            <div className="min-h-16 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+          }
+          readOnlyValue={
+            <div className="min-h-16">
               <RichTextContent value={currentDraft.salesComments ?? ''} />
             </div>
-          )}
-        </FormField>
+          }
+        />
       )
     }
 
     return (
-      <FormField
+      <MetadataHeaderField
         key={field.key}
         label={field.label}
         controlWidthClassName={headerFieldWidthClass(field.key)}
         required={headerRequired(field.key)}
-      >
-        <input
-          className={headerControlClassName(changed, field.editable, headerMissing(field.key))}
-          type={isDate ? 'date' : 'text'}
-          inputMode={isNumber ? 'numeric' : undefined}
-          pattern={isNumber ? '[0-9]*' : undefined}
-          value={isNumber ? digitString(currentDraft[field.key]) : textValue(currentDraft[field.key])}
-          readOnly={!field.editable}
-          onKeyDown={isNumber ? preventNonDigitKey : undefined}
-          onPaste={
-            isNumber
-              ? (event) => {
-                  event.preventDefault()
-                  patchDraft({ [field.key]: parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')) } as Partial<Opportunity>)
-                }
-              : isDate
-                ? (event) => handleDateInputPaste(event, (nextValue) => patchDraft({ [field.key]: nextValue } as Partial<Opportunity>))
-              : undefined
-          }
-          onChange={(event) =>
-            patchDraft({
-              [field.key]: isNumber
-                ? parseDigitValue(event.target.value.replace(/\D/g, ''))
-                : event.target.value || (isDate ? null : ''),
-            } as Partial<Opportunity>)
-          }
-        />
-      </FormField>
+        businessEditable={field.editable}
+        editor={
+          <input
+            className={headerControlClassName(changed, true, headerMissing(field.key))}
+            type={isDate ? 'date' : 'text'}
+            inputMode={isNumber ? 'numeric' : undefined}
+            pattern={isNumber ? '[0-9]*' : undefined}
+            value={isNumber ? digitString(currentDraft[field.key]) : textValue(currentDraft[field.key])}
+            onKeyDown={isNumber ? preventNonDigitKey : undefined}
+            onPaste={
+              isNumber
+                ? (event) => {
+                    event.preventDefault()
+                    patchDraft({ [field.key]: parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')) } as Partial<Opportunity>)
+                  }
+                : isDate
+                  ? (event) => handleDateInputPaste(event, (nextValue) => patchDraft({ [field.key]: nextValue } as Partial<Opportunity>))
+                : undefined
+            }
+            onChange={(event) =>
+              patchDraft({
+                [field.key]: isNumber
+                  ? parseDigitValue(event.target.value.replace(/\D/g, ''))
+                  : event.target.value || (isDate ? null : ''),
+              } as Partial<Opportunity>)
+            }
+          />
+        }
+        readOnlyValue={
+          isDate ? (
+            <DateTimeValue value={textValue(currentDraft[field.key])} semanticType="date" fallback="-" />
+          ) : (
+            textValue(currentDraft[field.key]) || '-'
+          )
+        }
+      />
     )
   }
 
@@ -1628,18 +1687,23 @@ export function OpportunityFormPage() {
     const isWonLocked = currentSavedOpportunity.stage === 'WON'
     return (
       <div className="flex flex-wrap items-start gap-3">
-        <FormField label="Stage" controlWidthClassName={headerFieldWidthClass('stage')}>
-          <select
-            className={headerControlClassName(headerChanged('stage'), !isWonLocked, headerMissing('stage'))}
-            value={currentDraft.stage}
-            disabled={isWonLocked}
-            onChange={(event) => updateStage(event.target.value as Opportunity['stage'])}
-          >
-            <option value="OPEN">Open</option>
-            <option value="POC">POC</option>
-            <option value="WON">Won</option>
-          </select>
-        </FormField>
+        <MetadataHeaderField
+          label="Stage"
+          controlWidthClassName={headerFieldWidthClass('stage')}
+          businessEditable={!isWonLocked}
+          editor={
+            <select
+              className={headerControlClassName(headerChanged('stage'), true, headerMissing('stage'))}
+              value={currentDraft.stage}
+              onChange={(event) => updateStage(event.target.value as Opportunity['stage'])}
+            >
+              <option value="OPEN">Open</option>
+              <option value="POC">POC</option>
+              <option value="WON">Won</option>
+            </select>
+          }
+          readOnlyValue={currentDraft.stage || '-'}
+        />
         {currentDraft.stage === 'POC' ? (
           <FormField label="Financial Profile" controlWidthClassName="w-32">
             <select
@@ -2128,16 +2192,20 @@ export function OpportunityFormPage() {
           <div className="space-y-2">
             <h3 className="text-sm font-semibold uppercase text-sf-text-muted">Operational Data</h3>
             <div className="flex flex-wrap items-start gap-3">
-              <FormField label="Current Milestone" controlWidthClassName="w-56">
-                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-                  {opportunityProjectMilestoneSummary().current || '-'}
-                </div>
-              </FormField>
-              <FormField label="Next Milestone" controlWidthClassName="w-56">
-                <div className="min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
-                  {opportunityProjectMilestoneSummary().next || '-'}
-                </div>
-              </FormField>
+              <MetadataHeaderField
+                label="Current Milestone"
+                controlWidthClassName="w-56"
+                businessEditable={false}
+                editor={null}
+                readOnlyValue={opportunityProjectMilestoneSummary().current || '-'}
+              />
+              <MetadataHeaderField
+                label="Next Milestone"
+                controlWidthClassName="w-56"
+                businessEditable={false}
+                editor={null}
+                readOnlyValue={opportunityProjectMilestoneSummary().next || '-'}
+              />
             </div>
           </div>
 

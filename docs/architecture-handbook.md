@@ -356,6 +356,7 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 
 - Mandatory fields must show a red asterisk next to the field label.
 - Read-only fields must render as plain read-only values without editable borders, contours, or input styling.
+- Header field presentation must be resolved by effective editability. Effective field editability is the intersection of business editability and the current user's field-level privilege. Authorized users receive the configured metadata editor. All other visible users receive the shared contour-free `HeaderReadonlyValue` presenter. The same privilege definition must be enforced at the commit boundary when field-level privileges are implemented.
 - Business forms must support View mode and Edit mode.
 - View mode presents business data without accidental edit affordances.
 - Edit mode enables approved editable fields and actions.

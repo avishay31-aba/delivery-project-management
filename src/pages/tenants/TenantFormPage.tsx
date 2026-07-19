@@ -17,8 +17,8 @@ import {
   AlertStatusIcon,
   BusinessObjectLink,
   FormField,
-  HeaderReadonlyValue,
   LinkedProjectsLinks,
+  MetadataHeaderField,
   OperationalStatusIcon,
   PlaceholderCard,
   RichTextContent,
@@ -775,9 +775,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderHeaderField(label: string, value: ReactNode, width = 'w-44') {
     return (
-      <FormField label={label} controlWidthClassName={width}>
-        <HeaderReadonlyValue>{value}</HeaderReadonlyValue>
-      </FormField>
+      <MetadataHeaderField
+        label={label}
+        controlWidthClassName={width}
+        businessEditable={false}
+        editor={null}
+        readOnlyValue={value}
+      />
     )
   }
 
@@ -903,24 +907,32 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       )
     }
 
+    if (tenantDraft.systemId) {
+      return (
+        <MetadataHeaderField
+          label="Current SID"
+          controlWidthClassName="w-52"
+          businessEditable={false}
+          editor={null}
+          readOnlyValue={hosting.sid}
+        />
+      )
+    }
+
     return (
       <FormField label="Current SID" controlWidthClassName="w-52">
-        {tenantDraft.systemId ? (
-          <HeaderReadonlyValue>{hosting.sid}</HeaderReadonlyValue>
-        ) : (
-          <select
-            className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
-            value={tenantDraft.systemId}
-            onChange={(event) => attachSystem(event.target.value)}
-          >
-            <option value="">No system linked</option>
-            {systems.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.sid ?? candidate.machineId ?? candidate.id} - {candidate.productType}
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
+          value={tenantDraft.systemId}
+          onChange={(event) => attachSystem(event.target.value)}
+        >
+          <option value="">No system linked</option>
+          {systems.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.sid ?? candidate.machineId ?? candidate.id} - {candidate.productType}
+            </option>
+          ))}
+        </select>
       </FormField>
     )
   }

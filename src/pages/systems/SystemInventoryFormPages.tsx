@@ -20,7 +20,7 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { BusinessObjectLink, FormField, HeaderReadonlyValue, LinkedProjectsLinks, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, LinkedProjectsLinks, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -607,24 +607,34 @@ export function InventoryForm<T extends InventoryRecord>({
       if (field.key === 'logo') {
         const productType = applicationSummaryProduct()
         return (
-          <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
-            {productType ? <ProductLogoIcon product={productType} /> : null}
-          </FormField>
+          <MetadataHeaderField
+            key={field.key}
+            label={field.label}
+            controlWidthClassName={width}
+            required={field.required}
+            businessEditable={false}
+            editor={null}
+            readOnlyValue={productType ? <ProductLogoIcon product={productType} /> : ''}
+          />
         )
       }
 
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
-          <HeaderReadonlyValue>
-            {field.inputType === 'date' ? (
-              <DateTimeValue value={value} semanticType="date" fallback="-" />
-            ) : field.key === 'linkedProjects' ? (
-              value ? <LinkedProjectsLinks projectIds={value} /> : '-'
-            ) : (
-              value || '-'
-            )}
-          </HeaderReadonlyValue>
-        </FormField>
+        <MetadataHeaderField
+          key={field.key}
+          label={field.label}
+          controlWidthClassName={width}
+          required={field.required}
+          businessEditable={false}
+          editor={null}
+          readOnlyValue={field.inputType === 'date' ? (
+            <DateTimeValue value={value} semanticType="date" fallback="-" />
+          ) : field.key === 'linkedProjects' ? (
+            value ? <LinkedProjectsLinks projectIds={value} /> : '-'
+          ) : (
+            value || '-'
+          )}
+        />
       )
     }
 
