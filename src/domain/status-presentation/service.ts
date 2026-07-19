@@ -1,9 +1,13 @@
 import {
   AlertTriangle,
   Ban,
+  Calendar,
+  CalendarX,
   Check,
   CheckCircle2,
   CircleCheck,
+  CircleAlert,
+  Hourglass,
   Info,
   LockKeyhole,
   OctagonAlert,
@@ -19,6 +23,8 @@ import type {
   StatusBadgeVariant,
   StatusPresentation,
 } from './types'
+import type { WarrantyStatus } from '@/data/seed.types'
+import { WARRANTY_STATUS_LABELS } from '@/domain/warranty-collection/metadata'
 
 const DEFAULT_PRESENTATION: StatusPresentation = {
   key: 'default',
@@ -69,6 +75,18 @@ const RECORD_CHANGE_PRESENTATIONS: Record<string, StatusPresentation> = {
   updated: { ...DEFAULT_PRESENTATION, key: 'updated', kind: 'recordChange', label: 'Updated', icon: Info, iconClassName: 'text-amber-700', badgeClassName: 'border-amber-300 bg-amber-100 text-amber-900', tooltip: 'Updated' },
 }
 
+const WARRANTY_PRESENTATIONS: Record<WarrantyStatus, StatusPresentation> = {
+  NOT_SET: { ...DEFAULT_PRESENTATION, key: 'NOT_SET', kind: 'warranty', label: WARRANTY_STATUS_LABELS.NOT_SET, icon: CircleAlert, iconClassName: 'text-sf-brand', badgeClassName: 'bg-blue-50 text-blue-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.NOT_SET}` },
+  PLANNED: { ...DEFAULT_PRESENTATION, key: 'PLANNED', kind: 'warranty', label: WARRANTY_STATUS_LABELS.PLANNED, icon: Calendar, iconClassName: 'text-slate-600', badgeClassName: 'bg-slate-100 text-slate-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.PLANNED}` },
+  VALID: { ...DEFAULT_PRESENTATION, key: 'VALID', kind: 'warranty', label: WARRANTY_STATUS_LABELS.VALID, icon: CheckCircle2, iconClassName: 'text-blue-700', badgeClassName: 'bg-blue-50 text-blue-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.VALID}` },
+  PENDING: { ...DEFAULT_PRESENTATION, key: 'PENDING', kind: 'warranty', label: WARRANTY_STATUS_LABELS.PENDING, icon: Hourglass, iconClassName: 'text-amber-700', badgeClassName: 'bg-amber-100 text-amber-900', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.PENDING}` },
+  RENEWED: { ...DEFAULT_PRESENTATION, key: 'RENEWED', kind: 'warranty', label: WARRANTY_STATUS_LABELS.RENEWED, icon: CheckCircle2, iconClassName: 'text-sf-success', badgeClassName: 'bg-green-100 text-sf-success', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.RENEWED}` },
+  EXPIRED: { ...DEFAULT_PRESENTATION, key: 'EXPIRED', kind: 'warranty', label: WARRANTY_STATUS_LABELS.EXPIRED, icon: CalendarX, iconClassName: 'text-red-700', badgeClassName: 'bg-red-100 text-red-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.EXPIRED}` },
+  NO_WARRANTY: { ...DEFAULT_PRESENTATION, key: 'NO_WARRANTY', kind: 'warranty', label: WARRANTY_STATUS_LABELS.NO_WARRANTY, icon: Ban, iconClassName: 'text-red-700', badgeClassName: 'bg-red-50 text-red-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.NO_WARRANTY}` },
+  OUT_OF_CONTRACT: { ...DEFAULT_PRESENTATION, key: 'OUT_OF_CONTRACT', kind: 'warranty', label: WARRANTY_STATUS_LABELS.OUT_OF_CONTRACT, icon: OctagonAlert, iconClassName: 'text-red-700', badgeClassName: 'bg-red-100 text-red-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.OUT_OF_CONTRACT}` },
+  OBSOLETE: { ...DEFAULT_PRESENTATION, key: 'OBSOLETE', kind: 'warranty', label: WARRANTY_STATUS_LABELS.OBSOLETE, icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.OBSOLETE}` },
+}
+
 export function statusBadgePresentation(variant: StatusBadgeVariant): StatusPresentation {
   return BADGE_PRESENTATIONS[variant] ?? BADGE_PRESENTATIONS.default
 }
@@ -98,6 +116,11 @@ export function milestoneStatusPresentation(status: string | null | undefined): 
 
 export function recordChangePresentation(state: 'New' | 'Updated'): StatusPresentation {
   return RECORD_CHANGE_PRESENTATIONS[state.toLocaleLowerCase()] ?? RECORD_CHANGE_PRESENTATIONS.updated
+}
+
+export function warrantyStatusPresentation(status: string | null | undefined): StatusPresentation {
+  const normalized = String(status ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_')
+  return WARRANTY_PRESENTATIONS[normalized as WarrantyStatus] ?? WARRANTY_PRESENTATIONS.NOT_SET
 }
 
 export function progressPresentation(value: number): ProgressPresentation {

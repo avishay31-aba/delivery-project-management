@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, BusinessIdListLinks, CountryFlag } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, CountryFlag, WarrantyStatusPresentation } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
@@ -83,7 +83,10 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
     { id: 'tenantStatus', label: 'Tenant Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
-    tenantRuntimeColumn('warrantyStatus', { editable: true, editKey: 'warrantyStatus' }),
+    {
+      ...tenantRuntimeColumn('warrantyStatus', { editable: true, editKey: 'warrantyStatus' }),
+      render: (row) => createElement(WarrantyStatusPresentation, { status: row.warrantyStatus }),
+    },
     { id: 'warrantyStartDate', label: 'Warranty Start Date', getValue: (row) => row.warrantyStartDate ?? '', semanticType: 'date' },
     { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.warrantyEndDate ?? '', editable: true, editKey: 'warrantyEndDate', semanticType: 'date' },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editable: true, editKey: 'pocStartDate', semanticType: 'date' },

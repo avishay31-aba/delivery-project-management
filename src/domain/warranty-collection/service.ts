@@ -46,6 +46,10 @@ export function warrantyTypeForProject(project?: Project): string {
   return 'Delivery'
 }
 
+export function warrantySubTypeForProject(project?: Project): string {
+  return project?.subType ?? ''
+}
+
 export function displayWarrantyStatus(status: WarrantyStatus): string {
   return WARRANTY_STATUS_LABELS[status]
 }
@@ -240,6 +244,7 @@ export function warrantyDashboardRows(context: WarrantyDashboardContext): Warran
         projectName: context.projectNameForProjectId(warranty.relatedProjectId),
         opportunityId: warranty.opportunityId,
         warrantyType: warranty.warrantyType,
+        warrantySubType: warranty.warrantySubType ?? context.projectSubTypeForProjectId?.(warranty.relatedProjectId) ?? '',
         first: row.firstWarranty,
         startDate: warranty.startDate,
         endDate: warranty.endDate,
@@ -307,6 +312,7 @@ export function renewalCandidateRows(context: WarrantyDashboardContext): Renewal
       product: row.product,
       relatedProjectId: row.relatedProjectId,
       warrantyType: row.warrantyType,
+      warrantySubType: row.warrantySubType,
       endDate: row.endDate,
       daysToExpiration: row.daysToExpiration,
       warrantyStatus: row.warrantyStatus,

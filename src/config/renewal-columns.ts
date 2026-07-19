@@ -1,7 +1,8 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, StatusBadge } from '@/components/ui'
+import { BusinessIdLink, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import type { RenewalCandidateRow } from '@/domain/warranty-collection'
+import { WARRANTY_FIELD_LABELS } from '@/domain/warranty-collection'
 import { badgeVariantForRenewalCategory } from '@/domain/status-presentation'
 
 function text(value: string | number | null | undefined): string | number {
@@ -10,7 +11,7 @@ function text(value: string | number | null | undefined): string | number {
 
 export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
   return [
-    { id: 'warrantyId', label: 'Warranty ID', getValue: (row) => row.warrantyId },
+    { id: 'warrantyId', label: WARRANTY_FIELD_LABELS.id, getValue: (row) => row.warrantyId },
     { id: 'customer', label: 'Customer', getValue: (row) => row.customer },
     {
       id: 'tenantTid',
@@ -32,10 +33,16 @@ export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
       getValue: (row) => row.relatedProjectId,
       render: (row) => createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: row.relatedProjectId }, row.relatedProjectId),
     },
-    { id: 'warrantyType', label: 'Warranty Type', getValue: (row) => row.warrantyType },
+    { id: 'warrantyType', label: WARRANTY_FIELD_LABELS.type, getValue: (row) => row.warrantyType },
+    { id: 'warrantySubType', label: WARRANTY_FIELD_LABELS.subType, getValue: (row) => row.warrantySubType },
     { id: 'endDate', label: 'End Date', getValue: (row) => row.endDate ?? '', semanticType: 'date' },
     { id: 'daysToExpiration', label: 'Days To Expiration', getValue: (row) => text(row.daysToExpiration) },
-    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => row.warrantyStatusLabel },
+    {
+      id: 'warrantyStatus',
+      label: WARRANTY_FIELD_LABELS.status,
+      getValue: (row) => row.warrantyStatusLabel,
+      render: (row) => createElement(WarrantyStatusPresentation, { status: row.warrantyStatus }),
+    },
     { id: 'tenantHeaderStatus', label: 'Tenant Header Status', getValue: (row) => row.tenantHeaderStatusLabel },
     {
       id: 'renewalCategory',

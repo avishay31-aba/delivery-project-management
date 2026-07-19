@@ -21,6 +21,7 @@ import {
   RichTextContent,
   RichTextEditor,
   SaveButtonLabel,
+  WarrantyStatusPresentation,
   formMessageClassName,
   validationControlClassName,
 } from '@/components/ui'
@@ -70,7 +71,6 @@ import {
   canManageWarrantyCollection,
   computeTenantWarranties,
   createTenantWarranty,
-  displayWarrantyStatus,
   parseWarrantyPredecessorReference,
   predecessorRefsForWarranty,
   predecessorReference,
@@ -93,6 +93,7 @@ import {
   tenantDeliveryPidDisplay,
   tenantFormType,
   tenantPocPidDisplay,
+  tenantRelatedProjects,
   tenantTimeZoneDisplayValue,
   TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
@@ -102,6 +103,7 @@ import { projectReference, systemReference } from '@/domain/business-reference'
 import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
+import { WARRANTY_FIELD_LABELS } from '@/domain/warranty-collection'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
@@ -248,6 +250,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
+  const projectSystems = useAppStore((state) => state.projectSystems)
   const accounts = useAppStore((state) => state.accounts)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
@@ -368,7 +371,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       ].filter((value): value is string => Boolean(value)),
     ),
   ).sort((first, second) => first.localeCompare(second))
-  const relatedProjects = linkedProjects
+  const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
+  const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
   const deliveryPidDisplay = tenantDeliveryPidDisplay(tenantDraft, projects, projectTenants)
   const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
@@ -602,6 +606,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function updateWarrantyDraft(id: string, key: keyof TenantWarranty, value: string | null) {
     if (isViewMode) return
+    if (key === 'relatedProjectId') {
+      warrantyEditor.updateDraft(id, {
+        relatedProjectId: value ?? '',
+        warrantySubType: projectById.get(value ?? '')?.subType ?? '',
+      })
+      return
+    }
     warrantyEditor.updateDraft(id, { [key]: value } as Partial<TenantWarranty>)
   }
 
@@ -1285,10 +1296,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             Warranty can be managed only after the tenant is linked to a Project/Opportunity.
           </div>
           <ReadonlyTable
-            headers={['Warranty ID', 'Warranty Type', 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark']}
+            headers={[WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark']}
             rows={warranties.map((warranty, warrantyIndex) => [
               warranty.warrantyId,
               warranty.warrantyType,
+              warranty.warrantySubType ?? projectById.get(warranty.relatedProjectId)?.subType ?? '',
               warrantyIndex === 0 ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : '',
               formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid)),
               formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid)),
@@ -1299,7 +1311,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               <DateTimeValue value={warranty.endDate} semanticType="date" />,
               warranty.durationDays ?? '',
               warranty.daysBeforeExpiration ?? '',
-              displayWarrantyStatus(warranty.warrantyStatus),
+              <WarrantyStatusPresentation status={warranty.warrantyStatus} />,
               warranty.alerts,
               warranty.remark,
             ])}
@@ -1324,7 +1336,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['Actions', 'Warranty ID', 'Warranty Type', 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', 'Related Project ID', 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remark'].map((header) => (
+                {['Actions', WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
                 ))}
               </tr>
@@ -1383,6 +1395,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyId}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.warrantyType}</td>
+                  <td className="border border-sf-border px-1.5 py-1">{warranty.warrantySubType ?? projectById.get(warranty.relatedProjectId)?.subType ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1 text-center">{warrantyIndex === 0 ? <Check className="mx-auto h-4 w-4 text-black" aria-label="First warranty" /> : ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(predecessorRefsForWarranty(warranty, tenantDraft.tid))}</td>
                   <td className="border border-sf-border px-1.5 py-1">{formatWarrantyRefs(successorRefsForWarranty(warranty, warranties, tenantDraft.tid))}</td>
@@ -1401,7 +1414,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                           <option value="">Select project</option>
                           {relatedProjects.map((candidate) => (
                             <option key={candidate.id} value={candidate.id}>
-                              {candidate.pid}
+                              {candidate.pid} - {candidate.subType}
                             </option>
                           ))}
                         </select>
@@ -1442,7 +1455,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.durationDays ?? ''}</td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.daysBeforeExpiration ?? ''}</td>
-                  <td className="border border-sf-border px-1.5 py-1">{displayWarrantyStatus(warranty.warrantyStatus)}</td>
+                  <td className="border border-sf-border px-1.5 py-1"><WarrantyStatusPresentation status={warranty.warrantyStatus} /></td>
                   <td className="border border-sf-border px-1.5 py-1">{warranty.alerts}</td>
                   <td className="min-w-80 border border-sf-border px-1.5 py-1">
                     {isEditingWarranty ? (
@@ -1460,7 +1473,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 )
               })}
               {warranties.length === 0 ? (
-                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={16}>No warranty records yet.</td></tr>
+                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={17}>No warranty records yet.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -1505,14 +1518,20 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 <option value="">Select project</option>
                 {relatedProjects.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
-                    {candidate.opportunityName} - {candidate.pid}
+                    {candidate.opportunityName} - {candidate.pid} - {candidate.subType}
                   </option>
                 ))}
               </select>
             </label>
             <div className="space-y-1">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">{WARRANTY_FIELD_LABELS.subType}</span>
+              <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">
+                {advancedWarrantyDraft.warrantySubType ?? projectById.get(advancedWarrantyDraft.relatedProjectId)?.subType ?? ''}
+              </div>
+            </div>
+            <div className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Status</span>
-              <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2">{displayWarrantyStatus(warranty.warrantyStatus)}</div>
+              <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2"><WarrantyStatusPresentation status={warranty.warrantyStatus} /></div>
             </div>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
@@ -1564,7 +1583,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                     }))
                   }
                 >
-                  <option value="">Warranty ID</option>
+                  <option value="">ID</option>
                   {predecessorOptions.map(({ tenant, warranty: option }) => (
                     <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
                       {option.warrantyId}

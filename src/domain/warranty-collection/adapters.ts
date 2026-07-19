@@ -4,6 +4,7 @@ import {
   daysBetween,
   nextWarrantyId,
   warrantyCollectionReadModel,
+  warrantySubTypeForProject,
   warrantyTypeForProject,
 } from './service'
 
@@ -31,7 +32,8 @@ export function createTenantWarranty(
     successor: '',
     accountId: tenant.accountId,
     relatedProjectId: project?.id ?? '',
-    warrantyType: project?.mainType ?? '',
+    warrantyType: warrantyTypeForProject(project),
+    warrantySubType: warrantySubTypeForProject(project),
     opportunityId,
     startDate: null,
     endDate: null,
@@ -62,6 +64,7 @@ export function computeTenantWarranties(
       firstWarranty: row.firstWarranty,
       accountId: tenant.accountId,
       warrantyType: warrantyTypeForProject(selectedProject),
+      warrantySubType: warrantySubTypeForProject(selectedProject),
       opportunityId: selectedOpportunity?.opportunityId ?? projectOpportunityReference(selectedProject),
       successor: row.successorRefs[0]?.warrantyId ?? warranty.successor ?? '',
       durationDays: daysBetween(warranty.startDate, warranty.endDate),

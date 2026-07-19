@@ -47,6 +47,7 @@ export interface WarrantyDashboardRow {
   projectName: string
   opportunityId: string
   warrantyType: string
+  warrantySubType: string
   first: boolean
   startDate: string | null
   endDate: string | null
@@ -70,6 +71,7 @@ export interface WarrantyDashboardContext {
   sidForTenant: (tenant: Tenant) => string
   productForTenant: (tenant: Tenant) => string
   projectNameForProjectId: (projectId: string) => string
+  projectSubTypeForProjectId?: (projectId: string) => string
 }
 
 export interface WarrantyDashboardSummary {
@@ -102,6 +104,7 @@ export interface RenewalCandidateRow {
   product: string
   relatedProjectId: string
   warrantyType: string
+  warrantySubType: string
   endDate: string | null
   daysToExpiration: number | null
   warrantyStatus: WarrantyStatus

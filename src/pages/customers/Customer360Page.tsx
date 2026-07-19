@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, PlaceholderCard, ProgressBar, StatusBadge } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { Tenant } from '@/data/seed.types'
 import {
@@ -29,7 +29,6 @@ import {
   alertVariantForDeadlineRiskStatus,
   alertVariantForProjectHealthStatus,
   alertVariantForRequirementCoverageStatus,
-  alertVariantForWarrantyStatus,
   badgeVariantForProjectHealthStatus,
   badgeVariantForProjectStatus,
   badgeVariantForRequirementCoverageStatus,
@@ -164,6 +163,7 @@ export function Customer360Page() {
           const project = projects.find((candidate) => candidate.id === projectId)
           return project?.opportunityName ?? project?.pid ?? ''
         },
+        projectSubTypeForProjectId: (projectId: string) => projects.find((candidate) => candidate.id === projectId)?.subType ?? '',
       }),
     [accounts, projects, salesManagers, systems, tenants],
   )
@@ -315,7 +315,7 @@ export function Customer360Page() {
 
     if (activeTab === 'warranties') {
       return readOnlyTable(
-        ['Warranty ID', 'Tenant TID', 'Tenant Name', 'SID', 'Related Project ID', 'Project Name', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
+        ['ID', 'Tenant TID', 'Tenant Name', 'SID', 'Related Project ID', 'Project Name', 'Sub Type', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
         customer.warrantyRows.map((row) => [
           row.warrantyId,
           <BusinessIdLink objectType="TENANT" businessId={row.tenantTid}>{row.tenantTid}</BusinessIdLink>,
@@ -323,12 +323,10 @@ export function Customer360Page() {
           row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '',
           row.relatedProjectId ? <BusinessIdLink objectType="PROJECT" businessId={row.relatedProjectId}>{row.relatedProjectId}</BusinessIdLink> : '',
           row.projectName,
+          row.warrantySubType,
           <DateTimeValue value={row.endDate} semanticType="date" />,
           row.daysToExpiration ?? '',
-          <span className="inline-flex items-center gap-1.5">
-            <AlertStatusIcon variant={alertVariantForWarrantyStatus(row.warrantyStatus, row.tenantHeaderStatus)} label={row.warrantyStatusLabel} />
-            {row.warrantyStatusLabel}
-          </span>,
+          <WarrantyStatusPresentation status={row.warrantyStatus} />,
           row.tenantHeaderStatusLabel,
           row.alerts,
         ]),

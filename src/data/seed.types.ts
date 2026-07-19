@@ -504,6 +504,7 @@ export interface TenantWarranty {
   accountId: string
   relatedProjectId: string
   warrantyType: string
+  warrantySubType?: string
   opportunityId: string
   startDate: string | null
   endDate: string | null

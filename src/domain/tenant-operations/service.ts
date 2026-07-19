@@ -1,4 +1,4 @@
-import type { Opportunity, Project, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import type { Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
@@ -103,6 +103,63 @@ export function tenantActiveProjects(
   return Array.from(projectIds)
     .map((projectId) => projects.find((project) => project.id === projectId))
     .filter((project): project is Project => Boolean(project))
+}
+
+export function tenantRelatedProjects(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+  systems: System[] = [],
+  projectSystems: ProjectSystemLink[] = [],
+  opportunities: Opportunity[] = [],
+): Project[] {
+  const projectIds = new Set<string>()
+  const addProject = (project: Project | undefined) => {
+    if (project) projectIds.add(project.id)
+  }
+  const addProjectId = (projectId: string | null | undefined) => {
+    if (projectId) projectIds.add(projectId)
+  }
+
+  projectTenants
+    .filter((link) => link.tenantId === tenant.id)
+    .forEach((link) => addProjectId(link.projectId))
+
+  projectSystems
+    .filter((link) => (link.tenantIds ?? []).includes(tenant.id))
+    .forEach((link) => addProjectId(link.projectId))
+
+  const tenantPocPid = (tenant as Tenant & { pocPid?: string }).pocPid
+  projects
+    .filter((project) => project.pid === tenant.deliveryPid || project.pid === tenantPocPid)
+    .forEach(addProject)
+
+  const tenantSystemIds = new Set([tenant.systemId, tenant.hostedSystemId].filter((value): value is string => Boolean(value)))
+  systems
+    .filter((system) => tenantSystemIds.has(system.id))
+    .flatMap((system) => system.linkedProjectIds ?? [])
+    .forEach(addProjectId)
+
+  opportunities.forEach((opportunity) => {
+    const hasTenantRequirement = [
+      ...(opportunity.changeRequestRequirements ?? []),
+      ...(opportunity.standardRenewalRequirements ?? []),
+    ].some((requirement) => requirement.tenantId === tenant.id)
+    if (!hasTenantRequirement) return
+    const opportunityProjectIds = [...(opportunity.pocProjectIds ?? []), opportunity.finalProjectId]
+    opportunityProjectIds.forEach(addProjectId)
+  })
+
+  return projects
+    .filter((project) => projectIds.has(project.id))
+    .sort((first, second) => {
+      const firstTime = Date.parse(first.createdAt)
+      const secondTime = Date.parse(second.createdAt)
+      if (Number.isFinite(firstTime) && Number.isFinite(secondTime) && firstTime !== secondTime) {
+        return firstTime - secondTime
+      }
+      return first.pid.localeCompare(second.pid)
+    })
 }
 
 export function tenantDeliveryPidDisplay(

@@ -61,6 +61,7 @@ export function RenewalWorkQueuePage() {
           const project = projects.find((candidate) => candidate.id === projectId)
           return project?.opportunityName ?? project?.pid ?? ''
         },
+        projectSubTypeForProjectId: (projectId: string) => projects.find((candidate) => candidate.id === projectId)?.subType ?? '',
       }),
     [accounts, projects, salesManagers, systems, tenants],
   )

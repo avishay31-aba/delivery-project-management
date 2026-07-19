@@ -37,7 +37,6 @@ import type {
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
 import {
-  AlertStatusIcon,
   BusinessIdLink,
   BusinessObjectLink,
   FormField,
@@ -46,6 +45,7 @@ import {
   RichTextEditor,
   SaveButtonLabel,
   StatusBadge,
+  WarrantyStatusPresentation,
   formMessageClassName,
 } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
@@ -96,7 +96,7 @@ import { tenantFormType } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
-import { alertVariantForWarrantyStatus, badgeVariantForProjectStatus } from '@/domain/status-presentation'
+import { badgeVariantForProjectStatus } from '@/domain/status-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
@@ -1747,12 +1747,7 @@ export function OpportunityFormPage() {
                     </td>
                     <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
                     <td className="border border-sf-border px-2 py-1">
-                      {tenant.warrantyStatus ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <AlertStatusIcon variant={alertVariantForWarrantyStatus(tenant.warrantyStatus)} label={tenant.warrantyStatus} />
-                          {tenant.warrantyStatus}
-                        </span>
-                      ) : ''}
+                      {tenant.warrantyStatus ? <WarrantyStatusPresentation status={tenant.warrantyStatus} /> : ''}
                     </td>
                     <td className="border border-sf-border px-2 py-1"><DateTimeValue value={tenant.warrantyEndDate} semanticType="date" /></td>
                   </tr>

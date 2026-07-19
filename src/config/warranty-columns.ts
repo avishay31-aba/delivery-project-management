@@ -1,13 +1,14 @@
 import { createElement } from 'react'
 import { Check } from 'lucide-react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, BusinessIdLink } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, WarrantyStatusPresentation } from '@/components/ui'
 import type { WarrantyDashboardRow } from '@/domain/warranty-collection'
+import { WARRANTY_FIELD_LABELS } from '@/domain/warranty-collection'
 import { alertVariantForWarrantyStatus } from '@/domain/status-presentation'
 
 export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[] {
   return [
-    { id: 'warrantyId', label: 'Warranty ID', getValue: (row) => row.warrantyId },
+    { id: 'warrantyId', label: WARRANTY_FIELD_LABELS.id, getValue: (row) => row.warrantyId },
     { id: 'customer', label: 'Customer', getValue: (row) => row.customer },
     { id: 'accountManager', label: 'Account Manager', getValue: (row) => row.accountManager },
     {
@@ -37,7 +38,8 @@ export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[]
       getValue: (row) => row.opportunityId,
       render: (row) => createElement(BusinessIdLink, { objectType: 'OPPORTUNITY', businessId: row.opportunityId }, row.opportunityId),
     },
-    { id: 'warrantyType', label: 'Warranty Type', getValue: (row) => row.warrantyType },
+    { id: 'warrantyType', label: WARRANTY_FIELD_LABELS.type, getValue: (row) => row.warrantyType },
+    { id: 'warrantySubType', label: WARRANTY_FIELD_LABELS.subType, getValue: (row) => row.warrantySubType },
     {
       id: 'first',
       label: 'First',
@@ -47,7 +49,12 @@ export function createWarrantyColumns(): DashboardColumn<WarrantyDashboardRow>[]
     { id: 'startDate', label: 'Start Date', getValue: (row) => row.startDate ?? '', semanticType: 'date' },
     { id: 'endDate', label: 'End Date', getValue: (row) => row.endDate ?? '', semanticType: 'date' },
     { id: 'daysToExpiration', label: 'Days To Expiration', getValue: (row) => row.daysToExpiration },
-    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => row.warrantyStatusLabel },
+    {
+      id: 'warrantyStatus',
+      label: WARRANTY_FIELD_LABELS.status,
+      getValue: (row) => row.warrantyStatusLabel,
+      render: (row) => createElement(WarrantyStatusPresentation, { status: row.warrantyStatus }),
+    },
     { id: 'tenantHeaderStatus', label: 'Tenant Header Status', getValue: (row) => row.tenantHeaderStatusLabel },
     {
       id: 'alerts',
