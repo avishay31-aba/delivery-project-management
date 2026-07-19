@@ -967,7 +967,6 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
-    const applicationSummary = applicationConfigurationSummaryRecord()
 
     return (
       <div className="space-y-4">
@@ -995,36 +994,42 @@ export function InventoryForm<T extends InventoryRecord>({
             actions={(tenant) => renderHostedTenantActions(tenant)}
           />
         </section>
-
-        <section className="sf-card" aria-labelledby="system-application-summary-section-title">
-          <div className="border-b border-sf-border bg-sf-surface-alt px-3 py-2">
-            <h3 id="system-application-summary-section-title" className="whitespace-nowrap text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
-          </div>
-          <div className="sf-scroll-x bg-white">
-            <table className="w-max border-collapse text-sm leading-tight">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  {APPLICATION_SUMMARY_FIELDS.map((column) => (
-                    <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                      <span>{column.label}</span>
-                      <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {APPLICATION_SUMMARY_FIELDS.map((column) => (
-                    <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-                      {tenantSummaryValue(column, applicationSummary)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
+    )
+  }
+
+  function renderApplicationConfigurationSummarySection() {
+    const applicationSummary = applicationConfigurationSummaryRecord()
+
+    return (
+      <section className="sf-card" aria-labelledby="system-application-summary-section-title">
+        <div className="border-b border-sf-border bg-sf-surface-alt px-3 py-2">
+          <h3 id="system-application-summary-section-title" className="whitespace-nowrap text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
+        </div>
+        <div className="sf-scroll-x bg-white">
+          <table className="w-max border-collapse text-sm leading-tight">
+            <thead className="bg-sf-surface-alt text-left">
+              <tr>
+                {APPLICATION_SUMMARY_FIELDS.map((column) => (
+                  <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
+                    <span>{column.label}</span>
+                    <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {APPLICATION_SUMMARY_FIELDS.map((column) => (
+                  <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
+                    {tenantSummaryValue(column, applicationSummary)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     )
   }
 
@@ -1465,6 +1470,7 @@ export function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       </CollapsibleSection>
+      {renderApplicationConfigurationSummarySection()}
       {renderPurposeHistorySection()}
       {renderRemarksSection()}
       {renderConfigurationHistorySection()}
