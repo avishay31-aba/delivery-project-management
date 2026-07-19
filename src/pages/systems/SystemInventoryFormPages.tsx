@@ -971,7 +971,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="space-y-4">
-        <section className="space-y-3" aria-labelledby="system-tenants-section-title">
+        <section className="sf-card space-y-3 p-3" aria-labelledby="system-tenants-section-title">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 id="system-tenants-section-title" className="text-lg font-semibold text-sf-text">Tenants</h3>
             <button
@@ -996,8 +996,8 @@ export function InventoryForm<T extends InventoryRecord>({
           />
         </section>
 
-        <section className="space-y-2">
-          <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
+        <section className="sf-card space-y-2 p-3" aria-labelledby="system-application-summary-section-title">
+          <h3 id="system-application-summary-section-title" className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
           <div className="sf-scroll-x rounded border border-sf-border bg-white">
             <table className="w-max border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
