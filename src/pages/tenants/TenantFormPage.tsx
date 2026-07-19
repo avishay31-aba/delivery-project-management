@@ -17,6 +17,7 @@ import {
   AlertStatusIcon,
   BusinessObjectLink,
   FormField,
+  LinkedProjectsLinks,
   OperationalStatusIcon,
   PlaceholderCard,
   RichTextContent,
@@ -100,7 +101,7 @@ import {
   TENANT_HOSTING_FIELDS,
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
-import { projectReference, systemReference } from '@/domain/business-reference'
+import { systemReference } from '@/domain/business-reference'
 import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
@@ -373,6 +374,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     ),
   ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
+  const linkedProjectPids = relatedProjects.map((candidate) => candidate.pid)
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
   const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
   const originalDeliveryProject = tenantDraft.deliveryPid
@@ -779,21 +781,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderPidLinks(pidList: string) {
-    const pids = pidList.split(';').map((pid) => pid.trim()).filter(Boolean)
-    if (pids.length === 0) return ''
-    return (
-      <span className="inline-flex flex-wrap gap-1">
-        {pids.map((pid, index) => {
-          const linkedProject = projects.find((candidate) => candidate.pid === pid)
-          return (
-            <span key={pid}>
-              {linkedProject ? <BusinessObjectLink reference={projectReference(linkedProject)}>{pid}</BusinessObjectLink> : pid}
-              {index < pids.length - 1 ? '; ' : ''}
-            </span>
-          )
-        })}
-      </span>
-    )
+    return <LinkedProjectsLinks projectIds={pidList} />
   }
 
   function updateTenantOperationalMode(value: string) {
@@ -950,6 +938,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Delivery PID', renderPidLinks(headerDeliveryPid))}
           {renderHeaderField('POC ID', renderPidLinks(headerPocPid))}
+          {renderHeaderField('Linked Projects', linkedProjectPids.length > 0 ? <LinkedProjectsLinks projectIds={linkedProjectPids} /> : '', 'w-80')}
           {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
           {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
           {renderCurrentSidField()}

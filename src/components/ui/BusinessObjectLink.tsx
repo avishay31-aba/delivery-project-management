@@ -26,6 +26,11 @@ interface BusinessIdListLinksProps {
   className?: string
 }
 
+interface LinkedProjectsLinksProps {
+  projectIds: string | string[] | null | undefined
+  className?: string
+}
+
 function fallbackLabel(reference: BusinessObjectReference | null | undefined, children?: ReactNode): ReactNode {
   return children ?? reference?.displayLabel ?? reference?.businessId ?? ''
 }
@@ -78,4 +83,8 @@ export function BusinessIdListLinks({ objectType, businessIds, className }: Busi
       ))}
     </>
   )
+}
+
+export function LinkedProjectsLinks({ projectIds, className }: LinkedProjectsLinksProps) {
+  return <BusinessIdListLinks objectType="PROJECT" businessIds={projectIds} className={className} />
 }
