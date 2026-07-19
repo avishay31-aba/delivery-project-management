@@ -971,28 +971,30 @@ export function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
-            disabled={linkedProjectsForSystem().length === 0}
-            onClick={openAddTenantDialog}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add Tenant
-          </button>
+        <section className="space-y-3" aria-labelledby="system-tenants-section-title">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="system-tenants-section-title" className="text-lg font-semibold text-sf-text">Tenants</h3>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+              disabled={linkedProjectsForSystem().length === 0}
+              onClick={openAddTenantDialog}
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add Tenant
+            </button>
+          </div>
           {linkedProjectsForSystem().length === 0 ? (
             <div className="text-sm text-sf-text-muted">Link this system to a project before adding tenants.</div>
           ) : null}
-        </div>
 
-        <TenantWarrantyContractTabs
-          tenants={hostedTenants}
-          systems={allocatedSystems}
-          emptyTextForSection={() => 'No hosted tenants in this section.'}
-          headingLevel="h3"
-          actions={(tenant) => renderHostedTenantActions(tenant)}
-        />
+          <TenantWarrantyContractTabs
+            tenants={hostedTenants}
+            systems={allocatedSystems}
+            emptyTextForSection={() => 'No hosted tenants in this section.'}
+            actions={(tenant) => renderHostedTenantActions(tenant)}
+          />
+        </section>
 
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
