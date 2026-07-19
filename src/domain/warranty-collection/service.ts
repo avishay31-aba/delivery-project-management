@@ -21,6 +21,7 @@ import type {
 } from './types'
 
 const UNDER_CONTRACT_ROW_STATUSES = new Set<WarrantyStatus>(['PLANNED', 'VALID', 'PENDING', 'EXPIRED'])
+const OUT_OF_CONTRACT_ROW_STATUSES = new Set<WarrantyStatus>(['NO_WARRANTY', 'RENEWED'])
 
 function titleCaseBusinessValue(value: string): string {
   return value
@@ -92,6 +93,22 @@ export function tenantWarrantyHeaderStatusDisplay(
     return WARRANTY_STATUS_LABELS[fallbackStatus as WarrantyStatus]
   }
   return String(fallbackStatus || WARRANTY_STATUS_LABELS.NOT_SET)
+}
+
+export function deriveTenantWarrantyContractStatus(statuses: WarrantyStatus[]): TenantWarrantyHeaderStatusReadModel {
+  if (statuses.some((status) => UNDER_CONTRACT_ROW_STATUSES.has(status))) {
+    return { status: 'UNDER_CONTRACT', label: 'Under Contract', visualStatus: 'VALID' }
+  }
+
+  if (statuses.some((status) => status === 'NO_WARRANTY') && statuses.every((status) => OUT_OF_CONTRACT_ROW_STATUSES.has(status))) {
+    return { status: 'OUT_OF_CONTRACT', label: 'Out of Contract', visualStatus: 'NO_WARRANTY' }
+  }
+
+  if (statuses.length === 0 || statuses.every((status) => status === 'NOT_SET')) {
+    return { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET, visualStatus: 'NOT_SET' }
+  }
+
+  return { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET, visualStatus: 'NOT_SET' }
 }
 
 export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
@@ -205,24 +222,7 @@ export function warrantyCollectionReadModel(warranties: TenantWarranty[], tenant
 }
 
 export function tenantWarrantyHeaderStatusReadModelFromRows(rows: WarrantyRowReadModel[]): TenantWarrantyHeaderStatusReadModel {
-  if (rows.length === 0 || rows.every((row) => row.generatedStatus === 'NOT_SET')) {
-    return { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET }
-  }
-
-  if (rows.some((row) => UNDER_CONTRACT_ROW_STATUSES.has(row.generatedStatus))) {
-    return { status: 'UNDER_CONTRACT', label: 'Under Contract' }
-  }
-
-  const noWarrantyRows = rows.filter((row) => row.generatedStatus === 'NO_WARRANTY')
-  if (noWarrantyRows.length > 0) {
-    const statusByWarrantyId = new Map(rows.map((row) => [row.warranty.warrantyId, row.generatedStatus]))
-    const allNoWarrantyPredecessorsRenewed = noWarrantyRows.every((row) => row.predecessorRefs.every((ref) => statusByWarrantyId.get(ref.warrantyId) === 'RENEWED'))
-    if (allNoWarrantyPredecessorsRenewed) {
-      return { status: 'OUT_OF_CONTRACT', label: 'Out Of Contract' }
-    }
-  }
-
-  return { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET }
+  return deriveTenantWarrantyContractStatus(rows.map((row) => row.generatedStatus))
 }
 
 export function tenantWarrantyHeaderStatusReadModel(warranties: TenantWarranty[], tenantTid: string): TenantWarrantyHeaderStatusReadModel {

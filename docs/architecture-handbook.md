@@ -382,6 +382,18 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Shared presentation formats include Date, Time, Date + Time, and Date + Time + Seconds.
 - The DateTimePresentation service is presentation-only. It must not own business deadline rules, timezone policy, persistence normalization, or domain date calculations.
 
+### Tenant Warranty Status Standard
+
+- Tenant Warranty Status is a derived aggregate of committed Warranty Business Objects.
+- WarrantyCollection owns the Tenant Warranty Status derivation and exposes it through the shared domain/read-model layer. Pages must not calculate the aggregate independently.
+- Draft Warranty rows do not affect Tenant Warranty Status. The aggregate changes only after the Warranty record is committed through Save or Apply Changes.
+- Tenant Warranty Status displays only `Not Set Yet`, `Under Contract`, or `Out of Contract`.
+- Precedence is:
+  - `Under Contract` when any committed Warranty record is `Planned`, `Valid`, `Pending Renewal`, or `Expired`. `Expired` is intentionally included in this contract category.
+  - `Out of Contract` when at least one committed Warranty record is `No Warranty` and every committed Warranty record is only `No Warranty` or `Renewed`.
+  - `Not Set Yet` when there are no committed Warranty records, or all committed Warranty records are `Not Set Yet`.
+- Aggregate labels may reuse an approved individual Warranty status visual without reusing the individual label. `Under Contract` reuses the individual `Valid` visual, `Out of Contract` reuses the individual `No Warranty` visual, and `Not Set Yet` reuses the individual `Not Set Yet` visual.
+
 ## Reusable Child Object Principle
 
 Some child structures are reusable across multiple parent Business Objects while still remaining scoped to their parent object instance.

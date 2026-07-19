@@ -31,6 +31,7 @@ export interface WarrantyRowReadModel {
 export interface TenantWarrantyHeaderStatusReadModel {
   status: TenantWarrantyHeaderStatus
   label: string
+  visualStatus: WarrantyStatus
 }
 
 export interface WarrantyDashboardRow {

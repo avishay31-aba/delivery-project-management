@@ -3,15 +3,21 @@ import { warrantyStatusPresentation } from '@/domain/status-presentation'
 
 interface WarrantyStatusPresentationProps {
   status: string | null | undefined
+  label?: string
+  tooltip?: string
   className?: string
 }
 
 export function WarrantyStatusPresentation({
   status,
+  label,
+  tooltip,
   className,
 }: WarrantyStatusPresentationProps) {
   const presentation = warrantyStatusPresentation(status)
   const Icon = presentation.icon
+  const displayLabel = label ?? presentation.label
+  const displayTooltip = tooltip ?? presentation.tooltip
 
   return (
     <span
@@ -20,11 +26,11 @@ export function WarrantyStatusPresentation({
         presentation.badgeClassName,
         className,
       )}
-      title={presentation.tooltip}
-      aria-label={presentation.tooltip}
+      title={displayTooltip}
+      aria-label={displayTooltip}
     >
       <Icon className={cn('h-3.5 w-3.5 shrink-0 stroke-[2.5]', presentation.iconClassName)} aria-hidden="true" />
-      <span>{presentation.label}</span>
+      <span>{displayLabel}</span>
     </span>
   )
 }

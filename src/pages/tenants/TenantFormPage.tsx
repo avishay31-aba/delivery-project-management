@@ -80,6 +80,7 @@ import {
   splitWarrantyPredecessors,
   successorRefsForWarranty,
   isSelfWarrantyPredecessorSelection,
+  tenantWarrantyHeaderStatusReadModel,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
   warrantyRelatedProjectOptionLabel,
@@ -391,7 +392,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
-  const draftComputedWarranties = computedWarranties(tenantDraft.warranties ?? [])
+  const committedWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
   const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
 
   useEffect(() => {
@@ -871,8 +872,13 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderWarrantyHeaderStatus() {
-    const latestStatus = draftComputedWarranties.at(-1)?.warrantyStatus ?? tenantDraft.warrantyStatus
-    return <WarrantyStatusPresentation status={latestStatus} />
+    return (
+      <WarrantyStatusPresentation
+        status={committedWarrantyHeaderStatus.visualStatus}
+        label={committedWarrantyHeaderStatus.label}
+        tooltip={`Tenant warranty status: ${committedWarrantyHeaderStatus.label}`}
+      />
+    )
   }
 
   function renderTenantTypeField() {
