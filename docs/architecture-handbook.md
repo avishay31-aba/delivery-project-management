@@ -362,6 +362,16 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Edit mode enables approved editable fields and actions.
 - Pages compose field metadata, owning-domain validation, and shared form components; pages must not redefine mandatory/read-only behavior independently.
 
+### Form Section Composition Standard
+
+- Every major Business Object section in a form must be presented as its own independent titled `sf-card` section.
+- Examples include Header, Requirements, Milestones, Tasks, Systems, Tenants, Application Configuration Summary, Warranty, Remarks, Documents, Activity, Configuration History, and Owners.
+- Each Business Object section must have its own title, visual boundary, ownership, and clear separation from adjacent sections.
+- Parent-owned information must not visually appear as part of a child Business Object section, even when it is positioned immediately after that child section.
+- Child Business Objects must not visually appear to belong to neighboring parent or sibling sections.
+- A section may contain shared tabs, tables, dialogs, or child-object controls that belong to that section, but unrelated parent or sibling Business Object content must remain outside the section boundary.
+- This is a composition and ownership-presentation rule. It must not be implemented with absolute positioning, fixed offsets, artificial empty rows, duplicated content, or page-specific layout workarounds.
+
 ### Dashboard Row Action Standards
 
 - Dashboard rows must not be the primary navigation control.
