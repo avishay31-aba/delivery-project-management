@@ -1,6 +1,13 @@
-import { type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal, flushSync } from 'react-dom'
-import { Bold, Highlighter, Italic, List, ListOrdered, Palette, Underline } from 'lucide-react'
+import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { Editor } from '@tiptap/core'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import UnderlineExtension from '@tiptap/extension-underline'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import Highlight from '@tiptap/extension-highlight'
+import { Bold, Highlighter, Italic, List, ListOrdered, Palette, Underline as UnderlineIcon } from 'lucide-react'
 
 interface RichTextEditorProps {
   value: string
@@ -10,16 +17,16 @@ interface RichTextEditorProps {
   toolbarMode?: 'always' | 'focus'
 }
 
-type RichTextCommand = 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList'
 type RichTextColorCommand = 'foreColor' | 'hiliteColor'
 type RichTextPaletteTarget = RichTextColorCommand | null
 type RichTextPalettePlacement = 'bottom' | 'top'
-type RichTextColorValue = string | null
 
 interface RichTextActiveFormatting {
   bold: boolean
   italic: boolean
   underline: boolean
+  bulletList: boolean
+  orderedList: boolean
   textColor: string | null
   highlightColor: string | null
 }
@@ -28,11 +35,6 @@ interface RichTextPalettePosition {
   left: number
   top: number
   placement: RichTextPalettePlacement
-}
-
-interface PendingTypingFormatting {
-  formatting: RichTextActiveFormatting
-  rangeSignature: string
 }
 
 interface ThemeColorFamily {
@@ -50,61 +52,40 @@ const RICH_TEXT_THEME_PALETTE: ThemeColorFamily[] = [
   { name: 'Purple', shades: ['#f3e8ff', '#e9d5ff', '#c084fc', '#9333ea', '#581c87'] },
 ]
 
-const RICH_TEXT_CARET_RESET_ATTRIBUTE = 'data-rich-text-caret-reset'
-const ZERO_WIDTH_SPACE = '\u200B'
 const EMPTY_ACTIVE_FORMATTING: RichTextActiveFormatting = {
   bold: false,
   italic: false,
   underline: false,
+  bulletList: false,
+  orderedList: false,
   textColor: null,
   highlightColor: null,
 }
 
+const HighlightWithSpanBackgroundImport = Highlight.extend({
+  parseHTML() {
+    return [
+      { tag: 'mark' },
+      {
+        tag: 'span',
+        getAttrs: (node) => {
+          const element = node as HTMLElement
+          const backgroundColor = element.style.backgroundColor || element.style.background
+          return backgroundColor ? { color: backgroundColor } : false
+        },
+      },
+    ]
+  },
+})
+
 function normalizeRichTextValue(value: string): string {
   const normalized = value.trim()
-  return normalized === '<br>' || normalized === '<div><br></div>' ? '' : value
-}
-
-function cleanupCaretResetMarkers(editor: HTMLElement) {
-  editor.querySelectorAll(`span[${RICH_TEXT_CARET_RESET_ATTRIBUTE}]`).forEach((marker) => {
-    marker.innerHTML = marker.innerHTML.replaceAll(ZERO_WIDTH_SPACE, '')
-    marker.replaceWith(...Array.from(marker.childNodes))
-  })
-  editor.querySelectorAll('span').forEach((span) => {
-    if (!span.textContent && span.childNodes.length === 0) span.remove()
-  })
-}
-
-function clearBackgroundFormatting(node: Node) {
-  if (node.nodeType !== Node.ELEMENT_NODE) {
-    node.childNodes.forEach(clearBackgroundFormatting)
-    return
-  }
-
-  const element = node as HTMLElement
-  element.style.backgroundColor = ''
-  element.style.removeProperty('background-color')
-  element.style.removeProperty('background')
-  if (!element.getAttribute('style')?.trim()) {
-    element.removeAttribute('style')
-  }
-  element.childNodes.forEach(clearBackgroundFormatting)
-}
-
-function backgroundAncestorForRange(range: Range, editor: HTMLElement): HTMLElement | null {
-  let node: Node | null = range.startContainer.nodeType === Node.ELEMENT_NODE
-    ? range.startContainer
-    : range.startContainer.parentNode
-
-  while (node && node !== editor) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const element = node as HTMLElement
-      if (element.style.backgroundColor || element.style.background) return element
-    }
-    node = node.parentNode
-  }
-
-  return null
+  return normalized === '<br>'
+    || normalized === '<div><br></div>'
+    || normalized === '<p></p>'
+    || normalized === '<p><br></p>'
+    ? ''
+    : value
 }
 
 function rgbToHex(value: string): string | null {
@@ -126,85 +107,86 @@ function normalizeToolbarColor(value: string | null | undefined, automaticIsDefa
   return hex
 }
 
-function selectionElement(range: Range, editor: HTMLElement): HTMLElement {
+function readActiveFormatting(editor: Editor): RichTextActiveFormatting {
+  const textStyleAttributes = editor.getAttributes('textStyle') as { color?: string }
+  const highlightAttributes = editor.getAttributes('highlight') as { color?: string }
+
+  return {
+    bold: editor.isActive('bold'),
+    italic: editor.isActive('italic'),
+    underline: editor.isActive('underline'),
+    bulletList: editor.isActive('bulletList'),
+    orderedList: editor.isActive('orderedList'),
+    textColor: normalizeToolbarColor(textStyleAttributes.color, true),
+    highlightColor: normalizeToolbarColor(highlightAttributes.color),
+  }
+}
+
+function selectionElement(editor: Editor): HTMLElement | null {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+  const range = selection.getRangeAt(0)
+  const editorElement = editor.view.dom
+  if (!editorElement.contains(range.commonAncestorContainer)) return null
   const node = range.startContainer.nodeType === Node.ELEMENT_NODE
     ? range.startContainer
     : range.startContainer.parentNode
-  return node instanceof HTMLElement && editor.contains(node) ? node : editor
+  return node instanceof HTMLElement && editorElement.contains(node) ? node : editorElement
 }
 
-function hasAncestor(element: HTMLElement, editor: HTMLElement, selectors: string): boolean {
+function hasAncestor(element: HTMLElement, editor: Editor, selectors: string): boolean {
   const match = element.closest(selectors)
-  return Boolean(match && editor.contains(match))
+  return Boolean(match && editor.view.dom.contains(match))
 }
 
-function isBoldElement(element: HTMLElement, editor: HTMLElement): boolean {
+function isBoldElement(element: HTMLElement, editor: Editor): boolean {
   const fontWeight = window.getComputedStyle(element).fontWeight
   return hasAncestor(element, editor, 'b,strong') || Number(fontWeight) >= 600 || fontWeight === 'bold'
 }
 
-function isItalicElement(element: HTMLElement, editor: HTMLElement): boolean {
+function isItalicElement(element: HTMLElement, editor: Editor): boolean {
   const fontStyle = window.getComputedStyle(element).fontStyle
   return hasAncestor(element, editor, 'i,em') || fontStyle === 'italic' || fontStyle === 'oblique'
 }
 
-function isUnderlinedElement(element: HTMLElement, editor: HTMLElement): boolean {
+function isUnderlinedElement(element: HTMLElement, editor: Editor): boolean {
   const textDecoration = window.getComputedStyle(element).textDecorationLine
   return hasAncestor(element, editor, 'u') || textDecoration.split(' ').includes('underline')
 }
 
-function rangeContainerSignature(node: Node, editor: HTMLElement): string {
-  const path: number[] = []
-  let current: Node | null = node
-  while (current && current !== editor) {
-    const parent: Node | null = current.parentNode
-    if (!parent) break
-    path.unshift(Array.prototype.indexOf.call(parent.childNodes, current))
-    current = parent
+function backgroundAncestor(element: HTMLElement, editor: Editor): HTMLElement | null {
+  let current: HTMLElement | null = element
+  while (current && current !== editor.view.dom) {
+    const backgroundColor = current.style.backgroundColor || current.style.background
+    if (current.tagName === 'MARK' || backgroundColor) return current
+    current = current.parentElement
   }
-  return path.join('.')
+  return null
 }
 
-function rangeSignature(range: Range, editor: HTMLElement): string {
-  return [
-    rangeContainerSignature(range.startContainer, editor),
-    range.startOffset,
-    rangeContainerSignature(range.endContainer, editor),
-    range.endOffset,
-    range.collapsed ? 'collapsed' : 'selected',
-  ].join(':')
+function readSelectionFormatting(editor: Editor): RichTextActiveFormatting {
+  const element = selectionElement(editor)
+  if (!element) return readActiveFormatting(editor)
+  const computed = window.getComputedStyle(element)
+  const highlightedAncestor = backgroundAncestor(element, editor)
+  const highlightColor = highlightedAncestor ? window.getComputedStyle(highlightedAncestor).backgroundColor : null
+
+  return {
+    bold: isBoldElement(element, editor),
+    italic: isItalicElement(element, editor),
+    underline: isUnderlinedElement(element, editor),
+    bulletList: editor.isActive('bulletList'),
+    orderedList: editor.isActive('orderedList'),
+    textColor: normalizeToolbarColor(computed.color, true),
+    highlightColor: normalizeToolbarColor(highlightColor),
+  }
 }
 
-function makeFormattedTypingNode(text: string, formatting: RichTextActiveFormatting): Node {
-  let node: Node = document.createTextNode(text)
-  const textColor = normalizeToolbarColor(formatting.textColor, true)
-  const highlightColor = normalizeToolbarColor(formatting.highlightColor)
-  const hasHighlightColor = Boolean(highlightColor && highlightColor !== '#ffffff')
-
-  if (textColor || hasHighlightColor) {
-    const span = document.createElement('span')
-    if (textColor) span.style.color = textColor
-    if (hasHighlightColor && highlightColor) span.style.backgroundColor = highlightColor
-    span.appendChild(node)
-    node = span
-  }
-  if (formatting.underline) {
-    const underline = document.createElement('u')
-    underline.appendChild(node)
-    node = underline
-  }
-  if (formatting.italic) {
-    const italic = document.createElement('i')
-    italic.appendChild(node)
-    node = italic
-  }
-  if (formatting.bold) {
-    const bold = document.createElement('b')
-    bold.appendChild(node)
-    node = bold
-  }
-
-  return node
+function applyEditorAction(editor: Editor | null, action: (editor: Editor) => void, updateActiveFormatting: (editor: Editor) => void) {
+  if (!editor) return
+  action(editor)
+  updateActiveFormatting(editor)
+  window.requestAnimationFrame(() => updateActiveFormatting(editor))
 }
 
 export function RichTextEditor({
@@ -215,34 +197,113 @@ export function RichTextEditor({
   toolbarMode = 'always',
 }: RichTextEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const editorRef = useRef<HTMLDivElement | null>(null)
   const textColorButtonRef = useRef<HTMLButtonElement | null>(null)
   const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null)
   const paletteRef = useRef<HTMLDivElement | null>(null)
-  const selectionRangeRef = useRef<Range | null>(null)
-  const pendingTypingFormattingRef = useRef<PendingTypingFormatting | null>(null)
-  const activeFormattingRef = useRef<RichTextActiveFormatting>(EMPTY_ACTIVE_FORMATTING)
+  const latestValueRef = useRef(value)
+  const toolbarActionVersionRef = useRef(0)
   const [focused, setFocused] = useState(false)
   const [openPaletteTarget, setOpenPaletteTarget] = useState<RichTextPaletteTarget>(null)
   const [palettePosition, setPalettePosition] = useState<RichTextPalettePosition>({ left: 0, top: 0, placement: 'bottom' })
   const [activeFormatting, setActiveFormatting] = useState<RichTextActiveFormatting>(EMPTY_ACTIVE_FORMATTING)
 
-  useEffect(() => {
-    const editor = editorRef.current
-    if (editor && editor.innerHTML !== value) {
-      editor.innerHTML = value
-    }
-  }, [value])
+  const updateActiveFormatting = (editor: Editor, source: 'editor' | 'selection' = 'editor') => {
+    setActiveFormatting(source === 'selection' ? readSelectionFormatting(editor) : readActiveFormatting(editor))
+  }
+
+  const scheduleActiveFormattingUpdate = () => {
+    const scheduledForVersion = toolbarActionVersionRef.current
+    window.requestAnimationFrame(() => {
+      if (scheduledForVersion !== toolbarActionVersionRef.current) return
+      if (editor) updateActiveFormatting(editor, 'selection')
+    })
+  }
+
+  const runEditorCommand = (action: (editor: Editor) => void) => {
+    toolbarActionVersionRef.current += 1
+    applyEditorAction(editor, action, updateActiveFormatting)
+  }
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      UnderlineExtension,
+      TextStyle,
+      Color,
+      HighlightWithSpanBackgroundImport.configure({ multicolor: true }),
+    ],
+    content: value || '',
+    editorProps: {
+      attributes: {
+        class: `rich-text-editor ${minHeightClassName} w-full rounded-b border border-sf-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sf-brand`,
+      },
+      handleDOMEvents: {
+        focus: () => {
+          setFocused(true)
+          scheduleActiveFormattingUpdate()
+          return false
+        },
+        blur: () => {
+          if (toolbarMode === 'focus') {
+            window.setTimeout(() => {
+              const target = document.activeElement
+              if (target && (rootRef.current?.contains(target) || paletteRef.current?.contains(target))) return
+              setFocused(false)
+            }, 0)
+          }
+          return false
+        },
+        mouseup: () => {
+          scheduleActiveFormattingUpdate()
+          return false
+        },
+        click: () => {
+          scheduleActiveFormattingUpdate()
+          return false
+        },
+        contextmenu: () => {
+          scheduleActiveFormattingUpdate()
+          return false
+        },
+        keyup: () => {
+          scheduleActiveFormattingUpdate()
+          return false
+        },
+      },
+    },
+    onFocus: ({ editor }) => {
+      setFocused(true)
+      updateActiveFormatting(editor)
+    },
+    onBlur: () => {
+      if (toolbarMode === 'focus') {
+        window.setTimeout(() => {
+          const target = document.activeElement
+          if (target && (rootRef.current?.contains(target) || paletteRef.current?.contains(target))) return
+          setFocused(false)
+        }, 0)
+      }
+    },
+    onSelectionUpdate: ({ editor }) => updateActiveFormatting(editor),
+    onTransaction: ({ editor }) => updateActiveFormatting(editor),
+    onUpdate: ({ editor }) => {
+      const html = normalizeRichTextValue(editor.getHTML())
+      latestValueRef.current = html
+      onChange(html)
+      updateActiveFormatting(editor)
+    },
+  })
 
   useEffect(() => {
-    function updateSelectionFromDocument() {
-      rememberSelection()
-      syncActiveFormatting()
+    latestValueRef.current = value
+    if (!editor) return
+    const current = normalizeRichTextValue(editor.getHTML())
+    const next = normalizeRichTextValue(value || '')
+    if (current !== next) {
+      editor.commands.setContent(value || '', { emitUpdate: false })
+      updateActiveFormatting(editor)
     }
-
-    document.addEventListener('selectionchange', updateSelectionFromDocument)
-    return () => document.removeEventListener('selectionchange', updateSelectionFromDocument)
-  }, [])
+  }, [editor, value])
 
   useEffect(() => {
     function closeOnOutsidePointerDown(event: PointerEvent) {
@@ -275,9 +336,8 @@ export function RichTextEditor({
       const nextTop = placement === 'top'
         ? Math.max(viewportPadding, triggerRect.top - paletteHeight - 4)
         : Math.max(viewportPadding, Math.min(window.innerHeight - viewportPadding - paletteHeight, triggerRect.bottom + 4))
-      const preferredLeft = triggerRect.left
       const nextLeft = Math.min(
-        Math.max(viewportPadding, preferredLeft),
+        Math.max(viewportPadding, triggerRect.left),
         Math.max(viewportPadding, window.innerWidth - viewportPadding - paletteWidth),
       )
 
@@ -293,335 +353,7 @@ export function RichTextEditor({
     }
   }, [openPaletteTarget])
 
-  function emitChange() {
-    const editor = editorRef.current
-    if (editor) cleanupCaretResetMarkers(editor)
-    onChange(normalizeRichTextValue(editor?.innerHTML ?? ''))
-  }
-
-  function setActiveFormattingState(next: RichTextActiveFormatting) {
-    activeFormattingRef.current = next
-    flushSync(() => setActiveFormatting(next))
-  }
-
-  function setPendingTypingFormatting(next: RichTextActiveFormatting, range: Range) {
-    const editor = editorRef.current
-    if (!editor) return
-    pendingTypingFormattingRef.current = {
-      formatting: next,
-      rangeSignature: rangeSignature(range, editor),
-    }
-    setActiveFormattingState(next)
-  }
-
-  function clearPendingTypingFormatting() {
-    pendingTypingFormattingRef.current = null
-  }
-
-  function rangeBelongsToEditor(range: Range | null, editor: HTMLElement): range is Range {
-    return Boolean(range && editor.contains(range.commonAncestorContainer))
-  }
-
-  function rememberSelection() {
-    const editor = editorRef.current
-    const selection = window.getSelection()
-    if (!editor || !selection || selection.rangeCount === 0) return
-    const range = selection.getRangeAt(0)
-    if (editor.contains(range.commonAncestorContainer)) {
-      selectionRangeRef.current = range.cloneRange()
-    }
-  }
-
-  function deriveActiveFormatting(range: Range, editor: HTMLElement): RichTextActiveFormatting {
-    const element = selectionElement(range, editor)
-    const computed = window.getComputedStyle(element)
-    const highlightedAncestor = backgroundAncestorForRange(range, editor)
-    const highlightColor = highlightedAncestor ? window.getComputedStyle(highlightedAncestor).backgroundColor : computed.backgroundColor
-    const normalizedHighlightColor = highlightedAncestor ? normalizeToolbarColor(highlightColor) : null
-    return {
-      bold: isBoldElement(element, editor),
-      italic: isItalicElement(element, editor),
-      underline: isUnderlinedElement(element, editor),
-      textColor: normalizeToolbarColor(computed.color, true),
-      highlightColor: normalizedHighlightColor === '#ffffff' ? null : normalizedHighlightColor,
-    }
-  }
-
-  function currentEditorRange(): Range | null {
-    const editor = editorRef.current
-    const selection = window.getSelection()
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : selectionRangeRef.current
-    return editor && rangeBelongsToEditor(range, editor) ? range : null
-  }
-
-  function syncActiveFormatting() {
-    const editor = editorRef.current
-    const range = currentEditorRange()
-    if (!editor || !range) {
-      clearPendingTypingFormatting()
-      setActiveFormattingState(EMPTY_ACTIVE_FORMATTING)
-      return
-    }
-
-    if (!range.collapsed) {
-      clearPendingTypingFormatting()
-      setActiveFormattingState(deriveActiveFormatting(range, editor))
-      return
-    }
-
-    const pending = pendingTypingFormattingRef.current
-    if (pending && pending.rangeSignature === rangeSignature(range, editor)) {
-      setActiveFormattingState(pending.formatting)
-      return
-    }
-
-    clearPendingTypingFormatting()
-    setActiveFormattingState(deriveActiveFormatting(range, editor))
-  }
-
-  function syncSelectionDerivedFormatting() {
-    const editor = editorRef.current
-    const range = currentEditorRange()
-    clearPendingTypingFormatting()
-    if (!editor || !range) {
-      setActiveFormattingState(EMPTY_ACTIVE_FORMATTING)
-      return
-    }
-    setActiveFormattingState(deriveActiveFormatting(range, editor))
-  }
-
-  function scheduleSelectionDerivedFormattingSync() {
-    window.requestAnimationFrame(syncSelectionDerivedFormatting)
-  }
-
-  function restoreSelection() {
-    const editor = editorRef.current
-    editor?.focus()
-    const range = selectionRangeRef.current
-    const selection = window.getSelection()
-    if (!range || !selection) return
-    selection.removeAllRanges()
-    selection.addRange(range)
-  }
-
-  function apply(command: RichTextCommand, value?: string) {
-    setFocused(true)
-    restoreSelection()
-    const editor = editorRef.current
-    const range = currentEditorRange()
-    if (!editor || !range) return
-
-    if (range.collapsed && (command === 'bold' || command === 'italic' || command === 'underline')) {
-      const next = { ...activeFormattingRef.current }
-      if (command === 'bold') next.bold = !next.bold
-      if (command === 'italic') next.italic = !next.italic
-      if (command === 'underline') next.underline = !next.underline
-      setPendingTypingFormatting(next, range)
-      return
-    }
-
-    clearPendingTypingFormatting()
-    document.execCommand(command, false, value)
-    rememberSelection()
-    emitChange()
-    syncActiveFormatting()
-  }
-
-  function applyColor(command: RichTextColorCommand, value: RichTextColorValue) {
-    setFocused(true)
-    restoreSelection()
-    let shouldEmitChange = true
-    const editor = editorRef.current
-    const selection = window.getSelection()
-    let range = currentEditorRange()
-
-    if (editor && range && !range.collapsed) {
-      clearPendingTypingFormatting()
-      if (range.commonAncestorContainer !== editor && !editor.contains(range.commonAncestorContainer)) {
-        range.selectNodeContents(editor)
-      }
-      const highlightedAncestor = command === 'hiliteColor' && value === null
-        ? backgroundAncestorForRange(range, editor)
-        : null
-      const contents = range.extractContents()
-      if (command === 'hiliteColor' && value === null) {
-        clearBackgroundFormatting(contents)
-        const insertedNodes = Array.from(contents.childNodes)
-        if (highlightedAncestor && !highlightedAncestor.textContent) {
-          highlightedAncestor.replaceWith(contents)
-        } else {
-          range.insertNode(contents)
-        }
-        const nextRange = document.createRange()
-        if (insertedNodes.length > 0) {
-          nextRange.setStartBefore(insertedNodes[0])
-          nextRange.setEndAfter(insertedNodes[insertedNodes.length - 1])
-        } else {
-          nextRange.setStart(range.startContainer, range.startOffset)
-          nextRange.collapse(true)
-        }
-        selection?.removeAllRanges()
-        selection?.addRange(nextRange)
-        selectionRangeRef.current = nextRange.cloneRange()
-      } else if (value) {
-        const colorSpan = document.createElement('span')
-        if (command === 'hiliteColor') {
-          colorSpan.style.backgroundColor = value
-        } else {
-          colorSpan.style.color = value
-        }
-        colorSpan.appendChild(contents)
-        range.insertNode(colorSpan)
-        selection?.removeAllRanges()
-        const nextRange = document.createRange()
-        nextRange.selectNodeContents(colorSpan)
-        selection?.addRange(nextRange)
-        selectionRangeRef.current = nextRange.cloneRange()
-      }
-    } else if (editor && range) {
-      if (command === 'hiliteColor' && value === null) {
-        const highlightedAncestor = backgroundAncestorForRange(range, editor)
-        if (highlightedAncestor) {
-          const nextRange = document.createRange()
-          nextRange.setStartAfter(highlightedAncestor)
-          nextRange.collapse(true)
-          selection?.removeAllRanges()
-          selection?.addRange(nextRange)
-          selectionRangeRef.current = nextRange.cloneRange()
-          range = nextRange
-        }
-      }
-      const next = {
-        ...activeFormattingRef.current,
-        [command === 'foreColor' ? 'textColor' : 'highlightColor']: normalizeToolbarColor(value, command === 'foreColor'),
-      }
-      setPendingTypingFormatting(next, range)
-      shouldEmitChange = false
-    }
-    rememberSelection()
-    if (shouldEmitChange) emitChange()
-    syncActiveFormatting()
-    setOpenPaletteTarget(null)
-  }
-
-  function applyAutomaticColor(command: RichTextColorCommand) {
-    if (command === 'foreColor') {
-      applyColor(command, '#000000')
-      return
-    }
-    applyColor(command, null)
-  }
-
-  function insertPendingTypingText(text: string): boolean {
-    const pending = pendingTypingFormattingRef.current
-    if (!pending) return false
-    const editor = editorRef.current
-    const range = currentEditorRange()
-    if (!editor || !range || !range.collapsed || pending.rangeSignature !== rangeSignature(range, editor)) {
-      return false
-    }
-
-    const formattedNode = makeFormattedTypingNode(text, pending.formatting)
-    const insertionRange = range.cloneRange()
-    const highlightedAncestor = pending.formatting.highlightColor === null ? backgroundAncestorForRange(range, editor) : null
-    if (highlightedAncestor) {
-      insertionRange.setStartAfter(highlightedAncestor)
-      insertionRange.collapse(true)
-    }
-    insertionRange.insertNode(formattedNode)
-
-    const nextRange = document.createRange()
-    nextRange.setStartAfter(formattedNode)
-    nextRange.collapse(true)
-    const selection = window.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(nextRange)
-    selectionRangeRef.current = nextRange.cloneRange()
-    pendingTypingFormattingRef.current = {
-      formatting: pending.formatting,
-      rangeSignature: rangeSignature(nextRange, editor),
-    }
-    setActiveFormattingState(pending.formatting)
-    emitChange()
-    return true
-  }
-
-  function formatRecentlyInsertedText(text: string): boolean {
-    const pending = pendingTypingFormattingRef.current
-    const editor = editorRef.current
-    const selection = window.getSelection()
-    if (!pending || !editor || !selection || selection.rangeCount === 0 || text.length === 0) return false
-
-    const range = selection.getRangeAt(0)
-    if (!range.collapsed || !editor.contains(range.commonAncestorContainer) || range.startContainer.nodeType !== Node.TEXT_NODE) return false
-    const textNode = range.startContainer
-    if (range.startOffset < text.length) return false
-
-    const insertedRange = document.createRange()
-    insertedRange.setStart(textNode, range.startOffset - text.length)
-    insertedRange.setEnd(textNode, range.startOffset)
-    const insertedText = insertedRange.toString()
-    if (insertedText !== text) return false
-
-    const highlightedAncestor = pending.formatting.highlightColor === null ? backgroundAncestorForRange(insertedRange, editor) : null
-    insertedRange.deleteContents()
-    const formattedNode = makeFormattedTypingNode(text, pending.formatting)
-    if (highlightedAncestor) {
-      const escapedRange = document.createRange()
-      escapedRange.setStartAfter(highlightedAncestor)
-      escapedRange.collapse(true)
-      escapedRange.insertNode(formattedNode)
-    } else {
-      insertedRange.insertNode(formattedNode)
-    }
-    const nextRange = document.createRange()
-    nextRange.setStartAfter(formattedNode)
-    nextRange.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(nextRange)
-    selectionRangeRef.current = nextRange.cloneRange()
-    pendingTypingFormattingRef.current = {
-      formatting: pending.formatting,
-      rangeSignature: rangeSignature(nextRange, editor),
-    }
-    setActiveFormattingState(pending.formatting)
-    return true
-  }
-
-  function handleBeforeInput(event: FormEvent<HTMLDivElement>) {
-    const nativeEvent = event.nativeEvent as InputEvent
-    if (!pendingTypingFormattingRef.current || nativeEvent.inputType !== 'insertText' || !nativeEvent.data) return
-
-    if (insertPendingTypingText(nativeEvent.data)) {
-      event.preventDefault()
-    }
-  }
-
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (!pendingTypingFormattingRef.current || event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return
-    if (insertPendingTypingText(event.key)) {
-      event.preventDefault()
-    }
-  }
-
-  function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
-    if (event.button !== 0) return
-    event.preventDefault()
-    setFocused(true)
-    rememberSelection()
-  }
-
-  function blockNonPrimaryToolbarMouse(event: ReactMouseEvent) {
-    event.preventDefault()
-    event.stopPropagation()
-  }
-
-  function runToolbarAction(event: ReactMouseEvent, action: () => void) {
-    if (event.button !== 0) return
-    action()
-  }
-
-  const showToolbar = toolbarMode === 'always' || focused
+  const toolbarVisible = toolbarMode === 'always' || focused || Boolean(editor?.isFocused)
   const activePaletteColor = openPaletteTarget === 'foreColor' ? activeFormatting.textColor : activeFormatting.highlightColor
 
   function toolbarButtonClass(active = false) {
@@ -633,9 +365,58 @@ export function RichTextEditor({
     ].join(' ')
   }
 
+  function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
+    if (event.button !== 0) return
+    event.stopPropagation()
+    setFocused(true)
+  }
+
+  function blockNonPrimaryToolbarMouse(event: ReactMouseEvent) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  function runToolbarAction(event: ReactMouseEvent, action: () => void) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    action()
+  }
+
+  function togglePalette(target: RichTextColorCommand) {
+    setOpenPaletteTarget((current) => (current === target ? null : target))
+    if (editor) updateActiveFormatting(editor)
+  }
+
+  function applyTextColor(color: string) {
+    runEditorCommand((instance) => {
+      instance.chain().focus().setColor(color).run()
+    })
+    setOpenPaletteTarget(null)
+  }
+
+  function applyAutomaticTextColor() {
+    applyTextColor('#000000')
+  }
+
+  function applyTextBackground(color: string) {
+    runEditorCommand((instance) => {
+      instance.chain().focus().setHighlight({ color }).run()
+    })
+    setOpenPaletteTarget(null)
+  }
+
+  function clearTextBackground() {
+    runEditorCommand((instance) => {
+      instance.chain().focus().unsetHighlight().run()
+    })
+    setOpenPaletteTarget(null)
+  }
+
   function renderPalette(target: RichTextColorCommand) {
     if (openPaletteTarget !== target) return null
     const automaticLabel = target === 'foreColor' ? 'Automatic' : 'No Color'
+    const applyAutomatic = target === 'foreColor' ? applyAutomaticTextColor : clearTextBackground
 
     return createPortal(
       <div
@@ -645,7 +426,7 @@ export function RichTextEditor({
         role="dialog"
         aria-label={target === 'foreColor' ? 'Text color palette' : 'Text background palette'}
         data-placement={palettePosition.placement}
-        onPointerDown={keepEditorSelection}
+       
         onMouseDown={keepEditorSelection}
       >
         <button
@@ -656,7 +437,8 @@ export function RichTextEditor({
           ].join(' ')}
           onAuxClick={blockNonPrimaryToolbarMouse}
           onContextMenu={blockNonPrimaryToolbarMouse}
-          onClick={(event) => runToolbarAction(event, () => applyAutomaticColor(target))}
+          onMouseDown={(event) => runToolbarAction(event, applyAutomatic)}
+          onClick={blockNonPrimaryToolbarMouse}
         >
           {automaticLabel}
         </button>
@@ -667,6 +449,9 @@ export function RichTextEditor({
               <div className="flex gap-1">
                 {family.shades.map((shade) => {
                   const selected = activePaletteColor?.toLowerCase() === shade.toLowerCase()
+                  const applyColor = target === 'foreColor'
+                    ? () => applyTextColor(shade)
+                    : () => applyTextBackground(shade)
                   return (
                     <button
                       key={shade}
@@ -681,7 +466,8 @@ export function RichTextEditor({
                       title={`${family.name} ${shade}`}
                       onAuxClick={blockNonPrimaryToolbarMouse}
                       onContextMenu={blockNonPrimaryToolbarMouse}
-                      onClick={(event) => runToolbarAction(event, () => applyColor(target, shade))}
+                      onMouseDown={(event) => runToolbarAction(event, applyColor)}
+                      onClick={blockNonPrimaryToolbarMouse}
                     />
                   )
                 })}
@@ -695,23 +481,47 @@ export function RichTextEditor({
   }
 
   return (
-    <div ref={rootRef} className={className}>
+    <div
+      ref={rootRef}
+      className={className}
+      onClick={(event) => event.stopPropagation()}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={() => {
+        if (toolbarMode === 'focus') {
+          window.setTimeout(() => {
+            const target = document.activeElement
+            if (target && (rootRef.current?.contains(target) || paletteRef.current?.contains(target))) return
+            setFocused(false)
+          }, 0)
+        }
+      }}
+    >
       <div
-        className={['flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1', showToolbar ? '' : 'hidden'].join(' ')}
+        className={[
+          'flex items-center gap-1 rounded-t border border-b-0 border-sf-border bg-sf-surface-alt px-2 py-1 transition-opacity',
+          toolbarVisible ? 'visible opacity-100' : 'invisible pointer-events-none opacity-0',
+        ].join(' ')}
       >
-        <button type="button" className={toolbarButtonClass(activeFormatting.bold)} aria-label="Bold" aria-pressed={activeFormatting.bold} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('bold'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.bold)} aria-label="Bold" aria-pressed={activeFormatting.bold} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => {
+          const chain = instance.chain().focus()
+          if (instance.isActive('bold')) {
+            chain.unsetBold().run()
+          } else {
+            chain.setBold().run()
+          }
+        }))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.italic)} aria-label="Italic" aria-pressed={activeFormatting.italic} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('italic'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.italic)} aria-label="Italic" aria-pressed={activeFormatting.italic} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleItalic().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.underline)} aria-label="Underline" aria-pressed={activeFormatting.underline} onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('underline'))}>
-          <Underline className="h-3.5 w-3.5" aria-hidden="true" />
+        <button type="button" className={toolbarButtonClass(activeFormatting.underline)} aria-label="Underline" aria-pressed={activeFormatting.underline} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleUnderline().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+          <UnderlineIcon className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className={toolbarButtonClass()} aria-label="Bullet list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertUnorderedList'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.bulletList)} aria-label="Bullet list" aria-pressed={activeFormatting.bulletList} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleBulletList().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
-        <button type="button" className={toolbarButtonClass()} aria-label="Numbered list" onPointerDown={keepEditorSelection} onMouseDown={keepEditorSelection} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={(event) => runToolbarAction(event, () => apply('insertOrderedList'))}>
+        <button type="button" className={toolbarButtonClass(activeFormatting.orderedList)} aria-label="Numbered list" aria-pressed={activeFormatting.orderedList} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleOrderedList().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="relative inline-flex">
@@ -721,11 +531,11 @@ export function RichTextEditor({
             className={`${toolbarButtonClass()} relative inline-flex`}
             aria-label="Text color"
             title="Text color"
-            onPointerDown={keepEditorSelection}
-            onMouseDown={keepEditorSelection}
+           
             onAuxClick={blockNonPrimaryToolbarMouse}
             onContextMenu={blockNonPrimaryToolbarMouse}
-            onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'foreColor' ? null : 'foreColor')))}
+            onMouseDown={(event) => runToolbarAction(event, () => togglePalette('foreColor'))}
+            onClick={blockNonPrimaryToolbarMouse}
           >
             <Palette className="h-3.5 w-3.5" aria-hidden="true" />
             <span
@@ -743,11 +553,11 @@ export function RichTextEditor({
             className={`${toolbarButtonClass()} relative inline-flex`}
             aria-label="Text background"
             title="Text background"
-            onPointerDown={keepEditorSelection}
-            onMouseDown={keepEditorSelection}
+           
             onAuxClick={blockNonPrimaryToolbarMouse}
             onContextMenu={blockNonPrimaryToolbarMouse}
-            onClick={(event) => runToolbarAction(event, () => setOpenPaletteTarget((current) => (current === 'hiliteColor' ? null : 'hiliteColor')))}
+            onMouseDown={(event) => runToolbarAction(event, () => togglePalette('hiliteColor'))}
+            onClick={blockNonPrimaryToolbarMouse}
           >
             <Highlighter className="h-3.5 w-3.5" aria-hidden="true" />
             <span
@@ -762,42 +572,7 @@ export function RichTextEditor({
           {renderPalette('hiliteColor')}
         </span>
       </div>
-      <div
-        ref={editorRef}
-        className={`rich-text-editor ${minHeightClassName} w-full ${showToolbar ? 'rounded-b' : 'rounded'} border border-sf-border bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-sf-brand`}
-        contentEditable
-        role="textbox"
-        suppressContentEditableWarning
-        onBeforeInput={handleBeforeInput}
-        onKeyDown={handleKeyDown}
-        onInput={(event) => {
-          const nativeEvent = event.nativeEvent as InputEvent
-          const appliedPendingFormat = nativeEvent.inputType === 'insertText'
-            && Boolean(nativeEvent.data)
-            && formatRecentlyInsertedText(nativeEvent.data ?? '')
-          if (!appliedPendingFormat) clearPendingTypingFormatting()
-          cleanupCaretResetMarkers(event.currentTarget)
-          rememberSelection()
-          if (!appliedPendingFormat) syncActiveFormatting()
-          onChange(normalizeRichTextValue(event.currentTarget.innerHTML))
-        }}
-        onFocus={() => {
-          setFocused(true)
-          rememberSelection()
-          syncActiveFormatting()
-        }}
-        onKeyUp={() => {
-          rememberSelection()
-          syncActiveFormatting()
-        }}
-        onMouseDown={scheduleSelectionDerivedFormattingSync}
-        onMouseUp={() => {
-          rememberSelection()
-          syncSelectionDerivedFormatting()
-        }}
-        onClick={scheduleSelectionDerivedFormattingSync}
-        onContextMenu={scheduleSelectionDerivedFormattingSync}
-      />
+      <EditorContent editor={editor} />
     </div>
   )
 }

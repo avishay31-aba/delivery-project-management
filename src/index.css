@@ -90,6 +90,16 @@
     margin: 0.125rem 0;
   }
 
+  .rich-text-editor p,
+  .rich-text-content p {
+    margin: 0;
+  }
+
+  .rich-text-editor p + p,
+  .rich-text-content p + p {
+    margin-top: 0.25rem;
+  }
+
   .sf-clamped-table-cell {
     display: -webkit-box;
     max-width: 100%;
