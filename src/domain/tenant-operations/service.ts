@@ -2,6 +2,11 @@ import type { Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
+import {
+  TENANT_WARRANTY_CONTRACT_GROUPS,
+  tenantWarrantyHeaderStatusReadModel,
+  type TenantWarrantyHeaderStatusReadModel,
+} from '@/domain/warranty-collection'
 
 export type TenantOperationalMode =
   | 'Operative'
@@ -67,6 +72,18 @@ export function tenantConfigurationPresentationRecord(
       mapCenter,
     } as TenantConfiguration,
   }
+}
+
+export function tenantDerivedWarrantyContractStatus(tenant: Tenant): TenantWarrantyHeaderStatusReadModel {
+  return tenantWarrantyHeaderStatusReadModel(tenant.warranties ?? [], tenant.tid)
+}
+
+export function tenantsGroupedByDerivedWarrantyContractStatus(tenants: Tenant[]): Array<{ status: TenantWarrantyHeaderStatusReadModel['status']; title: string; rows: Tenant[] }> {
+  return TENANT_WARRANTY_CONTRACT_GROUPS.map((group) => ({
+    status: group.status,
+    title: group.label,
+    rows: tenants.filter((tenant) => tenantDerivedWarrantyContractStatus(tenant).status === group.status),
+  }))
 }
 
 export function tenantHostedSystemHistory(tenant: Tenant): TenantHostedSystemHistory[] {

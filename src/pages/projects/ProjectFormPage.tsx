@@ -23,7 +23,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
+import { TenantWarrantyContractTabs } from '@/components/tenants/TenantWarrantyContractTabs'
 import { SystemDeliveryTable } from '@/components/systems'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel } from '@/components/configuration'
@@ -2026,17 +2026,6 @@ export function ProjectFormPage() {
   }
 
   function renderSystemsTenantsSection() {
-    const tenantSections = [
-      {
-        title: 'Under Contract',
-        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus !== 'OUT_OF_CONTRACT' && tenant.contractStatus !== 'OUT_OF_CONTRACT'),
-      },
-      {
-        title: 'Out of Contract',
-        rows: linkedTenants.filter((tenant) => tenant.warrantyStatus === 'OUT_OF_CONTRACT' || tenant.contractStatus === 'OUT_OF_CONTRACT'),
-      },
-    ]
-
     return (
       <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2110,22 +2099,11 @@ export function ProjectFormPage() {
           onToggle={() => toggleSection('tenants')}
           className="space-y-3"
         >
-          {tenantSections.map((section) => (
-            <div key={section.title} className="space-y-2">
-              <h4 className="text-sm font-semibold text-sf-text">{section.title}</h4>
-              {section.rows.length > 0 ? (
-                <TenantDeliveryTable
-                  tenants={section.rows}
-                  systems={systems}
-                  emptyText={`No ${section.title.toLowerCase()} tenants are linked to this Project.`}
-                />
-              ) : (
-                <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-                  No {section.title.toLowerCase()} tenants are linked to this Project.
-                </div>
-              )}
-            </div>
-          ))}
+          <TenantWarrantyContractTabs
+            tenants={linkedTenants}
+            systems={systems}
+            emptyTextForSection={(title) => `No ${title.toLowerCase()} tenants are linked to this Project.`}
+          />
         </CollapsibleSection>
       </div>
     )

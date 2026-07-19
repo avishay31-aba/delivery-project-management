@@ -19,7 +19,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
-import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
+import { TenantWarrantyContractTabs } from '@/components/tenants/TenantWarrantyContractTabs'
 import { BusinessObjectLink, FormField, LinkedProjectsLinks, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -968,21 +968,6 @@ export function InventoryForm<T extends InventoryRecord>({
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
     const applicationSummary = applicationConfigurationSummaryRecord()
-    const underContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus !== 'OUT_OF_CONTRACT')
-    const outOfContractTenants = hostedTenants.filter((tenant) => tenant.contractStatus === 'OUT_OF_CONTRACT')
-    function renderHostedTenantSection(title: string, sectionTenants: Tenant[]) {
-      return (
-        <section className="space-y-2">
-          <h3 className="text-lg font-semibold text-sf-text">{title}</h3>
-          <TenantDeliveryTable
-            tenants={sectionTenants}
-            systems={allocatedSystems}
-            emptyText="No hosted tenants in this section."
-            actions={(tenant) => renderHostedTenantActions(tenant)}
-          />
-        </section>
-      )
-    }
 
     return (
       <div className="space-y-4">
@@ -1001,8 +986,13 @@ export function InventoryForm<T extends InventoryRecord>({
           ) : null}
         </div>
 
-        {renderHostedTenantSection('Under Contract', underContractTenants)}
-        {renderHostedTenantSection('Out of Contract', outOfContractTenants)}
+        <TenantWarrantyContractTabs
+          tenants={hostedTenants}
+          systems={allocatedSystems}
+          emptyTextForSection={() => 'No hosted tenants in this section.'}
+          headingLevel="h3"
+          actions={(tenant) => renderHostedTenantActions(tenant)}
+        />
 
         <section className="space-y-2">
           <h3 className="text-lg font-semibold text-sf-text">Application Configuration Summary</h3>

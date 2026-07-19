@@ -2,8 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, CountryFlag, WarrantyStatusPresentation } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantPocPidDisplay } from '@/domain/tenant-operations'
-import { tenantWarrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
+import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
   objectDefinitionToRuntimeFormModel,
@@ -86,9 +85,9 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'tenantStatus', label: 'Tenant Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
     {
       ...tenantRuntimeColumn('warrantyStatus'),
-      getValue: (row) => tenantWarrantyHeaderStatusReadModel(row.warranties ?? [], row.tid).label,
+      getValue: (row) => tenantDerivedWarrantyContractStatus(row).label,
       render: (row) => {
-        const headerStatus = tenantWarrantyHeaderStatusReadModel(row.warranties ?? [], row.tid)
+        const headerStatus = tenantDerivedWarrantyContractStatus(row)
         return createElement(WarrantyStatusPresentation, {
           status: headerStatus.visualStatus,
           label: headerStatus.label,

@@ -80,7 +80,6 @@ import {
   splitWarrantyPredecessors,
   successorRefsForWarranty,
   isSelfWarrantyPredecessorSelection,
-  tenantWarrantyHeaderStatusReadModel,
   validateWarrantyEditDraft,
   warrantyManageabilityMessage,
   warrantyRelatedProjectOptionLabel,
@@ -93,6 +92,7 @@ import {
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
+  tenantDerivedWarrantyContractStatus,
   tenantFormType,
   tenantPocPidDisplay,
   tenantRelatedProjects,
@@ -392,7 +392,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
-  const committedWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
+  const committedWarrantyHeaderStatus = tenantDerivedWarrantyContractStatus(persistedTenant)
   const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
 
   useEffect(() => {

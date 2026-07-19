@@ -393,6 +393,7 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
   - `Out of Contract` when at least one committed Warranty record is `No Warranty` and every committed Warranty record is only `No Warranty` or `Renewed`.
   - `Not Set Yet` when there are no committed Warranty records, or all committed Warranty records are `Not Set Yet`.
 - Aggregate labels may reuse an approved individual Warranty status visual without reusing the individual label. `Under Contract` reuses the individual `Valid` visual, `Out of Contract` reuses the individual `No Warranty` visual, and `Not Set Yet` reuses the individual `Not Set Yet` visual.
+- Tenant collection grouping, filtering, summarization, and tabbing by warranty state must consume the shared Tenant-derived Warranty Contract Status. Project, System, Dashboard, Renewal Queue, and future consumers must not inspect Warranty records or duplicate Warranty derivation logic for Tenant grouping.
 
 ## Reusable Child Object Principle
 

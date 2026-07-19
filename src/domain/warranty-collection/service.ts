@@ -23,6 +23,12 @@ import type {
 const UNDER_CONTRACT_ROW_STATUSES = new Set<WarrantyStatus>(['PLANNED', 'VALID', 'PENDING', 'EXPIRED'])
 const OUT_OF_CONTRACT_ROW_STATUSES = new Set<WarrantyStatus>(['NO_WARRANTY', 'RENEWED'])
 
+export const TENANT_WARRANTY_CONTRACT_GROUPS: Array<{ status: TenantWarrantyHeaderStatusReadModel['status']; label: string }> = [
+  { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET },
+  { status: 'UNDER_CONTRACT', label: 'Under Contract' },
+  { status: 'OUT_OF_CONTRACT', label: 'Out of Contract' },
+]
+
 function titleCaseBusinessValue(value: string): string {
   return value
     .split('_')
