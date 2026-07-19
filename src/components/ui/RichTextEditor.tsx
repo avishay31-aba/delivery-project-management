@@ -1,4 +1,4 @@
-import { type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
@@ -40,6 +40,16 @@ interface RichTextPalettePosition {
 interface ThemeColorFamily {
   name: string
   shades: string[]
+}
+
+interface ToolbarControlProps {
+  active?: boolean
+  children: ReactNode
+  className?: string
+  controlRef?: Ref<HTMLSpanElement>
+  label: string
+  onAction: () => void
+  title?: string
 }
 
 const RICH_TEXT_THEME_PALETTE: ThemeColorFamily[] = [
@@ -197,15 +207,22 @@ export function RichTextEditor({
   toolbarMode = 'always',
 }: RichTextEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const textColorButtonRef = useRef<HTMLButtonElement | null>(null)
-  const highlightColorButtonRef = useRef<HTMLButtonElement | null>(null)
+  const textColorButtonRef = useRef<HTMLSpanElement | null>(null)
+  const highlightColorButtonRef = useRef<HTMLSpanElement | null>(null)
   const paletteRef = useRef<HTMLDivElement | null>(null)
-  const latestValueRef = useRef(value)
+  const latestEmittedValueRef = useRef(normalizeRichTextValue(value || ''))
   const toolbarActionVersionRef = useRef(0)
   const [focused, setFocused] = useState(false)
   const [openPaletteTarget, setOpenPaletteTarget] = useState<RichTextPaletteTarget>(null)
   const [palettePosition, setPalettePosition] = useState<RichTextPalettePosition>({ left: 0, top: 0, placement: 'bottom' })
   const [activeFormatting, setActiveFormatting] = useState<RichTextActiveFormatting>(EMPTY_ACTIVE_FORMATTING)
+  const editorExtensions = useMemo(() => [
+    StarterKit,
+    UnderlineExtension,
+    TextStyle,
+    Color,
+    HighlightWithSpanBackgroundImport.configure({ multicolor: true }),
+  ], [])
 
   const updateActiveFormatting = (editor: Editor, source: 'editor' | 'selection' = 'editor') => {
     setActiveFormatting(source === 'selection' ? readSelectionFormatting(editor) : readActiveFormatting(editor))
@@ -225,13 +242,7 @@ export function RichTextEditor({
   }
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      UnderlineExtension,
-      TextStyle,
-      Color,
-      HighlightWithSpanBackgroundImport.configure({ multicolor: true }),
-    ],
+    extensions: editorExtensions,
     content: value || '',
     editorProps: {
       attributes: {
@@ -288,20 +299,21 @@ export function RichTextEditor({
     onTransaction: ({ editor }) => updateActiveFormatting(editor),
     onUpdate: ({ editor }) => {
       const html = normalizeRichTextValue(editor.getHTML())
-      latestValueRef.current = html
+      latestEmittedValueRef.current = html
       onChange(html)
       updateActiveFormatting(editor)
     },
   })
 
   useEffect(() => {
-    latestValueRef.current = value
     if (!editor) return
     const current = normalizeRichTextValue(editor.getHTML())
     const next = normalizeRichTextValue(value || '')
+    if (next === latestEmittedValueRef.current) return
     if (current !== next) {
       editor.commands.setContent(value || '', { emitUpdate: false })
       updateActiveFormatting(editor)
+      latestEmittedValueRef.current = next
     }
   }, [editor, value])
 
@@ -365,7 +377,7 @@ export function RichTextEditor({
     ].join(' ')
   }
 
-  function keepEditorSelection(event: ReactPointerEvent | ReactMouseEvent) {
+  function keepEditorSelection(event: ReactMouseEvent) {
     if (event.button !== 0) return
     event.stopPropagation()
     setFocused(true)
@@ -381,6 +393,42 @@ export function RichTextEditor({
     event.preventDefault()
     event.stopPropagation()
     action()
+  }
+
+  function runToolbarKeyboardAction(event: ReactKeyboardEvent, action: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    event.stopPropagation()
+    action()
+  }
+
+  function ToolbarControl({
+    active = false,
+    children,
+    className = '',
+    controlRef,
+    label,
+    onAction,
+    title,
+  }: ToolbarControlProps) {
+    return (
+      <span
+        ref={controlRef}
+        role="button"
+        tabIndex={0}
+        className={[toolbarButtonClass(active), className].filter(Boolean).join(' ')}
+        aria-label={label}
+        aria-pressed={active}
+        title={title}
+        onMouseDown={(event) => runToolbarAction(event, onAction)}
+        onKeyDown={(event) => runToolbarKeyboardAction(event, onAction)}
+        onAuxClick={blockNonPrimaryToolbarMouse}
+        onContextMenu={blockNonPrimaryToolbarMouse}
+        onClick={blockNonPrimaryToolbarMouse}
+      >
+        {children}
+      </span>
+    )
   }
 
   function togglePalette(target: RichTextColorCommand) {
@@ -502,40 +550,35 @@ export function RichTextEditor({
           toolbarVisible ? 'visible opacity-100' : 'invisible pointer-events-none opacity-0',
         ].join(' ')}
       >
-        <button type="button" className={toolbarButtonClass(activeFormatting.bold)} aria-label="Bold" aria-pressed={activeFormatting.bold} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => {
+        <ToolbarControl active={activeFormatting.bold} label="Bold" onAction={() => runEditorCommand((instance) => {
           const chain = instance.chain().focus()
           if (instance.isActive('bold')) {
             chain.unsetBold().run()
           } else {
             chain.setBold().run()
           }
-        }))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+        })}>
           <Bold className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.italic)} aria-label="Italic" aria-pressed={activeFormatting.italic} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleItalic().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+        </ToolbarControl>
+        <ToolbarControl active={activeFormatting.italic} label="Italic" onAction={() => runEditorCommand((instance) => instance.chain().focus().toggleItalic().run())}>
           <Italic className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.underline)} aria-label="Underline" aria-pressed={activeFormatting.underline} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleUnderline().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+        </ToolbarControl>
+        <ToolbarControl active={activeFormatting.underline} label="Underline" onAction={() => runEditorCommand((instance) => instance.chain().focus().toggleUnderline().run())}>
           <UnderlineIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.bulletList)} aria-label="Bullet list" aria-pressed={activeFormatting.bulletList} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleBulletList().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+        </ToolbarControl>
+        <ToolbarControl active={activeFormatting.bulletList} label="Bullet list" onAction={() => runEditorCommand((instance) => instance.chain().focus().toggleBulletList().run())}>
           <List className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-        <button type="button" className={toolbarButtonClass(activeFormatting.orderedList)} aria-label="Numbered list" aria-pressed={activeFormatting.orderedList} onMouseDown={(event) => runToolbarAction(event, () => runEditorCommand((instance) => instance.chain().focus().toggleOrderedList().run()))} onAuxClick={blockNonPrimaryToolbarMouse} onContextMenu={blockNonPrimaryToolbarMouse} onClick={blockNonPrimaryToolbarMouse}>
+        </ToolbarControl>
+        <ToolbarControl active={activeFormatting.orderedList} label="Numbered list" onAction={() => runEditorCommand((instance) => instance.chain().focus().toggleOrderedList().run())}>
           <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
+        </ToolbarControl>
         <span className="relative inline-flex">
-          <button
-            ref={textColorButtonRef}
-            type="button"
-            className={`${toolbarButtonClass()} relative inline-flex`}
-            aria-label="Text color"
+          <ToolbarControl
+            controlRef={textColorButtonRef}
+            className="relative inline-flex"
+            label="Text color"
             title="Text color"
-           
-            onAuxClick={blockNonPrimaryToolbarMouse}
-            onContextMenu={blockNonPrimaryToolbarMouse}
-            onMouseDown={(event) => runToolbarAction(event, () => togglePalette('foreColor'))}
-            onClick={blockNonPrimaryToolbarMouse}
+            onAction={() => togglePalette('foreColor')}
           >
             <Palette className="h-3.5 w-3.5" aria-hidden="true" />
             <span
@@ -543,21 +586,16 @@ export function RichTextEditor({
               style={{ backgroundColor: activeFormatting.textColor ?? '#181818' }}
               aria-hidden="true"
             />
-          </button>
+          </ToolbarControl>
           {renderPalette('foreColor')}
         </span>
         <span className="relative inline-flex">
-          <button
-            ref={highlightColorButtonRef}
-            type="button"
-            className={`${toolbarButtonClass()} relative inline-flex`}
-            aria-label="Text background"
+          <ToolbarControl
+            controlRef={highlightColorButtonRef}
+            className="relative inline-flex"
+            label="Text background"
             title="Text background"
-           
-            onAuxClick={blockNonPrimaryToolbarMouse}
-            onContextMenu={blockNonPrimaryToolbarMouse}
-            onMouseDown={(event) => runToolbarAction(event, () => togglePalette('hiliteColor'))}
-            onClick={blockNonPrimaryToolbarMouse}
+            onAction={() => togglePalette('hiliteColor')}
           >
             <Highlighter className="h-3.5 w-3.5" aria-hidden="true" />
             <span
@@ -568,7 +606,7 @@ export function RichTextEditor({
               style={{ backgroundColor: activeFormatting.highlightColor ?? 'transparent' }}
               aria-hidden="true"
             />
-          </button>
+          </ToolbarControl>
           {renderPalette('hiliteColor')}
         </span>
       </div>
