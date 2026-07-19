@@ -17,6 +17,7 @@ import {
   AlertStatusIcon,
   BusinessObjectLink,
   FormField,
+  HeaderReadonlyValue,
   LinkedProjectsLinks,
   OperationalStatusIcon,
   PlaceholderCard,
@@ -775,7 +776,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function renderHeaderField(label: string, value: ReactNode, width = 'w-44') {
     return (
       <FormField label={label} controlWidthClassName={width}>
-        <div className="min-h-8 px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+        <HeaderReadonlyValue>{value}</HeaderReadonlyValue>
       </FormField>
     )
   }
@@ -905,7 +906,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return (
       <FormField label="Current SID" controlWidthClassName="w-52">
         {tenantDraft.systemId ? (
-          <div className="min-h-8 px-2 py-1 text-sm text-sf-text">{hosting.sid || '-'}</div>
+          <HeaderReadonlyValue>{hosting.sid}</HeaderReadonlyValue>
         ) : (
           <select
             className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"

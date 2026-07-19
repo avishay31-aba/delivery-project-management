@@ -20,7 +20,7 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
 import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
-import { BusinessObjectLink, FormField, LinkedProjectsLinks, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, HeaderReadonlyValue, LinkedProjectsLinks, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -615,7 +615,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
-          <div className="sf-readonly-field min-h-8 rounded border border-sf-border bg-sf-surface-alt px-2 py-1 text-sm text-sf-text">
+          <HeaderReadonlyValue>
             {field.inputType === 'date' ? (
               <DateTimeValue value={value} semanticType="date" fallback="-" />
             ) : field.key === 'linkedProjects' ? (
@@ -623,7 +623,7 @@ export function InventoryForm<T extends InventoryRecord>({
             ) : (
               value || '-'
             )}
-          </div>
+          </HeaderReadonlyValue>
         </FormField>
       )
     }
