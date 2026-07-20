@@ -1,5 +1,6 @@
 export type ActivityEventCategory =
   | 'PROJECT'
+  | 'OPPORTUNITY'
   | 'CUSTOMER'
   | 'WARRANTY'
   | 'REQUIREMENT'
@@ -7,8 +8,16 @@ export type ActivityEventCategory =
   | 'SYSTEM'
   | 'ALLOCATION'
   | 'MILESTONE'
+  | 'TASK'
+  | 'REMARK'
+  | 'CONFIGURATION'
+  | 'PURPOSE_HISTORY'
+  | 'OWNER'
+  | 'SECURITY'
+  | 'ADMINISTRATION'
   | 'DASHBOARD_VIEW'
   | 'DOCUMENT'
+  | 'OTHER'
 
 export type ActivityEventSource = 'USER' | 'SYSTEM' | 'MIGRATION' | 'IMPORT'
 

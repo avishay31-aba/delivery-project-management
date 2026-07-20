@@ -100,6 +100,7 @@ export function activityEventCategoryLabel(event: ActivityEvent): string {
   if (eventType.includes('user')) return 'User Management'
   if (eventType.includes('admin')) return 'Administration'
   if (event.category === 'PROJECT') return 'Project'
+  if (event.category === 'OPPORTUNITY') return 'Opportunity'
   if (event.category === 'SYSTEM') return 'System'
   if (event.category === 'TENANT') return 'Tenant'
   if (event.category === 'CUSTOMER') return 'Customer'

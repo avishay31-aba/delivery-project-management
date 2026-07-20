@@ -152,6 +152,18 @@ Every mutation must have one explicit commit boundary. Parent-owned mutations ac
 
 Every persisted mutation must have an explicit and visible commit boundary. Parent-owned staged mutations activate Save/Apply. Independently owned child Save actions commit explicitly. Destructive persisted actions require confirmation before immediate commit. Successful commits provide visible confirmation; failed commits provide visible error feedback. Removing an uncommitted draft is local and must be distinguished from deleting persisted data. No mutation may commit silently.
 
+## Shared Audit Trail
+
+Every Business Object in the ERP participates in the shared Audit Trail framework.
+
+Every meaningful business event is recorded through the shared mutation lifecycle. Audit Trail coverage is mandatory for every new Business Object introduced into the ERP.
+
+Audit Trail records are immutable chronological business records. They are created by authoritative domain/store transactions, not by React pages or presentation components. Corrections, cancellations, rollbacks and reversions create additional audit records rather than editing or deleting prior records.
+
+Audit Trail records must include structured metadata where applicable: timestamp, user, Business Object, Business Object ID, parent Business Object, event category, event type, previous values, new values, human-readable description, correlation ID and source.
+
+The Audit Trail covers lifecycle events, persisted field changes, operational events, child Business Object mutations, security events, cancelled or reverted business operations, and system-generated events. It excludes meaningless UI telemetry such as scrolling, tab opening, mouse movement, grid sorting, field typing before Save, and other draft-only interactions.
+
 ## Navigation Specification
 
 This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.

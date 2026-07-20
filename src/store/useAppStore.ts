@@ -12,12 +12,14 @@ import { generateBusinessIdFromCounter, reserveBusinessId } from '@/domain/busin
 import {
   createActivityEvent,
   type ActivityObjectRefInput,
+  type ActivityEventCategory,
   type ActivityEventInput,
   type ActivityEvent,
 } from '@/domain/activity-log'
 import {
   accountReference,
   activityObjectRefFromBusinessReference,
+  opportunityReference,
   projectReference,
   systemBusinessId,
   systemReference,
@@ -137,6 +139,93 @@ function requirementRef(requirementId: string): ActivityObjectRefInput {
 
 function relatedRefs(...refs: Array<ActivityObjectRefInput | null | undefined>): ActivityObjectRefInput[] {
   return refs.filter((ref): ref is ActivityObjectRefInput => Boolean(ref))
+}
+
+const AUDIT_FIELD_EXCLUSIONS = new Set([
+  'createdAt',
+  'updatedAt',
+  'technicalId',
+])
+
+function auditFieldLabel(field: string): string {
+  return field
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (first) => first.toUpperCase())
+}
+
+function auditValue(value: unknown): string {
+  if (value == null || value === '') return '-'
+  if (Array.isArray(value)) return value.length === 0 ? '-' : JSON.stringify(value)
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function auditCategoryForField(defaultCategory: ActivityEventCategory, field: string): ActivityEventCategory {
+  const normalized = field.toLocaleLowerCase()
+  if (normalized.includes('warrant')) return 'WARRANTY'
+  if (normalized.includes('document')) return 'DOCUMENT'
+  if (normalized.includes('remark')) return 'REMARK'
+  if (normalized.includes('owner')) return 'OWNER'
+  if (normalized.includes('configuration') || normalized.includes('mapcenter') || normalized.includes('license')) return 'CONFIGURATION'
+  if (normalized.includes('purposehistory')) return 'PURPOSE_HISTORY'
+  if (normalized.includes('task')) return 'TASK'
+  if (normalized.includes('requirement')) return 'REQUIREMENT'
+  return defaultCategory
+}
+
+function auditEventTypeForField(prefix: string, field: string): string {
+  const normalized = field.toLocaleLowerCase()
+  if (normalized.includes('warrant')) return `${prefix}.warrantyChanged`
+  if (normalized.includes('document')) return `${prefix}.documentChanged`
+  if (normalized.includes('remark')) return `${prefix}.remarkChanged`
+  if (normalized.includes('owner')) return `${prefix}.ownerChanged`
+  if (normalized.includes('purposehistory')) return `${prefix}.purposeHistoryChanged`
+  if (normalized.includes('configuration') || normalized.includes('mapcenter') || normalized.includes('license')) return `${prefix}.configurationChanged`
+  if (normalized.includes('task')) return `${prefix}.taskChanged`
+  if (normalized.includes('requirement')) return `${prefix}.requirementChanged`
+  return `${prefix}.fieldChanged`
+}
+
+function appendFieldChangeActivityEvents<T extends Record<string, unknown>>(
+  events: ActivityEvent[],
+  now: string,
+  config: {
+    previous: T
+    next: T
+    category: ActivityEventCategory
+    eventTypePrefix: string
+    objectLabel: string
+    primaryObject: ActivityObjectRefInput
+    relatedObjects?: ActivityObjectRefInput[]
+    excludeFields?: string[]
+  },
+): ActivityEvent[] {
+  let nextEvents = events
+  const exclusions = new Set([...AUDIT_FIELD_EXCLUSIONS, ...(config.excludeFields ?? [])])
+  const keys = Array.from(new Set([...Object.keys(config.previous), ...Object.keys(config.next)]))
+
+  keys.forEach((field) => {
+    if (exclusions.has(field)) return
+    const beforeValue = config.previous[field]
+    const afterValue = config.next[field]
+    if (valuesEqual(beforeValue, afterValue)) return
+
+    const fieldLabel = auditFieldLabel(field)
+    const category = auditCategoryForField(config.category, field)
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category,
+      eventType: auditEventTypeForField(config.eventTypePrefix, field),
+      severity: 'INFO',
+      summary: `${config.objectLabel} ${fieldLabel} changed from ${auditValue(beforeValue)} to ${auditValue(afterValue)}.`,
+      primaryObject: config.primaryObject,
+      relatedObjects: config.relatedObjects ?? [],
+      before: { [field]: beforeValue ?? null },
+      after: { [field]: afterValue ?? null },
+      metadata: { field, fieldLabel },
+    })
+  })
+
+  return nextEvents
 }
 
 function removeTenantsFromSystemTransaction(
@@ -486,6 +575,8 @@ function appendProjectSaveActivityEvents(
       severity: nextProject.progressStatus === 'DONE' ? 'SUCCESS' : 'INFO',
       summary: statusSummary,
       primaryObject: projectReference,
+      before: { progressStatus: previousProject.progressStatus },
+      after: { progressStatus: nextProject.progressStatus },
     })
   }
 
@@ -509,7 +600,16 @@ function appendProjectSaveActivityEvents(
     })
   }
 
-  return nextEvents
+  return appendFieldChangeActivityEvents(nextEvents, now, {
+    previous: previousProject as unknown as Record<string, unknown>,
+    next: nextProject as unknown as Record<string, unknown>,
+    category: 'PROJECT',
+    eventTypePrefix: 'project',
+    objectLabel: `Project ${nextProject.pid}`,
+    primaryObject: projectReference,
+    relatedObjects: relatedRefs(context.linkedOpportunity ? activityObjectRefFromBusinessReference(opportunityReference(context.linkedOpportunity)) : null, customerRef(context.account)),
+    excludeFields: ['tasks', 'milestones', 'progressStatus'],
+  })
 }
 
 function hostedTenantCountForSystemId(state: AppDataState, systemId: string): number {
@@ -782,11 +882,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   updateSystem: (id, patch, options) => {
-    set((state) => ({
-      systems: state.systems.map((s) =>
-        s.id === id ? { ...s, ...patch, updatedAt: options?.preserveNewState ? s.createdAt : new Date().toISOString() } : s,
-      ),
-    }))
+    const now = new Date().toISOString()
+    set((state) => {
+      let previousSystem: AppDataState['systems'][number] | undefined
+      let nextSystem: AppDataState['systems'][number] | undefined
+      const systems = state.systems.map((system) => {
+        if (system.id !== id) return system
+        previousSystem = system
+        nextSystem = { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        return nextSystem
+      })
+      return {
+        systems,
+        activityEvents: previousSystem && nextSystem
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousSystem as unknown as Record<string, unknown>,
+              next: nextSystem as unknown as Record<string, unknown>,
+              category: 'SYSTEM',
+              eventTypePrefix: 'system',
+              objectLabel: `System ${systemBusinessId(nextSystem)}`,
+              primaryObject: systemRef(nextSystem),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
@@ -850,24 +969,88 @@ export const useAppStore = create<AppStore>((set, get) => ({
               )
             : tenantRemovalState.systems,
       }
-      if (collection !== 'allocated' || typeof allocatedMapCenter !== 'string') return result
+      let activityEvents = result.activityEvents
+      if (collection === 'production') {
+        const previousSystem = state.productionSystemInventory.find((system) => system.id === id)
+        const nextSystem = result.productionSystemInventory.find((system) => system.id === id)
+        if (previousSystem && nextSystem) {
+          activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+            previous: previousSystem as unknown as Record<string, unknown>,
+            next: nextSystem as unknown as Record<string, unknown>,
+            category: 'SYSTEM',
+            eventTypePrefix: 'system',
+            objectLabel: `System ${systemBusinessId(nextSystem)}`,
+            primaryObject: systemRef(nextSystem),
+          })
+        }
+      }
+      if (collection === 'reused') {
+        const previousSystem = state.reusedInternalSystems.find((system) => system.id === id)
+        const nextSystem = result.reusedInternalSystems.find((system) => system.id === id)
+        if (previousSystem && nextSystem) {
+          activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+            previous: previousSystem as unknown as Record<string, unknown>,
+            next: nextSystem as unknown as Record<string, unknown>,
+            category: 'SYSTEM',
+            eventTypePrefix: 'system',
+            objectLabel: `System ${systemBusinessId(nextSystem)}`,
+            primaryObject: systemRef(nextSystem),
+          })
+        }
+      }
+      if (collection === 'allocated') {
+        const previousSystem = state.systems.find((system) => system.id === id)
+        const nextSystem = result.systems.find((system) => system.id === id)
+        if (previousSystem && nextSystem) {
+          activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+            previous: previousSystem as unknown as Record<string, unknown>,
+            next: nextSystem as unknown as Record<string, unknown>,
+            category: 'SYSTEM',
+            eventTypePrefix: 'system',
+            objectLabel: `System ${systemBusinessId(nextSystem)}`,
+            primaryObject: systemRef(nextSystem),
+            excludeFields: typeof allocatedMapCenter === 'string' ? ['mapCenter'] : [],
+          })
+        }
+      }
+      const auditedResult = { ...result, activityEvents }
+      if (collection !== 'allocated' || typeof allocatedMapCenter !== 'string') return auditedResult
       const mapCenterState = updateSystemMapCenterTransaction(
-        { ...state, ...result },
+        { ...state, ...auditedResult },
         id,
         allocatedMapCenter,
         now,
       )
-      return { ...result, systems: mapCenterState.systems, activityEvents: mapCenterState.activityEvents }
+      return { ...auditedResult, systems: mapCenterState.systems, activityEvents: mapCenterState.activityEvents }
     })
     get().saveToStorage()
   },
 
   updateTenant: (id, patch, options) => {
-    set((state) => ({
-      tenants: state.tenants.map((t) =>
-        t.id === id ? { ...t, ...patch, updatedAt: options?.preserveNewState ? t.createdAt : new Date().toISOString() } : t,
-      ),
-    }))
+    const now = new Date().toISOString()
+    set((state) => {
+      let previousTenant: AppDataState['tenants'][number] | undefined
+      let nextTenant: AppDataState['tenants'][number] | undefined
+      const tenants = state.tenants.map((tenant) => {
+        if (tenant.id !== id) return tenant
+        previousTenant = tenant
+        nextTenant = { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }
+        return nextTenant
+      })
+      return {
+        tenants,
+        activityEvents: previousTenant && nextTenant
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousTenant as unknown as Record<string, unknown>,
+              next: nextTenant as unknown as Record<string, unknown>,
+              category: 'TENANT',
+              eventTypePrefix: 'tenant',
+              objectLabel: `Tenant ${nextTenant.tid}`,
+              primaryObject: tenantRef(nextTenant),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
@@ -927,7 +1110,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
         systems,
         projectSystems: relationshipState.projectSystems,
         projectTenants: relationshipState.projectTenants,
-        activityEvents: relationshipState.activityEvents,
+        activityEvents: appendFieldChangeActivityEvents(relationshipState.activityEvents, now, {
+          previous: savedTenant as unknown as Record<string, unknown>,
+          next: committedTenant as unknown as Record<string, unknown>,
+          category: 'TENANT',
+          eventTypePrefix: 'tenant',
+          objectLabel: `Tenant ${committedTenant.tid}`,
+          primaryObject: tenantRef(committedTenant),
+          relatedObjects: relatedRefs(activeSystem ? systemRef(activeSystem) : null),
+        }),
       }
     })
     get().saveToStorage()
@@ -950,6 +1141,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
     if (!tenant) return
     const systemIds = [tenant.systemId, tenant.hostedSystemId].filter(Boolean)
+    const system = state.systems.find((candidate) => systemIds.includes(candidate.id))
+    const now = new Date().toISOString()
     set((current) => ({
       tenants: current.tenants.filter((candidate) => candidate.id !== tenantId),
       systems: current.systems.map((system) =>
@@ -969,9 +1162,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : link,
       ),
       projectTenants: current.projectTenants.filter((link) => link.tenantId !== tenantId),
-      activityEvents: current.activityEvents.filter((event) => {
-        const refs = [event.primaryObject, ...event.relatedObjects]
-        return !refs.some((ref) => ref.objectType.toUpperCase() === 'TENANT' && (ref.id === tenant.id || ref.businessId === tenant.tid))
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'TENANT',
+        eventType: 'tenant.creationRolledBack',
+        severity: 'WARNING',
+        summary: `Tenant ${tenant.tid} creation was rolled back before System form commit.`,
+        primaryObject: tenantRef(tenant),
+        relatedObjects: relatedRefs(system ? systemRef(system) : null),
+        before: { tenantId: tenant.id, tid: tenant.tid, hostedSystemId: tenant.hostedSystemId || tenant.systemId },
+        after: { rolledBack: true },
       }),
     }))
     get().saveToStorage()
@@ -1203,48 +1402,120 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   updateAccount: (id, patch) => {
-    set((state) => ({
-      accounts: state.accounts.map((account) => {
+    const now = new Date().toISOString()
+    set((state) => {
+      let previousAccount: AppDataState['accounts'][number] | undefined
+      let nextAccount: AppDataState['accounts'][number] | undefined
+      const accounts = state.accounts.map((account) => {
         if (account.id !== id) return account
-        const nextAccount = { ...account, ...patch, updatedAt: new Date().toISOString() }
-        return applyGeographicTimeZone(nextAccount)
-      }),
-    }))
+        previousAccount = account
+        nextAccount = applyGeographicTimeZone({ ...account, ...patch, updatedAt: now })
+        return nextAccount
+      })
+      return {
+        accounts,
+        activityEvents: previousAccount && nextAccount
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousAccount as unknown as Record<string, unknown>,
+              next: nextAccount as unknown as Record<string, unknown>,
+              category: 'CUSTOMER',
+              eventTypePrefix: 'customer',
+              objectLabel: `Customer ${nextAccount.accountCode}`,
+              primaryObject: customerRef(nextAccount) ?? activityObjectRefFromBusinessReference(accountReference(nextAccount)),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
   updateProductionSystemInventoryItem: (id, patch, options) => {
-    set((state) => ({
-      productionSystemInventory: state.productionSystemInventory.map((system) =>
-        system.id === id ? { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : new Date().toISOString() } : system,
-      ),
-    }))
+    const now = new Date().toISOString()
+    set((state) => {
+      let previousSystem: AppDataState['productionSystemInventory'][number] | undefined
+      let nextSystem: AppDataState['productionSystemInventory'][number] | undefined
+      const productionSystemInventory = state.productionSystemInventory.map((system) => {
+        if (system.id !== id) return system
+        previousSystem = system
+        nextSystem = { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        return nextSystem
+      })
+      return {
+        productionSystemInventory,
+        activityEvents: previousSystem && nextSystem
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousSystem as unknown as Record<string, unknown>,
+              next: nextSystem as unknown as Record<string, unknown>,
+              category: 'SYSTEM',
+              eventTypePrefix: 'system',
+              objectLabel: `System ${systemBusinessId(nextSystem)}`,
+              primaryObject: systemRef(nextSystem),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
   updateReusedInternalSystem: (id, patch, options) => {
     const now = new Date().toISOString()
-    set((state) => ({
-      reusedInternalSystems: state.reusedInternalSystems.map((system) => {
+    set((state) => {
+      let previousSystem: AppDataState['reusedInternalSystems'][number] | undefined
+      let nextCommittedSystem: AppDataState['reusedInternalSystems'][number] | undefined
+      const reusedInternalSystems = state.reusedInternalSystems.map((system) => {
         if (system.id !== id) return system
+        previousSystem = system
         const { purposeHistory: _purposeHistory, ...safePatch } = patch
         const nextSystem = patch.purpose && patch.purpose !== system.purpose
           ? updateReusedInternalPurpose(system, patch.purpose, now)
           : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
-        return { ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
-      }),
-    }))
+        nextCommittedSystem = { ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        return nextCommittedSystem
+      })
+      return {
+        reusedInternalSystems,
+        activityEvents: previousSystem && nextCommittedSystem
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousSystem as unknown as Record<string, unknown>,
+              next: nextCommittedSystem as unknown as Record<string, unknown>,
+              category: 'SYSTEM',
+              eventTypePrefix: 'system',
+              objectLabel: `System ${systemBusinessId(nextCommittedSystem)}`,
+              primaryObject: systemRef(nextCommittedSystem),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
   updateOpportunity: (id, patch, options) => {
-    set((state) => ({
-      opportunities: state.opportunities.map((opportunity) => {
+    const now = new Date().toISOString()
+    set((state) => {
+      let previousOpportunity: AppDataState['opportunities'][number] | undefined
+      let nextOpportunityRecord: AppDataState['opportunities'][number] | undefined
+      const opportunities = state.opportunities.map((opportunity) => {
         if (opportunity.id !== id) return opportunity
-        const nextOpportunity = { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : new Date().toISOString() }
-        return applyGeographicTimeZone(nextOpportunity, nextOpportunity.deliveryDate ?? nextOpportunity.pocStartDate)
-      }),
-    }))
+        previousOpportunity = opportunity
+        const nextOpportunity = { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now }
+        nextOpportunityRecord = applyGeographicTimeZone(nextOpportunity, nextOpportunity.deliveryDate ?? nextOpportunity.pocStartDate)
+        return nextOpportunityRecord
+      })
+      return {
+        opportunities,
+        activityEvents: previousOpportunity && nextOpportunityRecord
+          ? appendFieldChangeActivityEvents(state.activityEvents, now, {
+              previous: previousOpportunity as unknown as Record<string, unknown>,
+              next: nextOpportunityRecord as unknown as Record<string, unknown>,
+              category: 'OPPORTUNITY',
+              eventTypePrefix: 'opportunity',
+              objectLabel: `Opportunity ${nextOpportunityRecord.opportunityId}`,
+              primaryObject: activityObjectRefFromBusinessReference(opportunityReference(nextOpportunityRecord)),
+              relatedObjects: relatedRefs(customerRef(state.accounts.find((account) => account.id === nextOpportunityRecord?.accountId))),
+            })
+          : state.activityEvents,
+      }
+    })
     get().saveToStorage()
   },
 
@@ -1291,7 +1562,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       updatedAt: now,
     })
 
-    set((currentState) => ({ idCounters: nextOpportunityId.counters, opportunities: [opportunity, ...currentState.opportunities] }))
+    set((currentState) => ({
+      idCounters: nextOpportunityId.counters,
+      opportunities: [opportunity, ...currentState.opportunities],
+      activityEvents: appendActivityEvent(currentState.activityEvents, now, {
+        category: 'OPPORTUNITY',
+        eventType: 'opportunity.created',
+        severity: 'SUCCESS',
+        summary: `Opportunity ${opportunity.opportunityId} created.`,
+        primaryObject: activityObjectRefFromBusinessReference(opportunityReference(opportunity)),
+        relatedObjects: relatedRefs(customerRef(defaultAccount)),
+      }),
+    }))
     get().saveToStorage()
     return opportunity
   },
@@ -1421,13 +1703,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
             projectTenants: currentState.projectTenants,
             activityEvents: currentState.activityEvents,
           }
+      const committedOpportunity = opportunities.find((candidate) => candidate.id === savedOpportunity.id) ?? result.opportunity
+      let activityEvents = appendFieldChangeActivityEvents(relationshipState.activityEvents, now, {
+        previous: savedOpportunity as unknown as Record<string, unknown>,
+        next: committedOpportunity as unknown as Record<string, unknown>,
+        category: 'OPPORTUNITY',
+        eventTypePrefix: 'opportunity',
+        objectLabel: `Opportunity ${committedOpportunity.opportunityId}`,
+        primaryObject: activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)),
+        relatedObjects: relatedRefs(customerRef(account)),
+      })
+      result.projectChanges.forEach((change) => {
+        const project = projects.find((candidate) => candidate.id === change.projectId)
+        if (!project) return
+        const previousProject = currentState.projects.find((candidate) => candidate.id === change.projectId)
+        if (change.changeStatus === 'New' || !previousProject) {
+          activityEvents = appendActivityEvent(activityEvents, now, {
+            category: 'PROJECT',
+            eventType: 'project.createdFromOpportunity',
+            severity: 'SUCCESS',
+            summary: `Project ${project.pid} created from Opportunity ${committedOpportunity.opportunityId}.`,
+            primaryObject: projectRef(project),
+            relatedObjects: relatedRefs(activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)), customerRef(account)),
+          })
+          return
+        }
+        activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+          previous: previousProject as unknown as Record<string, unknown>,
+          next: project as unknown as Record<string, unknown>,
+          category: 'PROJECT',
+          eventTypePrefix: 'project',
+          objectLabel: `Project ${project.pid}`,
+          primaryObject: projectRef(project),
+          relatedObjects: relatedRefs(activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)), customerRef(account)),
+          excludeFields: ['tasks', 'milestones', 'progressStatus'],
+        })
+      })
       return {
         idCounters: result.idCounters,
         projects,
         systems: relationshipState.systems,
         projectSystems: relationshipState.projectSystems,
         projectTenants: relationshipState.projectTenants,
-        activityEvents: relationshipState.activityEvents,
+        activityEvents,
         projectLifecycleChangesByOpportunityId: {
           ...currentState.projectLifecycleChangesByOpportunityId,
           [result.opportunity.id]: result.projectChanges,
@@ -1524,7 +1842,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
       updatedAt: now,
     }
 
-    set((s) => ({ idCounters, tenants: [tenant, ...s.tenants] }))
+    set((s) => ({
+      idCounters,
+      tenants: [tenant, ...s.tenants],
+      activityEvents: appendActivityEvent(s.activityEvents, now, {
+        category: 'TENANT',
+        eventType: 'tenant.created',
+        severity: 'SUCCESS',
+        summary: `Tenant ${tenant.tid} created.`,
+        primaryObject: tenantRef(tenant),
+      }),
+    }))
     get().saveToStorage()
     return tenant
   },
