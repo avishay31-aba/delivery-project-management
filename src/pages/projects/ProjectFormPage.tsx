@@ -687,13 +687,22 @@ export function ProjectFormPage() {
 
     if (field.key === 'opportunityId') {
       return (
-        <FormField key={field.key} label={label} controlWidthClassName="w-72">
-          <input
-            className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
-            value={value}
-            list="project-opportunity-options"
-            onChange={(event) => updateDraftField('opportunityId', event.target.value)}
-          />
+        <FormField key={field.key} label={label} controlWidthClassName="w-72" renderAs="div">
+          <span className="flex items-center gap-2">
+            <input
+              aria-label={field.label}
+              className={fieldClassName(isChanged, isMissing, 'h-8 min-w-0 flex-1 text-sm')}
+              value={value}
+              list="project-opportunity-options"
+              onInput={(event) => updateDraftField('opportunityId', event.currentTarget.value)}
+              onChange={(event) => updateDraftField('opportunityId', event.target.value)}
+            />
+            {linkedOpportunity ? (
+              <BusinessObjectLink reference={opportunityReference(linkedOpportunity)} className="max-w-64 truncate text-sm">
+                {linkedOpportunity.opportunityName}
+              </BusinessObjectLink>
+            ) : null}
+          </span>
           <datalist id="project-opportunity-options">
             {opportunities.map((opportunity) => (
               <option key={opportunity.id} value={opportunity.opportunityId}>
@@ -1874,11 +1883,6 @@ export function ProjectFormPage() {
           <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(0, 8).map(renderHeaderField)}</div>
           <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(8, 15).map(renderHeaderField)}</div>
           <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(15).map(renderHeaderField)}</div>
-          {linkedOpportunity ? (
-            <BusinessObjectLink reference={opportunityReference(linkedOpportunity)} className="text-sm">
-              Open linked Opportunity
-            </BusinessObjectLink>
-          ) : null}
         </div>
       </CollapsibleSection>
 
