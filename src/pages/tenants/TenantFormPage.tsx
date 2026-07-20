@@ -89,6 +89,7 @@ import {
   derivedTenantOperationalMode,
   effectiveTenantOperationalMode,
   isManualTenantOperationalMode,
+  isTenantLifecycleInactive,
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
@@ -840,7 +841,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (isViewMode) return
     const nextOperationalStatus =
       value === '__DERIVED__'
-        ? derivedTenantOperationalMode(activeSystem)
+        ? ''
         : value
     setDraft((current) => (current ? { ...current, operationalStatus: nextOperationalStatus } : current))
     setMessages([])
@@ -861,6 +862,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function renderOperationalModeField() {
     const derivedMode = derivedTenantOperationalMode(activeSystem)
     const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
+    if (isTenantLifecycleInactive(tenantDraft)) {
+      return renderHeaderField('Operational Status', renderOperationalStatusOption(currentMode), 'w-72')
+    }
     const selectValue = isManualTenantOperationalMode(tenantDraft.operationalStatus) ? tenantDraft.operationalStatus : '__DERIVED__'
     const selectedLabel = selectValue === '__DERIVED__' ? derivedMode : selectValue
     const options = [

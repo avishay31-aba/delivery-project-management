@@ -2,7 +2,12 @@ import type { Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
-import { tenantLatestHistoricalSystemId } from './lifecycle'
+import {
+  isTenantLifecycleInactive,
+  tenantLatestHistoricalSystemId,
+  TENANT_OPERATIONAL_STATUS_CANCELLED,
+  TENANT_OPERATIONAL_STATUS_DELETED,
+} from './lifecycle'
 import {
   TENANT_WARRANTY_CONTRACT_GROUPS,
   tenantWarrantyHeaderStatusReadModel,
@@ -17,9 +22,12 @@ export type TenantOperationalMode =
   | 'Cancelled'
   | 'Access Blocked - Password Reset'
 
+export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
+  TENANT_OPERATIONAL_STATUS_DELETED,
+  TENANT_OPERATIONAL_STATUS_CANCELLED,
+]
+
 export const TENANT_MANUAL_OPERATIONAL_MODES: TenantOperationalMode[] = [
-  'Deleted',
-  'Cancelled',
   'Access Blocked - Password Reset',
 ]
 
@@ -44,9 +52,12 @@ export function isManualTenantOperationalMode(value: string | undefined | null):
 }
 
 export function effectiveTenantOperationalMode(tenant: Tenant, system?: System): TenantOperationalMode {
+  if (isTenantLifecycleInactive(tenant)) return tenant.operationalStatus as TenantOperationalMode
+  const systemDerivedMode = derivedTenantOperationalMode(system)
+  if (systemDerivedMode !== 'Operative') return systemDerivedMode
   return isManualTenantOperationalMode(tenant.operationalStatus)
     ? tenant.operationalStatus
-    : derivedTenantOperationalMode(system)
+    : systemDerivedMode
 }
 
 export function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {

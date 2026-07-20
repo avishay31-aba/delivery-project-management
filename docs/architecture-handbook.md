@@ -345,6 +345,14 @@ Therefore:
 
 This composition does not transfer Business Object ownership.
 
+### Business Object Mutation Ownership Principle
+
+Every business mutation must be initiated only by the Business Object that owns the business responsibility. Referencing or displaying another Business Object does not grant ownership of that object's lifecycle.
+
+Ownership is determined by business responsibility, not UI location. The UI exposes mutations from the owning Business Object; button placement is a consequence of ownership, not the definition of ownership.
+
+Derived states are computed from the authoritative owner and must not be edited independently by consumers. For Tenant hosting lifecycle, System owns Move Tenant, Delete Tenant, and Cancel Tenant because those actions change or terminate hosting relationships. Tenant owns Tenant-specific commercial and operational information, but it must not expose hosting lifecycle mutations.
+
 ### UI Preservation Principle
 
 The existing approved business forms are the product baseline.
