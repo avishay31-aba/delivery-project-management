@@ -34,6 +34,14 @@ function plainTextContent(value: string): string {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
 
+function normalizedRemark(record: RemarkRecord) {
+  return {
+    type: record.type.trim(),
+    content: record.content,
+    dueDate: record.dueDate ?? null,
+  }
+}
+
 function renderDeadlineAlert(dueDate: string | null | undefined) {
   const status = remarkDeadlineAlertStatus(dueDate)
   if (status === 'NONE') return null
@@ -115,6 +123,8 @@ export function RemarksGrid({
     editor.save(id, {
       validate: validateRemark,
       commit: commitRemark,
+      normalize: normalizedRemark,
+      isMeaningfulNewDraft: (draft) => Boolean(plainTextContent(draft.content)),
     })
   }
 
@@ -152,6 +162,11 @@ export function RemarksGrid({
               const isEditing = permissions.canEdit && Boolean(draft)
               const errors = editor.errorsFor(remark.id)
               const isSaving = editor.isSaving(remark.id)
+              const canSave = editor.canSave(remark.id, {
+                validate: validateRemark,
+                normalize: normalizedRemark,
+                isMeaningfulNewDraft: (draftRecord) => Boolean(plainTextContent(draftRecord.content)),
+              })
               return (
                 <tr key={remark.id} className="hover:bg-sf-surface-alt">
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
@@ -161,7 +176,7 @@ export function RemarksGrid({
                           <>
                             <EditableChildObjectActionButton
                               variant="primary"
-                              disabled={isSaving}
+                              disabled={isSaving || !canSave}
                               onClick={() => saveRemark(remark.id)}
                             >
                               <Save className="h-3.5 w-3.5" aria-hidden="true" />

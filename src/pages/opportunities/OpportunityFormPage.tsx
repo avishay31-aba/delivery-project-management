@@ -1999,17 +1999,19 @@ export function OpportunityFormPage() {
             <div className="relative inline-flex">
               <button
                 type="button"
-                className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!isDirty || isSaving}
                 onClick={() => saveChanges()}
               >
                 <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"
-                className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white hover:opacity-90"
+                className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-haspopup="menu"
                 aria-expanded={isSaveMenuOpen}
                 title="Save actions"
+                disabled={!isDirty || isSaving}
                 onClick={() => setIsSaveMenuOpen((current) => !current)}
               >
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />

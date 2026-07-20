@@ -129,6 +129,28 @@ function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
+function tenantParentSaveScope(tenant: Tenant): Partial<Tenant> {
+  const {
+    documents: _documents,
+    remarks: _remarks,
+    warranties: _warranties,
+    updatedAt: _updatedAt,
+    ...parentScope
+  } = tenant
+  return parentScope
+}
+
+function normalizedWarrantySaveScope(record: TenantWarranty) {
+  return {
+    relatedProjectId: record.relatedProjectId ?? '',
+    startDate: record.startDate ?? null,
+    endDate: record.endDate ?? null,
+    noWarranty: record.noWarranty ?? 'NO',
+    predecessor: record.predecessor ?? '',
+    remark: record.remark ?? '',
+  }
+}
+
 function textValue(value: unknown): string {
   if (Array.isArray(value)) return value.join('; ')
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
@@ -257,6 +279,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const updateTenant = useAppStore((state) => state.updateTenant)
   const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
   const updateSystemMapCenter = useAppStore((state) => state.updateSystemMapCenter)
   const savedTenant = useMemo(() => tenants.find((tenant) => tenant.tid === tid), [tenants, tid])
@@ -291,7 +314,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
   const [operationalStatusOpen, setOperationalStatusOpen] = useState(false)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
-  const isDirty = Boolean(savedTenant && draft && !valuesEqual(savedTenant, draft))
+  const isDirty = Boolean(savedTenant && draft && !valuesEqual(tenantParentSaveScope(savedTenant), tenantParentSaveScope(draft)))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
@@ -549,7 +572,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    const hasBusinessChanges = !valuesEqual(persistedTenant, normalizedDraft)
+    const hasBusinessChanges = !valuesEqual(tenantParentSaveScope(persistedTenant), tenantParentSaveScope(normalizedDraft))
     if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -662,14 +685,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (isViewMode) return
     warrantyEditor.save(id, {
       validate: validateWarrantyEditDraft,
+      normalize: normalizedWarrantySaveScope,
+      isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
       commit: (committedDraft) => {
-        setDraft((current) => {
-          if (!current) return current
-          const currentWarranties = current.warranties ?? []
-          const currentComputedWarranties = computedWarrantiesForTenant(current, currentWarranties)
+        const currentWarranties = persistedTenant.warranties ?? []
+        const currentComputedWarranties = computedWarrantiesForTenant(persistedTenant, currentWarranties)
           const currentWarranty = currentComputedWarranties.find((warranty) => warranty.id === committedDraft.id)
           const hasSuccessors = currentWarranty
-            ? successorRefsForWarranty(currentWarranty, currentComputedWarranties, current.tid).length > 0
+          ? successorRefsForWarranty(currentWarranty, currentComputedWarranties, persistedTenant.tid).length > 0
             : false
           const nextWarranty: TenantWarranty = {
             ...committedDraft,
@@ -678,11 +701,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           const nextWarranties = currentWarranties.some((warranty) => warranty.id === committedDraft.id)
             ? currentWarranties.map((warranty) => (warranty.id === committedDraft.id ? nextWarranty : warranty))
             : [...currentWarranties, nextWarranty]
-          return {
-            ...current,
-            warranties: computedWarrantiesForTenant(current, nextWarranties),
-          }
-        })
+        const committedWarranties = computedWarrantiesForTenant(persistedTenant, nextWarranties)
+        updateTenant(persistedTenant.id, { warranties: committedWarranties })
+        setDraft((current) => (current ? { ...current, warranties: committedWarranties } : current))
         setMessages([])
       },
     })
@@ -747,13 +768,19 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         </button>
         {isViewMode ? null : (
           <div className="relative inline-flex">
-            <button type="button" className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white" onClick={() => saveTenant(false)}>
+            <button
+              type="button"
+              className="rounded-l border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!isDirty || isSaving}
+              onClick={() => saveTenant(false)}
+            >
               <SaveButtonLabel saving={isSaving} />
             </button>
             <button
               type="button"
-              className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white"
+              className="inline-flex items-center rounded-r border border-l-0 border-sf-brand bg-sf-brand px-2 py-1 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Save actions"
+              disabled={!isDirty || isSaving}
               onClick={() => setSaveMenuOpen((current) => !current)}
             >
               <ChevronDown className="h-4 w-4" aria-hidden="true" />
@@ -1223,6 +1250,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         readOnly={isViewMode}
         onChange={(documents) => {
           if (isViewMode) return
+          updateTenant(persistedTenant.id, { documents })
           setDraft((current) => (current ? { ...current, documents } : current))
           setMessages([])
         }}
@@ -1252,6 +1280,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <RemarksGrid
           remarks={(tenantDraft.remarks ?? []) as RemarkRecord[]}
           onChange={(remarks) => {
+            if (isViewMode) return
+            updateTenant(persistedTenant.id, { remarks })
             setDraft((current) => (current ? { ...current, remarks } : current))
             setMessages([])
           }}
@@ -1355,6 +1385,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 const isSavingWarranty = warrantyEditor.isSaving(warranty.id)
                 const warrantyErrors = warrantyEditor.errorsFor(warranty.id)
                 const relatedProjectHasError = warrantyErrors.some((error) => error.toLowerCase().includes('project'))
+                const canSaveWarranty = warrantyEditor.canSave(warranty.id, {
+                  validate: validateWarrantyEditDraft,
+                  normalize: normalizedWarrantySaveScope,
+                  isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
+                })
                 return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">
@@ -1364,7 +1399,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                           <>
                             <EditableChildObjectActionButton
                               variant="primary"
-                              disabled={isSavingWarranty}
+                              disabled={isSavingWarranty || !canSaveWarranty}
                               onClick={() => saveWarranty(warranty.id)}
                             >
                               <Save className="h-3.5 w-3.5" aria-hidden="true" />

@@ -140,6 +140,15 @@ function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
+function projectParentSaveScope(project: Project): Partial<Project> {
+  const {
+    documents: _documents,
+    updatedAt: _updatedAt,
+    ...parentScope
+  } = project
+  return parentScope
+}
+
 function inputClassName(isChanged: boolean, extra = ''): string {
   return [
     'rounded border border-sf-border px-2 py-1 leading-tight',
@@ -468,7 +477,7 @@ export function ProjectFormPage() {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
-  const isDirty = Boolean(savedProject && currentDraft && (!valuesEqual(savedProject, currentDraft) || pendingAllocationIds.length > 0))
+  const isDirty = Boolean(savedProject && currentDraft && (!valuesEqual(projectParentSaveScope(savedProject), projectParentSaveScope(currentDraft)) || pendingAllocationIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
@@ -690,7 +699,7 @@ export function ProjectFormPage() {
       : ''
     const savePatch = projectSavePatch(projectDraft)
     const nextCommittedProject = { ...persistedProject, ...savePatch }
-    const hasBusinessChanges = !valuesEqual(persistedProject, nextCommittedProject) || pendingAllocationIds.length > 0
+    const hasBusinessChanges = !valuesEqual(projectParentSaveScope(persistedProject), projectParentSaveScope(nextCommittedProject)) || pendingAllocationIds.length > 0
     if (!hasBusinessChanges) {
       setSaveMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -877,16 +886,18 @@ export function ProjectFormPage() {
             <div className="relative inline-flex">
               <button
                 type="button"
-                className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+                className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!isDirty || isSaving}
                 onClick={() => saveProject(false)}
               >
                 <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"
-                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
+                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="More save actions"
                 aria-expanded={saveMenuOpen}
+                disabled={!isDirty || isSaving}
                 onClick={() => setSaveMenuOpen((current) => !current)}
               >
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />
@@ -1727,6 +1738,7 @@ export function ProjectFormPage() {
           readOnly={isViewMode}
           onChange={(documents) => {
             if (isViewMode) return
+            updateProject(persistedProject.id, { documents })
             setDraft((current) => (current ? { ...current, documents } : current))
             setSaveMessages([])
           }}

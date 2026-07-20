@@ -138,6 +138,14 @@ Product Readiness Review findings should be classified as one of:
 - Performance Improvement
 - Product Recommendation
 
+## Scope-Based Save Boundary
+
+Every explicit Save action is the commit boundary for the Business Object or save scope it owns. Child-object Save actions commit independently and do not require a subsequent parent-form Save.
+
+A Save action is available only when its owned scope contains a valid change from its persisted baseline. Dirty state is based on normalized value comparison, not on whether a field was touched.
+
+Uncommitted drafts do not affect shared read models. Clicking the Save action belonging to a draft commits that draft's owned scope. The main form Save / Apply Changes action commits parent Business Object fields and must not silently commit independently owned child-object drafts.
+
 ## Navigation Specification
 
 This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.

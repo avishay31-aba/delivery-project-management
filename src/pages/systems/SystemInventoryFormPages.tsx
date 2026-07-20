@@ -158,6 +158,17 @@ function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
 }
 
+function systemParentSaveScope<T extends InventoryRecord>(record: T): Partial<T> {
+  const {
+    documents: _documents,
+    owners: _owners,
+    remarks: _remarks,
+    updatedAt: _updatedAt,
+    ...parentScope
+  } = record
+  return parentScope as Partial<T>
+}
+
 function textValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')
   return value == null ? '' : String(value)
@@ -365,7 +376,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const [pendingTenantCreationIds, setPendingTenantCreationIds] = useState<string[]>([])
   const [pendingTenantRemovalIds, setPendingTenantRemovalIds] = useState<string[]>([])
-  const isDirty = Boolean(record && draft && (!valuesEqual(record, draft) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
+  const isDirty = Boolean(record && draft && (!valuesEqual(systemParentSaveScope(record), systemParentSaveScope(draft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
@@ -532,7 +543,7 @@ export function InventoryForm<T extends InventoryRecord>({
       ? String(location.state.returnTo ?? '')
       : ''
     const nextDraft = sanitizedDraftForSave()
-    const hasBusinessChanges = !valuesEqual(activeRecord, nextDraft) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
+    const hasBusinessChanges = !valuesEqual(systemParentSaveScope(activeRecord), systemParentSaveScope(nextDraft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
     if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -1106,14 +1117,20 @@ export function InventoryForm<T extends InventoryRecord>({
         {isViewMode ? null : (
           <>
             <div className="relative inline-flex">
-              <button type="button" className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => save(false)}>
+              <button
+                type="button"
+                className="rounded-l bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!isDirty || isSaving}
+                onClick={() => save(false)}
+              >
                 <SaveButtonLabel saving={isSaving} />
               </button>
               <button
                 type="button"
-                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700"
+                className="rounded-r border-l border-blue-500 bg-sf-brand px-2 py-1.5 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="More save actions"
                 aria-expanded={saveMenuOpen}
+                disabled={!isDirty || isSaving}
                 onClick={() => setSaveMenuOpen((current) => !current)}
               >
                 <ChevronDown className="h-4 w-4" aria-hidden="true" />
@@ -1149,6 +1166,7 @@ export function InventoryForm<T extends InventoryRecord>({
         readOnly={isViewMode}
         onChange={(documents) => {
           if (isViewMode) return
+          onSave(activeRecord.id, { documents } as Partial<T>)
           setDraft((current) => (current ? ({ ...current, documents } as T) : current))
           setMessages([])
         }}
@@ -1255,7 +1273,11 @@ export function InventoryForm<T extends InventoryRecord>({
     return (
       <OwnerGrid
         owners={(activeDraft.owners ?? []) as OwnerRecord[]}
-        onChange={(owners) => updateField('owners', owners)}
+        onChange={(owners) => {
+          if (isViewMode) return
+          onSave(activeRecord.id, { owners } as Partial<T>)
+          updateField('owners', owners)
+        }}
         readOnly={isViewMode}
       />
     )
@@ -1328,7 +1350,11 @@ export function InventoryForm<T extends InventoryRecord>({
     return (
       <RemarksGrid
         remarks={(activeDraft.remarks ?? []) as RemarkRecord[]}
-        onChange={(remarks) => updateField('remarks', remarks)}
+        onChange={(remarks) => {
+          if (isViewMode) return
+          onSave(activeRecord.id, { remarks } as Partial<T>)
+          updateField('remarks', remarks)
+        }}
         typeOptions={optionsWithCustom(SYSTEM_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Add new...'])}
         onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, SYSTEM_REMARK_TYPE_PICKLIST_KEY, value))}
         readOnly={isViewMode}

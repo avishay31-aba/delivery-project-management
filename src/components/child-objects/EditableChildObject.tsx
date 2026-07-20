@@ -15,6 +15,12 @@ export interface EditableChildObjectPermissions {
 
 export type EditableChildObjectValidation = string[]
 
+interface EditableChildObjectSaveStateOptions<TRecord> {
+  validate?: (draft: TRecord, isNew: boolean) => EditableChildObjectValidation
+  normalize?: (record: TRecord) => unknown
+  isMeaningfulNewDraft?: (draft: TRecord) => boolean
+}
+
 export function editableChildObjectPermissions({
   readOnly = false,
   canAdd = true,
@@ -34,11 +40,13 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
   const [savingIds, setSavingIds] = useState<string[]>([])
   const [errorsById, setErrorsById] = useState<Record<string, EditableChildObjectValidation>>({})
   const draftsRef = useRef<Record<string, TRecord>>({})
+  const baselinesRef = useRef<Record<string, TRecord | undefined>>({})
   const newDraftIdsRef = useRef<string[]>([])
   const savingIdsRef = useRef<string[]>([])
 
   function beginAdd(record: TRecord) {
     draftsRef.current = { ...draftsRef.current, [record.id]: record }
+    baselinesRef.current = { ...baselinesRef.current, [record.id]: undefined }
     newDraftIdsRef.current = Array.from(new Set([...newDraftIdsRef.current, record.id]))
     setDraftsById((current) => ({ ...current, [record.id]: record }))
     setNewDraftIds(newDraftIdsRef.current)
@@ -47,6 +55,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
 
   function beginEdit(record: TRecord) {
     draftsRef.current = { ...draftsRef.current, [record.id]: record }
+    baselinesRef.current = { ...baselinesRef.current, [record.id]: record }
     setDraftsById((current) => ({ ...current, [record.id]: record }))
     setErrorsById((current) => ({ ...current, [record.id]: [] }))
   }
@@ -72,8 +81,11 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
 
   function cancel(id: string) {
     const nextDrafts = { ...draftsRef.current }
+    const nextBaselines = { ...baselinesRef.current }
     delete nextDrafts[id]
+    delete nextBaselines[id]
     draftsRef.current = nextDrafts
+    baselinesRef.current = nextBaselines
     newDraftIdsRef.current = newDraftIdsRef.current.filter((candidate) => candidate !== id)
     setDraftsById((current) => {
       const next = { ...current }
@@ -90,6 +102,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
 
   function reset() {
     draftsRef.current = {}
+    baselinesRef.current = {}
     newDraftIdsRef.current = []
     savingIdsRef.current = []
     setDraftsById({})
@@ -98,22 +111,44 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     setErrorsById({})
   }
 
+  function hasChanges(id: string, options: EditableChildObjectSaveStateOptions<TRecord> = {}): boolean {
+    const draft = draftsRef.current[id]
+    if (!draft) return false
+    const isNew = newDraftIdsRef.current.includes(id)
+    if (isNew) return options.isMeaningfulNewDraft?.(draft) ?? true
+    const baseline = baselinesRef.current[id]
+    if (!baseline) return true
+    const normalize = options.normalize ?? ((record: TRecord) => record)
+    return JSON.stringify(normalize(draft) ?? null) !== JSON.stringify(normalize(baseline) ?? null)
+  }
+
+  function canSave(id: string, options: EditableChildObjectSaveStateOptions<TRecord> = {}): boolean {
+    const draft = draftsRef.current[id]
+    if (!draft || savingIdsRef.current.includes(id)) return false
+    const isNew = newDraftIdsRef.current.includes(id)
+    if (!hasChanges(id, options)) return false
+    return (options.validate?.(draft, isNew) ?? []).length === 0
+  }
+
   function save(
     id: string,
     {
       validate,
       commit,
       onCommitted,
+      normalize,
+      isMeaningfulNewDraft,
     }: {
       validate?: (draft: TRecord, isNew: boolean) => EditableChildObjectValidation
       commit: (draft: TRecord, isNew: boolean) => void
       onCommitted?: (draft: TRecord, isNew: boolean) => void
-    },
+    } & EditableChildObjectSaveStateOptions<TRecord>,
   ): boolean {
     const draft = draftsRef.current[id]
     if (!draft || savingIdsRef.current.includes(id)) return false
 
     const isNew = newDraftIdsRef.current.includes(id)
+    if (!hasChanges(id, { normalize, isMeaningfulNewDraft })) return false
     const validationErrors = validate?.(draft, isNew) ?? []
     if (validationErrors.length > 0) {
       setErrorsById((current) => ({ ...current, [id]: validationErrors }))
@@ -125,8 +160,11 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     window.setTimeout(() => {
       commit(draft, isNew)
       const nextDrafts = { ...draftsRef.current }
+      const nextBaselines = { ...baselinesRef.current }
       delete nextDrafts[id]
+      delete nextBaselines[id]
       draftsRef.current = nextDrafts
+      baselinesRef.current = nextBaselines
       newDraftIdsRef.current = newDraftIdsRef.current.filter((candidate) => candidate !== id)
       savingIdsRef.current = savingIdsRef.current.filter((candidate) => candidate !== id)
       setDraftsById((current) => {
@@ -154,6 +192,8 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     cancel,
     reset,
     save,
+    hasChanges,
+    canSave,
     draftFor: (id: string) => draftsById[id],
     isEditing: (id: string) => Boolean(draftsById[id]),
     isNew: (id: string) => newDraftIds.includes(id),

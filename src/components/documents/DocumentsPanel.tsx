@@ -123,7 +123,11 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                     {editingId === document.id ? (
                       <div className="flex flex-wrap items-center gap-1">
                         <input className="h-8 min-w-56 rounded border border-sf-border px-2 py-1 text-sm" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
-                        <EditableChildObjectActionButton variant="primary" onClick={() => saveEdit(document.id)}>
+                        <EditableChildObjectActionButton
+                          variant="primary"
+                          disabled={!editingName.trim() || editingName.trim() === document.fileName}
+                          onClick={() => saveEdit(document.id)}
+                        >
                           Save
                         </EditableChildObjectActionButton>
                       </div>
