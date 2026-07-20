@@ -93,7 +93,7 @@ import {
   warrantyRecordPatch,
   warrantyRecordsForTenant,
 } from '@/domain/warranty-collection'
-import { tenantFormType } from '@/domain/tenant-operations'
+import { tenantFormType, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
@@ -1774,7 +1774,7 @@ export function OpportunityFormPage() {
   function renderExistingTenantsAndSystemsSection() {
     const tenantSystemIds = new Set(accountTenants.map((tenant) => tenant.systemId))
     const systemOnlyRows = accountSystems.filter((system) => !tenantSystemIds.has(system.id))
-    const colSpan = 8
+    const colSpan = 9
 
     return (
       <CollapsibleSection
@@ -1793,6 +1793,7 @@ export function OpportunityFormPage() {
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Tenant Name</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">SID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Delivery PID</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Requirement ID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Current product/config summary</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Warranty status</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Warranty end date</th>
@@ -1815,6 +1816,7 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">
                       {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : ''}
                     </td>
+                    <td className="border border-sf-border px-2 py-1">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                     <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
                     <td className="border border-sf-border px-2 py-1">
                       {tenant.warrantyStatus ? <WarrantyStatusPresentation status={tenant.warrantyStatus} /> : ''}
@@ -1836,6 +1838,7 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">
                       {system.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={system.deliveryPid}>{system.deliveryPid}</BusinessIdLink> : ''}
                     </td>
+                    <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1">
                       {[system.productType, system.hostingType, system.cloudPlatform].filter(Boolean).join(' | ')}
                     </td>

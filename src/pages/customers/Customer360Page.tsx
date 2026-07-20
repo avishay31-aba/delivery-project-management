@@ -37,7 +37,7 @@ import {
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
-import { isTenantLifecycleInactive } from '@/domain/tenant-operations'
+import { isTenantLifecycleInactive, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { useAppStore } from '@/store/useAppStore'
 
 type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'requirements' | 'documents' | 'activity'
@@ -301,11 +301,13 @@ export function Customer360Page() {
 
     if (activeTab === 'tenants') {
       return readOnlyTable(
-        ['TID', 'Tenant Name', 'SID', 'Product', 'Operational Status', 'Country'],
+        ['TID', 'Tenant Name', 'SID', 'PID', 'Requirement ID', 'Product', 'Operational Status', 'Country'],
         customer.tenants.map((tenant) => [
           <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>,
           tenant.tenantName ?? '',
           tenant.hostingSid ? <BusinessIdLink objectType="SYSTEM" businessId={tenant.hostingSid}>{tenant.hostingSid}</BusinessIdLink> : '',
+          tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-',
+          tenantRequirementIdDisplay(tenant) || '-',
           tenant.productType,
           operationalStatus(tenant.operationalStatus),
           tenant.country,

@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, CountryFlag, WarrantyStatusPresentation } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay } from '@/domain/tenant-operations'
+import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
   objectDefinitionToRuntimeFormModel,
@@ -48,6 +48,7 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
       getValue: (row) => tenantDeliveryPidDisplay(row, projects, projectTenants),
       render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDeliveryPidDisplay(row, projects, projectTenants) }),
     },
+    { id: 'requirementId', label: 'Requirement ID', getValue: (row) => tenantRequirementIdDisplay(row) },
     {
       id: 'pocPid',
       label: 'POC PID',

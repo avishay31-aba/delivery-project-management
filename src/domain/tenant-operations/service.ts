@@ -331,6 +331,10 @@ export function tenantPocPidDisplay(
     .join('; ')
 }
 
+export function tenantRequirementIdDisplay(tenant: Tenant): string {
+  return tenant.sourceRequirementId ?? ''
+}
+
 export function tenantTimeZoneDisplayValue(
   tenant: Tenant,
   opportunity?: Opportunity,

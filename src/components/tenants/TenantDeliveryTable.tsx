@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord } from '@/domain/tenant-operations'
+import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { BusinessIdLink, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
@@ -50,6 +50,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
               'SID',
               'MID',
               'PID',
+              'Requirement ID',
               'Account Name',
               'Country',
               'Time Group',
@@ -89,6 +90,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-'}
                 </td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
