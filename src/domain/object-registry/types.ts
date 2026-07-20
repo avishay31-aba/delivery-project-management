@@ -21,6 +21,7 @@ export type ObjectRegistryDomainSource =
   | 'AllocationContext'
   | 'WarrantyCollection'
   | 'EngagementCircle'
+  | 'LinkedProjects'
   | 'SystemInventory'
   | 'OpportunityLifecycle'
   | 'ProjectLifecycle'

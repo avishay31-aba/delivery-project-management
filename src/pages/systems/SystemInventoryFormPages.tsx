@@ -18,6 +18,7 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
+import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { RemarksGrid } from '@/components/remarks'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
@@ -26,7 +27,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessObjectLink, FormField, LinkedProjectsLinks, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -84,6 +85,7 @@ import {
   validateReusedInternalMachineId,
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
+import { linkedProjectRowsForSystem } from '@/domain/linked-projects'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
@@ -637,7 +639,7 @@ export function InventoryForm<T extends InventoryRecord>({
     const width =
       field.key === 'url'
         ? 'w-96'
-        : field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'linkedProjects' || field.key === 'currentPid'
+        : field.key === 'alerts' || field.key === 'timeGroupAlert' || field.key === 'currentPid'
           ? 'w-80'
           : 'w-48'
 
@@ -667,8 +669,6 @@ export function InventoryForm<T extends InventoryRecord>({
           editor={null}
           readOnlyValue={field.inputType === 'date' ? (
             <DateTimeValue value={value} semanticType="date" fallback="-" />
-          ) : field.key === 'linkedProjects' ? (
-            value ? <LinkedProjectsLinks projectIds={value} /> : '-'
           ) : (
             value || '-'
           )}
@@ -1295,6 +1295,14 @@ export function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderLinkedProjectsTab() {
+    const rows = linkedProjectRowsForSystem(
+      allocatedSystemForTenantCreation() ?? activeRecord,
+      { projects, projectSystems, projectTenants, opportunities, accounts },
+    )
+    return <LinkedProjectsTable rows={rows} includeAccountName />
+  }
+
   function renderMoveTenantDialog() {
     const tenant = tenants.find((candidate) => candidate.id === moveTenantId)
     if (!tenant) return null
@@ -1678,7 +1686,7 @@ export function InventoryForm<T extends InventoryRecord>({
         onToggle={() => toggleSection('tabs')}
       >
         <div className="overflow-hidden rounded border border-sf-border bg-sf-surface">
-          <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
+          <div className="sticky top-0 z-10 flex flex-nowrap overflow-x-auto border-b border-sf-border bg-sf-surface-alt">
             {systemTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -1700,13 +1708,15 @@ export function InventoryForm<T extends InventoryRecord>({
               ? renderInfrastructureTab()
               : activeTab === 'tenant'
                 ? renderTenantTab()
-                : activeTab === 'documents'
-                  ? renderDocumentsTab()
-                  : activeTab === 'owner'
-                    ? renderOwnerTab()
-                    : activeTab === 'activity'
-                      ? renderActivityTab()
-                      : `${systemTabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+                : activeTab === 'linkedProjects'
+                  ? renderLinkedProjectsTab()
+                  : activeTab === 'documents'
+                    ? renderDocumentsTab()
+                    : activeTab === 'owner'
+                      ? renderOwnerTab()
+                      : activeTab === 'activity'
+                        ? renderActivityTab()
+                        : `${systemTabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>

@@ -71,6 +71,7 @@ export const SYSTEM_INVENTORY_TABS: SystemInventoryTab[] = [
   { id: 'tenant', label: 'Tenant' },
   { id: 'infrastructure', label: 'Platform' },
   { id: 'versionUpdate', label: 'Version update' },
+  { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
 ]

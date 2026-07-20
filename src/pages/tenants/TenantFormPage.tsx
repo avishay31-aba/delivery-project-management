@@ -8,6 +8,7 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { projectMainTypeLabel } from '@/domain/project-lifecycle'
 import {
   EditableChildObjectActionButton,
@@ -108,8 +109,9 @@ import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { WARRANTY_FIELD_LABELS } from '@/domain/warranty-collection'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 
-type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
+type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
 type ConfigKey = keyof TenantConfiguration
 type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
 type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
@@ -119,6 +121,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'hosting', label: 'Hosting' },
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
+  { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
   { id: 'activity', label: 'Activity Log' },
@@ -398,7 +401,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     ),
   ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
-  const linkedProjectPids = relatedProjects.map((candidate) => candidate.pid)
+  const linkedProjectRows = linkedProjectRowsForTenant(tenantDraft, { projects, projectSystems, projectTenants, opportunities, accounts, systems })
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
   const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
   const originalDeliveryProject = tenantDraft.deliveryPid
@@ -1002,7 +1005,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Delivery PID', renderPidLinks(headerDeliveryPid))}
           {renderHeaderField('POC ID', renderPidLinks(headerPocPid))}
-          {renderHeaderField('Linked Projects', linkedProjectPids.length > 0 ? <LinkedProjectsLinks projectIds={linkedProjectPids} /> : '', 'w-80')}
           {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
           {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
           {renderCurrentSidField()}
@@ -1284,10 +1286,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     )
   }
 
+  function renderLinkedProjectsTab() {
+    return <LinkedProjectsTable rows={linkedProjectRows} />
+  }
+
   function renderActiveTab() {
     if (activeTab === 'configuration') return renderConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
+    if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()
     if (activeTab === 'documents') return renderDocumentsTab()
     if (activeTab === 'activity') {
       return (
@@ -1750,7 +1757,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       {renderHeader()}
       {renderWarrantyDialog()}
       <section className="rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface">
+        <div className="sticky top-0 z-10 flex flex-nowrap overflow-x-auto border-b border-sf-border bg-sf-surface">
           {TENANT_TABS.map((tab) => (
             <button
               key={tab.id}

@@ -50,7 +50,6 @@ export const productionSystemMetadata: SystemInventoryMetadata = {
     { key: 'usedInRegion', label: 'Used In Region', editable: true, source: '2. Header', line: 3, inputType: 'picklist', options: REGION_OPTIONS, required: true },
     { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
-    { key: 'linkedProjects', label: 'Linked Projects', editable: false, source: '2. Header', line: 4, inputType: 'readonly' },
   ],
   tabs: SYSTEM_INVENTORY_TABS,
 }
@@ -81,7 +80,6 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
     { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'currentSid', label: 'Current SID', editable: false, source: 'POC/Training/Demo pool', line: 4, inputType: 'readonly' },
-    { key: 'linkedProjects', label: 'Linked Projects', editable: false, source: 'POC/Training/Demo pool', line: 4, inputType: 'readonly' },
     { key: 'occupationStartDate', label: 'Occupation Start Date', editable: false, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
     { key: 'occupationEndDate', label: 'Occupation End Date', editable: false, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
   ],
