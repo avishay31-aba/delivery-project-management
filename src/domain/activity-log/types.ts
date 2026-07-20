@@ -76,12 +76,30 @@ export interface ActivityLogDashboardSummary {
 
 export type ActivityLogPageSize = 20 | 50 | 100 | 'all'
 
+export type ActivityLogSortColumn =
+  | 'activityId'
+  | 'timestamp'
+  | 'user'
+  | 'eventCategory'
+  | 'eventType'
+  | 'businessObject'
+  | 'businessObjectId'
+  | 'description'
+  | 'source'
+  | 'correlationId'
+
+export interface ActivityLogSortRule {
+  column: ActivityLogSortColumn
+  direction: 'asc' | 'desc'
+}
+
 export interface ActivityLogBrowseQuery {
   objectType?: string
   objectIdOrBusinessId?: string
   fromDate?: string
   toDate?: string
   search?: string
+  sort?: ActivityLogSortRule | null
   pageNumber: number
   pageSize: ActivityLogPageSize
   latestRecordLimit?: number | null

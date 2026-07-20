@@ -1,48 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  activityEventCategoryLabel,
   browseActivityLog,
   type ActivityEvent,
   type ActivityLogPageSize,
+  type ActivityLogSortColumn,
+  type ActivityLogSortRule,
 } from '@/domain/activity-log'
+import { activityDashboardRows, createActivityLogColumns } from '@/config/activity-log-columns'
 import { formatSemanticDateTimeValue } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
-interface ActivityRow {
-  activityId: string
-  creationDate: string
-  user: string
-  eventCategory: string
-  description: string
-}
-
-const ACTIVITY_COLUMNS: Array<{ key: keyof ActivityRow; label: string }> = [
-  { key: 'activityId', label: 'Activity ID' },
-  { key: 'creationDate', label: 'Creation Date' },
-  { key: 'user', label: 'User' },
-  { key: 'eventCategory', label: 'Event Category' },
-  { key: 'description', label: 'Description' },
-]
+const ACTIVITY_COLUMNS = createActivityLogColumns().map((column) => ({
+  key: column.id as ActivityLogSortColumn,
+  label: column.label,
+}))
 
 const ACTIVITY_PAGE_SIZE_OPTIONS: ActivityLogPageSize[] = [20, 50, 100, 'all']
 const MAX_CUSTOM_RECORD_LIMIT = 10000
-
-function activityRows(events: ActivityEvent[]): ActivityRow[] {
-  return events.map((event) => ({
-    activityId: event.id,
-    creationDate: event.occurredAt,
-    user: event.actorName,
-    eventCategory: activityEventCategoryLabel(event),
-    description: event.summary,
-  }))
-}
 
 function csvValue(value: string): string {
   return `"${value.replaceAll('"', '""')}"`
 }
 
-function activityCreationDatePresentation(value: string): string {
+function activityTimestampPresentation(value: string): string {
   return formatSemanticDateTimeValue(value, 'datetime', { fallback: '' })
 }
 
@@ -70,6 +51,7 @@ export function ActivityTimeline({
   const [customLimitDraft, setCustomLimitDraft] = useState('')
   const [latestRecordLimit, setLatestRecordLimit] = useState<number | null>(null)
   const [limitError, setLimitError] = useState('')
+  const [sort, setSort] = useState<ActivityLogSortRule | null>(null)
 
   const result = useMemo(
     () =>
@@ -77,24 +59,26 @@ export function ActivityTimeline({
         fromDate,
         toDate,
         search,
+        sort,
         pageNumber,
         pageSize,
         latestRecordLimit,
       }),
-    [events, fromDate, latestRecordLimit, pageNumber, pageSize, search, toDate],
+    [events, fromDate, latestRecordLimit, pageNumber, pageSize, search, sort, toDate],
   )
-  const rows = useMemo(() => activityRows(result.records), [result.records])
+  const rows = useMemo(() => activityDashboardRows(result.records), [result.records])
   const exportRows = useMemo(
     () =>
-      activityRows(browseActivityLog(events, {
+      activityDashboardRows(browseActivityLog(events, {
         fromDate,
         toDate,
         search,
+        sort,
         pageNumber: 1,
         pageSize: 'all',
         latestRecordLimit,
       }).records),
-    [events, fromDate, latestRecordLimit, search, toDate],
+    [events, fromDate, latestRecordLimit, search, sort, toDate],
   )
 
   useEffect(() => {
@@ -111,6 +95,15 @@ export function ActivityTimeline({
 
   function resetToFirstPage() {
     setPageNumber(1)
+  }
+
+  function toggleSort(column: ActivityLogSortColumn) {
+    setSort((current) => {
+      if (!current || current.column !== column) return { column, direction: 'asc' }
+      if (current.direction === 'asc') return { column, direction: 'desc' }
+      return null
+    })
+    resetToFirstPage()
   }
 
   function applyDateFilter() {
@@ -155,7 +148,18 @@ export function ActivityTimeline({
   function exportCsv() {
     const header = ACTIVITY_COLUMNS.map((column) => column.label).join(',')
     const lines = exportRows.map((row) =>
-      [row.activityId, activityCreationDatePresentation(row.creationDate), row.user, row.eventCategory, row.description].map(csvValue).join(','),
+      [
+        row.activityId,
+        activityTimestampPresentation(row.timestamp),
+        row.user,
+        row.eventCategory,
+        row.eventType,
+        row.businessObject,
+        row.businessObjectId,
+        row.description,
+        row.source,
+        row.correlationId,
+      ].map(csvValue).join(','),
     )
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -300,7 +304,15 @@ export function ActivityTimeline({
             <tr>
               {ACTIVITY_COLUMNS.map((column) => (
                 <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                  {column.label}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1"
+                    onClick={() => toggleSort(column.key)}
+                  >
+                    {column.label}
+                    {sort?.column === column.key && sort.direction === 'asc' ? '↑' : ''}
+                    {sort?.column === column.key && sort.direction === 'desc' ? '↓' : ''}
+                  </button>
                 </th>
               ))}
             </tr>
@@ -310,11 +322,16 @@ export function ActivityTimeline({
               <tr key={row.activityId} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.activityId}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                  <DateTimeValue value={row.creationDate} semanticType="datetime" />
+                  <DateTimeValue value={row.timestamp} semanticType="datetime" />
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.user}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.eventCategory}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.eventType}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.businessObject}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.businessObjectId}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.description}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.source}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.correlationId || '-'}</td>
               </tr>
             ))}
             {rows.length === 0 ? (

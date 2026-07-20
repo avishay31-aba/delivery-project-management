@@ -5,6 +5,7 @@ import type {
   ActivityEvent,
   ActivityEventCategory,
   ActivityLogDashboardSummary,
+  ActivityLogSortRule,
   ActivityLogSummary,
 } from './types'
 import { ACTIVITY_EVENT_CATEGORY_LABELS } from './metadata'
@@ -24,6 +25,32 @@ function sortNewestFirst(events: ActivityEvent[]): ActivityEvent[] {
   )
 }
 
+function activitySortValue(event: ActivityEvent, sort: ActivityLogSortRule): string {
+  if (sort.column === 'activityId') return event.id
+  if (sort.column === 'timestamp') return event.occurredAt
+  if (sort.column === 'user') return event.actorName
+  if (sort.column === 'eventCategory') return activityEventCategoryLabel(event)
+  if (sort.column === 'eventType') return event.eventType
+  if (sort.column === 'businessObject') return event.primaryObject.objectType
+  if (sort.column === 'businessObjectId') return event.primaryObject.businessId || event.primaryObject.id
+  if (sort.column === 'description') return event.summary
+  if (sort.column === 'source') return event.source
+  if (sort.column === 'correlationId') return event.correlationId ?? ''
+  return ''
+}
+
+function sortActivityEvents(events: ActivityEvent[], sort?: ActivityLogSortRule | null): ActivityEvent[] {
+  if (!sort) return sortNewestFirst(events)
+  const direction = sort.direction === 'asc' ? 1 : -1
+  return [...events].sort((first, second) => {
+    const firstValue = activitySortValue(first, sort)
+    const secondValue = activitySortValue(second, sort)
+    return direction * firstValue.localeCompare(secondValue, undefined, { numeric: true }) ||
+      second.occurredAt.localeCompare(first.occurredAt) ||
+      (second.sequence ?? 0) - (first.sequence ?? 0)
+  })
+}
+
 function eventLocalDateKey(event: ActivityEvent): string {
   const parsed = new Date(event.occurredAt)
   if (Number.isNaN(parsed.valueOf())) return ''
@@ -39,8 +66,12 @@ function activitySearchText(event: ActivityEvent): string {
     event.occurredAt,
     event.actorName,
     activityEventCategoryLabel(event),
+    event.eventType,
     event.summary,
     event.details ?? '',
+    event.source,
+    event.correlationId ?? '',
+    event.primaryObject.objectType,
     event.primaryObject.businessId,
     event.primaryObject.displayLabel,
   ].join(' ').toLocaleLowerCase()
@@ -132,13 +163,13 @@ export function browseActivityLog(
   const latestLimit = positiveInteger(query.latestRecordLimit)
   const pageSize = query.pageSize
 
-  const matching = sortNewestFirst(scopedEvents.filter((event) => {
+  const matching = sortActivityEvents(scopedEvents.filter((event) => {
     const eventDate = eventLocalDateKey(event)
     if (query.fromDate && eventDate && eventDate < query.fromDate) return false
     if (query.toDate && eventDate && eventDate > query.toDate) return false
     if (!normalizedSearch) return true
     return activitySearchText(event).includes(normalizedSearch)
-  }))
+  }), query.sort)
   const limited = latestLimit ? matching.slice(0, latestLimit) : matching
   const totalMatchingRecords = limited.length
   const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
