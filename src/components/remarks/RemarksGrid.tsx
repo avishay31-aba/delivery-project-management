@@ -97,8 +97,24 @@ export function RemarksGrid({
 
   function deleteRemark(id: string) {
     editor.commitDelete(id, {
+      confirmMessage: 'Delete this Remark record?\n\nThis change will be saved immediately and cannot be undone.',
       commit: () => onChange(remarks.filter((remark) => remark.id !== id)),
+      successMessage: 'Remark deleted.',
     })
+  }
+
+  function cancelRemark(id: string) {
+    const shouldConfirmDiscard = editor.isNew(id) && editor.hasChanges(id, {
+      isMeaningfulNewDraft: (draftRecord) => Boolean(plainTextContent(draftRecord.content)),
+    })
+    if (shouldConfirmDiscard) {
+      editor.commitDelete(id, {
+        commit: () => undefined,
+        discardMessage: 'Discard this unsaved Remark draft?\n\nThe entered changes will be lost.',
+      })
+      return
+    }
+    editor.cancel(id)
   }
 
   function handleTypeChange(id: string, value: string) {
@@ -127,6 +143,7 @@ export function RemarksGrid({
       commit: commitRemark,
       normalize: normalizedRemark,
       isMeaningfulNewDraft: (draft) => Boolean(plainTextContent(draft.content)),
+      successMessage: 'Remark saved.',
     })
   }
 
@@ -145,6 +162,17 @@ export function RemarksGrid({
           </button>
         ) : null}
       </div>
+      {editor.notification ? (
+        <div
+          className={[
+            'rounded border px-3 py-2 text-sm',
+            editor.notification.tone === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700',
+          ].join(' ')}
+          role="status"
+        >
+          {editor.notification.message}
+        </div>
+      ) : null}
 
       <div className="sf-scroll-x rounded border border-sf-border bg-white">
         <table className="w-max min-w-full border-collapse text-sm leading-tight">
@@ -187,7 +215,7 @@ export function RemarksGrid({
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
                               disabled={isSaving || isDeleting}
-                              onClick={() => editor.cancel(remark.id)}
+                              onClick={() => cancelRemark(remark.id)}
                             >
                               <X className="h-3.5 w-3.5" aria-hidden="true" />
                               Cancel

@@ -706,6 +706,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         setDraft((current) => (current ? { ...current, warranties: committedWarranties } : current))
         setMessages([])
       },
+      successMessage: 'Warranty saved.',
     })
   }
 
@@ -725,6 +726,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (isViewMode) return
     const persistedWarranties = persistedTenant.warranties ?? []
     warrantyEditor.commitDelete(id, {
+      confirmMessage: 'Delete this Warranty record?\n\nThis change will be saved immediately and cannot be undone.',
       commit: () => {
         const nextWarranties = persistedWarranties.filter((warranty) => warranty.id !== id)
         const committedWarranties = computedWarrantiesForTenant(persistedTenant, nextWarranties)
@@ -732,7 +734,22 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         setDraft((current) => (current ? { ...current, warranties: committedWarranties } : current))
         setMessages([])
       },
+      successMessage: 'Warranty deleted.',
     })
+  }
+
+  function cancelWarranty(id: string) {
+    const shouldConfirmDiscard = warrantyEditor.isNew(id) && warrantyEditor.hasChanges(id, {
+      isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
+    })
+    if (shouldConfirmDiscard) {
+      warrantyEditor.commitDelete(id, {
+        commit: () => undefined,
+        discardMessage: 'Discard this unsaved Warranty draft?\n\nThe entered changes will be lost.',
+      })
+      return
+    }
+    warrantyEditor.cancel(id)
   }
 
   function renderActionButtons() {
@@ -1375,6 +1392,17 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             </button>
           )}
         </div>
+        {warrantyEditor.notification ? (
+          <div
+            className={[
+              'rounded border px-3 py-2 text-sm',
+              warrantyEditor.notification.tone === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700',
+            ].join(' ')}
+            role="status"
+          >
+            {warrantyEditor.notification.message}
+          </div>
+        ) : null}
         <div className="overflow-x-auto rounded border border-sf-border bg-white">
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
@@ -1413,7 +1441,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
                               disabled={isSavingWarranty || isDeletingWarranty}
-                              onClick={() => warrantyEditor.cancel(warranty.id)}
+                              onClick={() => cancelWarranty(warranty.id)}
                             >
                               <X className="h-3.5 w-3.5" aria-hidden="true" />
                               Cancel

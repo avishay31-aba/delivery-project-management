@@ -150,6 +150,8 @@ Every successful commit must update the authoritative shared store and publish o
 
 Every mutation must have one explicit commit boundary. Parent-owned mutations activate the parent Save/Apply action. Independently owned child creates and updates commit through the child Save action, while deletion of a persisted child commits through its confirmed Delete action. Removing an uncommitted draft is local only. No visible mutation may remain without an available commit path.
 
+Every persisted mutation must have an explicit and visible commit boundary. Parent-owned staged mutations activate Save/Apply. Independently owned child Save actions commit explicitly. Destructive persisted actions require confirmation before immediate commit. Successful commits provide visible confirmation; failed commits provide visible error feedback. Removing an uncommitted draft is local and must be distinguished from deleting persisted data. No mutation may commit silently.
+
 ## Navigation Specification
 
 This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.

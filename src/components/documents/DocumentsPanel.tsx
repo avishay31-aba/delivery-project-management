@@ -25,17 +25,20 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [replaceDocumentId, setReplaceDocumentId] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
   function addDocuments(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
     onChange(addDocumentsToCollection(documents, files))
+    setMessage({ tone: 'success', text: files.length === 1 ? 'Document uploaded.' : 'Documents uploaded.' })
     event.target.value = ''
   }
 
   function startEdit(document: DocumentRecord) {
     setEditingId(document.id)
     setEditingName(document.fileName)
+    setMessage(null)
   }
 
   function saveEdit(documentId: string) {
@@ -44,13 +47,21 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
     onChange(renameDocument(documents, documentId, nextName))
     setEditingId(null)
     setEditingName('')
+    setMessage({ tone: 'success', text: 'Document renamed.' })
   }
 
   function removeDocument(documentId: string) {
+    const document = documents.find((candidate) => candidate.id === documentId)
+    const label = document?.fileName ? ` "${document.fileName}"` : ''
+    if (!window.confirm(`Delete this Document${label}?\n\nThis change will be saved immediately and cannot be undone.`)) return
     onChange(removeDocumentFromCollection(documents, documentId))
+    setMessage({ tone: 'success', text: 'Document deleted.' })
   }
 
   function requestReplace(documentId: string) {
+    const document = documents.find((candidate) => candidate.id === documentId)
+    const label = document?.fileName ? ` "${document.fileName}"` : ''
+    if (!window.confirm(`Replace this Document${label}?\n\nThis change will be saved immediately after you choose a replacement file.`)) return
     setReplaceDocumentId(documentId)
     replaceInputRef.current?.click()
   }
@@ -60,6 +71,7 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
     if (!file || !replaceDocumentId) return
     onChange(replaceDocumentInCollection(documents, replaceDocumentId, file))
     setReplaceDocumentId(null)
+    setMessage({ tone: 'success', text: 'Document replaced.' })
     event.target.value = ''
   }
 
@@ -77,6 +89,17 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
           </>
         )}
       </div>
+      {message ? (
+        <div
+          className={[
+            'rounded border px-3 py-2 text-sm',
+            message.tone === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700',
+          ].join(' ')}
+          role="status"
+        >
+          {message.text}
+        </div>
+      ) : null}
 
       {documents.length > 0 ? (
         <div className="overflow-x-auto rounded border border-sf-border bg-white">

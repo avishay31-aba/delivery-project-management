@@ -15,6 +15,8 @@ export interface EditableChildObjectPermissions {
 
 export type EditableChildObjectValidation = string[]
 
+export type EditableChildObjectNotification = { tone: 'success' | 'error'; message: string } | null
+
 interface EditableChildObjectSaveStateOptions<TRecord> {
   validate?: (draft: TRecord, isNew: boolean) => EditableChildObjectValidation
   normalize?: (record: TRecord) => unknown
@@ -40,6 +42,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
   const [savingIds, setSavingIds] = useState<string[]>([])
   const [deletingIds, setDeletingIds] = useState<string[]>([])
   const [errorsById, setErrorsById] = useState<Record<string, EditableChildObjectValidation>>({})
+  const [notification, setNotification] = useState<EditableChildObjectNotification>(null)
   const draftsRef = useRef<Record<string, TRecord>>({})
   const baselinesRef = useRef<Record<string, TRecord | undefined>>({})
   const newDraftIdsRef = useRef<string[]>([])
@@ -113,6 +116,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     setSavingIds([])
     setDeletingIds([])
     setErrorsById({})
+    setNotification(null)
   }
 
   function hasChanges(id: string, options: EditableChildObjectSaveStateOptions<TRecord> = {}): boolean {
@@ -142,11 +146,13 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
       onCommitted,
       normalize,
       isMeaningfulNewDraft,
+      successMessage,
       failureMessage = 'Save failed. Please try again.',
     }: {
       validate?: (draft: TRecord, isNew: boolean) => EditableChildObjectValidation
       commit: (draft: TRecord, isNew: boolean) => void
       onCommitted?: (draft: TRecord, isNew: boolean) => void
+      successMessage?: string
       failureMessage?: string
     } & EditableChildObjectSaveStateOptions<TRecord>,
   ): boolean {
@@ -170,6 +176,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
         savingIdsRef.current = savingIdsRef.current.filter((candidate) => candidate !== id)
         setSavingIds(savingIdsRef.current)
         setErrorsById((current) => ({ ...current, [id]: [failureMessage] }))
+        setNotification({ tone: 'error', message: failureMessage })
         return
       }
       const nextDrafts = { ...draftsRef.current }
@@ -192,6 +199,9 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
         delete next[id]
         return next
       })
+      if (successMessage) {
+        setNotification({ tone: 'success', message: successMessage })
+      }
       onCommitted?.(draft, isNew)
     }, 100)
     return true
@@ -201,19 +211,27 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     id: string,
     {
       commit,
+      confirmMessage,
+      discardMessage,
       onCommitted,
+      successMessage,
       failureMessage = 'Delete failed. Please try again.',
     }: {
       commit: () => void
+      confirmMessage?: string
+      discardMessage?: string
       onCommitted?: () => void
+      successMessage?: string
       failureMessage?: string
     },
   ): boolean {
     if (savingIdsRef.current.includes(id) || deletingIdsRef.current.includes(id)) return false
     if (newDraftIdsRef.current.includes(id)) {
+      if (discardMessage && !window.confirm(discardMessage)) return false
       cancel(id)
       return true
     }
+    if (confirmMessage && !window.confirm(confirmMessage)) return false
 
     deletingIdsRef.current = Array.from(new Set([...deletingIdsRef.current, id]))
     setDeletingIds(deletingIdsRef.current)
@@ -224,6 +242,7 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
         deletingIdsRef.current = deletingIdsRef.current.filter((candidate) => candidate !== id)
         setDeletingIds(deletingIdsRef.current)
         setErrorsById((current) => ({ ...current, [id]: [failureMessage] }))
+        setNotification({ tone: 'error', message: failureMessage })
         return
       }
 
@@ -247,6 +266,9 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
         delete next[id]
         return next
       })
+      if (successMessage) {
+        setNotification({ tone: 'success', message: successMessage })
+      }
       onCommitted?.()
     }, 100)
     return true
@@ -269,6 +291,8 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     isSaving: (id: string) => savingIds.includes(id),
     isDeleting: (id: string) => deletingIds.includes(id),
     errorsFor: (id: string) => errorsById[id] ?? [],
+    notification,
+    clearNotification: () => setNotification(null),
     newDrafts: Object.values(draftsById).filter((draft) => newDraftIds.includes(draft.id)),
   }
 }
