@@ -68,9 +68,13 @@ import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFiel
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import {
   deletedTenantHostedSystemHistory,
+  endedTenantHostedSystemHistory,
   movedTenantHostedSystemHistory,
   resolveTenantCreationSource,
   systemForTenant,
+  TENANT_OPERATIONAL_STATUS_CANCELLED,
+  TENANT_OPERATIONAL_STATUS_DELETED,
+  tenantIsActivelyHostedBySystem,
   tenantCreationDraftFromSource,
   tenantConfigurationSaveDraft,
 } from '@/domain/tenant-operations'
@@ -138,6 +142,7 @@ function removeTenantsFromSystemTransaction(
   state: AppDataState,
   tenantIds: string[],
   now: string,
+  reason: 'Deleted' | 'Cancelled' = 'Deleted',
 ): Pick<AppDataState, 'tenants' | 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
   const tenantIdSet = new Set(tenantIds)
   const tenantsToRemove = state.tenants.filter((tenant) => tenantIdSet.has(tenant.id))
@@ -171,9 +176,19 @@ function removeTenantsFromSystemTransaction(
       category: 'TENANT',
       eventType: 'tenant.deletedFromSystem',
       severity: 'WARNING',
-      summary: `Tenant ${tenant.tid} removed from system.`,
+      summary: reason === 'Cancelled'
+        ? `Tenant ${tenant.tid} cancelled and removed from active hosting.`
+        : `Tenant ${tenant.tid} commercially deleted and removed from active hosting.`,
       primaryObject: tenantRef(tenant),
       relatedObjects: relatedRefs(system ? systemRef(system) : null, ...relatedProjects.map(projectRef)),
+      before: {
+        operationalStatus: tenant.operationalStatus,
+        hostedSystemId: tenant.hostedSystemId || tenant.systemId,
+      },
+      after: {
+        operationalStatus: reason,
+        hostedSystemId: '',
+      },
     })
   })
 
@@ -185,8 +200,10 @@ function removeTenantsFromSystemTransaction(
         systemId: '',
         hostedSystemId: '',
         hostingSid: '',
-        operationalStatus: 'Deleted',
-        hostedSystemHistory: deletedTenantHostedSystemHistory(tenant, now),
+        operationalStatus: reason === 'Cancelled' ? TENANT_OPERATIONAL_STATUS_CANCELLED : TENANT_OPERATIONAL_STATUS_DELETED,
+        hostedSystemHistory: reason === 'Cancelled'
+          ? endedTenantHostedSystemHistory(tenant, now, 'Cancelled')
+          : deletedTenantHostedSystemHistory(tenant, now),
         updatedAt: now,
       }
     }),
@@ -204,14 +221,13 @@ function removeTenantsFromSystemTransaction(
         ? { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => !tenantIdSet.has(tenantId)) }
         : link,
     ),
-    projectTenants: state.projectTenants.map((link) => {
-      const tenantSystemIds = systemIdsByTenantId.get(link.tenantId) ?? []
-      return tenantIdSet.has(link.tenantId) &&
-        tenantSystemIds.includes(link.systemId) &&
-        link.allocationStatus !== 'DEALLOCATED'
-        ? deallocateProjectTenantLink(link, now)
-        : link
-    }),
+    projectTenants: reason === 'Cancelled'
+      ? state.projectTenants.map((link) =>
+          tenantIdSet.has(link.tenantId) && link.allocationStatus !== 'DEALLOCATED'
+            ? deallocateProjectTenantLink(link, now)
+            : link,
+        )
+      : state.projectTenants,
     activityEvents,
   }
 }
@@ -496,7 +512,7 @@ function appendProjectSaveActivityEvents(
 }
 
 function hostedTenantCountForSystemId(state: AppDataState, systemId: string): number {
-  return state.tenants.filter((tenant) => tenant.systemId === systemId || tenant.hostedSystemId === systemId).length
+  return state.tenants.filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId)).length
 }
 
 function updateSystemMapCenterTransaction(
@@ -579,6 +595,7 @@ interface AppStore extends AppDataState {
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
   saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
   deleteTenantFromSystem: (id: string) => void
+  cancelTenantFromSystem: (id: string) => void
   rollbackSystemFormTenantCreation: (tenantId: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => void
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
@@ -917,7 +934,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   deleteTenantFromSystem: (id) => {
     const now = new Date().toISOString()
-    set((state) => removeTenantsFromSystemTransaction(state, [id], now))
+    set((state) => removeTenantsFromSystemTransaction(state, [id], now, 'Deleted'))
+    get().saveToStorage()
+  },
+
+  cancelTenantFromSystem: (id) => {
+    const now = new Date().toISOString()
+    set((state) => removeTenantsFromSystemTransaction(state, [id], now, 'Cancelled'))
     get().saveToStorage()
   },
 
@@ -958,6 +981,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const tenant = state.tenants.find((candidate) => candidate.id === id)
     const sourceSystem = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
     const destinationSystem = state.systems.find((candidate) => candidate.id === destinationSystemId)
+    if (!tenant || !destinationSystem) return
+    if (tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_DELETED || tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_CANCELLED) return
+    const sourceSystemId = tenant.hostedSystemId || tenant.systemId
+    if (!sourceSystemId || sourceSystemId === destinationSystemId) return
+    const linkedProjectIds = new Set(
+      state.projectTenants
+        .filter((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
+        .map((link) => link.projectId),
+    )
     const now = new Date().toISOString()
     set((state) => ({
       tenants: state.tenants.map((tenant) => {
@@ -965,21 +997,55 @@ export const useAppStore = create<AppStore>((set, get) => ({
         return {
           ...tenant,
           systemId: destinationSystemId,
+          hostedSystemId: destinationSystemId,
+          hostingSid: systemBusinessId(destinationSystem),
           contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
           hostedSystemHistory: movedTenantHostedSystemHistory(tenant, destinationSystemId, now),
           updatedAt: now,
         }
       }),
-      activityEvents: tenant
-        ? appendActivityEvent(state.activityEvents, now, {
-            category: 'TENANT',
-            eventType: 'tenant.movedToSystem',
-            severity: 'INFO',
-            summary: `Tenant ${tenant.tid} moved to system ${destinationSystem ? systemBusinessId(destinationSystem) : destinationSystemId}.`,
-            primaryObject: tenantRef(tenant),
-            relatedObjects: relatedRefs(sourceSystem ? systemRef(sourceSystem) : null, destinationSystem ? systemRef(destinationSystem) : null),
-          })
-        : state.activityEvents,
+      systems: state.systems.map((system) => {
+        if (system.id === sourceSystemId) {
+          return {
+            ...system,
+            tenantIds: (system.tenantIds ?? []).filter((tenantId) => tenantId !== tenant.id),
+            updatedAt: now,
+          }
+        }
+        if (system.id === destinationSystemId) {
+          return {
+            ...system,
+            tenantIds: Array.from(new Set([...(system.tenantIds ?? []), tenant.id])),
+            updatedAt: now,
+          }
+        }
+        return system
+      }),
+      projectSystems: state.projectSystems.map((link) => {
+        if (link.allocationStatus === 'DEALLOCATED') return link
+        if (link.systemId === sourceSystemId) {
+          return { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => tenantId !== tenant.id) }
+        }
+        if (link.systemId === destinationSystemId && linkedProjectIds.has(link.projectId)) {
+          return { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+        }
+        return link
+      }),
+      projectTenants: state.projectTenants.map((link) =>
+        link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED'
+          ? { ...link, systemId: destinationSystemId }
+          : link,
+      ),
+      activityEvents: appendActivityEvent(state.activityEvents, now, {
+        category: 'TENANT',
+        eventType: 'tenant.movedToSystem',
+        severity: 'INFO',
+        summary: `Tenant ${tenant.tid} moved from system ${sourceSystem ? systemBusinessId(sourceSystem) : sourceSystemId} to system ${systemBusinessId(destinationSystem)}.`,
+        primaryObject: tenantRef(tenant),
+        relatedObjects: relatedRefs(sourceSystem ? systemRef(sourceSystem) : null, systemRef(destinationSystem)),
+        before: { hostedSystemId: sourceSystemId, operationalStatus: tenant.operationalStatus },
+        after: { hostedSystemId: destinationSystemId, operationalStatus: tenant.operationalStatus },
+      }),
     }))
     get().saveToStorage()
   },

@@ -7,6 +7,7 @@ import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@
 import {
   joinUniqueValues,
   currentProjectPidsForSystem,
+  hostedTenantsForSystem,
   systemSourceLabel,
   tenantCountForSystem,
 } from '@/domain/system-inventory'
@@ -141,11 +142,11 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'tenants',
       label: 'Hosted Tenants',
-      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id || tenant.hostedSystemId === row.id).map((tenant) => tenant.tid)),
+      getValue: (row) => joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.tid)),
       render: (row) =>
         createElement(BusinessIdListLinks, {
           objectType: 'TENANT',
-          businessIds: joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id || tenant.hostedSystemId === row.id).map((tenant) => tenant.tid)),
+          businessIds: joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.tid)),
         }),
     },
     systemUrlColumn<AllocatedSystemDashboardRow>({ replaceable: true }),

@@ -2,6 +2,7 @@ import type { Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System
 import { activeProjectTenantLinks } from '@/domain/allocation-context'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
+import { tenantLatestHistoricalSystemId } from './lifecycle'
 import {
   TENANT_WARRANTY_CONTRACT_GROUPS,
   tenantWarrantyHeaderStatusReadModel,
@@ -50,6 +51,11 @@ export function effectiveTenantOperationalMode(tenant: Tenant, system?: System):
 
 export function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {
   return systems.find((system) => system.id === tenant.hostedSystemId || system.id === tenant.systemId)
+}
+
+export function currentOrHistoricalSystemForTenant(tenant: Tenant, systems: System[]): System | undefined {
+  const systemId = tenantLatestHistoricalSystemId(tenant)
+  return systems.find((system) => system.id === systemId)
 }
 
 export function inheritedTenantMapCenter(tenant: Tenant, systems: System[], tenants: Tenant[] = []): string {
@@ -213,13 +219,21 @@ export function tenantTimeZoneDisplayValue(
   return geographicTimeZoneDisplayValue(country, state, referenceDate)
 }
 
-export function deletedTenantHostedSystemHistory(tenant: Tenant, deletedAt: string): TenantHostedSystemHistory[] {
+export function endedTenantHostedSystemHistory(
+  tenant: Tenant,
+  endedAt: string,
+  reason: 'Deleted' | 'Cancelled',
+): TenantHostedSystemHistory[] {
   const history = tenantHostedSystemHistory(tenant)
   return history.map((entry, index) =>
     index === history.length - 1 && entry.endedAt == null
-      ? { ...entry, endedAt: deletedAt, reason: 'Deleted' as const }
+      ? { ...entry, endedAt, reason }
       : entry,
   )
+}
+
+export function deletedTenantHostedSystemHistory(tenant: Tenant, deletedAt: string): TenantHostedSystemHistory[] {
+  return endedTenantHostedSystemHistory(tenant, deletedAt, 'Deleted')
 }
 
 export function movedTenantHostedSystemHistory(

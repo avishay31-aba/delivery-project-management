@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
-import { joinUniqueValues, systemIdentity, tenantCountForSystem } from '@/domain/system-inventory'
+import { hostedTenantsForSystem, joinUniqueValues, systemIdentity, tenantCountForSystem } from '@/domain/system-inventory'
 
 export function createSystemColumns(
   accounts: Account[],
@@ -42,11 +42,11 @@ export function createSystemColumns(
     {
       id: 'deliveryPid',
       label: 'Related Delivery PID',
-      getValue: (row) => joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.deliveryPid), ';'),
+      getValue: (row) => joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.deliveryPid), ';'),
       render: (row) =>
         createElement(BusinessIdListLinks, {
           objectType: 'PROJECT',
-          businessIds: joinUniqueValues(tenants.filter((tenant) => tenant.systemId === row.id).map((tenant) => tenant.deliveryPid), ';'),
+          businessIds: joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.deliveryPid), ';'),
         }),
     },
     { id: 'systemStatus', label: 'System Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },

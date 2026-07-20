@@ -533,7 +533,7 @@ export interface TenantHostedSystemHistory {
   systemId: string
   startedAt: string
   endedAt: string | null
-  reason: 'Created' | 'Moved' | 'Deleted'
+  reason: 'Created' | 'Moved' | 'Deleted' | 'Cancelled'
 }
 
 export interface ProductionSystemInventoryItem {

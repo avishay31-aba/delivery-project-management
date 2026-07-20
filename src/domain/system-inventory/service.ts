@@ -6,6 +6,7 @@ import {
   applicationConfigurationValue,
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
 } from '@/domain/application-configuration'
+import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
 import type { ConfigurationHistoryRecord, TenantConfiguration } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import {
@@ -77,7 +78,7 @@ export function joinUniqueValues(values: Array<string | null | undefined>, separ
 }
 
 export function hostedTenantsForSystem(systemId: string, tenants: Tenant[]): Tenant[] {
-  return tenants.filter((tenant) => tenant.systemId === systemId || tenant.hostedSystemId === systemId)
+  return tenants.filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId))
 }
 
 const INTEGER_SUMMARY_KEYS = new Set([

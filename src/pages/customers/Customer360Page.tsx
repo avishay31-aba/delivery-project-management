@@ -37,6 +37,7 @@ import {
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
+import { isTenantLifecycleInactive } from '@/domain/tenant-operations'
 import { useAppStore } from '@/store/useAppStore'
 
 type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'requirements' | 'documents' | 'activity'
@@ -219,7 +220,7 @@ export function Customer360Page() {
           {summaryCard('Open Projects', openProjects.length)}
           {summaryCard('Warning Projects', customer.projectHealthSummary.warningProjects)}
           {summaryCard('At Risk Projects', customer.projectHealthSummary.atRiskProjects)}
-          {summaryCard('Active Tenants', customer.tenants.filter((tenant) => tenant.operationalStatus !== 'Deleted').length)}
+          {summaryCard('Active Tenants', customer.tenants.filter((tenant) => !isTenantLifecycleInactive(tenant)).length)}
           {summaryCard('Warranty Renewal Candidates', customer.warrantySummary.renewalCandidates)}
           {summaryCard('Requirements', customer.requirementCoverageSummary.totalRequirements)}
           {summaryCard('Covered Requirements', customer.requirementCoverageSummary.covered)}

@@ -1,6 +1,7 @@
 import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/milestone-plan'
 import { getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { tenantVisibleInProjectTenantCollections } from '@/domain/tenant-operations/lifecycle'
 import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
 import { projectTimeZoneDisplayValue, resolveGeographicTimeZone } from '@/domain/geographic-time-zone'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
@@ -683,7 +684,7 @@ export function linkedTenantsForProject(
     activeProjectTenantLinks(projectTenantLinksForProject)
       .map((link) => link.tenantId),
   )
-  return tenants.filter((tenant) => linkedTenantIds.has(tenant.id))
+  return tenants.filter((tenant) => linkedTenantIds.has(tenant.id) && tenantVisibleInProjectTenantCollections(tenant))
 }
 
 export function activeSystemLinkMapBySystemId(activeSystemLinks: ProjectSystemLink[]): Map<string, ProjectSystemLink> {

@@ -409,6 +409,15 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Aggregate labels may reuse an approved individual Warranty status visual without reusing the individual label. `Under Contract` reuses the individual `Valid` visual, `Out of Contract` reuses the individual `No Warranty` visual, and `Not Set Yet` reuses the individual `Not Set Yet` visual.
 - Tenant collection grouping, filtering, summarization, and tabbing by warranty state must consume the shared Tenant-derived Warranty Contract Status. Project, System, Dashboard, Renewal Queue, and future consumers must not inspect Warranty records or duplicate Warranty derivation logic for Tenant grouping.
 
+### Tenant Lifecycle And Hosting Standard
+
+- Tenant is a virtual commercial and configuration Business Object. System is the physical infrastructure Business Object.
+- System Application Configuration Summary represents the accumulated configuration contribution of currently active Tenants hosted on that System.
+- Move changes only the Tenant's active hosted System relationship. The Tenant ID, Tenant-owned scalar fields, Tenant-owned child records, Warranty records, configuration requirements, and Project relationships must be preserved.
+- Delete is commercial termination. It sets Tenant Operational Status to `Deleted`, ends active hosting, excludes the Tenant from active System Tenant tables and active System Application Configuration Summary, and preserves Project relationships plus historical System hosting.
+- Cancel represents creation by mistake. It sets Tenant Operational Status to `Cancelled`, ends active hosting, excludes the Tenant from active System Tenant tables and active System Application Configuration Summary, and removes active Project-Tenant relationships while preserving technical audit/history.
+- Delete and Cancel are lifecycle transitions, never hard deletion. Historical retention, operational visibility, and configuration contribution eligibility are separate concerns owned by TenantOperations/SystemInventory read models.
+
 ## Reusable Child Object Principle
 
 Some child structures are reusable across multiple parent Business Objects while still remaining scoped to their parent object instance.

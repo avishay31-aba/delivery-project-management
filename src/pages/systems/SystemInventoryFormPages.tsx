@@ -351,6 +351,8 @@ export function InventoryForm<T extends InventoryRecord>({
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
   const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
   const rollbackSystemFormTenantCreation = useAppStore((state) => state.rollbackSystemFormTenantCreation)
+  const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
+  const cancelTenantFromSystem = useAppStore((state) => state.cancelTenantFromSystem)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const {
     value: draft,
@@ -921,9 +923,28 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function deleteHostedTenant(tenant: Tenant) {
     if (isViewMode) return
-    if (!window.confirm(`Remove tenant ${tenant.tid} from this system?`)) return
-    setPendingTenantRemovalIds((current) => Array.from(new Set([...current, tenant.id])))
-    setMessages([`Tenant ${tenant.tid} marked for removal. Save or Apply Changes to commit.`])
+    if (!window.confirm(`Delete Tenant ${tenant.tid}?\n\nThe Tenant will be removed from active System hosting and configuration, but will remain in its linked Projects and historical records.\n\nThis change will be saved immediately.`)) return
+    deleteTenantFromSystem(tenant.id)
+    const routePath = tenantReference(tenant).routePath
+    const opened = routePath ? window.open(`${window.location.origin}${window.location.pathname}#${routePath}`, '_blank', 'noopener,noreferrer') : null
+    setMessages([
+      opened
+        ? `Tenant ${tenant.tid} deleted and removed from active System hosting.`
+        : `Tenant ${tenant.tid} deleted and removed from active System hosting. Open Tenant ${tenant.tid} from the Tenant dashboard to review it.`,
+    ])
+  }
+
+  function cancelHostedTenant(tenant: Tenant) {
+    if (isViewMode) return
+    if (!window.confirm(`Cancel Tenant ${tenant.tid}?\n\nThe Tenant will be removed from active System hosting and from all linked Projects because it was created by mistake.\n\nThe historical audit record will be preserved.\n\nThis change will be saved immediately.`)) return
+    cancelTenantFromSystem(tenant.id)
+    const routePath = tenantReference(tenant).routePath
+    const opened = routePath ? window.open(`${window.location.origin}${window.location.pathname}#${routePath}`, '_blank', 'noopener,noreferrer') : null
+    setMessages([
+      opened
+        ? `Tenant ${tenant.tid} cancelled and removed from active System hosting.`
+        : `Tenant ${tenant.tid} cancelled and removed from active System hosting. Open Tenant ${tenant.tid} from the Tenant dashboard to review it.`,
+    ])
   }
 
   function moveHostedTenant(tenant: Tenant) {
@@ -941,6 +962,16 @@ export function InventoryForm<T extends InventoryRecord>({
       setMessages([`Destination system "${destination}" was not found.`])
       return
     }
+    const sourceSystem = allocatedSystems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
+    if (destinationSystem.id === (tenant.hostedSystemId || tenant.systemId)) {
+      setMessages([`Tenant ${tenant.tid} is already hosted by ${systemIdentity(destinationSystem)}.`])
+      return
+    }
+    if (tenant.operationalStatus === 'Deleted' || tenant.operationalStatus === 'Cancelled') {
+      setMessages([`Tenant ${tenant.tid} cannot be moved because its Operational Status is ${tenant.operationalStatus}.`])
+      return
+    }
+    if (!window.confirm(`Move Tenant ${tenant.tid} from System ${sourceSystem ? systemIdentity(sourceSystem) : tenant.hostingSid || tenant.systemId} to System ${systemIdentity(destinationSystem)}?\n\nThis will update the active configuration summaries of both Systems and will be saved immediately.`)) return
     moveTenantToSystem(tenant.id, destinationSystem.id)
     setMessages([`Tenant ${tenant.tid} moved to ${systemIdentity(destinationSystem)}.`])
   }
@@ -971,6 +1002,13 @@ export function InventoryForm<T extends InventoryRecord>({
           onClick={() => moveHostedTenant(tenant)}
         >
           Move
+        </button>
+        <button
+          type="button"
+          className="rounded border border-purple-200 bg-white px-2 py-1 text-xs text-purple-700 hover:bg-purple-50"
+          onClick={() => cancelHostedTenant(tenant)}
+        >
+          Cancel
         </button>
       </div>
     )

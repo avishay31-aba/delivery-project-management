@@ -1,5 +1,6 @@
 export * from './types'
 export * from './metadata'
+export * from './lifecycle'
 export * from './service'
 export * from './validation'
 export * from './adapters'

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { System, Tenant } from '@/data/seed.types'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
-import { effectiveTenantOperationalMode, tenantConfigurationPresentationRecord } from '@/domain/tenant-operations'
+import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { BusinessIdLink, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
@@ -65,7 +65,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
         </thead>
         <tbody>
           {tenants.map((tenant) => {
-            const system = systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId)
+            const system = currentOrHistoricalSystemForTenant(tenant, systems)
             const configurationRecord = tenantConfigurationPresentationRecord(tenant, systems, tenants)
             return (
               <tr key={tenant.id} className="hover:bg-sf-surface-alt">
