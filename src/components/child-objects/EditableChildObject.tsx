@@ -38,11 +38,13 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
   const [draftsById, setDraftsById] = useState<Record<string, TRecord>>({})
   const [newDraftIds, setNewDraftIds] = useState<string[]>([])
   const [savingIds, setSavingIds] = useState<string[]>([])
+  const [deletingIds, setDeletingIds] = useState<string[]>([])
   const [errorsById, setErrorsById] = useState<Record<string, EditableChildObjectValidation>>({})
   const draftsRef = useRef<Record<string, TRecord>>({})
   const baselinesRef = useRef<Record<string, TRecord | undefined>>({})
   const newDraftIdsRef = useRef<string[]>([])
   const savingIdsRef = useRef<string[]>([])
+  const deletingIdsRef = useRef<string[]>([])
 
   function beginAdd(record: TRecord) {
     draftsRef.current = { ...draftsRef.current, [record.id]: record }
@@ -105,9 +107,11 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     baselinesRef.current = {}
     newDraftIdsRef.current = []
     savingIdsRef.current = []
+    deletingIdsRef.current = []
     setDraftsById({})
     setNewDraftIds([])
     setSavingIds([])
+    setDeletingIds([])
     setErrorsById({})
   }
 
@@ -193,6 +197,61 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     return true
   }
 
+  function commitDelete(
+    id: string,
+    {
+      commit,
+      onCommitted,
+      failureMessage = 'Delete failed. Please try again.',
+    }: {
+      commit: () => void
+      onCommitted?: () => void
+      failureMessage?: string
+    },
+  ): boolean {
+    if (savingIdsRef.current.includes(id) || deletingIdsRef.current.includes(id)) return false
+    if (newDraftIdsRef.current.includes(id)) {
+      cancel(id)
+      return true
+    }
+
+    deletingIdsRef.current = Array.from(new Set([...deletingIdsRef.current, id]))
+    setDeletingIds(deletingIdsRef.current)
+    window.setTimeout(() => {
+      try {
+        commit()
+      } catch {
+        deletingIdsRef.current = deletingIdsRef.current.filter((candidate) => candidate !== id)
+        setDeletingIds(deletingIdsRef.current)
+        setErrorsById((current) => ({ ...current, [id]: [failureMessage] }))
+        return
+      }
+
+      const nextDrafts = { ...draftsRef.current }
+      const nextBaselines = { ...baselinesRef.current }
+      delete nextDrafts[id]
+      delete nextBaselines[id]
+      draftsRef.current = nextDrafts
+      baselinesRef.current = nextBaselines
+      newDraftIdsRef.current = newDraftIdsRef.current.filter((candidate) => candidate !== id)
+      deletingIdsRef.current = deletingIdsRef.current.filter((candidate) => candidate !== id)
+      setDraftsById((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      setNewDraftIds(newDraftIdsRef.current)
+      setDeletingIds(deletingIdsRef.current)
+      setErrorsById((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      onCommitted?.()
+    }, 100)
+    return true
+  }
+
   return {
     beginAdd,
     beginEdit,
@@ -201,12 +260,14 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     cancel,
     reset,
     save,
+    commitDelete,
     hasChanges,
     canSave,
     draftFor: (id: string) => draftsById[id],
     isEditing: (id: string) => Boolean(draftsById[id]),
     isNew: (id: string) => newDraftIds.includes(id),
     isSaving: (id: string) => savingIds.includes(id),
+    isDeleting: (id: string) => deletingIds.includes(id),
     errorsFor: (id: string) => errorsById[id] ?? [],
     newDrafts: Object.values(draftsById).filter((draft) => newDraftIds.includes(draft.id)),
   }

@@ -96,7 +96,9 @@ export function RemarksGrid({
   }
 
   function deleteRemark(id: string) {
-    onChange(remarks.filter((remark) => remark.id !== id))
+    editor.commitDelete(id, {
+      commit: () => onChange(remarks.filter((remark) => remark.id !== id)),
+    })
   }
 
   function handleTypeChange(id: string, value: string) {
@@ -162,6 +164,7 @@ export function RemarksGrid({
               const isEditing = permissions.canEdit && Boolean(draft)
               const errors = editor.errorsFor(remark.id)
               const isSaving = editor.isSaving(remark.id)
+              const isDeleting = editor.isDeleting(remark.id)
               const canSave = editor.canSave(remark.id, {
                 validate: validateRemark,
                 normalize: normalizedRemark,
@@ -183,7 +186,7 @@ export function RemarksGrid({
                               {isSaving ? 'Saving...' : 'Save'}
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
-                              disabled={isSaving}
+                              disabled={isSaving || isDeleting}
                               onClick={() => editor.cancel(remark.id)}
                             >
                               <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -201,13 +204,14 @@ export function RemarksGrid({
                               </EditableChildObjectActionButton>
                             ) : null}
                             {permissions.canDelete ? (
-                              <EditableChildObjectActionButton
-                                variant="danger"
-                                onClick={() => deleteRemark(remark.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                                Delete
-                              </EditableChildObjectActionButton>
+                            <EditableChildObjectActionButton
+                              variant="danger"
+                              disabled={isDeleting}
+                              onClick={() => deleteRemark(remark.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                            </EditableChildObjectActionButton>
                             ) : null}
                           </>
                         )}

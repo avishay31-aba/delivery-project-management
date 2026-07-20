@@ -723,10 +723,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function deleteWarranty(id: string) {
     if (isViewMode) return
-    setDraft((current) => {
-      if (!current) return current
-      const nextWarranties = (current.warranties ?? []).filter((warranty) => warranty.id !== id)
-      return { ...current, warranties: computedWarrantiesForTenant(current, nextWarranties) }
+    const persistedWarranties = persistedTenant.warranties ?? []
+    warrantyEditor.commitDelete(id, {
+      commit: () => {
+        const nextWarranties = persistedWarranties.filter((warranty) => warranty.id !== id)
+        const committedWarranties = computedWarrantiesForTenant(persistedTenant, nextWarranties)
+        updateTenant(persistedTenant.id, { warranties: committedWarranties })
+        setDraft((current) => (current ? { ...current, warranties: committedWarranties } : current))
+        setMessages([])
+      },
     })
   }
 
@@ -1383,6 +1388,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               {warranties.map((warranty, warrantyIndex) => {
                 const isEditingWarranty = !isViewMode && warrantyEditor.isEditing(warranty.id)
                 const isSavingWarranty = warrantyEditor.isSaving(warranty.id)
+                const isDeletingWarranty = warrantyEditor.isDeleting(warranty.id)
                 const warrantyErrors = warrantyEditor.errorsFor(warranty.id)
                 const relatedProjectHasError = warrantyErrors.some((error) => error.toLowerCase().includes('project'))
                 const canSaveWarranty = warrantyEditor.canSave(warranty.id, {
@@ -1406,7 +1412,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                               {isSavingWarranty ? 'Saving...' : 'Save'}
                             </EditableChildObjectActionButton>
                             <EditableChildObjectActionButton
-                              disabled={isSavingWarranty}
+                              disabled={isSavingWarranty || isDeletingWarranty}
                               onClick={() => warrantyEditor.cancel(warranty.id)}
                             >
                               <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1427,9 +1433,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                               <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
                               Advanced Edit
                             </EditableChildObjectActionButton>
-                            <EditableChildObjectActionButton variant="danger" onClick={() => deleteWarranty(warranty.id)}>
+                            <EditableChildObjectActionButton variant="danger" disabled={isDeletingWarranty} onClick={() => deleteWarranty(warranty.id)}>
                               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              Delete
+                              {isDeletingWarranty ? 'Deleting...' : 'Delete'}
                             </EditableChildObjectActionButton>
                           </>
                         )

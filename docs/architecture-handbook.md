@@ -148,6 +148,8 @@ Uncommitted drafts do not affect shared read models. Clicking the Save action be
 
 Every successful commit must update the authoritative shared store and publish or invalidate all dependent read models. All relevant mounted and subsequently opened consumers must reflect the committed state immediately, without a parent Save, refresh or re-navigation. Only committed values may be published; drafts remain local to their owning save scope.
 
+Every mutation must have one explicit commit boundary. Parent-owned mutations activate the parent Save/Apply action. Independently owned child creates and updates commit through the child Save action, while deletion of a persisted child commits through its confirmed Delete action. Removing an uncommitted draft is local only. No visible mutation may remain without an available commit path.
+
 ## Navigation Specification
 
 This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.
