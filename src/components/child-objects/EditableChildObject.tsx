@@ -138,10 +138,12 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
       onCommitted,
       normalize,
       isMeaningfulNewDraft,
+      failureMessage = 'Save failed. Please try again.',
     }: {
       validate?: (draft: TRecord, isNew: boolean) => EditableChildObjectValidation
       commit: (draft: TRecord, isNew: boolean) => void
       onCommitted?: (draft: TRecord, isNew: boolean) => void
+      failureMessage?: string
     } & EditableChildObjectSaveStateOptions<TRecord>,
   ): boolean {
     const draft = draftsRef.current[id]
@@ -158,7 +160,14 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     savingIdsRef.current = Array.from(new Set([...savingIdsRef.current, id]))
     setSavingIds(savingIdsRef.current)
     window.setTimeout(() => {
-      commit(draft, isNew)
+      try {
+        commit(draft, isNew)
+      } catch {
+        savingIdsRef.current = savingIdsRef.current.filter((candidate) => candidate !== id)
+        setSavingIds(savingIdsRef.current)
+        setErrorsById((current) => ({ ...current, [id]: [failureMessage] }))
+        return
+      }
       const nextDrafts = { ...draftsRef.current }
       const nextBaselines = { ...baselinesRef.current }
       delete nextDrafts[id]

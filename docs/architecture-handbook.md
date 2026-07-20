@@ -146,6 +146,8 @@ A Save action is available only when its owned scope contains a valid change fro
 
 Uncommitted drafts do not affect shared read models. Clicking the Save action belonging to a draft commits that draft's owned scope. The main form Save / Apply Changes action commits parent Business Object fields and must not silently commit independently owned child-object drafts.
 
+Every successful commit must update the authoritative shared store and publish or invalidate all dependent read models. All relevant mounted and subsequently opened consumers must reflect the committed state immediately, without a parent Save, refresh or re-navigation. Only committed values may be published; drafts remain local to their owning save scope.
+
 ## Navigation Specification
 
 This section defines the ERP navigation principles. It is an Architecture Handbook enhancement, not a separate methodology artifact.
