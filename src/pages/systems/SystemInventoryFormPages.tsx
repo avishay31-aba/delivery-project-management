@@ -19,6 +19,12 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
+import {
+  EMPTY_SYSTEM_CANDIDATE_FILTERS,
+  SystemCandidateDialog,
+  type SystemCandidateFilters,
+  type SystemCandidateSortKey,
+} from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import { BusinessObjectLink, FormField, LinkedProjectsLinks, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
@@ -81,12 +87,20 @@ import {
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
+import {
+  tenantMoveDefaultMode,
+  tenantMoveDefaultRegion,
+  tenantMoveDestinationCandidates,
+  validateTenantMoveDestination,
+  type TenantMoveMode,
+} from '@/domain/tenant-operations'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type SaveTimestampOptions = { preserveNewState?: boolean }
 type InventorySectionId = 'header' | 'configuration' | 'tabs' | 'purposeHistory'
 type InfrastructureInnerTab = 'environment' | 'infrastructure'
+type MoveTenantConfirmation = { tenantId: string; destinationSystemId: string }
 const SYSTEM_REMARK_TYPE_PICKLIST_KEY = 'systemRemarkType'
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<InventorySectionId, boolean> = {
@@ -341,6 +355,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const location = useLocation()
   const isViewMode = isRouteViewMode(location)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
+  const accounts = useAppStore((state) => state.accounts)
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
@@ -372,6 +387,16 @@ export function InventoryForm<T extends InventoryRecord>({
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
+  const [moveTenantId, setMoveTenantId] = useState('')
+  const [moveMode, setMoveMode] = useState<TenantMoveMode>('DELIVERED')
+  const [selectedMoveDestinationIds, setSelectedMoveDestinationIds] = useState<string[]>([])
+  const [moveCandidateSearch, setMoveCandidateSearch] = useState('')
+  const [moveCandidateFilters, setMoveCandidateFilters] = useState<SystemCandidateFilters>(EMPTY_SYSTEM_CANDIDATE_FILTERS)
+  const [moveCandidateSortKey, setMoveCandidateSortKey] = useState<SystemCandidateSortKey>('id')
+  const [moveCandidateSortDirection, setMoveCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [moveResult, setMoveResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [moveConfirmation, setMoveConfirmation] = useState<MoveTenantConfirmation | null>(null)
+  const [isMoveCommitting, setIsMoveCommitting] = useState(false)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: string; value: string } | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<InventorySectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
@@ -949,31 +974,89 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function moveHostedTenant(tenant: Tenant) {
     if (isViewMode) return
-    const destination = window.prompt('Move tenant to SID or MID')
-    if (!destination) return
-    const normalizedDestination = destination.trim().toLocaleLowerCase()
-    const destinationSystem = allocatedSystems.find((system) =>
-      [system.sid, system.machineId, system.id]
-        .filter(Boolean)
-        .map((value) => String(value).toLocaleLowerCase())
-        .includes(normalizedDestination),
-    )
-    if (!destinationSystem) {
-      setMessages([`Destination system "${destination}" was not found.`])
+    const defaultMode = tenantMoveDefaultMode(tenant, projects, projectTenants)
+    const defaultRegion = tenantMoveDefaultRegion({ tenant, projects, projectTenants, opportunities, accounts })
+    setMoveTenantId(tenant.id)
+    setMoveMode(defaultMode)
+    setSelectedMoveDestinationIds([])
+    setMoveCandidateSearch('')
+    setMoveCandidateFilters({ ...EMPTY_SYSTEM_CANDIDATE_FILTERS, regionTimeGroup: defaultRegion })
+    setMoveCandidateSortKey('id')
+    setMoveCandidateSortDirection('asc')
+    setMoveResult(null)
+    setMoveConfirmation(null)
+  }
+
+  function changeMoveMode(mode: TenantMoveMode) {
+    if (isViewMode) return
+    const tenant = tenants.find((candidate) => candidate.id === moveTenantId)
+    setMoveMode(mode)
+    setSelectedMoveDestinationIds([])
+    setMoveCandidateSearch('')
+    setMoveCandidateFilters({
+      ...EMPTY_SYSTEM_CANDIDATE_FILTERS,
+      regionTimeGroup: tenant ? tenantMoveDefaultRegion({ tenant, projects, projectTenants, opportunities, accounts }) : '',
+    })
+    setMoveResult(null)
+    setMoveConfirmation(null)
+  }
+
+  function toggleMoveCandidate(candidateId: string, selected: boolean) {
+    if (isViewMode) return
+    setSelectedMoveDestinationIds(selected ? [candidateId] : [])
+    setMoveConfirmation(null)
+    setMoveResult(null)
+  }
+
+  function requestMoveConfirmation() {
+    if (isViewMode || isMoveCommitting) return
+    const tenant = tenants.find((candidate) => candidate.id === moveTenantId)
+    const destinationSystemId = selectedMoveDestinationIds[0]
+    if (!tenant || !destinationSystemId) {
+      setMoveResult({ ok: false, message: 'Select one destination System before moving the Tenant.' })
       return
     }
-    const sourceSystem = allocatedSystems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
-    if (destinationSystem.id === (tenant.hostedSystemId || tenant.systemId)) {
-      setMessages([`Tenant ${tenant.tid} is already hosted by ${systemIdentity(destinationSystem)}.`])
+    const validationMessage = validateTenantMoveDestination({
+      tenant,
+      systems: allocatedSystems,
+      projects,
+      projectSystems,
+      projectTenants,
+      opportunities,
+      accounts,
+    }, destinationSystemId)
+    if (validationMessage) {
+      setMoveResult({ ok: false, message: validationMessage })
       return
     }
-    if (tenant.operationalStatus === 'Deleted' || tenant.operationalStatus === 'Cancelled') {
-      setMessages([`Tenant ${tenant.tid} cannot be moved because its Operational Status is ${tenant.operationalStatus}.`])
+    setMoveConfirmation({ tenantId: tenant.id, destinationSystemId })
+    setMoveResult(null)
+  }
+
+  function confirmMoveTenant() {
+    if (isViewMode || isMoveCommitting || !moveConfirmation) return
+    setIsMoveCommitting(true)
+    const tenant = tenants.find((candidate) => candidate.id === moveConfirmation.tenantId)
+    const destinationSystem = allocatedSystems.find((candidate) => candidate.id === moveConfirmation.destinationSystemId)
+    const result = moveTenantToSystem(moveConfirmation.tenantId, moveConfirmation.destinationSystemId)
+    setIsMoveCommitting(false)
+    if (!result.ok) {
+      setMoveResult(result)
       return
     }
-    if (!window.confirm(`Move Tenant ${tenant.tid} from System ${sourceSystem ? systemIdentity(sourceSystem) : tenant.hostingSid || tenant.systemId} to System ${systemIdentity(destinationSystem)}?\n\nThis will update the active configuration summaries of both Systems and will be saved immediately.`)) return
-    moveTenantToSystem(tenant.id, destinationSystem.id)
-    setMessages([`Tenant ${tenant.tid} moved to ${systemIdentity(destinationSystem)}.`])
+    setMoveTenantId('')
+    setSelectedMoveDestinationIds([])
+    setMoveConfirmation(null)
+    setMoveResult(null)
+    setMessages([result.message || `Tenant ${tenant?.tid ?? ''} moved to ${destinationSystem ? systemIdentity(destinationSystem) : 'destination System'}.`])
+  }
+
+  function closeMoveDialog() {
+    if (isMoveCommitting) return
+    setMoveTenantId('')
+    setSelectedMoveDestinationIds([])
+    setMoveConfirmation(null)
+    setMoveResult(null)
   }
 
   function renderHostedTenantActions(tenant: Tenant) {
@@ -1208,6 +1291,98 @@ export function InventoryForm<T extends InventoryRecord>({
           setDraft((current) => (current ? ({ ...current, documents } as T) : current))
           setMessages([])
         }}
+      />
+    )
+  }
+
+  function renderMoveTenantDialog() {
+    const tenant = tenants.find((candidate) => candidate.id === moveTenantId)
+    if (!tenant) return null
+    const sourceSystem = allocatedSystems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
+    const destinationSystem = moveConfirmation
+      ? allocatedSystems.find((system) => system.id === moveConfirmation.destinationSystemId)
+      : selectedMoveDestinationIds[0]
+        ? allocatedSystems.find((system) => system.id === selectedMoveDestinationIds[0])
+        : undefined
+    const candidates = tenantMoveDestinationCandidates({
+      tenant,
+      systems: allocatedSystems,
+      projects,
+      projectSystems,
+      projectTenants,
+      opportunities,
+      accounts,
+    }, moveMode)
+    const resultMessage = moveResult ? (
+      <div className={moveResult.ok ? 'rounded border border-green-200 bg-green-50 p-2 text-sm text-green-700' : 'rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700'}>
+        {moveResult.message}
+      </div>
+    ) : null
+    const confirmationMessage = moveConfirmation && destinationSystem ? (
+      <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="font-semibold">
+          Move Tenant {tenant.tid} from System {sourceSystem ? systemIdentity(sourceSystem) : tenant.hostingSid || tenant.systemId} to System {systemIdentity(destinationSystem)}?
+        </p>
+        <p className="mt-1">Only the hosted System will change. The Tenant and all of its data and linked Projects will remain unchanged.</p>
+        <p className="mt-1">This change will be saved immediately.</p>
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt"
+            disabled={isMoveCommitting}
+            onClick={() => setMoveConfirmation(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isMoveCommitting}
+            onClick={confirmMoveTenant}
+          >
+            {isMoveCommitting ? 'Moving...' : 'Confirm Move'}
+          </button>
+        </div>
+      </div>
+    ) : null
+
+    return (
+      <SystemCandidateDialog
+        title={`Move tenant ${tenant.tid}`}
+        description="Select an already allocated destination System. Tenant-owned data and Project links remain unchanged."
+        closeLabel="Close move tenant dialog"
+        confirmLabel="Review Move"
+        modes={[
+          { id: 'DELIVERED', label: 'Allocate Delivered System', icon: <Database className="h-4 w-4" aria-hidden="true" /> },
+          { id: 'POC_ASSIGNED', label: 'Allocate POC Assigned System', icon: <Sparkles className="h-4 w-4" aria-hidden="true" /> },
+        ]}
+        selectedMode={moveMode}
+        onModeChange={(mode) => changeMoveMode(mode as TenantMoveMode)}
+        result={
+          <div className="space-y-2">
+            {resultMessage}
+            {confirmationMessage}
+          </div>
+        }
+        candidates={candidates}
+        selectedCandidateIds={selectedMoveDestinationIds}
+        onToggleCandidate={toggleMoveCandidate}
+        search={moveCandidateSearch}
+        onSearchChange={setMoveCandidateSearch}
+        filters={moveCandidateFilters}
+        onFiltersChange={(filters) => {
+          setMoveCandidateFilters(filters)
+          setMoveConfirmation(null)
+        }}
+        sortKey={moveCandidateSortKey}
+        onSortKeyChange={setMoveCandidateSortKey}
+        sortDirection={moveCandidateSortDirection}
+        onSortDirectionChange={setMoveCandidateSortDirection}
+        onClose={closeMoveDialog}
+        onConfirm={requestMoveConfirmation}
+        emptyText="No eligible destination Systems for this Move mode."
+        allowMultiple={false}
+        confirmDisabled={selectedMoveDestinationIds.length === 0 || Boolean(moveConfirmation) || isMoveCommitting}
       />
     )
   }
@@ -1562,6 +1737,7 @@ export function InventoryForm<T extends InventoryRecord>({
         </div>
       ) : null}
       {renderAddTenantDialog()}
+      {renderMoveTenantDialog()}
     </div>
   )
 }

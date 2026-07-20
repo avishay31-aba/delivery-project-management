@@ -77,6 +77,7 @@ import {
   tenantIsActivelyHostedBySystem,
   tenantCreationDraftFromSource,
   tenantConfigurationSaveDraft,
+  validateTenantMoveDestination,
 } from '@/domain/tenant-operations'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'id' | 'occurredAt'>
@@ -597,7 +598,7 @@ interface AppStore extends AppDataState {
   deleteTenantFromSystem: (id: string) => void
   cancelTenantFromSystem: (id: string) => void
   rollbackSystemFormTenantCreation: (tenantId: string) => void
-  moveTenantToSystem: (id: string, destinationSystemId: string) => void
+  moveTenantToSystem: (id: string, destinationSystemId: string) => AllocationActionResult
   createTenantFromSystemRequirement: (projectId: string, systemId: string, requirementId: string) => AllocationActionResult
   createInternalTenantForSystem: (projectId: string, systemId: string) => AllocationActionResult
   updateAccount: (id: string, patch: Partial<AppDataState['accounts'][number]>) => void
@@ -981,10 +982,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const tenant = state.tenants.find((candidate) => candidate.id === id)
     const sourceSystem = tenant ? state.systems.find((candidate) => candidate.id === tenant.systemId || candidate.id === tenant.hostedSystemId) : undefined
     const destinationSystem = state.systems.find((candidate) => candidate.id === destinationSystemId)
-    if (!tenant || !destinationSystem) return
-    if (tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_DELETED || tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_CANCELLED) return
+    if (!tenant) return { ok: false, message: 'Tenant not found.' }
+    if (!destinationSystem) return { ok: false, message: 'Destination System was not found.' }
+    const validationMessage = validateTenantMoveDestination({
+      tenant,
+      systems: state.systems,
+      projects: state.projects,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      opportunities: state.opportunities,
+      accounts: state.accounts,
+    }, destinationSystemId)
+    if (validationMessage) return { ok: false, message: validationMessage }
     const sourceSystemId = tenant.hostedSystemId || tenant.systemId
-    if (!sourceSystemId || sourceSystemId === destinationSystemId) return
+    if (!sourceSystemId || sourceSystemId === destinationSystemId) return { ok: false, message: 'Destination System must be different from the current hosted System.' }
     const linkedProjectIds = new Set(
       state.projectTenants
         .filter((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
@@ -1048,6 +1059,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }),
     }))
     get().saveToStorage()
+    return { ok: true, message: `Tenant ${tenant.tid} moved to ${systemBusinessId(destinationSystem)}.` }
   },
 
   createTenantFromSystemRequirement: (projectId, systemId, requirementId) => {

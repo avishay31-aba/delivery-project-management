@@ -10,10 +10,8 @@ import {
 } from '@/config/project-form-metadata'
 import type {
   Opportunity,
-  ProductionSystemInventoryItem,
   Project,
   ProjectSystemLink,
-  ReusedInternalSystem,
   System,
   Tenant,
 } from '@/data/seed.types'
@@ -24,7 +22,14 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { SystemDeliveryTable } from '@/components/systems'
+import {
+  EMPTY_SYSTEM_CANDIDATE_FILTERS,
+  SystemCandidateDialog,
+  SystemDeliveryTable,
+  type SystemCandidate,
+  type SystemCandidateFilters,
+  type SystemCandidateSortKey,
+} from '@/components/systems'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
@@ -93,37 +98,12 @@ import {
 } from '@/domain/milestone-plan'
 
 type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents' | 'activity'
-type AllocationCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
-type AllocationCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
-type AllocationCandidateFilterKey =
-  | 'hostingType'
-  | 'cloudPlatform'
-  | 'regionTimeGroup'
-type AllocationCandidateFilters = Record<AllocationCandidateFilterKey, string>
+type AllocationCandidate = SystemCandidate
+type AllocationCandidateSortKey = SystemCandidateSortKey
+type AllocationCandidateFilters = SystemCandidateFilters
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
 
-const ALLOCATION_CANDIDATE_SORT_OPTIONS: Array<{ key: AllocationCandidateSortKey; label: string }> = [
-  { key: 'id', label: 'ID' },
-  { key: 'mid', label: 'MID' },
-  { key: 'source', label: 'Source' },
-  { key: 'status', label: 'Status' },
-  { key: 'product', label: 'Product' },
-  { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'csp', label: 'CSP' },
-  { key: 'region', label: 'Used in Region' },
-]
-
-const EMPTY_ALLOCATION_CANDIDATE_FILTERS: AllocationCandidateFilters = {
-  regionTimeGroup: '',
-  hostingType: '',
-  cloudPlatform: '',
-}
-
-const ALLOCATION_CANDIDATE_FILTER_OPTIONS: Array<{ key: AllocationCandidateFilterKey; label: string }> = [
-  { key: 'hostingType', label: 'Hosting' },
-  { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'regionTimeGroup', label: 'Used in Region' },
-]
+const EMPTY_ALLOCATION_CANDIDATE_FILTERS = EMPTY_SYSTEM_CANDIDATE_FILTERS
 
 const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   projectHeader: false,
@@ -164,92 +144,9 @@ function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): str
   ].join(' ')
 }
 
-function candidatePrimaryId(candidate: AllocationCandidate): string {
-  if ('sid' in candidate && candidate.sid) return candidate.sid
-  if ('machineId' in candidate && candidate.machineId) return candidate.machineId
-  return candidate.id
-}
-
-function candidateMachineId(candidate: AllocationCandidate): string {
-  return 'machineId' in candidate ? candidate.machineId ?? '' : ''
-}
-
-function candidateSource(candidate: AllocationCandidate): string {
-  return 'source' in candidate ? candidate.source ?? '' : ''
-}
-
-function candidateStatus(candidate: AllocationCandidate): string {
-  return 'status' in candidate ? candidate.status : candidate.operationalStatus
-}
-
-function candidateRegionTimeGroup(candidate: AllocationCandidate): string {
-  if ('usedInRegion' in candidate && candidate.usedInRegion) return candidate.usedInRegion
-  if ('region' in candidate && candidate.region) return candidate.region
-  if ('timeGroup' in candidate && candidate.timeGroup) return candidate.timeGroup
-  return ''
-}
-
-function candidateCloudRegion(candidate: AllocationCandidate): string {
-  return candidate.cloudRegion ?? ''
-}
-
-function candidateAvailability(candidate: AllocationCandidate): string {
-  if ('availability' in candidate && candidate.availability) return candidate.availability
-  if ('allocationStatus' in candidate && candidate.allocationStatus) return String(candidate.allocationStatus)
-  return ''
-}
-
-function candidateVersion(candidate: AllocationCandidate): string {
-  const value = (candidate as AllocationCandidate & { versionNumber?: string | number | null }).versionNumber
-  return value ? String(value) : ''
-}
-
-function candidateFilterValue(candidate: AllocationCandidate, filterKey: AllocationCandidateFilterKey): string {
-  const values: Record<AllocationCandidateFilterKey, string> = {
-    hostingType: candidate.hostingType,
-    cloudPlatform: candidate.cloudPlatform ?? '',
-    regionTimeGroup: candidateRegionTimeGroup(candidate),
-  }
-  return values[filterKey]
-}
-
-function candidateSortValue(candidate: AllocationCandidate, sortKey: AllocationCandidateSortKey): string {
-  const values: Record<AllocationCandidateSortKey, string> = {
-    id: candidatePrimaryId(candidate),
-    mid: candidateMachineId(candidate),
-    source: candidateSource(candidate),
-    status: candidateStatus(candidate),
-    product: candidate.productType,
-    cloudPlatform: candidate.cloudPlatform ?? '',
-    csp: candidate.csp ?? '',
-    region: candidateRegionTimeGroup(candidate),
-  }
-  return values[sortKey]
-}
-
-function candidateSearchText(candidate: AllocationCandidate): string {
-  return ALLOCATION_CANDIDATE_SORT_OPTIONS
-    .map((option) => candidateSortValue(candidate, option.key))
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-}
-
 function allocationStatusClassName(result: AllocationActionResult | null): string {
   if (!result) return ''
   return result.ok ? successMessageClassName() : errorMessageClassName()
-}
-
-function candidateFilterOptions(candidates: AllocationCandidate[], filterKey: AllocationCandidateFilterKey): string[] {
-  return Array.from(new Set(candidates.map((candidate) => candidateFilterValue(candidate, filterKey)).filter(Boolean)))
-    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
-}
-
-function candidateMatchesStructuredFilters(candidate: AllocationCandidate, filters: AllocationCandidateFilters): boolean {
-  return ALLOCATION_CANDIDATE_FILTER_OPTIONS.every((filter) => {
-    const filterValue = filters[filter.key]
-    return filterValue ? candidateFilterValue(candidate, filter.key) === filterValue : true
-  })
 }
 
 function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
@@ -536,28 +433,6 @@ export function ProjectFormPage() {
       : selectedMode === 'REUSED_INTERNAL'
         ? availableReusedInternalCandidates(reusedInternalSystems)
         : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
-  const trimmedAllocationCandidateSearch = allocationCandidateSearch.trim().toLowerCase()
-  const allocationCandidateFilterValues = useMemo(
-    () =>
-      Object.fromEntries(
-        ALLOCATION_CANDIDATE_FILTER_OPTIONS.map((filter) => [
-          filter.key,
-          candidateFilterOptions(availableAllocationCandidates, filter.key),
-        ]),
-      ) as Record<AllocationCandidateFilterKey, string[]>,
-    [availableAllocationCandidates],
-  )
-  const visibleAllocationCandidates = [...availableAllocationCandidates]
-    .filter((candidate) =>
-      trimmedAllocationCandidateSearch ? candidateSearchText(candidate).includes(trimmedAllocationCandidateSearch) : true,
-    )
-    .filter((candidate) => candidateMatchesStructuredFilters(candidate, allocationCandidateFilters))
-    .sort((firstCandidate, secondCandidate) => {
-      const direction = allocationCandidateSortDirection === 'asc' ? 1 : -1
-      return candidateSortValue(firstCandidate, allocationCandidateSortKey).localeCompare(
-        candidateSortValue(secondCandidate, allocationCandidateSortKey),
-      ) * direction
-    })
 
   function toggleSection(sectionId: CollapsibleSectionId) {
     setCollapsedSections((current) => ({ ...current, [sectionId]: !current[sectionId] }))
@@ -1768,199 +1643,36 @@ export function ProjectFormPage() {
   function renderAllocationDialog() {
     if (!isAllocationDialogOpen) return null
     const isReusedInternalAllocationMode = selectedMode === 'REUSED_INTERNAL'
-    const allocationCandidateHeaders = [
-      'Select',
-      ...(isReusedInternalAllocationMode ? ['MID'] : ['ID', 'MID']),
-      'Source',
-      'Status',
-      'Used in Region',
-      'Country',
-      'Product',
-      'Hosting',
-      'Cloud Platform',
-      'Cloud Region',
-      'Availability',
-      'Version',
-    ]
 
     return (
-      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/35 p-4 pt-8">
-        <div className="flex h-[82vh] w-full max-w-[96rem] flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-allocation-title">
-          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
-            <div>
-              <h2 id="project-allocation-title" className="text-xl font-semibold text-sf-text">Allocate system</h2>
-              <p className="text-sm text-sf-text-muted">Create a Project to System link for {projectDraft.pid}. Tenants are created later from the System Form.</p>
-            </div>
-            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close allocation dialog" onClick={() => setIsAllocationDialogOpen(false)}>
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            <div className="flex flex-wrap gap-2">
-              {permittedAllocationModes.map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={[
-                    'inline-flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-semibold',
-                    selectedMode === mode
-                      ? 'border-sf-brand bg-sf-brand text-white'
-                      : 'border-sf-border bg-white text-sf-text hover:bg-sf-surface-alt',
-                  ].join(' ')}
-                  onClick={() => changeAllocationMode(mode)}
-                >
-                  {mode === 'EXISTING_SYSTEM' ? <Link2 className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-                  {allocationModeLabelForProject(mode, projectDraft)}
-                </button>
-              ))}
-            </div>
-
-            {allocationResult ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
-
-            {availableAllocationCandidates.length > 0 ? (
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-end gap-2 rounded border border-sf-border bg-white p-2">
-                  <label className="block text-sm font-medium text-sf-text">
-                    Filter
-                    <input
-                      className="mt-1 h-8 rounded border border-sf-border px-2 text-sm"
-                      placeholder="Search candidates"
-                      value={allocationCandidateSearch}
-                      onChange={(event) => setAllocationCandidateSearch(event.target.value)}
-                    />
-                  </label>
-                  <label className="block text-sm font-medium text-sf-text">
-                    Sort by
-                    <select
-                      className="mt-1 h-8 rounded border border-sf-border px-2 text-sm"
-                      value={allocationCandidateSortKey}
-                      onChange={(event) => setAllocationCandidateSortKey(event.target.value as AllocationCandidateSortKey)}
-                    >
-                      {ALLOCATION_CANDIDATE_SORT_OPTIONS.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
-                    onClick={() => setAllocationCandidateSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'))}
-                  >
-                    {allocationCandidateSortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                  </button>
-                  {ALLOCATION_CANDIDATE_FILTER_OPTIONS.map((filter) => {
-                    const options = allocationCandidateFilterValues[filter.key]
-                    if (options.length === 0) return null
-                    return (
-                      <label key={filter.key} className="block text-sm font-medium text-sf-text">
-                        {filter.label}
-                        <select
-                          className="mt-1 h-8 max-w-44 rounded border border-sf-border px-2 text-sm"
-                          value={allocationCandidateFilters[filter.key]}
-                          onChange={(event) =>
-                            setAllocationCandidateFilters((current) => ({
-                              ...current,
-                              [filter.key]: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="">All</option>
-                          {options.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )
-                  })}
-                  {Object.values(allocationCandidateFilters).some(Boolean) ? (
-                    <button
-                      type="button"
-                      className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
-                      onClick={() => setAllocationCandidateFilters(EMPTY_ALLOCATION_CANDIDATE_FILTERS)}
-                    >
-                      Clear filters
-                    </button>
-                  ) : null}
-                </div>
-                <div className="sf-scroll-x rounded border border-sf-border bg-white">
-                <table className="min-w-full border-collapse text-sm leading-tight">
-                  <thead className="bg-sf-surface-alt text-left">
-                    <tr>
-                      {allocationCandidateHeaders.map((label) => (
-                        <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleAllocationCandidates.map((candidate) => (
-                      <tr key={candidate.id} className="hover:bg-sf-surface-alt">
-                        <td className="border border-sf-border px-1.5 py-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedAllocationIds.includes(candidate.id)}
-                            onChange={(event) => toggleAllocationCandidate(candidate.id, event.target.checked)}
-                          />
-                        </td>
-                        {isReusedInternalAllocationMode ? (
-                          <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate) || candidatePrimaryId(candidate)}</td>
-                        ) : (
-                          <>
-                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidatePrimaryId(candidate)}</td>
-                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateMachineId(candidate)}</td>
-                          </>
-                        )}
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
-                        <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegionTimeGroup(candidate) || '-'}</td>
-                        <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? candidate.country || '-' : '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.hostingType || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateCloudRegion(candidate) || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateAvailability(candidate) || '-'}</td>
-                        <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
-                      </tr>
-                    ))}
-                    {visibleAllocationCandidates.length === 0 ? (
-                      <tr>
-                        <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={allocationCandidateHeaders.length}>
-                          No systems match the current filter.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-                {selectedMode === 'EXISTING_SYSTEM'
-                  ? 'No new tenant system requirements.'
-                  : 'No available systems for this allocation mode.'}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2 border-t border-sf-border p-4">
-            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsAllocationDialogOpen(false)}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={selectedAllocationIds.length === 0}
-              onClick={confirmAllocation}
-            >
-              Confirm
-            </button>
-          </div>
-        </div>
-      </div>
+      <SystemCandidateDialog
+        title="Allocate system"
+        description={`Create a Project to System link for ${projectDraft.pid}. Tenants are created later from the System Form.`}
+        closeLabel="Close allocation dialog"
+        modes={permittedAllocationModes.map((mode) => ({
+          id: mode,
+          label: allocationModeLabelForProject(mode, projectDraft),
+          icon: mode === 'EXISTING_SYSTEM' ? <Link2 className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />,
+        }))}
+        selectedMode={selectedMode}
+        onModeChange={(mode) => changeAllocationMode(mode as AllocationMode)}
+        result={allocationResult ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
+        candidates={availableAllocationCandidates}
+        selectedCandidateIds={selectedAllocationIds}
+        onToggleCandidate={toggleAllocationCandidate}
+        search={allocationCandidateSearch}
+        onSearchChange={setAllocationCandidateSearch}
+        filters={allocationCandidateFilters}
+        onFiltersChange={setAllocationCandidateFilters}
+        sortKey={allocationCandidateSortKey}
+        onSortKeyChange={setAllocationCandidateSortKey}
+        sortDirection={allocationCandidateSortDirection}
+        onSortDirectionChange={setAllocationCandidateSortDirection}
+        onClose={() => setIsAllocationDialogOpen(false)}
+        onConfirm={confirmAllocation}
+        emptyText={selectedMode === 'EXISTING_SYSTEM' ? 'No new tenant system requirements.' : 'No available systems for this allocation mode.'}
+        isReusedInternalMode={isReusedInternalAllocationMode}
+      />
     )
   }
 

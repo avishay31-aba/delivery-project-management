@@ -1,8 +1,10 @@
-import type { Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
-import { activeProjectTenantLinks } from '@/domain/allocation-context'
+import type { Account, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, System, Tenant, TenantConfiguration, TenantFormType, TenantHostedSystemHistory } from '@/data/seed.types'
+import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
+import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 import {
+  activeHostedSystemIdForTenant,
   isTenantLifecycleInactive,
   tenantLatestHistoricalSystemId,
   TENANT_OPERATIONAL_STATUS_CANCELLED,
@@ -13,6 +15,18 @@ import {
   tenantWarrantyHeaderStatusReadModel,
   type TenantWarrantyHeaderStatusReadModel,
 } from '@/domain/warranty-collection'
+
+export type TenantMoveMode = 'DELIVERED' | 'POC_ASSIGNED'
+
+interface TenantMoveContext {
+  tenant: Tenant
+  systems: System[]
+  projects: Project[]
+  projectSystems: ProjectSystemLink[]
+  projectTenants: ProjectTenantLink[]
+  opportunities?: Opportunity[]
+  accounts?: Account[]
+}
 
 export type TenantOperationalMode =
   | 'Operative'
@@ -194,6 +208,104 @@ export function tenantRelatedProjects(
       }
       return first.pid.localeCompare(second.pid)
     })
+}
+
+function projectLinkAllocatedAt(link: ProjectTenantLink): string {
+  return link.allocatedAt ?? ''
+}
+
+export function tenantOriginalProject(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): Project | undefined {
+  const projectById = new Map(projects.map((project) => [project.id, project]))
+  const linkedProjects = projectTenants
+    .filter((link) => link.tenantId === tenant.id)
+    .sort((first, second) => {
+      const firstDate = projectLinkAllocatedAt(first)
+      const secondDate = projectLinkAllocatedAt(second)
+      if (firstDate && secondDate && firstDate !== secondDate) return firstDate.localeCompare(secondDate)
+      if (firstDate) return -1
+      if (secondDate) return 1
+      return first.id.localeCompare(second.id)
+    })
+    .map((link) => projectById.get(link.projectId))
+    .filter((project): project is Project => Boolean(project))
+  if (linkedProjects[0]) return linkedProjects[0]
+
+  const tenantPocPid = (tenant as Tenant & { pocPid?: string }).pocPid
+  return projects.find((project) => project.pid === tenant.deliveryPid || project.pid === tenantPocPid)
+}
+
+export function tenantMoveDefaultMode(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): TenantMoveMode {
+  return tenantOriginalProject(tenant, projects, projectTenants)?.mainType === 'POC'
+    ? 'POC_ASSIGNED'
+    : 'DELIVERED'
+}
+
+export function tenantMoveDefaultRegion(context: Pick<TenantMoveContext, 'tenant' | 'projects' | 'projectTenants' | 'opportunities' | 'accounts'>): string {
+  const project = tenantOriginalProject(context.tenant, context.projects, context.projectTenants)
+  if (!project) return ''
+  const linkedOpportunity = context.opportunities?.find((opportunity) => opportunity.id === project.opportunityId || opportunity.opportunityId === project.opportunityId)
+  const account = context.accounts?.find((candidate) => candidate.accountName === project.accountName)
+  return projectHeaderFieldValue(project, 'region', { linkedOpportunity, account }).trim()
+}
+
+function projectMatchesMoveMode(project: Project, mode: TenantMoveMode): boolean {
+  if (project.archivedAt) return false
+  if (mode === 'POC_ASSIGNED') return project.mainType === 'POC'
+  return (
+    (project.mainType === 'DELIVERY' && (project.subType === 'NEW' || project.subType === 'UPSELL')) ||
+    (project.mainType === 'RENEWAL' && project.subType === 'UPSELL')
+  )
+}
+
+function systemRegion(system: System): string {
+  return system.region || system.timeGroup || ''
+}
+
+export function tenantMoveDestinationCandidates(context: TenantMoveContext, mode: TenantMoveMode): System[] {
+  const sourceSystemId = activeHostedSystemIdForTenant(context.tenant)
+  const sourceProduct = context.systems.find((system) => system.id === sourceSystemId)?.productType || context.tenant.productType
+  const projectById = new Map(context.projects.map((project) => [project.id, project]))
+  const eligibleProjectIds = new Set(
+    context.projects
+      .filter((project) => projectMatchesMoveMode(project, mode))
+      .map((project) => project.id),
+  )
+  const allocatedSystemIds = new Set(
+    activeProjectSystemLinks(context.projectSystems)
+      .filter((link) => eligibleProjectIds.has(link.projectId) && projectById.has(link.projectId))
+      .map((link) => link.systemId),
+  )
+  const defaultRegion = tenantMoveDefaultRegion(context)
+  return context.systems.filter((system) => {
+    if (system.id === sourceSystemId) return false
+    if (!allocatedSystemIds.has(system.id)) return false
+    if (sourceProduct && system.productType && system.productType !== sourceProduct) return false
+    const destinationRegion = systemRegion(system)
+    if (defaultRegion && destinationRegion && destinationRegion !== defaultRegion) return false
+    return true
+  })
+}
+
+export function validateTenantMoveDestination(context: TenantMoveContext, destinationSystemId: string): string | null {
+  if (isTenantLifecycleInactive(context.tenant)) return `Tenant ${context.tenant.tid} cannot be moved because its Operational Status is ${context.tenant.operationalStatus}.`
+  if (!activeHostedSystemIdForTenant(context.tenant)) return `Tenant ${context.tenant.tid} is not actively hosted by a System.`
+  if (activeHostedSystemIdForTenant(context.tenant) === destinationSystemId) return 'Destination System must be different from the current hosted System.'
+  if (!context.systems.some((system) => system.id === destinationSystemId)) return 'Destination System was not found.'
+  const candidates = [
+    ...tenantMoveDestinationCandidates(context, 'DELIVERED'),
+    ...tenantMoveDestinationCandidates(context, 'POC_ASSIGNED'),
+  ]
+  return candidates.some((system) => system.id === destinationSystemId)
+    ? null
+    : 'Destination System is not eligible for this Tenant move.'
 }
 
 export function tenantDeliveryPidDisplay(
