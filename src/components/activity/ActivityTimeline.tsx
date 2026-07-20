@@ -1,22 +1,23 @@
-import { useMemo, useState } from 'react'
-import { activityEventCategoryLabel, type ActivityEvent } from '@/domain/activity-log'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  activityEventCategoryLabel,
+  browseActivityLog,
+  type ActivityEvent,
+  type ActivityLogPageSize,
+} from '@/domain/activity-log'
 import { formatSemanticDateTimeValue } from '@/domain/date-time-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
-type ActivitySortKey = 'activityId' | 'creationDate' | 'user' | 'eventCategory' | 'description'
-type SortDirection = 'asc' | 'desc'
-
 interface ActivityRow {
   activityId: string
   creationDate: string
-  creationDateSort: string
   user: string
   eventCategory: string
   description: string
 }
 
-const ACTIVITY_COLUMNS: Array<{ key: ActivitySortKey; label: string }> = [
+const ACTIVITY_COLUMNS: Array<{ key: keyof ActivityRow; label: string }> = [
   { key: 'activityId', label: 'Activity ID' },
   { key: 'creationDate', label: 'Creation Date' },
   { key: 'user', label: 'User' },
@@ -24,23 +25,17 @@ const ACTIVITY_COLUMNS: Array<{ key: ActivitySortKey; label: string }> = [
   { key: 'description', label: 'Description' },
 ]
 
+const ACTIVITY_PAGE_SIZE_OPTIONS: ActivityLogPageSize[] = [20, 50, 100, 'all']
+const MAX_CUSTOM_RECORD_LIMIT = 10000
+
 function activityRows(events: ActivityEvent[]): ActivityRow[] {
   return events.map((event) => ({
     activityId: event.id,
     creationDate: event.occurredAt,
-    creationDateSort: event.occurredAt,
     user: event.actorName,
     eventCategory: activityEventCategoryLabel(event),
     description: event.summary,
   }))
-}
-
-function compareRows(first: ActivityRow, second: ActivityRow, sortKey: ActivitySortKey, direction: SortDirection): number {
-  const multiplier = direction === 'asc' ? 1 : -1
-  if (sortKey === 'creationDate') {
-    return first.creationDateSort.localeCompare(second.creationDateSort) * multiplier
-  }
-  return first[sortKey].localeCompare(second[sortKey], undefined, { numeric: true }) * multiplier
 }
 
 function csvValue(value: string): string {
@@ -51,6 +46,10 @@ function activityCreationDatePresentation(value: string): string {
   return formatSemanticDateTimeValue(value, 'datetime', { fallback: '' })
 }
 
+function pageSizeLabel(pageSize: ActivityLogPageSize): string {
+  return pageSize === 'all' ? 'All' : String(pageSize)
+}
+
 export function ActivityTimeline({
   events,
   emptyText = 'No activity has been recorded.',
@@ -59,35 +58,103 @@ export function ActivityTimeline({
   emptyText?: string
   showCategoryFilter?: boolean
 }) {
-  const regionalDateFormat = useDateTimePresentationPreference()
+  useDateTimePresentationPreference()
   const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<ActivitySortKey>('creationDate')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
-  const rows = useMemo(() => activityRows(events), [events, regionalDateFormat])
-  const filteredRows = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase()
-    return rows
-      .filter((row) => {
-        if (!normalizedSearch) return true
-        return [row.activityId, activityCreationDatePresentation(row.creationDate), row.user, row.eventCategory, row.description].some((value) =>
-          value.toLocaleLowerCase().includes(normalizedSearch),
-        )
-      })
-      .sort((first, second) => compareRows(first, second, sortKey, sortDirection))
-  }, [rows, search, sortDirection, sortKey])
+  const [fromDateDraft, setFromDateDraft] = useState('')
+  const [toDateDraft, setToDateDraft] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [dateError, setDateError] = useState('')
+  const [pageSize, setPageSize] = useState<ActivityLogPageSize>(20)
+  const [pageNumber, setPageNumber] = useState(1)
+  const [customLimitDraft, setCustomLimitDraft] = useState('')
+  const [latestRecordLimit, setLatestRecordLimit] = useState<number | null>(null)
+  const [limitError, setLimitError] = useState('')
 
-  function toggleSort(nextSortKey: ActivitySortKey) {
-    if (nextSortKey === sortKey) {
-      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+  const result = useMemo(
+    () =>
+      browseActivityLog(events, {
+        fromDate,
+        toDate,
+        search,
+        pageNumber,
+        pageSize,
+        latestRecordLimit,
+      }),
+    [events, fromDate, latestRecordLimit, pageNumber, pageSize, search, toDate],
+  )
+  const rows = useMemo(() => activityRows(result.records), [result.records])
+  const exportRows = useMemo(
+    () =>
+      activityRows(browseActivityLog(events, {
+        fromDate,
+        toDate,
+        search,
+        pageNumber: 1,
+        pageSize: 'all',
+        latestRecordLimit,
+      }).records),
+    [events, fromDate, latestRecordLimit, search, toDate],
+  )
+
+  useEffect(() => {
+    if (result.currentPage !== pageNumber) setPageNumber(result.currentPage)
+  }, [pageNumber, result.currentPage])
+
+  useEffect(() => {
+    if (fromDateDraft && toDateDraft && fromDateDraft > toDateDraft) {
+      setDateError('From Date must not be later than To Date.')
+    } else if (dateError) {
+      setDateError('')
+    }
+  }, [dateError, fromDateDraft, toDateDraft])
+
+  function resetToFirstPage() {
+    setPageNumber(1)
+  }
+
+  function applyDateFilter() {
+    if (fromDateDraft && toDateDraft && fromDateDraft > toDateDraft) {
+      setDateError('From Date must not be later than To Date.')
       return
     }
-    setSortKey(nextSortKey)
-    setSortDirection(nextSortKey === 'creationDate' ? 'desc' : 'asc')
+    setDateError('')
+    setFromDate(fromDateDraft)
+    setToDate(toDateDraft)
+    resetToFirstPage()
+  }
+
+  function clearDateFilter() {
+    setDateError('')
+    setFromDateDraft('')
+    setToDateDraft('')
+    setFromDate('')
+    setToDate('')
+    resetToFirstPage()
+  }
+
+  function applyCustomLimit() {
+    const trimmed = customLimitDraft.trim()
+    const parsed = Number(trimmed)
+    if (!trimmed || !Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_CUSTOM_RECORD_LIMIT) {
+      setLimitError(`Enter a positive whole number up to ${MAX_CUSTOM_RECORD_LIMIT}.`)
+      return
+    }
+    setLimitError('')
+    setLatestRecordLimit(parsed)
+    resetToFirstPage()
+  }
+
+  function clearCustomLimit() {
+    setLimitError('')
+    setCustomLimitDraft('')
+    setLatestRecordLimit(null)
+    resetToFirstPage()
   }
 
   function exportCsv() {
     const header = ACTIVITY_COLUMNS.map((column) => column.label).join(',')
-    const lines = filteredRows.map((row) =>
+    const lines = exportRows.map((row) =>
       [row.activityId, activityCreationDatePresentation(row.creationDate), row.user, row.eventCategory, row.description].map(csvValue).join(','),
     )
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -99,31 +166,132 @@ export function ActivityTimeline({
     URL.revokeObjectURL(url)
   }
 
+  const hasAnyActivity = events.length > 0
+  const emptyMessage = hasAnyActivity ? 'No activity matches the current filters.' : emptyText
+  const pageSummary = result.totalMatchingRecords > 0
+    ? `Records ${result.firstRecordNumber}-${result.lastRecordNumber} of ${result.totalMatchingRecords}`
+    : 'Records 0-0 of 0'
+
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="relative">
-          <input
-            aria-label="Search Activity Log"
-            className="h-8 w-72 rounded border border-sf-border px-2 py-1 pr-7 text-sm"
-            placeholder="Search / Filter"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          {search ? (
-            <button
-              type="button"
-              className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-sf-text-muted hover:bg-sf-surface-alt hover:text-sf-text"
-              aria-label="Clear activity search"
-              onClick={() => setSearch('')}
-            >
-              x
-            </button>
-          ) : null}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block text-sm font-medium text-sf-text">
+            <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">Search</span>
+            <input
+              aria-label="Search Activity Log"
+              className="h-8 w-72 rounded border border-sf-border px-2 py-1 text-sm"
+              placeholder="Search Activity Log"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                resetToFirstPage()
+              }}
+            />
+          </label>
+          <label className="block text-sm font-medium text-sf-text">
+            <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">From Date</span>
+            <input
+              aria-label="Activity From Date"
+              className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+              type="date"
+              value={fromDateDraft}
+              onChange={(event) => setFromDateDraft(event.target.value)}
+              onInput={(event) => setFromDateDraft(event.currentTarget.value)}
+            />
+          </label>
+          <label className="block text-sm font-medium text-sf-text">
+            <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">To Date</span>
+            <input
+              aria-label="Activity To Date"
+              className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+              type="date"
+              value={toDateDraft}
+              onChange={(event) => setToDateDraft(event.target.value)}
+              onInput={(event) => setToDateDraft(event.currentTarget.value)}
+            />
+          </label>
+          <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={applyDateFilter}>
+            Apply
+          </button>
+          <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={clearDateFilter}>
+            Clear / All Dates
+          </button>
         </div>
-        <button type="button" className="rounded border border-sf-border px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={exportCsv}>
+        <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={exportCsv}>
           Export CSV
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="block text-sm font-medium text-sf-text">
+          <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">Records Per Page</span>
+          <select
+            aria-label="Activity records per page"
+            className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+            value={String(pageSize)}
+            onChange={(event) => {
+              const value = event.target.value === 'all' ? 'all' : Number(event.target.value) as ActivityLogPageSize
+              setPageSize(value)
+              resetToFirstPage()
+            }}
+          >
+            {ACTIVITY_PAGE_SIZE_OPTIONS.map((value) => (
+              <option key={value} value={String(value)}>{pageSizeLabel(value)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-medium text-sf-text">
+          <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">Latest Record Count</span>
+          <input
+            aria-label="Latest Activity record count"
+            className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+            inputMode="numeric"
+            placeholder="e.g. 25"
+            value={customLimitDraft}
+            onChange={(event) => setCustomLimitDraft(event.target.value)}
+          />
+        </label>
+        <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={applyCustomLimit}>
+          Apply Latest
+        </button>
+        <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={clearCustomLimit}>
+          Clear Limit
+        </button>
+        {latestRecordLimit ? (
+          <span className="pb-1 text-sm text-sf-text-muted">Showing latest {latestRecordLimit} matching records before pagination.</span>
+        ) : null}
+      </div>
+
+      {dateError || limitError ? (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          {dateError || limitError}
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-sf-border bg-white px-3 py-2 text-sm text-sf-text">
+        <div>
+          Page {result.currentPage} of {result.totalPages}
+          <span className="ml-3 text-sf-text-muted">{pageSummary}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded border border-sf-border px-3 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={result.currentPage <= 1}
+            onClick={() => setPageNumber((current) => Math.max(1, current - 1))}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            className="rounded border border-sf-border px-3 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={result.currentPage >= result.totalPages}
+            onClick={() => setPageNumber((current) => Math.min(result.totalPages, current + 1))}
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       <div className="sf-scroll-x rounded border border-sf-border bg-white">
@@ -132,20 +300,13 @@ export function ActivityTimeline({
             <tr>
               {ACTIVITY_COLUMNS.map((column) => (
                 <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1"
-                    onClick={() => toggleSort(column.key)}
-                  >
-                    {column.label}
-                    {sortKey === column.key ? <span aria-hidden="true">{sortDirection === 'asc' ? '^' : 'v'}</span> : null}
-                  </button>
+                  {column.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row) => (
+            {rows.map((row) => (
               <tr key={row.activityId} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.activityId}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
@@ -156,10 +317,10 @@ export function ActivityTimeline({
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.description}</td>
               </tr>
             ))}
-            {filteredRows.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={ACTIVITY_COLUMNS.length}>
-                  {emptyText}
+                  {emptyMessage}
                 </td>
               </tr>
             ) : null}

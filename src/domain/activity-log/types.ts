@@ -64,3 +64,26 @@ export interface ActivityLogDashboardSummary {
   tenantEvents: number
   systemEvents: number
 }
+
+export type ActivityLogPageSize = 20 | 50 | 100 | 'all'
+
+export interface ActivityLogBrowseQuery {
+  objectType?: string
+  objectIdOrBusinessId?: string
+  fromDate?: string
+  toDate?: string
+  search?: string
+  pageNumber: number
+  pageSize: ActivityLogPageSize
+  latestRecordLimit?: number | null
+}
+
+export interface ActivityLogBrowseResult {
+  records: ActivityEvent[]
+  totalMatchingRecords: number
+  totalPages: number
+  currentPage: number
+  pageSize: ActivityLogPageSize
+  firstRecordNumber: number
+  lastRecordNumber: number
+}

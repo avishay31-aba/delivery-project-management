@@ -1,5 +1,7 @@
 import { ACTIVITY_EVENT_CATEGORIES } from './metadata'
 import type {
+  ActivityLogBrowseQuery,
+  ActivityLogBrowseResult,
   ActivityEvent,
   ActivityEventCategory,
   ActivityLogDashboardSummary,
@@ -20,6 +22,32 @@ function sortNewestFirst(events: ActivityEvent[]): ActivityEvent[] {
   return [...events].sort((first, second) =>
     second.occurredAt.localeCompare(first.occurredAt) || (second.sequence ?? 0) - (first.sequence ?? 0),
   )
+}
+
+function eventLocalDateKey(event: ActivityEvent): string {
+  const parsed = new Date(event.occurredAt)
+  if (Number.isNaN(parsed.valueOf())) return ''
+  const year = String(parsed.getFullYear()).padStart(4, '0')
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function activitySearchText(event: ActivityEvent): string {
+  return [
+    event.id,
+    event.occurredAt,
+    event.actorName,
+    activityEventCategoryLabel(event),
+    event.summary,
+    event.details ?? '',
+    event.primaryObject.businessId,
+    event.primaryObject.displayLabel,
+  ].join(' ').toLocaleLowerCase()
+}
+
+function positiveInteger(value: number | null | undefined): number | null {
+  return Number.isInteger(value) && value && value > 0 ? value : null
 }
 
 export function activityEventsForObject(
@@ -90,6 +118,43 @@ export function activityEventsByDateRange(
     (!startIso || event.occurredAt >= startIso) &&
     (!endIso || event.occurredAt <= endIso),
   ))
+}
+
+export function browseActivityLog(
+  events: ActivityEvent[],
+  query: ActivityLogBrowseQuery,
+): ActivityLogBrowseResult {
+  const scopedEvents = query.objectType && query.objectIdOrBusinessId
+    ? events.filter((event) => eventMatchesObject(event, query.objectType ?? '', query.objectIdOrBusinessId ?? ''))
+    : events
+  const normalizedSearch = query.search?.trim().toLocaleLowerCase() ?? ''
+  const latestLimit = positiveInteger(query.latestRecordLimit)
+  const pageSize = query.pageSize
+
+  const matching = sortNewestFirst(scopedEvents.filter((event) => {
+    const eventDate = eventLocalDateKey(event)
+    if (query.fromDate && eventDate && eventDate < query.fromDate) return false
+    if (query.toDate && eventDate && eventDate > query.toDate) return false
+    if (!normalizedSearch) return true
+    return activitySearchText(event).includes(normalizedSearch)
+  }))
+  const limited = latestLimit ? matching.slice(0, latestLimit) : matching
+  const totalMatchingRecords = limited.length
+  const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
+  const totalPages = Math.max(1, Math.ceil(totalMatchingRecords / numericPageSize))
+  const currentPage = Math.min(Math.max(1, query.pageNumber), totalPages)
+  const startIndex = pageSize === 'all' ? 0 : (currentPage - 1) * numericPageSize
+  const records = pageSize === 'all' ? limited : limited.slice(startIndex, startIndex + numericPageSize)
+
+  return {
+    records,
+    totalMatchingRecords,
+    totalPages,
+    currentPage,
+    pageSize,
+    firstRecordNumber: records.length > 0 ? startIndex + 1 : 0,
+    lastRecordNumber: records.length > 0 ? startIndex + records.length : 0,
+  }
 }
 
 export function activityLogSummary(events: ActivityEvent[]): ActivityLogSummary {

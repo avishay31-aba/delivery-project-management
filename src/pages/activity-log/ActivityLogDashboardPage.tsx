@@ -1,10 +1,6 @@
 import { useMemo } from 'react'
-import { DataDashboard } from '@/components/dashboard'
+import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import {
-  activityDashboardRows,
-  createActivityLogColumns,
-} from '@/config/activity-log-columns'
 import { activityLogDashboardSummary } from '@/domain/activity-log'
 import { useAppStore } from '@/store/useAppStore'
 
@@ -19,9 +15,7 @@ function kpiCard(label: string, value: number) {
 
 export function ActivityLogDashboardPage() {
   const activityEvents = useAppStore((state) => state.activityEvents)
-  const rows = useMemo(() => activityDashboardRows(activityEvents), [activityEvents])
   const summary = useMemo(() => activityLogDashboardSummary(activityEvents), [activityEvents])
-  const columns = useMemo(() => createActivityLogColumns(), [])
 
   return (
     <div className="space-y-4">
@@ -39,15 +33,7 @@ export function ActivityLogDashboardPage() {
         {kpiCard('System Events', summary.systemEvents)}
       </section>
 
-      <DataDashboard
-        title="Activity / Audit Log"
-        dashboardScope="activityLog"
-        rows={rows}
-        columns={columns}
-        enableInlineEditing={false}
-        enableRecordActions={false}
-        initialSorting={[{ id: 'creationDate', desc: true }]}
-      />
+      <ActivityTimeline events={activityEvents} emptyText="No activity has been recorded across the ERP." />
     </div>
   )
 }
