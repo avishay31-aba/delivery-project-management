@@ -23,7 +23,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import { TenantWarrantyContractTabs } from '@/components/tenants/TenantWarrantyContractTabs'
+import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import { SystemDeliveryTable } from '@/components/systems'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel } from '@/components/configuration'
@@ -2099,7 +2099,7 @@ export function ProjectFormPage() {
           onToggle={() => toggleSection('tenants')}
           className="space-y-3"
         >
-          <TenantWarrantyContractTabs
+          <TenantWarrantyContractSections
             tenants={linkedTenants}
             systems={systems}
             emptyTextForSection={(title) => `No ${title.toLowerCase()} tenants are linked to this Project.`}

@@ -19,7 +19,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { RemarksGrid } from '@/components/remarks'
-import { TenantWarrantyContractTabs } from '@/components/tenants/TenantWarrantyContractTabs'
+import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import { BusinessObjectLink, FormField, LinkedProjectsLinks, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -987,13 +987,14 @@ export function InventoryForm<T extends InventoryRecord>({
             <div className="text-sm text-sf-text-muted">Link this system to a project before adding tenants.</div>
           ) : null}
 
-          <TenantWarrantyContractTabs
+          <TenantWarrantyContractSections
             tenants={hostedTenants}
             systems={allocatedSystems}
             emptyTextForSection={() => 'No hosted tenants in this section.'}
             actions={(tenant) => renderHostedTenantActions(tenant)}
           />
         </section>
+        {renderApplicationConfigurationSummarySection()}
       </div>
     )
   }
@@ -1470,7 +1471,6 @@ export function InventoryForm<T extends InventoryRecord>({
           </div>
         </div>
       </CollapsibleSection>
-      {renderApplicationConfigurationSummarySection()}
       {renderPurposeHistorySection()}
       {renderRemarksSection()}
       {renderConfigurationHistorySection()}
