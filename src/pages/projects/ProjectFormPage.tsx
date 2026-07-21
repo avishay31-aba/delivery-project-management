@@ -275,14 +275,22 @@ function RequirementSection({
             </thead>
             <tbody className="bg-white">
               {rows.map((row) => (
-                <tr key={row.id} className={section.kind === 'B' ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-sf-surface-alt'}>
-                  {section.columns.map((column) => (
-                    <td key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
-                      <ApplicationConfigurationComparisonCell comparison={comparisonForCell(row as unknown as Record<string, unknown>, column.key)}>
-                        {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
-                      </ApplicationConfigurationComparisonCell>
-                    </td>
-                  ))}
+                <tr key={row.id} className="hover:bg-sf-surface-alt">
+                  {section.columns.map((column) => {
+                    const comparison = comparisonForCell(row as unknown as Record<string, unknown>, column.key)
+                    const cellClassName = [
+                      'whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text',
+                      comparison && !comparison.matches ? 'configuration-change-outstanding' : '',
+                    ].filter(Boolean).join(' ')
+
+                    return (
+                      <td key={column.key} className={cellClassName}>
+                        <ApplicationConfigurationComparisonCell comparison={comparison}>
+                          {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
+                        </ApplicationConfigurationComparisonCell>
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

@@ -121,23 +121,27 @@
   }
 
   .configuration-change-addition {
-    @apply rounded-sm bg-green-50 px-0.5 font-semibold text-green-700;
+    @apply font-semibold text-green-700;
   }
 
   .configuration-change-removal {
-    @apply rounded-sm bg-red-50 px-0.5 font-semibold;
+    @apply font-semibold text-red-700;
   }
 
   .configuration-change-boolean-yes {
-    @apply rounded-sm bg-green-50 px-0.5 font-semibold;
+    @apply font-semibold text-green-700;
   }
 
   .configuration-change-boolean-no {
-    @apply rounded-sm bg-red-50 px-0.5 font-semibold;
+    @apply font-semibold text-red-700;
   }
 
   .configuration-change-changed {
     @apply font-semibold;
+  }
+
+  .configuration-change-outstanding {
+    @apply bg-yellow-50;
   }
 
   .sf-view-mode input:not([type='checkbox']):not([type='radio']),
