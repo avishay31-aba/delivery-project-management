@@ -18,7 +18,7 @@ import {
 import { useAppStore } from '@/store/useAppStore'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
-import { FileDownloadLink, FormField, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { BusinessIdLink, FileDownloadLink, FormField, ReadonlyField, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
 
 type SortKey = 'id' | 'timestamp' | 'userName' | 'mid' | 'sid' | 'versionLabel' | 'buildLabel' | 'emailSentAt' | 'remarks'
 type SortState = { key: SortKey; direction: 'asc' | 'desc' } | null
@@ -438,17 +438,23 @@ export function SystemVersionUpdatePanel({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="MID" controlWidthClassName="w-full" className="w-full" renderAs="div">
-                  <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'}</div>
-                </FormField>
-                <FormField label="SID" controlWidthClassName="w-full" className="w-full" renderAs="div">
-                  <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.sid || '-' : sid || '-'}</div>
-                </FormField>
+              <div className="grid grid-cols-2 gap-4">
+                <ReadonlyField label="MID" className="!w-full" value={draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'} />
+                <ReadonlyField
+                  label="SID"
+                  className="!w-full"
+                  value={(draft.id ? rows.find((row) => row.id === draft.id)?.sid || '' : sid || '')
+                    ? (
+                        <BusinessIdLink objectType="SYSTEM" businessId={draft.id ? rows.find((row) => row.id === draft.id)?.sid || '' : sid || ''}>
+                          {draft.id ? rows.find((row) => row.id === draft.id)?.sid || '' : sid || ''}
+                        </BusinessIdLink>
+                      )
+                    : '-'}
+                />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="Version Number" required error={fieldErrors.versionNumber} fieldId="version-update-versionNumber" errorId={fieldErrorId('versionNumber')} controlWidthClassName="w-full" className="w-full">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Version Number" required error={fieldErrors.versionNumber} fieldId="version-update-versionNumber" errorId={fieldErrorId('versionNumber')} controlWidthClassName="w-full" className="!w-full">
                   <select
                     id="version-update-versionNumber"
                     className={fieldControlClassName('versionNumber')}
@@ -475,7 +481,7 @@ export function SystemVersionUpdatePanel({
                   fieldId="version-update-buildNumber"
                   errorId={fieldErrorId('buildNumber')}
                   controlWidthClassName="w-full"
-                  className="w-full"
+                  className="!w-full"
                 >
                   <select
                     id="version-update-buildNumber"
@@ -501,7 +507,7 @@ export function SystemVersionUpdatePanel({
               {VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category) => {
                 const attachment = draft.attachments[category]
                 return (
-                  <FormField key={category} label={VERSION_UPDATE_ATTACHMENT_LABELS[category]} required error={fieldErrors[category]} fieldId={`version-update-${category}`} errorId={fieldErrorId(category)} controlWidthClassName="w-full" className="w-full">
+                  <FormField key={category} label={VERSION_UPDATE_ATTACHMENT_LABELS[category]} required error={fieldErrors[category]} fieldId={`version-update-${category}`} errorId={fieldErrorId(category)} controlWidthClassName="w-full" className="!w-full">
                     <div className={`flex flex-wrap items-center gap-2 rounded border bg-white p-2 ${fieldErrors[category] ? 'border-red-500' : 'border-sf-border'}`}>
                       <input
                         id={`version-update-${category}`}
@@ -518,7 +524,7 @@ export function SystemVersionUpdatePanel({
                 )
               })}
 
-              <FormField label="Remarks" controlWidthClassName="w-full" className="w-full" renderAs="div">
+              <FormField label="Remarks" controlWidthClassName="w-full" className="!w-full" renderAs="div">
                 <RichTextEditor value={draft.remarks} onChange={(value) => setDraft((current) => current ? { ...current, remarks: value } : current)} />
               </FormField>
             </div>
