@@ -101,6 +101,7 @@ export function SystemVersionUpdatePanel({
   const [sort, setSort] = useState<SortState>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<VersionUpdateFieldKey, string>>>({})
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false)
 
   const rows = useMemo(
     () => versionUpdateRowsForSystem(versionUpdates, referenceData, systemId),
@@ -126,6 +127,7 @@ export function SystemVersionUpdatePanel({
     setDraft({ ...EMPTY_DRAFT, attachments: {} })
     setMessage(null)
     setFieldErrors({})
+    setHasAttemptedSave(false)
   }
 
   function beginEdit(record: VersionUpdateRecord) {
@@ -151,7 +153,21 @@ export function SystemVersionUpdatePanel({
     })
     setMessage(null)
     setFieldErrors({})
+    setHasAttemptedSave(false)
   }
+
+  function clearFieldErrors(...fields: VersionUpdateFieldKey[]) {
+    setFieldErrors((current) => {
+      const next = { ...current }
+      fields.forEach((field) => {
+        delete next[field]
+      })
+      return next
+    })
+  }
+
+  const visibleFieldErrors = (['versionNumber', 'buildNumber', ...VERSION_UPDATE_ATTACHMENT_CATEGORIES] as VersionUpdateFieldKey[])
+    .filter((field) => Boolean(fieldErrors[field]))
 
   function fieldErrorId(field: VersionUpdateFieldKey) {
     return `version-update-${field}-error`
@@ -199,9 +215,9 @@ export function SystemVersionUpdatePanel({
             }
           : current,
       )
-    setMessage(null)
-    setFieldErrors((current) => ({ ...current, versionNumber: undefined, buildNumber: undefined }))
-    return
+      setMessage(null)
+      if (hasAttemptedSave) clearFieldErrors('versionNumber')
+      return
     }
     setDraft((current) => {
       if (!current) return current
@@ -216,7 +232,7 @@ export function SystemVersionUpdatePanel({
       }
     })
     setMessage(null)
-    setFieldErrors((current) => ({ ...current, versionNumber: undefined, buildNumber: undefined }))
+    if (hasAttemptedSave) clearFieldErrors('versionNumber')
   }
 
   function selectBuild(value: string) {
@@ -234,11 +250,12 @@ export function SystemVersionUpdatePanel({
           : current,
       )
       setMessage(null)
+      if (hasAttemptedSave) clearFieldErrors('buildNumber')
       return
     }
     setDraft((current) => current ? { ...current, buildNumberRefId: value, newBuildNumberLabel: '' } : current)
     setMessage(null)
-    setFieldErrors((current) => ({ ...current, buildNumber: undefined }))
+    if (hasAttemptedSave) clearFieldErrors('buildNumber')
   }
 
   async function handleFileChange(category: VersionUpdateAttachmentCategory, event: ChangeEvent<HTMLInputElement>) {
@@ -249,7 +266,7 @@ export function SystemVersionUpdatePanel({
       const attachment = await createPendingAttachmentDraft({ category, file })
       setDraft((current) => current ? { ...current, attachments: { ...current.attachments, [category]: attachment } } : current)
       setMessage(null)
-      setFieldErrors((current) => ({ ...current, [category]: undefined }))
+      if (hasAttemptedSave) clearFieldErrors(category)
     } catch {
       setMessage({ tone: 'error', text: `${VERSION_UPDATE_ATTACHMENT_LABELS[category]} could not be read.` })
     }
@@ -270,12 +287,14 @@ export function SystemVersionUpdatePanel({
     })
     if (result.ok) {
       setFieldErrors({})
+      setHasAttemptedSave(false)
       setMessage({ tone: 'success', text: result.message })
       setDraft(null)
       return
     }
     const nextErrors = mapValidationErrors(result.message)
     if (Object.keys(nextErrors).length > 0) {
+      setHasAttemptedSave(true)
       setFieldErrors(nextErrors)
       setMessage(null)
       focusFirstInvalidField(nextErrors)
@@ -408,13 +427,11 @@ export function SystemVersionUpdatePanel({
               </button>
             </div>
             <div className="space-y-4 overflow-auto p-4">
-              {Object.keys(fieldErrors).length > 0 ? (
+              {visibleFieldErrors.length > 0 ? (
                 <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
                   <p className="font-semibold">Please complete the required fields below.</p>
                   <ul className="mt-1 list-disc pl-5">
-                    {(['versionNumber', 'buildNumber', ...VERSION_UPDATE_ATTACHMENT_CATEGORIES] as VersionUpdateFieldKey[])
-                      .filter((field) => fieldErrors[field])
-                      .map((field) => (
+                    {visibleFieldErrors.map((field) => (
                         <li key={field}>{field === 'versionNumber' ? 'Version Number' : field === 'buildNumber' ? 'Build Number' : VERSION_UPDATE_ATTACHMENT_LABELS[field]}</li>
                       ))}
                   </ul>
@@ -422,13 +439,16 @@ export function SystemVersionUpdatePanel({
               ) : null}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField label="MID" controlWidthClassName="w-full" renderAs="div">
+                <FormField label="MID" controlWidthClassName="w-full" className="w-full" renderAs="div">
                   <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'}</div>
                 </FormField>
-                <FormField label="SID" controlWidthClassName="w-full" renderAs="div">
+                <FormField label="SID" controlWidthClassName="w-full" className="w-full" renderAs="div">
                   <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.sid || '-' : sid || '-'}</div>
                 </FormField>
-                <FormField label="Version Number" required error={fieldErrors.versionNumber} fieldId="version-update-versionNumber" errorId={fieldErrorId('versionNumber')} controlWidthClassName="w-full">
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField label="Version Number" required error={fieldErrors.versionNumber} fieldId="version-update-versionNumber" errorId={fieldErrorId('versionNumber')} controlWidthClassName="w-full" className="w-full">
                   <select
                     id="version-update-versionNumber"
                     className={fieldControlClassName('versionNumber')}
@@ -455,6 +475,7 @@ export function SystemVersionUpdatePanel({
                   fieldId="version-update-buildNumber"
                   errorId={fieldErrorId('buildNumber')}
                   controlWidthClassName="w-full"
+                  className="w-full"
                 >
                   <select
                     id="version-update-buildNumber"
@@ -480,7 +501,7 @@ export function SystemVersionUpdatePanel({
               {VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category) => {
                 const attachment = draft.attachments[category]
                 return (
-                  <FormField key={category} label={VERSION_UPDATE_ATTACHMENT_LABELS[category]} required error={fieldErrors[category]} fieldId={`version-update-${category}`} errorId={fieldErrorId(category)} controlWidthClassName="w-full">
+                  <FormField key={category} label={VERSION_UPDATE_ATTACHMENT_LABELS[category]} required error={fieldErrors[category]} fieldId={`version-update-${category}`} errorId={fieldErrorId(category)} controlWidthClassName="w-full" className="w-full">
                     <div className={`flex flex-wrap items-center gap-2 rounded border bg-white p-2 ${fieldErrors[category] ? 'border-red-500' : 'border-sf-border'}`}>
                       <input
                         id={`version-update-${category}`}
@@ -497,7 +518,7 @@ export function SystemVersionUpdatePanel({
                 )
               })}
 
-              <FormField label="Remarks" controlWidthClassName="w-full" renderAs="div">
+              <FormField label="Remarks" controlWidthClassName="w-full" className="w-full" renderAs="div">
                 <RichTextEditor value={draft.remarks} onChange={(value) => setDraft((current) => current ? { ...current, remarks: value } : current)} />
               </FormField>
             </div>
