@@ -20,6 +20,7 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { RemarksGrid } from '@/components/remarks'
+import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
   SystemCandidateDialog,
@@ -1559,48 +1560,12 @@ export function InventoryForm<T extends InventoryRecord>({
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>
-        {records.length === 0 ? (
-          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-            No configuration history has been recorded for this system.
-          </div>
-        ) : (
-          <div className="sf-scroll-x rounded border border-sf-border bg-white">
-            <table className="w-max border-collapse text-sm leading-tight">
-              <thead className="bg-sf-surface-alt text-left">
-                <tr>
-                  {['Record ID', 'Timestamp', 'TID', 'Recorded By'].map((label) => (
-                    <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                      {label}
-                    </th>
-                  ))}
-                  {APPLICATION_SUMMARY_FIELDS.map((field) => (
-                    <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                      <span>{field.label}</span>
-                      <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((record) => (
-                  <tr key={record.id} className="hover:bg-sf-surface-alt">
-                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordId}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
-                      <DateTimeValue value={record.timestamp} semanticType="datetime" />
-                    </td>
-                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.tid ?? ''}</td>
-                    <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{record.recordedBy}</td>
-                    {APPLICATION_SUMMARY_FIELDS.map((field) => (
-                      <td key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
-                        {textValue((record.configuration as unknown as Record<string, unknown>)[field.configKey]) || '-'}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <ConfigurationHistorySection
+          records={records}
+          fields={APPLICATION_SUMMARY_FIELDS}
+          emptyText="No configuration history has been recorded for this system."
+          tidValue={(record) => record.tid ?? ''}
+        />
       </section>
     )
   }

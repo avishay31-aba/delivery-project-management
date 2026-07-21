@@ -102,7 +102,6 @@ export interface ActivityLogBrowseQuery {
   sort?: ActivityLogSortRule | null
   pageNumber: number
   pageSize: ActivityLogPageSize
-  latestRecordLimit?: number | null
 }
 
 export interface ActivityLogBrowseResult {

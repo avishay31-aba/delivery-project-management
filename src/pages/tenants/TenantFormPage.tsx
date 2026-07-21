@@ -7,6 +7,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
+import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { projectMainTypeLabel } from '@/domain/project-lifecycle'
@@ -52,7 +53,6 @@ import type {
   System,
   Tenant,
   TenantConfiguration,
-  TenantConfigurationHistoryRecord,
   TenantFormType,
   TenantWarranty,
   YesNo,
@@ -1331,27 +1331,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>
-        <ReadonlyTable
-          headers={[
-            'Record ID',
-            'Timestamp',
-            'TID',
-            'Recorded By',
-            ...CONFIGURATION_FIELDS.map((field) => (
-              <span key={field.key}>
-                <span>{field.label}</span>
-                <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
-              </span>
-            )),
-          ]}
-          rows={records.map((record: TenantConfigurationHistoryRecord) => [
-            record.recordId,
-            <DateTimeValue value={record.timestamp} semanticType="datetime" />,
-            'this',
-            record.recordedBy,
-            ...CONFIGURATION_FIELDS.map((field) => textValue(configurationValue(record.configuration, field))),
-          ])}
+        <ConfigurationHistorySection
+          records={records}
+          fields={CONFIGURATION_FIELDS}
           emptyText="No configuration changes have been recorded for this POC tenant."
+          tidValue={() => 'this'}
         />
       </section>
     )

@@ -77,10 +77,6 @@ function activitySearchText(event: ActivityEvent): string {
   ].join(' ').toLocaleLowerCase()
 }
 
-function positiveInteger(value: number | null | undefined): number | null {
-  return Number.isInteger(value) && value && value > 0 ? value : null
-}
-
 export function activityEventsForObject(
   events: ActivityEvent[],
   objectType: string,
@@ -160,7 +156,6 @@ export function browseActivityLog(
     ? events.filter((event) => eventMatchesObject(event, query.objectType ?? '', query.objectIdOrBusinessId ?? ''))
     : events
   const normalizedSearch = query.search?.trim().toLocaleLowerCase() ?? ''
-  const latestLimit = positiveInteger(query.latestRecordLimit)
   const pageSize = query.pageSize
 
   const matching = sortActivityEvents(scopedEvents.filter((event) => {
@@ -170,13 +165,12 @@ export function browseActivityLog(
     if (!normalizedSearch) return true
     return activitySearchText(event).includes(normalizedSearch)
   }), query.sort)
-  const limited = latestLimit ? matching.slice(0, latestLimit) : matching
-  const totalMatchingRecords = limited.length
+  const totalMatchingRecords = matching.length
   const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
   const totalPages = Math.max(1, Math.ceil(totalMatchingRecords / numericPageSize))
   const currentPage = Math.min(Math.max(1, query.pageNumber), totalPages)
   const startIndex = pageSize === 'all' ? 0 : (currentPage - 1) * numericPageSize
-  const records = pageSize === 'all' ? limited : limited.slice(startIndex, startIndex + numericPageSize)
+  const records = pageSize === 'all' ? matching : matching.slice(startIndex, startIndex + numericPageSize)
 
   return {
     records,
