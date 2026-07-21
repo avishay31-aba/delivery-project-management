@@ -89,6 +89,7 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
       ].join(' ')}
       emptyText={emptyText}
       filteredEmptyText="No configuration history matches the current filters."
+      enableSearch={false}
       searchLabel="Search / Filter"
       searchPlaceholder="Search Configuration History"
       recordsPerPageLabel="Records per page"

@@ -19,6 +19,7 @@ interface RecordHistorySectionProps<TRecord> {
   getSearchText: (record: TRecord) => string
   emptyText: string
   filteredEmptyText?: string
+  enableSearch?: boolean
   searchLabel?: string
   searchPlaceholder?: string
   recordsPerPageLabel?: string
@@ -53,6 +54,7 @@ export function RecordHistorySection<TRecord>({
   getSearchText,
   emptyText,
   filteredEmptyText = 'No records match the current filters.',
+  enableSearch = true,
   searchLabel = 'Search / Filter',
   searchPlaceholder = 'Search / Filter',
   recordsPerPageLabel = 'Records per page',
@@ -78,7 +80,7 @@ export function RecordHistorySection<TRecord>({
   }, [resetPageSignal])
 
   const sortedAndFilteredRecords = useMemo(() => {
-    const searchText = normalized(search)
+    const searchText = enableSearch ? normalized(search) : ''
     const filtered = searchText
       ? records.filter((record) => normalized(getSearchText(record)).includes(searchText))
       : records
@@ -91,7 +93,7 @@ export function RecordHistorySection<TRecord>({
       const result = compareValues(column.sortValue?.(first), column.sortValue?.(second))
       return sort.direction === 'asc' ? result : -result
     })
-  }, [columns, getSearchText, records, search, sort])
+  }, [columns, enableSearch, getSearchText, records, search, sort])
 
   const totalMatchingRecords = sortedAndFilteredRecords.length
   const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
@@ -145,19 +147,21 @@ export function RecordHistorySection<TRecord>({
               ))}
             </select>
           </label>
-          <label className="block text-sm font-medium text-sf-text">
-            <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{searchLabel}</span>
-            <input
-              aria-label={searchLabel}
-              className="h-8 w-72 rounded border border-sf-border px-2 py-1 text-sm"
-              placeholder={searchPlaceholder}
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                resetToFirstPage()
-              }}
-            />
-          </label>
+          {enableSearch ? (
+            <label className="block text-sm font-medium text-sf-text">
+              <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{searchLabel}</span>
+              <input
+                aria-label={searchLabel}
+                className="h-8 w-72 rounded border border-sf-border px-2 py-1 text-sm"
+                placeholder={searchPlaceholder}
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  resetToFirstPage()
+                }}
+              />
+            </label>
+          ) : null}
           {controls}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
