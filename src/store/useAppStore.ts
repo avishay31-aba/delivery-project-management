@@ -1185,7 +1185,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       newVersionNumberLabel: draft.newVersionNumberLabel,
       newBuildNumberLabel: draft.newBuildNumberLabel,
       attachmentCategories: draft.attachments.map((attachment) => attachment.category),
-      remarks: draft.remarks,
       referenceData: state.referenceData,
     })
     if (validationMessages.length > 0) return { ok: false, message: validationMessages.join(' ') }

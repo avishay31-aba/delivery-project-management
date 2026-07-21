@@ -18,10 +18,11 @@ import {
 import { useAppStore } from '@/store/useAppStore'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
-import { FileDownloadLink, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { FileDownloadLink, FormField, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
 
 type SortKey = 'id' | 'timestamp' | 'userName' | 'mid' | 'sid' | 'versionLabel' | 'buildLabel' | 'emailSentAt' | 'remarks'
 type SortState = { key: SortKey; direction: 'asc' | 'desc' } | null
+type VersionUpdateFieldKey = 'versionNumber' | 'buildNumber' | VersionUpdateAttachmentCategory
 
 interface SystemVersionUpdatePanelProps {
   systemId: string
@@ -99,6 +100,7 @@ export function SystemVersionUpdatePanel({
   const [draft, setDraft] = useState<VersionUpdateDraft | null>(null)
   const [sort, setSort] = useState<SortState>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<VersionUpdateFieldKey, string>>>({})
 
   const rows = useMemo(
     () => versionUpdateRowsForSystem(versionUpdates, referenceData, systemId),
@@ -123,6 +125,7 @@ export function SystemVersionUpdatePanel({
   function beginAdd() {
     setDraft({ ...EMPTY_DRAFT, attachments: {} })
     setMessage(null)
+    setFieldErrors({})
   }
 
   function beginEdit(record: VersionUpdateRecord) {
@@ -147,6 +150,37 @@ export function SystemVersionUpdatePanel({
       remarks: record.remarks,
     })
     setMessage(null)
+    setFieldErrors({})
+  }
+
+  function fieldErrorId(field: VersionUpdateFieldKey) {
+    return `version-update-${field}-error`
+  }
+
+  function fieldControlClassName(field: VersionUpdateFieldKey, base = 'mt-1 h-9 w-full rounded border px-2 py-1 font-normal') {
+    return `${base} ${fieldErrors[field] ? 'border-red-500' : 'border-sf-border'}`
+  }
+
+  function mapValidationErrors(messageText: string): Partial<Record<VersionUpdateFieldKey, string>> {
+    const nextErrors: Partial<Record<VersionUpdateFieldKey, string>> = {}
+    if (messageText.includes('Version Number is required.')) nextErrors.versionNumber = 'Version Number is required.'
+    if (messageText.includes('Build Number is required.')) nextErrors.buildNumber = 'Build Number is required.'
+    if (messageText.includes('Build Number does not belong')) nextErrors.buildNumber = 'Build Number does not belong to the selected Version Number.'
+    VERSION_UPDATE_ATTACHMENT_CATEGORIES.forEach((category) => {
+      const requiredMessage = `${VERSION_UPDATE_ATTACHMENT_LABELS[category]} is required.`
+      if (messageText.includes(requiredMessage)) nextErrors[category] = requiredMessage
+    })
+    return nextErrors
+  }
+
+  function focusFirstInvalidField(errors: Partial<Record<VersionUpdateFieldKey, string>>) {
+    const firstField = (['versionNumber', 'buildNumber', ...VERSION_UPDATE_ATTACHMENT_CATEGORIES] as VersionUpdateFieldKey[]).find((field) => errors[field])
+    if (!firstField) return
+    window.setTimeout(() => {
+      const element = document.getElementById(`version-update-${firstField}`)
+      element?.focus()
+      element?.scrollIntoView({ block: 'nearest' })
+    })
   }
 
   function selectVersion(value: string) {
@@ -165,8 +199,9 @@ export function SystemVersionUpdatePanel({
             }
           : current,
       )
-      setMessage(null)
-      return
+    setMessage(null)
+    setFieldErrors((current) => ({ ...current, versionNumber: undefined, buildNumber: undefined }))
+    return
     }
     setDraft((current) => {
       if (!current) return current
@@ -181,6 +216,7 @@ export function SystemVersionUpdatePanel({
       }
     })
     setMessage(null)
+    setFieldErrors((current) => ({ ...current, versionNumber: undefined, buildNumber: undefined }))
   }
 
   function selectBuild(value: string) {
@@ -202,6 +238,7 @@ export function SystemVersionUpdatePanel({
     }
     setDraft((current) => current ? { ...current, buildNumberRefId: value, newBuildNumberLabel: '' } : current)
     setMessage(null)
+    setFieldErrors((current) => ({ ...current, buildNumber: undefined }))
   }
 
   async function handleFileChange(category: VersionUpdateAttachmentCategory, event: ChangeEvent<HTMLInputElement>) {
@@ -212,6 +249,7 @@ export function SystemVersionUpdatePanel({
       const attachment = await createPendingAttachmentDraft({ category, file })
       setDraft((current) => current ? { ...current, attachments: { ...current.attachments, [category]: attachment } } : current)
       setMessage(null)
+      setFieldErrors((current) => ({ ...current, [category]: undefined }))
     } catch {
       setMessage({ tone: 'error', text: `${VERSION_UPDATE_ATTACHMENT_LABELS[category]} could not be read.` })
     }
@@ -230,8 +268,20 @@ export function SystemVersionUpdatePanel({
         .map((category) => draft.attachments[category])
         .filter((attachment): attachment is PendingAttachmentDraft => Boolean(attachment)),
     })
-    setMessage({ tone: result.ok ? 'success' : 'error', text: result.message })
-    if (result.ok) setDraft(null)
+    if (result.ok) {
+      setFieldErrors({})
+      setMessage({ tone: 'success', text: result.message })
+      setDraft(null)
+      return
+    }
+    const nextErrors = mapValidationErrors(result.message)
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      setMessage(null)
+      focusFirstInvalidField(nextErrors)
+      return
+    }
+    setMessage({ tone: 'error', text: result.message })
   }
 
   function deleteRecord(record: VersionUpdateRecord) {
@@ -358,20 +408,35 @@ export function SystemVersionUpdatePanel({
               </button>
             </div>
             <div className="space-y-4 overflow-auto p-4">
+              {Object.keys(fieldErrors).length > 0 ? (
+                <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                  <p className="font-semibold">Please complete the required fields below.</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {(['versionNumber', 'buildNumber', ...VERSION_UPDATE_ATTACHMENT_CATEGORIES] as VersionUpdateFieldKey[])
+                      .filter((field) => fieldErrors[field])
+                      .map((field) => (
+                        <li key={field}>{field === 'versionNumber' ? 'Version Number' : field === 'buildNumber' ? 'Build Number' : VERSION_UPDATE_ATTACHMENT_LABELS[field]}</li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="block text-sm font-semibold text-sf-text">
-                  MID
-                  <div className="mt-1 rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'}</div>
-                </label>
-                <label className="block text-sm font-semibold text-sf-text">
-                  SID
-                  <div className="mt-1 rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.sid || '-' : sid || '-'}</div>
-                </label>
-                <label className="block text-sm font-semibold text-sf-text">
-                  Version Number
+                <FormField label="MID" controlWidthClassName="w-full" renderAs="div">
+                  <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'}</div>
+                </FormField>
+                <FormField label="SID" controlWidthClassName="w-full" renderAs="div">
+                  <div className="rounded border border-sf-border bg-sf-surface-alt px-2 py-1.5 font-normal">{draft.id ? rows.find((row) => row.id === draft.id)?.sid || '-' : sid || '-'}</div>
+                </FormField>
+                <FormField label="Version Number" required error={fieldErrors.versionNumber} fieldId="version-update-versionNumber" errorId={fieldErrorId('versionNumber')} controlWidthClassName="w-full">
                   <select
-                    className="mt-1 h-9 w-full rounded border border-sf-border px-2 py-1 font-normal"
+                    id="version-update-versionNumber"
+                    className={fieldControlClassName('versionNumber')}
                     value={draft.newVersionNumberLabel ? '__new_version__' : draft.versionNumberRefId}
+                    required
+                    aria-required="true"
+                    aria-invalid={Boolean(fieldErrors.versionNumber)}
+                    aria-describedby={fieldErrors.versionNumber ? fieldErrorId('versionNumber') : undefined}
                     onChange={(event) => selectVersion(event.target.value)}
                   >
                     <option value="">Select Version Number</option>
@@ -381,16 +446,25 @@ export function SystemVersionUpdatePanel({
                     {draft.newVersionNumberLabel ? <option value="__new_version__">{draft.newVersionNumberLabel} (new)</option> : null}
                     <option value="__add_new__">Add new...</option>
                   </select>
-                </label>
-                <label className="block text-sm font-semibold text-sf-text">
-                  Build Number
-                  {draft.versionNumberRefId && buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).length === 0 && !draft.newBuildNumberLabel ? (
-                    <span className="ml-2 text-xs font-normal text-sf-text-muted">No builds for this Version yet.</span>
-                  ) : null}
+                </FormField>
+                <FormField
+                  label="Build Number"
+                  required
+                  error={fieldErrors.buildNumber}
+                  helperText={draft.versionNumberRefId && buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).length === 0 && !draft.newBuildNumberLabel ? 'No builds for this Version yet.' : undefined}
+                  fieldId="version-update-buildNumber"
+                  errorId={fieldErrorId('buildNumber')}
+                  controlWidthClassName="w-full"
+                >
                   <select
-                    className="mt-1 h-9 w-full rounded border border-sf-border px-2 py-1 font-normal"
+                    id="version-update-buildNumber"
+                    className={fieldControlClassName('buildNumber')}
                     value={draft.newBuildNumberLabel ? '__new_build__' : draft.buildNumberRefId}
                     disabled={!draft.versionNumberRefId && !draft.newVersionNumberLabel}
+                    required
+                    aria-required="true"
+                    aria-invalid={Boolean(fieldErrors.buildNumber)}
+                    aria-describedby={fieldErrors.buildNumber ? fieldErrorId('buildNumber') : undefined}
                     onChange={(event) => selectBuild(event.target.value)}
                   >
                     <option value="">Select Build Number</option>
@@ -400,28 +474,32 @@ export function SystemVersionUpdatePanel({
                     {draft.newBuildNumberLabel ? <option value="__new_build__">{draft.newBuildNumberLabel} (new)</option> : null}
                     {draft.versionNumberRefId || draft.newVersionNumberLabel ? <option value="__add_new__">Add new...</option> : null}
                   </select>
-                </label>
+                </FormField>
               </div>
 
               {VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category) => {
                 const attachment = draft.attachments[category]
                 return (
-                  <label key={category} className="block text-sm font-semibold text-sf-text">
-                    {VERSION_UPDATE_ATTACHMENT_LABELS[category]}
-                    <div className="mt-1 flex flex-wrap items-center gap-2 rounded border border-sf-border bg-white p-2">
-                      <input type="file" onChange={(event) => void handleFileChange(category, event)} />
+                  <FormField key={category} label={VERSION_UPDATE_ATTACHMENT_LABELS[category]} required error={fieldErrors[category]} fieldId={`version-update-${category}`} errorId={fieldErrorId(category)} controlWidthClassName="w-full">
+                    <div className={`flex flex-wrap items-center gap-2 rounded border bg-white p-2 ${fieldErrors[category] ? 'border-red-500' : 'border-sf-border'}`}>
+                      <input
+                        id={`version-update-${category}`}
+                        type="file"
+                        required
+                        aria-required="true"
+                        aria-invalid={Boolean(fieldErrors[category])}
+                        aria-describedby={fieldErrors[category] ? fieldErrorId(category) : undefined}
+                        onChange={(event) => void handleFileChange(category, event)}
+                      />
                       <span className="text-sm font-normal text-sf-text-muted">{attachment?.fileName ?? 'No file selected'}</span>
                     </div>
-                  </label>
+                  </FormField>
                 )
               })}
 
-              <label className="block text-sm font-semibold text-sf-text">
-                Remarks
-                <div className="mt-1 font-normal">
-                  <RichTextEditor value={draft.remarks} onChange={(value) => setDraft((current) => current ? { ...current, remarks: value } : current)} />
-                </div>
-              </label>
+              <FormField label="Remarks" controlWidthClassName="w-full" renderAs="div">
+                <RichTextEditor value={draft.remarks} onChange={(value) => setDraft((current) => current ? { ...current, remarks: value } : current)} />
+              </FormField>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-sf-border p-4">
               <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setDraft(null)}>

@@ -4,7 +4,6 @@ import type {
   VersionUpdateRecord,
 } from '@/data/seed.types'
 import { referenceDataDisplayValue, referenceDataRecordById, validateReferenceDataLabel } from '@/domain/reference-data'
-import { hasMeaningfulRichText } from '@/domain/rich-text'
 
 export const VERSION_UPDATE_ATTACHMENT_CATEGORIES: VersionUpdateAttachmentCategory[] = ['CONFIG', 'ATP', 'CHECKLIST']
 
@@ -87,7 +86,6 @@ export function validateVersionUpdateDraft(input: {
   newVersionNumberLabel?: string
   newBuildNumberLabel?: string
   attachmentCategories: VersionUpdateAttachmentCategory[]
-  remarks: string
   referenceData: ReferenceDataRecord[]
 }): string[] {
   const messages: string[] = []
@@ -117,6 +115,5 @@ export function validateVersionUpdateDraft(input: {
       messages.push(`${VERSION_UPDATE_ATTACHMENT_LABELS[category]} is required.`)
     }
   })
-  if (!hasMeaningfulRichText(input.remarks)) messages.push('Remarks is required.')
   return messages
 }
