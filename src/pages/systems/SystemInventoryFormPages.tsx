@@ -23,6 +23,7 @@ import { RemarksGrid } from '@/components/remarks'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
   SystemCandidateDialog,
+  SystemVersionUpdatePanel,
   type SystemCandidateFilters,
   type SystemCandidateSortKey,
 } from '@/components/systems'
@@ -86,6 +87,7 @@ import {
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
 import { linkedProjectRowsForSystem } from '@/domain/linked-projects'
+import { systemCurrentBuildLabel, systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
@@ -267,9 +269,20 @@ function deriveCurrentSid(record: InventoryRecord, systems: System[]): string {
     .join('; ')
 }
 
-function derivedValue(record: InventoryRecord, key: string, projects: Project[], tenants: Tenant[], projectSystems: ProjectSystemLink[] = [], systems: System[] = []): string {
+function derivedValue(
+  record: InventoryRecord,
+  key: string,
+  projects: Project[],
+  tenants: Tenant[],
+  projectSystems: ProjectSystemLink[] = [],
+  systems: System[] = [],
+  versionUpdates: ReturnType<typeof useAppStore.getState>['versionUpdates'] = [],
+  referenceData: ReturnType<typeof useAppStore.getState>['referenceData'] = [],
+): string {
   if (key === 'currentSid') return deriveCurrentSid(record, systems)
   if (key === 'currentPid') return deriveCurrentPid(record, projects, projectSystems)
+  if (key === 'currentVersion') return systemCurrentVersionLabel(versionUpdates, referenceData, record.id, record.currentVersionUpdateId)
+  if (key === 'currentBuild') return systemCurrentBuildLabel(versionUpdates, referenceData, record.id, record.currentVersionUpdateId)
   if (key === 'linkedProjects') return deriveLinkedProjects(record, projects, projectSystems)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
@@ -362,6 +375,8 @@ export function InventoryForm<T extends InventoryRecord>({
   const opportunities = useAppStore((state) => state.opportunities)
   const tenants = useAppStore((state) => state.tenants)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const referenceData = useAppStore((state) => state.referenceData)
+  const versionUpdates = useAppStore((state) => state.versionUpdates)
   const allocatedSystems = useAppStore((state) => state.systems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
@@ -633,7 +648,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
     const sourceRecord = field.editable ? activeDraft : activeRecord
-    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems)
+    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const width =
@@ -1295,6 +1310,28 @@ export function InventoryForm<T extends InventoryRecord>({
     )
   }
 
+  function renderVersionUpdateTab() {
+    const systemCollection: 'production' | 'reused' | 'allocated' =
+      'systemClass' in activeRecord
+        ? 'allocated'
+        : metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
+          ? 'reused'
+          : 'production'
+    const mid = 'machineId' in activeRecord ? activeRecord.machineId ?? '' : ''
+    const sid = 'sid' in activeRecord && activeRecord.sid ? activeRecord.sid : deriveCurrentSid(activeRecord, allocatedSystems)
+
+    return (
+      <SystemVersionUpdatePanel
+        systemId={activeRecord.id}
+        systemCollection={systemCollection}
+        mid={mid}
+        sid={sid}
+        currentVersionUpdateId={activeRecord.currentVersionUpdateId}
+        readOnly={isViewMode}
+      />
+    )
+  }
+
   function renderLinkedProjectsTab() {
     const rows = linkedProjectRowsForSystem(
       allocatedSystemForTenantCreation() ?? activeRecord,
@@ -1391,6 +1428,7 @@ export function InventoryForm<T extends InventoryRecord>({
         emptyText="No eligible destination Systems for this Move mode."
         allowMultiple={false}
         confirmDisabled={selectedMoveDestinationIds.length === 0 || Boolean(moveConfirmation) || isMoveCommitting}
+        getCandidateVersion={(candidate) => systemCurrentVersionLabel(versionUpdates, referenceData, candidate.id, 'currentVersionUpdateId' in candidate ? candidate.currentVersionUpdateId : null)}
       />
     )
   }
@@ -1708,15 +1746,17 @@ export function InventoryForm<T extends InventoryRecord>({
               ? renderInfrastructureTab()
               : activeTab === 'tenant'
                 ? renderTenantTab()
-                : activeTab === 'linkedProjects'
-                  ? renderLinkedProjectsTab()
-                  : activeTab === 'documents'
-                    ? renderDocumentsTab()
-                    : activeTab === 'owner'
-                      ? renderOwnerTab()
-                      : activeTab === 'activity'
-                        ? renderActivityTab()
-                        : `${systemTabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
+                : activeTab === 'versionUpdate'
+                  ? renderVersionUpdateTab()
+                  : activeTab === 'linkedProjects'
+                    ? renderLinkedProjectsTab()
+                    : activeTab === 'documents'
+                      ? renderDocumentsTab()
+                      : activeTab === 'owner'
+                        ? renderOwnerTab()
+                        : activeTab === 'activity'
+                          ? renderActivityTab()
+                          : `${systemTabs.find((tab) => tab.id === activeTab)?.label} workspace is reserved for later system execution phases.`}
           </div>
         </div>
       </CollapsibleSection>

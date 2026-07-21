@@ -1,5 +1,5 @@
 import { type ChangeEvent, useRef, useState } from 'react'
-import { Download, Edit3, FileText, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { Edit3, FileText, RefreshCw, Trash2, Upload } from 'lucide-react'
 import type { DocumentRecord } from '@/data/seed.types'
 import {
   addDocuments as addDocumentsToCollection,
@@ -11,15 +11,17 @@ import {
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
+import { FileDownloadLink, TableSection } from '@/components/ui'
 
 interface DocumentsPanelProps {
   documents: DocumentRecord[]
   emptyText: string
   onChange: (documents: DocumentRecord[]) => void
   readOnly?: boolean
+  title?: string
 }
 
-export function DocumentsPanel({ documents, emptyText, onChange, readOnly = false }: DocumentsPanelProps) {
+export function DocumentsPanel({ documents, emptyText, onChange, readOnly = false, title = 'Documents' }: DocumentsPanelProps) {
   useDateTimePresentationPreference()
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -27,12 +29,16 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
   const [replaceDocumentId, setReplaceDocumentId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
-  function addDocuments(event: ChangeEvent<HTMLInputElement>) {
+  async function addDocuments(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? [])
     if (files.length === 0) return
-    onChange(addDocumentsToCollection(documents, files))
-    setMessage({ tone: 'success', text: files.length === 1 ? 'Document uploaded.' : 'Documents uploaded.' })
     event.target.value = ''
+    try {
+      onChange(await addDocumentsToCollection(documents, files))
+      setMessage({ tone: 'success', text: files.length === 1 ? 'Document uploaded.' : 'Documents uploaded.' })
+    } catch {
+      setMessage({ tone: 'error', text: 'Document upload failed.' })
+    }
   }
 
   function startEdit(document: DocumentRecord) {
@@ -66,29 +72,32 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
     replaceInputRef.current?.click()
   }
 
-  function replaceDocument(event: ChangeEvent<HTMLInputElement>) {
+  async function replaceDocument(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file || !replaceDocumentId) return
-    onChange(replaceDocumentInCollection(documents, replaceDocumentId, file))
-    setReplaceDocumentId(null)
-    setMessage({ tone: 'success', text: 'Document replaced.' })
     event.target.value = ''
+    try {
+      onChange(await replaceDocumentInCollection(documents, replaceDocumentId, file))
+      setReplaceDocumentId(null)
+      setMessage({ tone: 'success', text: 'Document replaced.' })
+    } catch {
+      setMessage({ tone: 'error', text: 'Document replacement failed.' })
+    }
   }
 
+  const actions = readOnly ? null : (
+    <>
+      <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt">
+        <Upload className="h-4 w-4" aria-hidden="true" />
+        Upload
+        <input className="sr-only" type="file" multiple onChange={(event) => void addDocuments(event)} />
+      </label>
+      <input ref={replaceInputRef} className="sr-only" type="file" onChange={(event) => void replaceDocument(event)} />
+    </>
+  )
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {readOnly ? null : (
-          <>
-            <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt">
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              Upload
-              <input className="sr-only" type="file" multiple onChange={addDocuments} />
-            </label>
-            <input ref={replaceInputRef} className="sr-only" type="file" onChange={replaceDocument} />
-          </>
-        )}
-      </div>
+    <TableSection title={title} actions={actions}>
       {message ? (
         <div
           className={[
@@ -118,11 +127,10 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
                 <tr key={document.id} className="hover:bg-sf-surface-alt">
                   <td className="border border-sf-border px-1.5 py-1 align-top">
                     <div className="flex flex-wrap items-center gap-2">
-                      {document.objectUrl ? (
-                        <a className="inline-flex items-center gap-1 text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">
-                          <Download className="h-4 w-4" aria-hidden="true" />
+                      {document.storedFileReference || document.objectUrl ? (
+                        <FileDownloadLink fileName={document.fileName} fileReference={document.storedFileReference ?? document.objectUrl}>
                           Open
-                        </a>
+                        </FileDownloadLink>
                       ) : null}
                       {readOnly ? null : (
                         <>
@@ -177,6 +185,6 @@ export function DocumentsPanel({ documents, emptyText, onChange, readOnly = fals
       ) : (
         <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">{emptyText}</div>
       )}
-    </div>
+    </TableSection>
   )
 }

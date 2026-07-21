@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { Tenant } from '@/data/seed.types'
 import {
@@ -372,7 +372,9 @@ export function Customer360Page() {
         formatDocumentSize(document.fileSize),
         <DateTimeValue value={document.uploadedAt} semanticType="datetime" />,
         <DateTimeValue value={document.replacedAt} semanticType="datetime" />,
-        document.objectUrl ? <a className="text-sf-brand hover:underline" href={document.objectUrl} target="_blank" rel="noreferrer">Open</a> : '',
+        document.storedFileReference || document.objectUrl
+          ? <FileDownloadLink fileName={document.fileName} fileReference={document.storedFileReference ?? document.objectUrl}>Open</FileDownloadLink>
+          : '',
       ]),
       'No documents found across this customer portfolio.',
       )

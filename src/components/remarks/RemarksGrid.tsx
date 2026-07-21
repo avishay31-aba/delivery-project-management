@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { RichTextContent, RichTextEditor } from '@/components/ui'
+import { RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
 import {
   createRemarkRecord,
   remarkDeadlineAlertLabel,
@@ -147,21 +147,19 @@ export function RemarksGrid({
     })
   }
 
+  const actions = permissions.canAdd ? (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      onClick={addRemark}
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Add remark
+    </button>
+  ) : null
+
   return (
-    <section className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold text-sf-text">Remarks</h3>
-        {permissions.canAdd ? (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
-            onClick={addRemark}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add remark
-          </button>
-        ) : null}
-      </div>
+    <TableSection title="Remarks" actions={actions} className="space-y-2">
       {editor.notification ? (
         <div
           className={[
@@ -317,6 +315,6 @@ export function RemarksGrid({
           </tbody>
         </table>
       </div>
-    </section>
+    </TableSection>
   )
 }

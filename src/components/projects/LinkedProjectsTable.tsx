@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
-import { BusinessObjectLink, PlaceholderCard } from '@/components/ui'
+import { BusinessObjectLink, PlaceholderCard, TableSection } from '@/components/ui'
 import { projectMainTypeLabel, projectStatusLabel } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
 import type { LinkedProjectRow } from '@/domain/linked-projects'
@@ -9,6 +9,7 @@ import { ProjectStatusIcon } from './ProjectStatusIcon'
 interface LinkedProjectsTableProps {
   rows: LinkedProjectRow[]
   includeAccountName?: boolean
+  title?: string
 }
 
 type LinkedProjectSortKey = 'pid' | 'progressStatus' | 'projectName' | 'projectType' | 'projectSubType' | 'accountName'
@@ -29,7 +30,7 @@ function sortValue(value: string): string {
   return value.trim().toLocaleLowerCase()
 }
 
-export function LinkedProjectsTable({ rows, includeAccountName = false }: LinkedProjectsTableProps) {
+export function LinkedProjectsTable({ rows, includeAccountName = false, title = 'Linked Projects' }: LinkedProjectsTableProps) {
   const [sort, setSort] = useState<{ key: LinkedProjectSortKey; direction: SortDirection } | null>(null)
   const columns = useMemo<LinkedProjectColumn[]>(() => [
     {
@@ -95,15 +96,18 @@ export function LinkedProjectsTable({ rows, includeAccountName = false }: Linked
 
   if (rows.length === 0) {
     return (
-      <PlaceholderCard
-        title="No linked Projects"
-        description="No Projects are linked to this record."
-      />
+      <TableSection title={title}>
+        <PlaceholderCard
+          title="No linked Projects"
+          description="No Projects are linked to this record."
+        />
+      </TableSection>
     )
   }
 
   return (
-    <div className="sf-scroll-x rounded border border-sf-border bg-white">
+    <TableSection title={title}>
+      <div className="sf-scroll-x rounded border border-sf-border bg-white">
       <table className="w-max min-w-full border-collapse text-sm leading-tight">
         <thead className="bg-sf-surface-alt text-left">
           <tr>
@@ -136,6 +140,7 @@ export function LinkedProjectsTable({ rows, includeAccountName = false }: Linked
           })}
         </tbody>
       </table>
-    </div>
+      </div>
+    </TableSection>
   )
 }

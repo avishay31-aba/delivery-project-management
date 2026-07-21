@@ -46,6 +46,10 @@ export type IdCounterKey =
   | 'configurationHistory'
   | 'purposeHistory'
   | 'document'
+  | 'versionNumber'
+  | 'buildNumber'
+  | 'versionUpdate'
+  | 'versionUpdateAttachment'
   | 'pid'
   | 'sid'
   | 'tid'
@@ -67,6 +71,10 @@ export interface IdCounters {
   configurationHistory: number
   purposeHistory: number
   document: number
+  versionNumber: number
+  buildNumber: number
+  versionUpdate: number
+  versionUpdateAttachment: number
   pid: number
   sid: number
   tid: number
@@ -330,6 +338,9 @@ export interface System {
   owners?: OwnerRecord[]
   configurationHistory?: ConfigurationHistoryRecord[]
   documents?: DocumentRecord[]
+  currentVersionUpdateId?: string | null
+  currentVersionNumberRefId?: string | null
+  currentBuildNumberRefId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -525,9 +536,65 @@ export interface DocumentRecord {
   uploadedAt: string
   replacedAt?: string
   objectUrl?: string
+  storedFileReference?: string
+  uploadedBy?: string
+  parentObjectType?: string
+  parentBusinessId?: string
 }
 
 export type TenantDocument = DocumentRecord
+
+export type ReferenceDataType = 'VERSION_NUMBER' | 'BUILD_NUMBER'
+
+export interface ReferenceDataRecord {
+  id: string
+  referenceType: ReferenceDataType
+  label: string
+  normalizedLabel: string
+  active: boolean
+  createdAt: string
+  createdBy: string
+  updatedAt: string
+  updatedBy: string
+}
+
+export type VersionUpdateAttachmentCategory = 'CONFIG' | 'ATP' | 'CHECKLIST'
+
+export interface VersionUpdateAttachmentRecord {
+  id: string
+  category: VersionUpdateAttachmentCategory
+  fileName: string
+  mimeType: string
+  fileSize: number
+  uploadedAt: string
+  uploadedBy: string
+  storedFileReference: string
+  parentObjectType: 'VERSION_UPDATE'
+  parentBusinessId: string
+}
+
+export interface VersionUpdateRecord {
+  id: string
+  systemId: string
+  systemCollection: 'production' | 'reused' | 'allocated'
+  committedAt: string
+  committedSequence: number
+  userName: string
+  midSnapshot: string
+  sidSnapshot: string
+  versionNumberRefId: string
+  buildNumberRefId: string
+  attachments: VersionUpdateAttachmentRecord[]
+  emailSentAt: string | null
+  remarks: string
+  deletedAt?: string | null
+  deletedBy?: string | null
+  deletionReason?: string
+  createdAt: string
+  createdBy: string
+  updatedAt: string
+  updatedBy: string
+}
 
 export interface TenantHostedSystemHistory {
   systemId: string
@@ -563,6 +630,9 @@ export interface ProductionSystemInventoryItem {
   operationalStatus: string
   tenantCount: number
   documents?: DocumentRecord[]
+  currentVersionUpdateId?: string | null
+  currentVersionNumberRefId?: string | null
+  currentBuildNumberRefId?: string | null
   licenses?: number | null
   users?: number | null
   concurrentSearches?: number | null
@@ -652,6 +722,9 @@ export interface ReusedInternalSystem {
   owners?: OwnerRecord[]
   configurationHistory?: ConfigurationHistoryRecord[]
   documents?: DocumentRecord[]
+  currentVersionUpdateId?: string | null
+  currentVersionNumberRefId?: string | null
+  currentBuildNumberRefId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -702,6 +775,8 @@ export interface AppDataState {
   systems: System[]
   tenants: Tenant[]
   warrantyRecords: WarrantyRecord[]
+  referenceData: ReferenceDataRecord[]
+  versionUpdates: VersionUpdateRecord[]
   activityEvents: ActivityEvent[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]

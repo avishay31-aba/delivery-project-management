@@ -145,6 +145,7 @@ interface SystemCandidateDialogProps {
   allowMultiple?: boolean
   isReusedInternalMode?: boolean
   confirmDisabled?: boolean
+  getCandidateVersion?: (candidate: SystemCandidate) => string
 }
 
 export function SystemCandidateDialog({
@@ -173,6 +174,7 @@ export function SystemCandidateDialog({
   allowMultiple = true,
   isReusedInternalMode = false,
   confirmDisabled,
+  getCandidateVersion = candidateVersion,
 }: SystemCandidateDialogProps) {
   const candidateHeaders = [
     'Select',
@@ -351,7 +353,7 @@ export function SystemCandidateDialog({
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateCloudRegion(candidate) || '-'}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateAvailability(candidate) || '-'}</td>
-                          <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateVersion(candidate) || '-'}</td>
+                          <td className="border border-sf-border px-1.5 py-1 text-sf-text">{getCandidateVersion(candidate) || '-'}</td>
                         </tr>
                       ))}
                       {visibleCandidates.length === 0 ? (

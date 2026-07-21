@@ -20,6 +20,10 @@ const MINIMUM_SEED_COUNTERS: IdCounters = {
   configurationHistory: 0,
   purposeHistory: 0,
   document: 0,
+  versionNumber: 0,
+  buildNumber: 0,
+  versionUpdate: 0,
+  versionUpdateAttachment: 0,
   pid: 0,
   sid: 0,
   tid: 0,
@@ -97,7 +101,7 @@ function allTenantWarranties(state: Partial<AppDataState>) {
 
 export function deriveIdCountersFromRecords(
   state: Pick<AppDataState, 'projects' | 'systems' | 'tenants'> &
-    Partial<Pick<AppDataState, 'accounts' | 'opportunities' | 'productionSystemInventory' | 'reusedInternalSystems' | 'warrantyRecords' | 'activityEvents'>>,
+    Partial<Pick<AppDataState, 'accounts' | 'opportunities' | 'productionSystemInventory' | 'reusedInternalSystems' | 'warrantyRecords' | 'activityEvents' | 'referenceData' | 'versionUpdates'>>,
 ): IdCounters {
   const productionSystemIds = [
     ...state.systems.map((system) => system.sid),
@@ -121,6 +125,10 @@ export function deriveIdCountersFromRecords(
     configurationHistory: maxCounter(allConfigurationHistory(state).map((record) => record.recordId), 'configurationHistory'),
     purposeHistory: maxCounter(allPurposeHistory(state).map((record) => record.recordId), 'purposeHistory'),
     document: maxCounter(allDocuments(state).map((document) => document.id), 'document'),
+    versionNumber: maxCounter((state.referenceData ?? []).filter((record) => record.referenceType === 'VERSION_NUMBER').map((record) => record.id), 'versionNumber'),
+    buildNumber: maxCounter((state.referenceData ?? []).filter((record) => record.referenceType === 'BUILD_NUMBER').map((record) => record.id), 'buildNumber'),
+    versionUpdate: maxCounter((state.versionUpdates ?? []).map((record) => record.id), 'versionUpdate'),
+    versionUpdateAttachment: maxCounter((state.versionUpdates ?? []).flatMap((record) => record.attachments ?? []).map((attachment) => attachment.id), 'versionUpdateAttachment'),
     pid: 0,
     sid: 0,
     tid: 0,

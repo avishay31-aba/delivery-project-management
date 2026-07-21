@@ -80,6 +80,7 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
+import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
@@ -289,6 +290,8 @@ export function ProjectFormPage() {
   const salesManagers = useAppStore((state) => state.salesManagers)
   const tenants = useAppStore((state) => state.tenants)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const referenceData = useAppStore((state) => state.referenceData)
+  const versionUpdates = useAppStore((state) => state.versionUpdates)
   const systems = useAppStore((state) => state.systems)
   const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
@@ -1681,6 +1684,7 @@ export function ProjectFormPage() {
         onConfirm={confirmAllocation}
         emptyText={selectedMode === 'EXISTING_SYSTEM' ? 'No new tenant system requirements.' : 'No available systems for this allocation mode.'}
         isReusedInternalMode={isReusedInternalAllocationMode}
+        getCandidateVersion={(candidate) => systemCurrentVersionLabel(versionUpdates, referenceData, candidate.id, 'currentVersionUpdateId' in candidate ? candidate.currentVersionUpdateId : null)}
       />
     )
   }

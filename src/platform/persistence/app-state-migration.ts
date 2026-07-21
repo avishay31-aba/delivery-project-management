@@ -40,6 +40,8 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
       : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
+    referenceData: Array.isArray(state.referenceData) ? state.referenceData : [],
+    versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
     projectSystems: Array.isArray(state.projectSystems)
       ? state.projectSystems.map(normalizeProjectSystemLink)

@@ -5,6 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
+import { TableSection } from '@/components/ui'
 
 interface OwnerGridProps {
   owners: OwnerRecord[]
@@ -83,21 +84,19 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
     })
   }
 
+  const actions = permissions.canAdd ? (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      onClick={addOwner}
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Add owner
+    </button>
+  ) : null
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold text-sf-text">Owner</h3>
-        {permissions.canAdd ? (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
-            onClick={addOwner}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add owner
-          </button>
-        ) : null}
-      </div>
+    <TableSection title="Owner" actions={actions}>
 
       {editor.notification ? (
         <div
@@ -210,6 +209,6 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
           </tbody>
         </table>
       </div>
-    </div>
+    </TableSection>
   )
 }

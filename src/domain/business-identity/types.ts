@@ -10,6 +10,10 @@ export type BusinessEntityType =
   | 'configurationHistory'
   | 'purposeHistory'
   | 'document'
+  | 'versionNumber'
+  | 'buildNumber'
+  | 'versionUpdate'
+  | 'versionUpdateAttachment'
 
 export interface BusinessIdentityPolicy {
   entityType: BusinessEntityType

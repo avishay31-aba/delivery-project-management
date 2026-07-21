@@ -5,6 +5,10 @@ import type {
   Opportunity,
   OpportunitySubType,
   OpportunityType,
+  ReferenceDataRecord,
+  ReferenceDataType,
+  VersionUpdateAttachmentRecord,
+  VersionUpdateRecord,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
@@ -68,6 +72,14 @@ import {
 } from '@/domain/opportunity-lifecycle'
 import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
+import {
+  normalizeReferenceLabel,
+  referenceDataLabel,
+  REFERENCE_DATA_TYPE_LABELS,
+  validateReferenceDataLabel,
+} from '@/domain/reference-data'
+import { commitVersionUpdateAttachment, type PendingAttachmentDraft } from '@/domain/attachment'
+import { validateVersionUpdateDraft } from '@/domain/system-version-update'
 import {
   deletedTenantHostedSystemHistory,
   endedTenantHostedSystemHistory,
@@ -134,6 +146,24 @@ function requirementRef(requirementId: string): ActivityObjectRefInput {
     id: requirementId,
     businessId: requirementId,
     displayLabel: requirementId,
+  }
+}
+
+function referenceDataRef(record: ReferenceDataRecord): ActivityObjectRefInput {
+  return {
+    objectType: record.referenceType,
+    id: record.id,
+    businessId: record.id,
+    displayLabel: `${REFERENCE_DATA_TYPE_LABELS[record.referenceType]} ${record.label}`,
+  }
+}
+
+function versionUpdateRef(record: VersionUpdateRecord): ActivityObjectRefInput {
+  return {
+    objectType: 'VERSION_UPDATE',
+    id: record.id,
+    businessId: record.id,
+    displayLabel: `Version Update ${record.id}`,
   }
 }
 
@@ -693,6 +723,21 @@ interface AppStore extends AppDataState {
     tenantRemovalIds?: string[],
     options?: SaveTimestampOptions,
   ) => void
+  createReferenceDataRecord: (referenceType: ReferenceDataType, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
+  updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
+  setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
+  saveVersionUpdate: (
+    systemCollection: 'production' | 'reused' | 'allocated',
+    systemId: string,
+    draft: {
+      id?: string
+      versionNumberRefId: string
+      buildNumberRefId: string
+      remarks: string
+      attachments: PendingAttachmentDraft[]
+    },
+  ) => AllocationActionResult & { record?: VersionUpdateRecord }
+  deleteVersionUpdate: (id: string, reason?: string) => AllocationActionResult
   updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
   saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
   deleteTenantFromSystem: (id: string) => void
@@ -757,6 +802,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       systems: state.systems,
       tenants: state.tenants,
       warrantyRecords: state.warrantyRecords,
+      referenceData: state.referenceData,
+      versionUpdates: state.versionUpdates,
       activityEvents: state.activityEvents,
       projectSystems: state.projectSystems,
       projectTenants: state.projectTenants,
@@ -1024,6 +1071,272 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return { ...auditedResult, systems: mapCenterState.systems, activityEvents: mapCenterState.activityEvents }
     })
     get().saveToStorage()
+  },
+
+  createReferenceDataRecord: (referenceType, label) => {
+    const state = get()
+    const messages = validateReferenceDataLabel(state.referenceData, referenceType, label)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const now = new Date().toISOString()
+    const entityType = referenceType === 'VERSION_NUMBER' ? 'versionNumber' : 'buildNumber'
+    const nextId = generateBusinessIdFromCounter(entityType, state.idCounters, state.referenceData.map((record) => record.id))
+    const record: ReferenceDataRecord = {
+      id: nextId.id,
+      referenceType,
+      label: referenceDataLabel(label),
+      normalizedLabel: normalizeReferenceLabel(label),
+      active: true,
+      createdAt: now,
+      createdBy: CURRENT_USER_DISPLAY_NAME,
+      updatedAt: now,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+    set((current) => ({
+      idCounters: nextId.counters,
+      referenceData: [...current.referenceData, record],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: `${referenceType.toLocaleLowerCase()}.created`,
+        severity: 'SUCCESS',
+        summary: `${REFERENCE_DATA_TYPE_LABELS[referenceType]} ${record.label} created.`,
+        primaryObject: referenceDataRef(record),
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[referenceType]} created.`, record }
+  },
+
+  updateReferenceDataRecord: (id, label) => {
+    const state = get()
+    const existing = state.referenceData.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'Reference data record not found.' }
+    const messages = validateReferenceDataLabel(state.referenceData, existing.referenceType, label, id)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const nextLabel = referenceDataLabel(label)
+    if (nextLabel === existing.label) return { ok: true, message: 'No changes to save.', record: existing }
+    const now = new Date().toISOString()
+    const record = {
+      ...existing,
+      label: nextLabel,
+      normalizedLabel: normalizeReferenceLabel(nextLabel),
+      updatedAt: now,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+    set((current) => ({
+      referenceData: current.referenceData.map((candidate) => candidate.id === id ? record : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: `${existing.referenceType.toLocaleLowerCase()}.renamed`,
+        severity: 'INFO',
+        summary: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} renamed from ${existing.label} to ${record.label}.`,
+        primaryObject: referenceDataRef(record),
+        before: { label: existing.label },
+        after: { label: record.label },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} updated.`, record }
+  },
+
+  setReferenceDataActive: (id, active) => {
+    const state = get()
+    const existing = state.referenceData.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'Reference data record not found.' }
+    if (existing.active === active) return { ok: true, message: 'No changes to save.' }
+    const now = new Date().toISOString()
+    const record = { ...existing, active, updatedAt: now, updatedBy: CURRENT_USER_DISPLAY_NAME }
+    set((current) => ({
+      referenceData: current.referenceData.map((candidate) => candidate.id === id ? record : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: `${existing.referenceType.toLocaleLowerCase()}.${active ? 'activated' : 'deactivated'}`,
+        severity: active ? 'SUCCESS' : 'WARNING',
+        summary: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} ${record.label} ${active ? 'activated' : 'deactivated'}.`,
+        primaryObject: referenceDataRef(record),
+        before: { active: existing.active },
+        after: { active },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} ${active ? 'activated' : 'deactivated'}.` }
+  },
+
+  saveVersionUpdate: (systemCollection, systemId, draft) => {
+    const state = get()
+    const system =
+      systemCollection === 'production'
+        ? state.productionSystemInventory.find((candidate) => candidate.id === systemId)
+        : systemCollection === 'reused'
+          ? state.reusedInternalSystems.find((candidate) => candidate.id === systemId)
+          : state.systems.find((candidate) => candidate.id === systemId)
+    if (!system) return { ok: false, message: 'System not found.' }
+    const existingRecord = draft.id ? state.versionUpdates.find((record) => record.id === draft.id) : undefined
+    if (draft.id && !existingRecord) return { ok: false, message: 'Version Update record not found.' }
+    const validationMessages = validateVersionUpdateDraft({
+      versionNumberRefId: draft.versionNumberRefId,
+      buildNumberRefId: draft.buildNumberRefId,
+      attachmentCategories: draft.attachments.map((attachment) => attachment.category),
+      referenceData: state.referenceData,
+    })
+    if (validationMessages.length > 0) return { ok: false, message: validationMessages.join(' ') }
+
+    const now = new Date().toISOString()
+    const correlationId = `corr-${crypto.randomUUID()}`
+    const isCurrentEdit = Boolean(existingRecord && system.currentVersionUpdateId === existingRecord.id)
+    const isNew = !existingRecord
+    const nextVersionUpdateIdentity = isNew
+      ? generateBusinessIdFromCounter('versionUpdate', state.idCounters, state.versionUpdates.map((record) => record.id))
+      : { counters: state.idCounters, id: existingRecord.id }
+    const usedAttachmentIds = state.versionUpdates.flatMap((record) => record.attachments.map((attachment) => attachment.id))
+    let nextIdCounters = nextVersionUpdateIdentity.counters
+    const committedAttachments: VersionUpdateAttachmentRecord[] = draft.attachments.map((attachment) => {
+      const nextAttachmentIdentity = generateBusinessIdFromCounter('versionUpdateAttachment', nextIdCounters, usedAttachmentIds)
+      nextIdCounters = nextAttachmentIdentity.counters
+      usedAttachmentIds.push(nextAttachmentIdentity.id)
+      return commitVersionUpdateAttachment(attachment, nextAttachmentIdentity.id, nextVersionUpdateIdentity.id, now)
+    })
+    const committedSequence = existingRecord?.committedSequence ?? Math.max(0, ...state.versionUpdates.map((record) => record.committedSequence ?? 0)) + 1
+    const record: VersionUpdateRecord = {
+      id: nextVersionUpdateIdentity.id,
+      systemId,
+      systemCollection,
+      committedAt: existingRecord?.committedAt ?? now,
+      committedSequence,
+      userName: existingRecord?.userName ?? CURRENT_USER_DISPLAY_NAME,
+      midSnapshot: existingRecord?.midSnapshot ?? ('machineId' in system ? system.machineId ?? '' : ''),
+      sidSnapshot: existingRecord?.sidSnapshot ?? ('sid' in system ? system.sid ?? '' : ''),
+      versionNumberRefId: draft.versionNumberRefId,
+      buildNumberRefId: draft.buildNumberRefId,
+      attachments: committedAttachments,
+      emailSentAt: existingRecord?.emailSentAt ?? null,
+      remarks: draft.remarks,
+      createdAt: existingRecord?.createdAt ?? now,
+      createdBy: existingRecord?.createdBy ?? CURRENT_USER_DISPLAY_NAME,
+      updatedAt: now,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+    const shouldUpdateCurrent = isNew || isCurrentEdit
+
+    set((current) => {
+      const versionUpdates = existingRecord
+        ? current.versionUpdates.map((candidate) => candidate.id === existingRecord.id ? record : candidate)
+        : [...current.versionUpdates, record]
+      const currentPatch = shouldUpdateCurrent
+        ? {
+            currentVersionUpdateId: record.id,
+            currentVersionNumberRefId: record.versionNumberRefId,
+            currentBuildNumberRefId: record.buildNumberRefId,
+            updatedAt: now,
+          }
+        : {}
+      const activityBase = appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: isNew ? 'systemVersionUpdate.created' : 'systemVersionUpdate.edited',
+        severity: 'SUCCESS',
+        summary: `Version Update ${record.id} ${isNew ? 'created' : 'edited'} for System ${systemBusinessId(system)}.`,
+        primaryObject: versionUpdateRef(record),
+        relatedObjects: relatedRefs(systemRef(system)),
+        before: existingRecord ? {
+          versionNumberRefId: existingRecord.versionNumberRefId,
+          buildNumberRefId: existingRecord.buildNumberRefId,
+          remarks: existingRecord.remarks,
+        } : undefined,
+        after: {
+          versionNumberRefId: record.versionNumberRefId,
+          buildNumberRefId: record.buildNumberRefId,
+          remarks: record.remarks,
+        },
+        correlationId,
+      })
+      const activityEvents = shouldUpdateCurrent
+        ? appendActivityEvent(activityBase, now, {
+            category: 'SYSTEM',
+            eventType: 'system.currentVersionChanged',
+            severity: 'SUCCESS',
+            summary: `System ${systemBusinessId(system)} current Version and Build updated from Version Update ${record.id}.`,
+            primaryObject: systemRef(system),
+            relatedObjects: relatedRefs(versionUpdateRef(record)),
+            before: {
+              currentVersionUpdateId: system.currentVersionUpdateId ?? null,
+              currentVersionNumberRefId: system.currentVersionNumberRefId ?? null,
+              currentBuildNumberRefId: system.currentBuildNumberRefId ?? null,
+            },
+            after: {
+              currentVersionUpdateId: record.id,
+              currentVersionNumberRefId: record.versionNumberRefId,
+              currentBuildNumberRefId: record.buildNumberRefId,
+            },
+            correlationId,
+          })
+        : activityBase
+      return {
+        idCounters: nextIdCounters,
+        versionUpdates,
+        productionSystemInventory: systemCollection === 'production'
+          ? current.productionSystemInventory.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
+          : current.productionSystemInventory,
+        reusedInternalSystems: systemCollection === 'reused'
+          ? current.reusedInternalSystems.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
+          : current.reusedInternalSystems,
+        systems: systemCollection === 'allocated'
+          ? current.systems.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
+          : current.systems,
+        activityEvents,
+      }
+    })
+    get().saveToStorage()
+    return { ok: true, message: 'Version Update saved.', record }
+  },
+
+  deleteVersionUpdate: (id, reason = '') => {
+    const state = get()
+    const record = state.versionUpdates.find((candidate) => candidate.id === id)
+    if (!record) return { ok: false, message: 'Version Update record not found.' }
+    const system =
+      record.systemCollection === 'production'
+        ? state.productionSystemInventory.find((candidate) => candidate.id === record.systemId)
+        : record.systemCollection === 'reused'
+          ? state.reusedInternalSystems.find((candidate) => candidate.id === record.systemId)
+          : state.systems.find((candidate) => candidate.id === record.systemId)
+    if (system?.currentVersionUpdateId === record.id) {
+      const now = new Date().toISOString()
+      set((current) => ({
+        activityEvents: appendActivityEvent(current.activityEvents, now, {
+          category: 'CONFIGURATION',
+          eventType: 'systemVersionUpdate.deleteBlocked',
+          severity: 'WARNING',
+          summary: `Delete blocked for current Version Update ${record.id}.`,
+          primaryObject: versionUpdateRef(record),
+          relatedObjects: relatedRefs(system ? systemRef(system) : null),
+        }),
+      }))
+      get().saveToStorage()
+      return { ok: false, message: 'The current authoritative Version Update cannot be deleted. Add a newer Version Update before deleting this historical record.' }
+    }
+    const now = new Date().toISOString()
+    const deletedRecord = {
+      ...record,
+      deletedAt: now,
+      deletedBy: CURRENT_USER_DISPLAY_NAME,
+      deletionReason: reason.trim(),
+      updatedAt: now,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+    set((current) => ({
+      versionUpdates: current.versionUpdates.map((candidate) => candidate.id === id ? deletedRecord : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: 'systemVersionUpdate.deleted',
+        severity: 'WARNING',
+        summary: `Historical Version Update ${record.id} logically deleted.`,
+        primaryObject: versionUpdateRef(record),
+        relatedObjects: relatedRefs(system ? systemRef(system) : null),
+        before: { deletedAt: record.deletedAt ?? null },
+        after: { deletedAt: now, deletionReason: deletedRecord.deletionReason || null },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Historical Version Update deleted.' }
   },
 
   updateTenant: (id, patch, options) => {

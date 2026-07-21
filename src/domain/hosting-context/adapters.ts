@@ -1,6 +1,7 @@
 import type { AppDataState, System, Tenant, TenantHostingSnapshot } from '@/data/seed.types'
 import { DEFAULT_HOSTING_CONTEXT, DEFAULT_HOSTING_INTENT } from './metadata'
 import type { HostingContext, HostingIntent } from './types'
+import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 
 export function defaultHostingIntent(): HostingIntent {
   return { ...DEFAULT_HOSTING_INTENT }
@@ -50,15 +51,22 @@ export function tenantHostingPatchFromSystem(system: Partial<HostingContext>): P
   }
 }
 
-export function hostingSnapshotFromSystem(tenant: Tenant, system?: System): TenantHostingSnapshot {
+export function hostingSnapshotFromSystem(
+  tenant: Tenant,
+  system?: System,
+  context?: Pick<AppDataState, 'versionUpdates' | 'referenceData'>,
+): TenantHostingSnapshot {
   const platform = system?.cloudPlatform ?? tenant.cloudPlatform ?? ''
   const cloudRegion = system?.cloudRegion ?? tenant.cloudRegion ?? ''
+  const versionNumber = system && context
+    ? systemCurrentVersionLabel(context.versionUpdates, context.referenceData, system.id, system.currentVersionUpdateId)
+    : ''
   return {
     currentSystem: Boolean(system),
     sid: system?.sid ?? tenant.hostingSid ?? '',
     operationalStatus: system?.operationalStatus ?? tenant.operationalStatus ?? '',
     machineNumber: system?.machineId ?? '',
-    versionNumber: system?.cognitoRegion ?? '',
+    versionNumber,
     hostingType: system?.hostingType ?? tenant.hostingType ?? '',
     url: system?.url ?? '',
     performanceTier: system?.performanceTier ?? tenant.performanceTier ?? '',
@@ -72,10 +80,14 @@ export function hostingSnapshotFromSystem(tenant: Tenant, system?: System): Tena
   }
 }
 
-export function hostingSnapshotFromTenant(tenant: Tenant, systems: AppDataState['systems']): TenantHostingSnapshot {
+export function hostingSnapshotFromTenant(
+  tenant: Tenant,
+  systems: AppDataState['systems'],
+  context?: Pick<AppDataState, 'versionUpdates' | 'referenceData'>,
+): TenantHostingSnapshot {
   const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
   return {
-    ...hostingSnapshotFromSystem(tenant, system),
+    ...hostingSnapshotFromSystem(tenant, system, context),
     currentSystem: Boolean(tenant.systemId || tenant.hostedSystemId),
   }
 }

@@ -13,6 +13,10 @@ export const BUSINESS_IDENTITY_POLICIES: Record<BusinessEntityType, BusinessIden
   configurationHistory: { entityType: 'configurationHistory', prefix: 'CH', minimumCounter: 0, minDigits: 6 },
   purposeHistory: { entityType: 'purposeHistory', prefix: 'PH', minimumCounter: 0, minDigits: 6 },
   document: { entityType: 'document', prefix: 'DOC', minimumCounter: 0, minDigits: 6 },
+  versionNumber: { entityType: 'versionNumber', prefix: 'VN', minimumCounter: 0, minDigits: 6 },
+  buildNumber: { entityType: 'buildNumber', prefix: 'BN', minimumCounter: 0, minDigits: 6 },
+  versionUpdate: { entityType: 'versionUpdate', prefix: 'VU', minimumCounter: 0, minDigits: 6 },
+  versionUpdateAttachment: { entityType: 'versionUpdateAttachment', prefix: 'VUA', minimumCounter: 0, minDigits: 6 },
 }
 
 const BUSINESS_ID_RESERVATIONS_STORAGE_KEY = 'delivery-erp.business-id-reservations.v1'
