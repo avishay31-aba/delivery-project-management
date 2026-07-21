@@ -439,7 +439,17 @@ export function SystemVersionUpdatePanel({
               ) : null}
 
               <div className="grid grid-cols-2 gap-4">
-                <ReadonlyField label="MID" className="!w-full" value={draft.id ? rows.find((row) => row.id === draft.id)?.mid || '-' : mid || '-'} />
+                <ReadonlyField
+                  label="MID"
+                  className="!w-full"
+                  value={(draft.id ? rows.find((row) => row.id === draft.id)?.mid || '' : mid || '')
+                    ? (
+                        <BusinessIdLink objectType="INTERNAL_REUSED_SYSTEM" businessId={draft.id ? rows.find((row) => row.id === draft.id)?.mid || '' : mid || ''}>
+                          {draft.id ? rows.find((row) => row.id === draft.id)?.mid || '' : mid || ''}
+                        </BusinessIdLink>
+                      )
+                    : '-'}
+                />
                 <ReadonlyField
                   label="SID"
                   className="!w-full"
