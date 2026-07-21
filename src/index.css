@@ -112,6 +112,34 @@
     line-height: 1.25rem;
   }
 
+  .configuration-change-increase {
+    @apply font-semibold text-green-700;
+  }
+
+  .configuration-change-decrease {
+    @apply font-semibold text-red-700;
+  }
+
+  .configuration-change-addition {
+    @apply rounded-sm bg-green-50 px-0.5 font-semibold text-green-700;
+  }
+
+  .configuration-change-removal {
+    @apply rounded-sm bg-red-50 px-0.5 font-semibold;
+  }
+
+  .configuration-change-boolean-yes {
+    @apply rounded-sm bg-green-50 px-0.5 font-semibold;
+  }
+
+  .configuration-change-boolean-no {
+    @apply rounded-sm bg-red-50 px-0.5 font-semibold;
+  }
+
+  .configuration-change-changed {
+    @apply font-semibold;
+  }
+
   .sf-view-mode input:not([type='checkbox']):not([type='radio']),
   .sf-view-mode select,
   .sf-view-mode textarea,

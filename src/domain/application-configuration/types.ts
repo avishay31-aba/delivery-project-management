@@ -49,3 +49,19 @@ export interface ValidationMessage {
   level: 'error' | 'warning'
   message: string
 }
+
+export type ApplicationConfigurationComparisonDataType = 'number' | 'list' | 'boolean' | 'string'
+
+export type ApplicationConfigurationComparisonDirection = 'increase' | 'decrease' | 'changed' | 'none'
+
+export interface ApplicationConfigurationComparisonResult {
+  fieldKey: string
+  dataType: ApplicationConfigurationComparisonDataType
+  matches: boolean
+  currentValue: unknown
+  requestedValue: unknown
+  direction: ApplicationConfigurationComparisonDirection
+  addedItems: string[]
+  removedItems: string[]
+  requestedBooleanValue?: boolean | null
+}

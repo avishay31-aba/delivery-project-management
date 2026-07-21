@@ -1,5 +1,11 @@
 import type { ConfigurationHistoryRecord, TenantConfigurationHistoryRecord } from '@/data/seed.types'
-import type { ApplicationConfiguration, ApplicationConfigurationFieldMetadata, SharedFieldMetadata } from './types'
+import { APPLICATION_CONFIGURATION_FIELDS } from './metadata'
+import type {
+  ApplicationConfiguration,
+  ApplicationConfigurationComparisonResult,
+  ApplicationConfigurationFieldMetadata,
+  SharedFieldMetadata,
+} from './types'
 
 export const APPLICATION_CONFIGURATION_CATEGORY_ORDER = [
   'Hosting',
@@ -14,6 +20,129 @@ export function applicationConfigurationValue(
   field: ApplicationConfigurationFieldMetadata,
 ): unknown {
   return configuration[field.configKey]
+}
+
+export function applicationConfigurationFieldForRequirementKey(key: string): ApplicationConfigurationFieldMetadata | undefined {
+  return APPLICATION_CONFIGURATION_FIELDS.find((field) => field.key === key || field.configKey === key)
+}
+
+function normalizeScalar(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
+function normalizeNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  const parsed = Number(String(value).trim())
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeList(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : normalizeScalar(value).split(/[;,]/)
+  const unique = new Map<string, string>()
+  values
+    .map((item) => normalizeScalar(item))
+    .filter(Boolean)
+    .forEach((item) => unique.set(item.toLocaleLowerCase(), item))
+  return Array.from(unique.values()).sort((first, second) => first.localeCompare(second))
+}
+
+function normalizeBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  const normalized = normalizeScalar(value).toLocaleLowerCase()
+  if (['yes', 'y', 'true', '1'].includes(normalized)) return true
+  if (['no', 'n', 'false', '0'].includes(normalized)) return false
+  return null
+}
+
+function hasSameListValues(first: string[], second: string[]): boolean {
+  return first.length === second.length && first.every((value, index) => value.toLocaleLowerCase() === second[index]?.toLocaleLowerCase())
+}
+
+export function compareApplicationConfigurationField(
+  field: ApplicationConfigurationFieldMetadata,
+  requestedRecord: Record<string, unknown>,
+  currentConfiguration: ApplicationConfiguration,
+): ApplicationConfigurationComparisonResult {
+  const requestedValue = field.key in requestedRecord ? requestedRecord[field.key] : requestedRecord[field.configKey]
+  const currentValue = applicationConfigurationValue(currentConfiguration, field)
+
+  if (field.inputType === 'integer') {
+    const requestedNumber = normalizeNumber(requestedValue)
+    const currentNumber = normalizeNumber(currentValue)
+    const matches = requestedNumber === currentNumber
+    const direction = matches
+      ? 'none'
+      : requestedNumber !== null && (currentNumber === null || requestedNumber > currentNumber)
+        ? 'increase'
+        : requestedNumber !== null && currentNumber !== null && requestedNumber < currentNumber
+          ? 'decrease'
+          : 'changed'
+
+    return {
+      fieldKey: field.key,
+      dataType: 'number',
+      matches,
+      currentValue: currentNumber,
+      requestedValue: requestedNumber,
+      direction,
+      addedItems: [],
+      removedItems: [],
+    }
+  }
+
+  if (field.inputType === 'multiselect') {
+    const requestedItems = normalizeList(requestedValue)
+    const currentItems = normalizeList(currentValue)
+    const requestedKeys = new Set(requestedItems.map((item) => item.toLocaleLowerCase()))
+    const currentKeys = new Set(currentItems.map((item) => item.toLocaleLowerCase()))
+    const addedItems = requestedItems.filter((item) => !currentKeys.has(item.toLocaleLowerCase()))
+    const removedItems = currentItems.filter((item) => !requestedKeys.has(item.toLocaleLowerCase()))
+    const matches = hasSameListValues(requestedItems, currentItems)
+
+    return {
+      fieldKey: field.key,
+      dataType: 'list',
+      matches,
+      currentValue: currentItems,
+      requestedValue: requestedItems,
+      direction: matches ? 'none' : 'changed',
+      addedItems,
+      removedItems,
+    }
+  }
+
+  const requestedBooleanValue = normalizeBoolean(requestedValue)
+  const currentBooleanValue = normalizeBoolean(currentValue)
+  if (requestedBooleanValue !== null || currentBooleanValue !== null) {
+    const matches = requestedBooleanValue === currentBooleanValue
+    return {
+      fieldKey: field.key,
+      dataType: 'boolean',
+      matches,
+      currentValue: currentBooleanValue,
+      requestedValue: requestedBooleanValue,
+      direction: matches ? 'none' : 'changed',
+      addedItems: [],
+      removedItems: [],
+      requestedBooleanValue,
+    }
+  }
+
+  const requestedText = normalizeScalar(requestedValue)
+  const currentText = normalizeScalar(currentValue)
+  const matches = requestedText.localeCompare(currentText, undefined, { sensitivity: 'accent' }) === 0
+  return {
+    fieldKey: field.key,
+    dataType: 'string',
+    matches,
+    currentValue: currentText,
+    requestedValue: requestedText,
+    direction: matches ? 'none' : 'changed',
+    addedItems: [],
+    removedItems: [],
+  }
 }
 
 export function applicationConfigurationCategoryLabel(field: Pick<SharedFieldMetadata, 'key' | 'group'>): string {

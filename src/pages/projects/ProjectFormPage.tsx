@@ -20,6 +20,7 @@ import { BusinessObjectLink, FormField, MetadataHeaderField, PlaceholderCard, Pr
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
+import { ApplicationConfigurationComparisonCell } from '@/components/application-configuration/ApplicationConfigurationComparisonCell'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import {
@@ -80,7 +81,12 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
+import {
+  applicationConfigurationFieldForRequirementKey,
+  compareApplicationConfigurationField,
+} from '@/domain/application-configuration'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
+import { tenantConfigurationFromTenant } from '@/domain/tenant-operations'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
@@ -227,6 +233,18 @@ function RequirementSection({
 }) {
   const rows = projectRequirementRows(opportunity, section.kind)
 
+  function comparisonForCell(row: Record<string, unknown>, columnKey: string) {
+    if (section.kind !== 'B') return null
+    const field = applicationConfigurationFieldForRequirementKey(columnKey)
+    if (!field) return null
+    const tenantId = typeof row.tenantId === 'string' ? row.tenantId : ''
+    if (!tenantId) return null
+    const tenant = tenants.find((candidate) => candidate.id === tenantId)
+    if (!tenant) return null
+    const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
+    return compareApplicationConfigurationField(field, row, tenantConfigurationFromTenant(tenant, system))
+  }
+
   return (
     <div className="space-y-2">
       <div>
@@ -260,7 +278,9 @@ function RequirementSection({
                 <tr key={row.id} className={section.kind === 'B' ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-sf-surface-alt'}>
                   {section.columns.map((column) => (
                     <td key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text">
-                      {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
+                      <ApplicationConfigurationComparisonCell comparison={comparisonForCell(row as unknown as Record<string, unknown>, column.key)}>
+                        {projectRequirementReadonlyCellValue(row, column, section.kind, tenants, systems)}
+                      </ApplicationConfigurationComparisonCell>
                     </td>
                   ))}
                 </tr>

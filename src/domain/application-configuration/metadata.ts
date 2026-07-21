@@ -24,7 +24,7 @@ export const APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFieldMeta
   { key: 'crossSystemFeatures', configKey: 'crossSystemFeatures', label: 'Additional Sources', group: 'Additional Sources', editable: true, inputType: 'multiselect' },
   { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
   { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
   { key: 'aiFeatures', configKey: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
   { key: 'additionalFeatures', configKey: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
 ]
