@@ -723,7 +723,7 @@ interface AppStore extends AppDataState {
     tenantRemovalIds?: string[],
     options?: SaveTimestampOptions,
   ) => void
-  createReferenceDataRecord: (referenceType: ReferenceDataType, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
+  createReferenceDataRecord: (referenceType: ReferenceDataType, label: string, options?: { versionNumberId?: string | null }) => AllocationActionResult & { record?: ReferenceDataRecord }
   updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
   setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
   saveVersionUpdate: (
@@ -733,6 +733,8 @@ interface AppStore extends AppDataState {
       id?: string
       versionNumberRefId: string
       buildNumberRefId: string
+      newVersionNumberLabel?: string
+      newBuildNumberLabel?: string
       remarks: string
       attachments: PendingAttachmentDraft[]
     },
@@ -1073,9 +1075,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
-  createReferenceDataRecord: (referenceType, label) => {
+  createReferenceDataRecord: (referenceType, label, options) => {
     const state = get()
-    const messages = validateReferenceDataLabel(state.referenceData, referenceType, label)
+    if (referenceType === 'BUILD_NUMBER') {
+      const parentVersion = state.referenceData.find((record) => record.id === options?.versionNumberId && record.referenceType === 'VERSION_NUMBER')
+      if (!parentVersion) return { ok: false, message: 'Version Number is required before adding a Build Number.' }
+    }
+    const messages = validateReferenceDataLabel(state.referenceData, referenceType, label, undefined, options?.versionNumberId)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const now = new Date().toISOString()
     const entityType = referenceType === 'VERSION_NUMBER' ? 'versionNumber' : 'buildNumber'
@@ -1083,6 +1089,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const record: ReferenceDataRecord = {
       id: nextId.id,
       referenceType,
+      versionNumberId: referenceType === 'BUILD_NUMBER' ? options?.versionNumberId ?? null : null,
       label: referenceDataLabel(label),
       normalizedLabel: normalizeReferenceLabel(label),
       active: true,
@@ -1110,7 +1117,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const existing = state.referenceData.find((record) => record.id === id)
     if (!existing) return { ok: false, message: 'Reference data record not found.' }
-    const messages = validateReferenceDataLabel(state.referenceData, existing.referenceType, label, id)
+    const messages = validateReferenceDataLabel(state.referenceData, existing.referenceType, label, id, existing.versionNumberId)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const nextLabel = referenceDataLabel(label)
     if (nextLabel === existing.label) return { ok: true, message: 'No changes to save.', record: existing }
@@ -1175,7 +1182,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const validationMessages = validateVersionUpdateDraft({
       versionNumberRefId: draft.versionNumberRefId,
       buildNumberRefId: draft.buildNumberRefId,
+      newVersionNumberLabel: draft.newVersionNumberLabel,
+      newBuildNumberLabel: draft.newBuildNumberLabel,
       attachmentCategories: draft.attachments.map((attachment) => attachment.category),
+      remarks: draft.remarks,
       referenceData: state.referenceData,
     })
     if (validationMessages.length > 0) return { ok: false, message: validationMessages.join(' ') }
@@ -1184,11 +1194,57 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const correlationId = `corr-${crypto.randomUUID()}`
     const isCurrentEdit = Boolean(existingRecord && system.currentVersionUpdateId === existingRecord.id)
     const isNew = !existingRecord
+    let nextIdCounters = state.idCounters
+    let nextReferenceData = state.referenceData
+    let versionNumberRefId = draft.versionNumberRefId
+    let buildNumberRefId = draft.buildNumberRefId
+    let createdVersionReference: ReferenceDataRecord | undefined
+    let createdBuildReference: ReferenceDataRecord | undefined
+
+    if (draft.newVersionNumberLabel?.trim()) {
+      const nextVersionReferenceId = generateBusinessIdFromCounter('versionNumber', nextIdCounters, nextReferenceData.map((record) => record.id))
+      nextIdCounters = nextVersionReferenceId.counters
+      createdVersionReference = {
+        id: nextVersionReferenceId.id,
+        referenceType: 'VERSION_NUMBER',
+        versionNumberId: null,
+        label: referenceDataLabel(draft.newVersionNumberLabel),
+        normalizedLabel: normalizeReferenceLabel(draft.newVersionNumberLabel),
+        active: true,
+        createdAt: now,
+        createdBy: CURRENT_USER_DISPLAY_NAME,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_DISPLAY_NAME,
+      }
+      nextReferenceData = [...nextReferenceData, createdVersionReference]
+      versionNumberRefId = createdVersionReference.id
+    }
+
+    if (draft.newBuildNumberLabel?.trim()) {
+      const nextBuildReferenceId = generateBusinessIdFromCounter('buildNumber', nextIdCounters, nextReferenceData.map((record) => record.id))
+      nextIdCounters = nextBuildReferenceId.counters
+      createdBuildReference = {
+        id: nextBuildReferenceId.id,
+        referenceType: 'BUILD_NUMBER',
+        versionNumberId: versionNumberRefId,
+        label: referenceDataLabel(draft.newBuildNumberLabel),
+        normalizedLabel: normalizeReferenceLabel(draft.newBuildNumberLabel),
+        active: true,
+        createdAt: now,
+        createdBy: CURRENT_USER_DISPLAY_NAME,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_DISPLAY_NAME,
+      }
+      nextReferenceData = [...nextReferenceData, createdBuildReference]
+      buildNumberRefId = createdBuildReference.id
+    }
+    const selectedVersionReference = nextReferenceData.find((record) => record.id === versionNumberRefId)
+
     const nextVersionUpdateIdentity = isNew
-      ? generateBusinessIdFromCounter('versionUpdate', state.idCounters, state.versionUpdates.map((record) => record.id))
-      : { counters: state.idCounters, id: existingRecord.id }
+      ? generateBusinessIdFromCounter('versionUpdate', nextIdCounters, state.versionUpdates.map((record) => record.id))
+      : { counters: nextIdCounters, id: existingRecord.id }
+    nextIdCounters = nextVersionUpdateIdentity.counters
     const usedAttachmentIds = state.versionUpdates.flatMap((record) => record.attachments.map((attachment) => attachment.id))
-    let nextIdCounters = nextVersionUpdateIdentity.counters
     const committedAttachments: VersionUpdateAttachmentRecord[] = draft.attachments.map((attachment) => {
       const nextAttachmentIdentity = generateBusinessIdFromCounter('versionUpdateAttachment', nextIdCounters, usedAttachmentIds)
       nextIdCounters = nextAttachmentIdentity.counters
@@ -1205,8 +1261,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       userName: existingRecord?.userName ?? CURRENT_USER_DISPLAY_NAME,
       midSnapshot: existingRecord?.midSnapshot ?? ('machineId' in system ? system.machineId ?? '' : ''),
       sidSnapshot: existingRecord?.sidSnapshot ?? ('sid' in system ? system.sid ?? '' : ''),
-      versionNumberRefId: draft.versionNumberRefId,
-      buildNumberRefId: draft.buildNumberRefId,
+      versionNumberRefId,
+      buildNumberRefId,
       attachments: committedAttachments,
       emailSentAt: existingRecord?.emailSentAt ?? null,
       remarks: draft.remarks,
@@ -1229,7 +1285,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
             updatedAt: now,
           }
         : {}
-      const activityBase = appendActivityEvent(current.activityEvents, now, {
+      let activityBase = current.activityEvents
+      if (createdVersionReference) {
+        activityBase = appendActivityEvent(activityBase, now, {
+          category: 'CONFIGURATION',
+          eventType: 'versionNumber.created',
+          severity: 'SUCCESS',
+          summary: `Version Number ${createdVersionReference.label} created.`,
+          primaryObject: referenceDataRef(createdVersionReference),
+          correlationId,
+        })
+      }
+      if (createdBuildReference) {
+        activityBase = appendActivityEvent(activityBase, now, {
+          category: 'CONFIGURATION',
+          eventType: 'buildNumber.created',
+          severity: 'SUCCESS',
+          summary: `Build Number ${createdBuildReference.label} created under Version Number ${selectedVersionReference?.label ?? versionNumberRefId}.`,
+          primaryObject: referenceDataRef(createdBuildReference),
+          relatedObjects: relatedRefs(selectedVersionReference ? referenceDataRef(selectedVersionReference) : null),
+          after: { versionNumberId: versionNumberRefId },
+          correlationId,
+        })
+        activityBase = appendActivityEvent(activityBase, now, {
+          category: 'CONFIGURATION',
+          eventType: 'buildNumber.linkedToVersionNumber',
+          severity: 'SUCCESS',
+          summary: `Build Number ${createdBuildReference.label} linked to Version Number ${selectedVersionReference?.label ?? versionNumberRefId}.`,
+          primaryObject: referenceDataRef(createdBuildReference),
+          relatedObjects: relatedRefs(selectedVersionReference ? referenceDataRef(selectedVersionReference) : null),
+          after: { versionNumberId: versionNumberRefId },
+          correlationId,
+        })
+      }
+      activityBase = appendActivityEvent(activityBase, now, {
         category: 'CONFIGURATION',
         eventType: isNew ? 'systemVersionUpdate.created' : 'systemVersionUpdate.edited',
         severity: 'SUCCESS',
@@ -1272,6 +1361,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return {
         idCounters: nextIdCounters,
         versionUpdates,
+        referenceData: nextReferenceData,
         productionSystemInventory: systemCollection === 'production'
           ? current.productionSystemInventory.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
           : current.productionSystemInventory,

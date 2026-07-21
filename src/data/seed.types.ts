@@ -549,6 +549,7 @@ export type ReferenceDataType = 'VERSION_NUMBER' | 'BUILD_NUMBER'
 export interface ReferenceDataRecord {
   id: string
   referenceType: ReferenceDataType
+  versionNumberId?: string | null
   label: string
   normalizedLabel: string
   active: boolean

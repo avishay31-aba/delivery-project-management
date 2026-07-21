@@ -3,9 +3,10 @@ import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
 import type { ReferenceDataRecord, VersionUpdateAttachmentCategory, VersionUpdateRecord } from '@/data/seed.types'
 import { createPendingAttachmentDraft, type PendingAttachmentDraft } from '@/domain/attachment'
 import {
+  activeBuildNumberRecordsForVersion,
   activeReferenceDataRecords,
-  BUILD_NUMBER_REFERENCE_TYPE,
   referenceDataRecordById,
+  referenceDataLabel,
   VERSION_NUMBER_REFERENCE_TYPE,
 } from '@/domain/reference-data'
 import {
@@ -35,6 +36,8 @@ interface VersionUpdateDraft {
   id?: string
   versionNumberRefId: string
   buildNumberRefId: string
+  newVersionNumberLabel: string
+  newBuildNumberLabel: string
   attachments: Partial<Record<VersionUpdateAttachmentCategory, PendingAttachmentDraft>>
   remarks: string
 }
@@ -42,6 +45,8 @@ interface VersionUpdateDraft {
 const EMPTY_DRAFT: VersionUpdateDraft = {
   versionNumberRefId: '',
   buildNumberRefId: '',
+  newVersionNumberLabel: '',
+  newBuildNumberLabel: '',
   attachments: {},
   remarks: '',
 }
@@ -65,10 +70,17 @@ function attachmentFor(row: VersionUpdateRow, category: VersionUpdateAttachmentC
   return row.record.attachments.find((attachment) => attachment.category === category)
 }
 
-function referenceOptions(records: ReferenceDataRecord[], currentId: string, type: 'VERSION_NUMBER' | 'BUILD_NUMBER'): ReferenceDataRecord[] {
-  const active = activeReferenceDataRecords(records, type)
+function versionOptions(records: ReferenceDataRecord[], currentId: string): ReferenceDataRecord[] {
+  const active = activeReferenceDataRecords(records, VERSION_NUMBER_REFERENCE_TYPE)
   const current = referenceDataRecordById(records, currentId)
   if (current && !active.some((record) => record.id === current.id)) return [...active, current]
+  return active
+}
+
+function buildOptions(records: ReferenceDataRecord[], versionNumberId: string, currentId: string): ReferenceDataRecord[] {
+  const active = activeBuildNumberRecordsForVersion(records, versionNumberId)
+  const current = referenceDataRecordById(records, currentId)
+  if (current && current.versionNumberId === versionNumberId && !active.some((record) => record.id === current.id)) return [...active, current]
   return active
 }
 
@@ -82,7 +94,6 @@ export function SystemVersionUpdatePanel({
 }: SystemVersionUpdatePanelProps) {
   const referenceData = useAppStore((state) => state.referenceData)
   const versionUpdates = useAppStore((state) => state.versionUpdates)
-  const createReferenceDataRecord = useAppStore((state) => state.createReferenceDataRecord)
   const saveVersionUpdate = useAppStore((state) => state.saveVersionUpdate)
   const deleteVersionUpdate = useAppStore((state) => state.deleteVersionUpdate)
   const [draft, setDraft] = useState<VersionUpdateDraft | null>(null)
@@ -119,6 +130,8 @@ export function SystemVersionUpdatePanel({
       id: record.id,
       versionNumberRefId: record.versionNumberRefId,
       buildNumberRefId: record.buildNumberRefId,
+      newVersionNumberLabel: '',
+      newBuildNumberLabel: '',
       attachments: Object.fromEntries(
         record.attachments.map((attachment) => [
           attachment.category,
@@ -136,23 +149,59 @@ export function SystemVersionUpdatePanel({
     setMessage(null)
   }
 
-  function addReferenceValue(referenceType: 'VERSION_NUMBER' | 'BUILD_NUMBER') {
-    const label = window.prompt(`Add ${referenceType === 'VERSION_NUMBER' ? 'Version Number' : 'Build Number'}`)
-    if (!label?.trim()) return
-    const result = createReferenceDataRecord(referenceType, label)
-    if (!result.ok || !result.record) {
-      setMessage({ tone: 'error', text: result.message })
+  function selectVersion(value: string) {
+    if (value === '__add_new__') {
+      const label = window.prompt('Add Version Number')
+      const nextLabel = referenceDataLabel(label ?? '')
+      if (!nextLabel) return
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              versionNumberRefId: '',
+              buildNumberRefId: '',
+              newVersionNumberLabel: nextLabel,
+              newBuildNumberLabel: '',
+            }
+          : current,
+      )
+      setMessage(null)
       return
     }
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            [referenceType === 'VERSION_NUMBER' ? 'versionNumberRefId' : 'buildNumberRefId']: result.record?.id ?? '',
-          }
-        : current,
-    )
-    setMessage({ tone: 'success', text: result.message })
+    setDraft((current) => {
+      if (!current) return current
+      const currentBuild = referenceDataRecordById(referenceData, current.buildNumberRefId)
+      const buildBelongsToVersion = currentBuild?.versionNumberId === value
+      return {
+        ...current,
+        versionNumberRefId: value,
+        buildNumberRefId: buildBelongsToVersion ? current.buildNumberRefId : '',
+        newVersionNumberLabel: '',
+        newBuildNumberLabel: buildBelongsToVersion ? current.newBuildNumberLabel : '',
+      }
+    })
+    setMessage(null)
+  }
+
+  function selectBuild(value: string) {
+    if (value === '__add_new__') {
+      const label = window.prompt('Add Build Number')
+      const nextLabel = referenceDataLabel(label ?? '')
+      if (!nextLabel) return
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              buildNumberRefId: '',
+              newBuildNumberLabel: nextLabel,
+            }
+          : current,
+      )
+      setMessage(null)
+      return
+    }
+    setDraft((current) => current ? { ...current, buildNumberRefId: value, newBuildNumberLabel: '' } : current)
+    setMessage(null)
   }
 
   async function handleFileChange(category: VersionUpdateAttachmentCategory, event: ChangeEvent<HTMLInputElement>) {
@@ -174,6 +223,8 @@ export function SystemVersionUpdatePanel({
       id: draft.id,
       versionNumberRefId: draft.versionNumberRefId,
       buildNumberRefId: draft.buildNumberRefId,
+      newVersionNumberLabel: draft.newVersionNumberLabel,
+      newBuildNumberLabel: draft.newBuildNumberLabel,
       remarks: draft.remarks,
       attachments: VERSION_UPDATE_ATTACHMENT_CATEGORIES
         .map((category) => draft.attachments[category])
@@ -294,7 +345,7 @@ export function SystemVersionUpdatePanel({
         </table>
       </div>
 
-      {draft ? (
+              {draft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
           <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="version-update-dialog-title">
             <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
@@ -320,28 +371,34 @@ export function SystemVersionUpdatePanel({
                   Version Number
                   <select
                     className="mt-1 h-9 w-full rounded border border-sf-border px-2 py-1 font-normal"
-                    value={draft.versionNumberRefId}
-                    onChange={(event) => event.target.value === '__add_new__' ? addReferenceValue(VERSION_NUMBER_REFERENCE_TYPE) : setDraft((current) => current ? { ...current, versionNumberRefId: event.target.value } : current)}
+                    value={draft.newVersionNumberLabel ? '__new_version__' : draft.versionNumberRefId}
+                    onChange={(event) => selectVersion(event.target.value)}
                   >
                     <option value="">Select Version Number</option>
-                    {referenceOptions(referenceData, draft.versionNumberRefId, VERSION_NUMBER_REFERENCE_TYPE).map((record) => (
+                    {versionOptions(referenceData, draft.versionNumberRefId).map((record) => (
                       <option key={record.id} value={record.id}>{record.label}{record.active ? '' : ' (inactive)'}</option>
                     ))}
+                    {draft.newVersionNumberLabel ? <option value="__new_version__">{draft.newVersionNumberLabel} (new)</option> : null}
                     <option value="__add_new__">Add new...</option>
                   </select>
                 </label>
                 <label className="block text-sm font-semibold text-sf-text">
                   Build Number
+                  {draft.versionNumberRefId && buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).length === 0 && !draft.newBuildNumberLabel ? (
+                    <span className="ml-2 text-xs font-normal text-sf-text-muted">No builds for this Version yet.</span>
+                  ) : null}
                   <select
                     className="mt-1 h-9 w-full rounded border border-sf-border px-2 py-1 font-normal"
-                    value={draft.buildNumberRefId}
-                    onChange={(event) => event.target.value === '__add_new__' ? addReferenceValue(BUILD_NUMBER_REFERENCE_TYPE) : setDraft((current) => current ? { ...current, buildNumberRefId: event.target.value } : current)}
+                    value={draft.newBuildNumberLabel ? '__new_build__' : draft.buildNumberRefId}
+                    disabled={!draft.versionNumberRefId && !draft.newVersionNumberLabel}
+                    onChange={(event) => selectBuild(event.target.value)}
                   >
                     <option value="">Select Build Number</option>
-                    {referenceOptions(referenceData, draft.buildNumberRefId, BUILD_NUMBER_REFERENCE_TYPE).map((record) => (
+                    {draft.versionNumberRefId ? buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).map((record) => (
                       <option key={record.id} value={record.id}>{record.label}{record.active ? '' : ' (inactive)'}</option>
-                    ))}
-                    <option value="__add_new__">Add new...</option>
+                    )) : null}
+                    {draft.newBuildNumberLabel ? <option value="__new_build__">{draft.newBuildNumberLabel} (new)</option> : null}
+                    {draft.versionNumberRefId || draft.newVersionNumberLabel ? <option value="__add_new__">Add new...</option> : null}
                   </select>
                 </label>
               </div>

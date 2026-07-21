@@ -26,6 +26,15 @@ export function activeReferenceDataRecords(records: ReferenceDataRecord[], refer
   return referenceDataRecordsForType(records, referenceType).filter((record) => record.active)
 }
 
+export function buildNumberRecordsForVersion(records: ReferenceDataRecord[], versionNumberId: string | null | undefined): ReferenceDataRecord[] {
+  if (!versionNumberId) return []
+  return referenceDataRecordsForType(records, BUILD_NUMBER_REFERENCE_TYPE).filter((record) => record.versionNumberId === versionNumberId)
+}
+
+export function activeBuildNumberRecordsForVersion(records: ReferenceDataRecord[], versionNumberId: string | null | undefined): ReferenceDataRecord[] {
+  return buildNumberRecordsForVersion(records, versionNumberId).filter((record) => record.active)
+}
+
 export function referenceDataRecordById(records: ReferenceDataRecord[], id: string | null | undefined): ReferenceDataRecord | undefined {
   if (!id) return undefined
   return records.find((record) => record.id === id)
@@ -40,11 +49,13 @@ export function referenceDataDuplicate(
   referenceType: ReferenceDataType,
   label: string,
   excludeId?: string,
+  versionNumberId?: string | null,
 ): ReferenceDataRecord | undefined {
   const normalizedLabel = normalizeReferenceLabel(label)
   return records.find((record) =>
     record.referenceType === referenceType &&
     record.normalizedLabel === normalizedLabel &&
+    (referenceType !== BUILD_NUMBER_REFERENCE_TYPE || record.versionNumberId === versionNumberId) &&
     record.id !== excludeId,
   )
 }
@@ -54,12 +65,14 @@ export function validateReferenceDataLabel(
   referenceType: ReferenceDataType,
   label: string,
   excludeId?: string,
+  versionNumberId?: string | null,
 ): string[] {
   const messages: string[] = []
   const nextLabel = referenceDataLabel(label)
   const typeLabel = REFERENCE_DATA_TYPE_LABELS[referenceType]
   if (!nextLabel) messages.push(`${typeLabel} is required.`)
-  if (nextLabel && referenceDataDuplicate(records, referenceType, nextLabel, excludeId)) {
+  if (referenceType === BUILD_NUMBER_REFERENCE_TYPE && !versionNumberId) messages.push('Version Number is required before adding a Build Number.')
+  if (nextLabel && referenceDataDuplicate(records, referenceType, nextLabel, excludeId, versionNumberId)) {
     messages.push(`${typeLabel} "${nextLabel}" already exists.`)
   }
   return messages

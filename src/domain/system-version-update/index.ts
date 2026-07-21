@@ -3,7 +3,8 @@ import type {
   VersionUpdateAttachmentCategory,
   VersionUpdateRecord,
 } from '@/data/seed.types'
-import { referenceDataDisplayValue, referenceDataRecordById } from '@/domain/reference-data'
+import { referenceDataDisplayValue, referenceDataRecordById, validateReferenceDataLabel } from '@/domain/reference-data'
+import { hasMeaningfulRichText } from '@/domain/rich-text'
 
 export const VERSION_UPDATE_ATTACHMENT_CATEGORIES: VersionUpdateAttachmentCategory[] = ['CONFIG', 'ATP', 'CHECKLIST']
 
@@ -83,18 +84,39 @@ export function versionUpdateRowsForSystem(
 export function validateVersionUpdateDraft(input: {
   versionNumberRefId: string
   buildNumberRefId: string
+  newVersionNumberLabel?: string
+  newBuildNumberLabel?: string
   attachmentCategories: VersionUpdateAttachmentCategory[]
+  remarks: string
   referenceData: ReferenceDataRecord[]
 }): string[] {
   const messages: string[] = []
+  const newVersionLabel = input.newVersionNumberLabel?.trim() ?? ''
+  const newBuildLabel = input.newBuildNumberLabel?.trim() ?? ''
   const versionReference = referenceDataRecordById(input.referenceData, input.versionNumberRefId)
   const buildReference = referenceDataRecordById(input.referenceData, input.buildNumberRefId)
-  if (!versionReference || versionReference.referenceType !== 'VERSION_NUMBER') messages.push('Version Number is required.')
-  if (!buildReference || buildReference.referenceType !== 'BUILD_NUMBER') messages.push('Build Number is required.')
+  if (newVersionLabel) {
+    messages.push(...validateReferenceDataLabel(input.referenceData, 'VERSION_NUMBER', newVersionLabel))
+  } else if (!versionReference || versionReference.referenceType !== 'VERSION_NUMBER') {
+    messages.push('Version Number is required.')
+  }
+
+  const selectedVersionId = versionReference?.referenceType === 'VERSION_NUMBER' ? versionReference.id : null
+  if (newBuildLabel) {
+    messages.push(...validateReferenceDataLabel(input.referenceData, 'BUILD_NUMBER', newBuildLabel, undefined, selectedVersionId ?? (newVersionLabel ? '__new_version__' : null)))
+  } else if (!buildReference || buildReference.referenceType !== 'BUILD_NUMBER') {
+    messages.push('Build Number is required.')
+  } else if (newVersionLabel) {
+    messages.push('Build Number must be created under the new Version Number.')
+  } else if (buildReference.versionNumberId !== selectedVersionId) {
+    messages.push('Build Number does not belong to the selected Version Number.')
+  }
+
   VERSION_UPDATE_ATTACHMENT_CATEGORIES.forEach((category) => {
     if (!input.attachmentCategories.includes(category)) {
       messages.push(`${VERSION_UPDATE_ATTACHMENT_LABELS[category]} is required.`)
     }
   })
+  if (!hasMeaningfulRichText(input.remarks)) messages.push('Remarks is required.')
   return messages
 }

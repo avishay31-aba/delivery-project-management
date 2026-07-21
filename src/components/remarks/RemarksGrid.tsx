@@ -13,6 +13,7 @@ import {
   type RemarkRecord,
 } from '@/domain/remarks'
 import { alertPresentationForDeadline } from '@/domain/status-presentation'
+import { hasMeaningfulRichText } from '@/domain/rich-text'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
@@ -28,10 +29,6 @@ interface RemarksGridProps {
 
 function isAddNewOption(value: string): boolean {
   return value === 'Add new...'
-}
-
-function plainTextContent(value: string): string {
-  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
 
 function normalizedRemark(record: RemarkRecord) {
@@ -105,7 +102,7 @@ export function RemarksGrid({
 
   function cancelRemark(id: string) {
     const shouldConfirmDiscard = editor.isNew(id) && editor.hasChanges(id, {
-      isMeaningfulNewDraft: (draftRecord) => Boolean(plainTextContent(draftRecord.content)),
+      isMeaningfulNewDraft: (draftRecord) => hasMeaningfulRichText(draftRecord.content),
     })
     if (shouldConfirmDiscard) {
       editor.commitDelete(id, {
@@ -133,7 +130,7 @@ export function RemarksGrid({
   function validateRemark(draft: RemarkRecord): string[] {
     const errors: string[] = []
     if (!draft.type.trim()) errors.push('Type is required.')
-    if (!plainTextContent(draft.content)) errors.push('Content is required.')
+    if (!hasMeaningfulRichText(draft.content)) errors.push('Content is required.')
     return errors
   }
 
@@ -142,7 +139,7 @@ export function RemarksGrid({
       validate: validateRemark,
       commit: commitRemark,
       normalize: normalizedRemark,
-      isMeaningfulNewDraft: (draft) => Boolean(plainTextContent(draft.content)),
+      isMeaningfulNewDraft: (draft) => hasMeaningfulRichText(draft.content),
       successMessage: 'Remark saved.',
     })
   }
@@ -194,7 +191,7 @@ export function RemarksGrid({
               const canSave = editor.canSave(remark.id, {
                 validate: validateRemark,
                 normalize: normalizedRemark,
-                isMeaningfulNewDraft: (draftRecord) => Boolean(plainTextContent(draftRecord.content)),
+                isMeaningfulNewDraft: (draftRecord) => hasMeaningfulRichText(draftRecord.content),
               })
               return (
                 <tr key={remark.id} className="hover:bg-sf-surface-alt">
