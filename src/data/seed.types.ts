@@ -243,6 +243,7 @@ export interface NewTenantRequirement extends OpportunityRequirementBase {
 export interface ChangeRequestRequirement extends OpportunityRequirementBase {
   tenantId: string
   systemId: string
+  baselineConfiguration?: TenantConfiguration
 }
 
 export interface StandardRenewalRequirement extends Partial<OpportunityRequirementBase> {

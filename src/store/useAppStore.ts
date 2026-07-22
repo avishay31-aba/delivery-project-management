@@ -93,10 +93,32 @@ import {
   tenantConfigurationSaveDraft,
   validateTenantMoveDestination,
 } from '@/domain/tenant-operations'
+import { requiresCloudPlatform } from '@/domain/hosting-context'
+import { changeRequestRequirementWithTenantBaseline } from '@/domain/tenant-requirement'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'id' | 'occurredAt'>
 type SaveTimestampOptions = { preserveNewState?: boolean }
 let unsubscribeCommittedStateChanges: (() => void) | null = null
+
+function opportunityWithCommittedRequirementContext(opportunity: Opportunity, tenants: AppDataState['tenants']): Opportunity {
+  return {
+    ...opportunity,
+    newTenantRequirements: opportunity.newTenantRequirements.map((requirement) => ({
+      ...requirement,
+      cloudPlatform: requiresCloudPlatform(requirement.hostingType) ? requirement.cloudPlatform : '',
+    })),
+    changeRequestRequirements: opportunity.changeRequestRequirements.map((requirement) => {
+      const tenant = tenants.find((candidate) => candidate.id === requirement.tenantId)
+      return changeRequestRequirementWithTenantBaseline(
+        {
+          ...requirement,
+          cloudPlatform: requiresCloudPlatform(requirement.hostingType) ? requirement.cloudPlatform : '',
+        },
+        tenant,
+      )
+    }),
+  }
+}
 
 function appendActivityEvent(
   events: ActivityEvent[],
@@ -1899,7 +1921,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const opportunities = state.opportunities.map((opportunity) => {
         if (opportunity.id !== id) return opportunity
         previousOpportunity = opportunity
-        const nextOpportunity = { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now }
+        const nextOpportunity = opportunityWithCommittedRequirementContext(
+          { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now },
+          state.tenants,
+        )
         nextOpportunityRecord = applyGeographicTimeZone(nextOpportunity, nextOpportunity.deliveryDate ?? nextOpportunity.pocStartDate)
         return nextOpportunityRecord
       })
@@ -2054,8 +2079,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const account = state.accounts.find((candidate) => candidate.id === opportunity.accountId)
     const salesManager = state.salesManagers.find((candidate) => candidate.id === opportunity.salesManagerId)
     const now = new Date().toISOString()
+    const preparedOpportunity = opportunityWithCommittedRequirementContext(opportunity, state.tenants)
     const result = syncOpportunityProjectsFromOpportunity(
-      opportunity,
+      preparedOpportunity,
       savedOpportunity,
       {
         account,

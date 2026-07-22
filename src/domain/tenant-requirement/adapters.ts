@@ -4,11 +4,12 @@ import type {
   OpportunityDealPackage,
   StandardRenewalRequirement,
   Tenant,
+  TenantConfiguration,
   WarrantyRecord,
 } from '@/data/seed.types'
 import { ADDITIONAL_FEATURE_OPTIONS, AI_OPTIONS } from '@/config/picklist-options'
-import { applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
-import { defaultHostingIntent } from '@/domain/hosting-context'
+import { applicationConfigurationFromTenant, applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
+import { defaultHostingIntent, requiresCloudPlatform } from '@/domain/hosting-context'
 import { warrantyRecordPatch } from '@/domain/warranty-collection'
 
 export function createBaseRequirement(requirementId: string): Omit<
@@ -133,6 +134,30 @@ export function createChangeRequestRequirement(index: number, tenant?: Tenant, m
     ...applicationConfigurationPatchFromTenant(tenant),
     tenantId: tenant?.id ?? '',
     systemId: tenant?.systemId ?? '',
+    baselineConfiguration: changeRequestBaselineConfigurationFromTenant(tenant),
+  }
+}
+
+export function changeRequestBaselineConfigurationFromTenant(tenant?: Tenant): TenantConfiguration | undefined {
+  return tenant ? applicationConfigurationFromTenant(tenant) : undefined
+}
+
+export function changeRequestRequirementWithTenantBaseline(
+  requirement: ChangeRequestRequirement,
+  tenant?: Tenant,
+  options: { replaceExisting?: boolean } = {},
+): ChangeRequestRequirement {
+  if (!tenant) return requirement
+  if (requirement.baselineConfiguration && !options.replaceExisting) {
+    return {
+      ...requirement,
+      cloudPlatform: requiresCloudPlatform(requirement.hostingType) ? requirement.cloudPlatform : '',
+    }
+  }
+  return {
+    ...requirement,
+    baselineConfiguration: changeRequestBaselineConfigurationFromTenant(tenant),
+    cloudPlatform: requiresCloudPlatform(requirement.hostingType) ? requirement.cloudPlatform : '',
   }
 }
 

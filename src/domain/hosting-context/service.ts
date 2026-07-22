@@ -10,7 +10,20 @@ import {
 } from './metadata'
 
 export function cloudPlatformOptionsForHosting(hosting: string): string[] {
-  return hosting === 'Cloud' || hosting === 'Hybrid' ? CLOUD_PLATFORM_OPTIONS : []
+  return requiresCloudPlatform(hosting) ? CLOUD_PLATFORM_OPTIONS : []
+}
+
+export function normalizeHostingType(value: string | null | undefined): string {
+  const normalized = String(value ?? '').trim().toLocaleLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ')
+  if (normalized === 'cloud') return 'Cloud'
+  if (normalized === 'hybrid') return 'Hybrid'
+  if (normalized === 'on prem' || normalized === 'on premise' || normalized === 'on premises') return 'On premise'
+  return String(value ?? '').trim()
+}
+
+export function requiresCloudPlatform(hosting: string | null | undefined): boolean {
+  const normalized = normalizeHostingType(hosting)
+  return normalized === 'Cloud' || normalized === 'Hybrid'
 }
 
 export function cspOptionsForCloudPlatform(cloudPlatform: string): string[] {
@@ -33,6 +46,6 @@ export function requiresCloudRegion(cloudPlatform: string): boolean {
 }
 
 export function isServerHosting(value: string | null | undefined): boolean {
-  const normalized = String(value ?? '').toLowerCase()
+  const normalized = normalizeHostingType(value).toLowerCase()
   return normalized.includes('prem') || normalized.includes('hybrid') || normalized.includes('server')
 }

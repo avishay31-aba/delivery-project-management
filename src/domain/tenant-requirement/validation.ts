@@ -4,6 +4,7 @@ import type {
   Opportunity,
   StandardRenewalRequirement,
 } from '@/data/seed.types'
+import { requiresCloudPlatform } from '@/domain/hosting-context'
 import {
   validateApplicationConfigurationIntegerFields,
   validateApplicationLicensesDoNotExceedUsers,
@@ -32,6 +33,7 @@ function validateRequiredGridFields(
 
   return columns.flatMap((column) => {
     if (column.key === 'existingSystemId' && values.deployTarget !== 'EXISTING_SID') return []
+    if (column.key === 'cloudPlatform') return []
     if (!column.required) return []
 
     return isEmpty(values[column.key])
@@ -59,6 +61,10 @@ export function validateRequirementA(
         message: "Existing System SID must belong to one of the selected deal owner's accounts.",
       })
     }
+  }
+
+  if (requiresCloudPlatform(row.hostingType) && isEmpty(row.cloudPlatform)) {
+    messages.push({ level: 'error', message: `Grid A row ${rowIndex + 1}: Cloud Platform is required.` })
   }
 
   if (isEmpty(row.tangles) && isEmpty(row.webloc)) {
@@ -90,6 +96,10 @@ export function validateRequirementB(
   const tenant = context.tenants.find((candidate) => candidate.id === row.tenantId)
   if (tenant && row.systemId !== tenant.systemId) {
     messages.push({ level: 'warning', message: 'SID will be reset from the selected tenant.' })
+  }
+
+  if (requiresCloudPlatform(row.hostingType) && isEmpty(row.cloudPlatform)) {
+    messages.push({ level: 'error', message: `Grid B row ${rowIndex + 1}: Cloud Platform is required.` })
   }
 
   if (isEmpty(row.tangles) && isEmpty(row.webloc)) {

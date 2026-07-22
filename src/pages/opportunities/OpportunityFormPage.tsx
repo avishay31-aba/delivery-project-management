@@ -6,6 +6,7 @@ import {
   PRODUCT_OPTIONS,
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
+  requiresCloudPlatform,
 } from '@/config/cloud-platform-metadata'
 import {
   ADDITIONAL_FEATURE_OPTIONS,
@@ -71,6 +72,7 @@ import {
   createChangeRequestRequirement,
   createNewTenantRequirement,
   createStandardRenewalRequirement,
+  changeRequestRequirementWithTenantBaseline,
   newTenantRequirementWithDealPackage,
 } from '@/domain/tenant-requirement'
 import {
@@ -1249,7 +1251,7 @@ export function OpportunityFormPage() {
   function updateRequirement(kind: RequirementGridKind, rowId: string, key: string, value: string | string[] | number | null) {
     if (isViewMode) return
     const configurationPatch =
-      key === 'hostingType' && value === 'On premise'
+      key === 'hostingType' && !requiresCloudPlatform(String(value ?? ''))
         ? { [key]: value, cloudPlatform: '' }
         : { [key]: value }
 
@@ -1274,7 +1276,11 @@ export function OpportunityFormPage() {
               ...row,
               ...configurationPatch,
               ...(key === 'tenantId' && selectedTenant
-                ? { ...applicationConfigurationPatchFromTenant(selectedTenant), systemId: selectedTenant.systemId }
+                ? {
+                    ...applicationConfigurationPatchFromTenant(selectedTenant),
+                    systemId: selectedTenant.systemId,
+                    baselineConfiguration: changeRequestRequirementWithTenantBaseline(row, selectedTenant, { replaceExisting: true }).baselineConfiguration,
+                  }
                 : {}),
             } as ChangeRequestRequirement)
           : row,

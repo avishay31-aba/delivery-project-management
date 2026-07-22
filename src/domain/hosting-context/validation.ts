@@ -1,5 +1,5 @@
 import type { HostingContext, HostingValidationMessage } from './types'
-import { requiresCloudRegion } from './service'
+import { requiresCloudPlatform, requiresCloudRegion } from './service'
 
 function textValue(value: unknown): string {
   return value == null ? '' : String(value)
@@ -29,7 +29,7 @@ export function sanitizeHostingContext<T extends Partial<HostingContext>>(contex
   const vpnEnabled = textValue(context.vpnEnabled)
   const next = { ...context }
 
-  if (hostingType === 'On premise') {
+  if (!requiresCloudPlatform(hostingType)) {
     next.cloudPlatform = ''
     next.csp = ''
     next.cloudRegion = ''
@@ -48,7 +48,9 @@ export function sanitizeHostingContext<T extends Partial<HostingContext>>(contex
 }
 
 export function hostingContextPatchForFieldChange(key: string, value: unknown): Partial<HostingContext> {
-  if (key === 'hostingType') return { cloudPlatform: '', csp: '', cloudRegion: '' }
+  if (key === 'hostingType') {
+    return { cloudPlatform: '', csp: '', cloudRegion: '' }
+  }
   if (key === 'cloudPlatform') return { csp: '', cloudRegion: '' }
   if (key === 'vpnEnabled' && value !== 'YES') return { vpnType: '' }
   return {}

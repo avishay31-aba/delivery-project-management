@@ -9,6 +9,7 @@ import {
   type ProjectRequirementSectionMetadata,
 } from '@/config/project-form-metadata'
 import type {
+  ChangeRequestRequirement,
   Opportunity,
   Project,
   ProjectSystemLink,
@@ -86,7 +87,6 @@ import {
   compareApplicationConfigurationField,
 } from '@/domain/application-configuration'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
-import { tenantConfigurationFromTenant } from '@/domain/tenant-operations'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
@@ -241,8 +241,9 @@ function RequirementSection({
     if (!tenantId) return null
     const tenant = tenants.find((candidate) => candidate.id === tenantId)
     if (!tenant) return null
-    const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
-    return compareApplicationConfigurationField(field, row, tenantConfigurationFromTenant(tenant, system))
+    const baselineConfiguration = (row as unknown as ChangeRequestRequirement).baselineConfiguration
+    if (!baselineConfiguration) return null
+    return compareApplicationConfigurationField(field, row, baselineConfiguration)
   }
 
   return (
@@ -280,7 +281,7 @@ function RequirementSection({
                     const comparison = comparisonForCell(row as unknown as Record<string, unknown>, column.key)
                     const cellClassName = [
                       'whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text',
-                      comparison && !comparison.matches ? 'configuration-change-outstanding' : '',
+                      comparison && !comparison.matches ? 'configuration-change-marked' : '',
                     ].filter(Boolean).join(' ')
 
                     return (

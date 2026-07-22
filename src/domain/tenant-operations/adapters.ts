@@ -12,6 +12,7 @@ import {
   HOSTING_OPTIONS,
   hostingSnapshotFromTenant,
   hostingSnapshotFromSystem,
+  requiresCloudPlatform,
   tenantHostingPatchFromSystem,
 } from '@/domain/hosting-context'
 import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
@@ -139,13 +140,16 @@ export function tenantRequirementFromConfiguration(
   system?: System,
 ): NewTenantRequirement {
   const hostingType = system?.hostingType ?? tenant.hostingType ?? HOSTING_OPTIONS[0]
+  const cloudPlatform = requiresCloudPlatform(hostingType)
+    ? system?.cloudPlatform ?? tenant.cloudPlatform ?? cloudPlatformOptionsForHosting(hostingType)[0] ?? ''
+    : ''
   return {
     id: `tenant-config-${tenant.id}`,
     requirementId: tenant.sourceRequirementId ?? 'TENANT-CONFIG',
     deployTarget: 'NEW_SYSTEM',
     existingSystemId: null,
     hostingType,
-    cloudPlatform: system?.cloudPlatform ?? tenant.cloudPlatform ?? cloudPlatformOptionsForHosting(hostingType)[0] ?? '',
+    cloudPlatform,
     csp: system?.csp ?? tenant.csp,
     cloudRegion: system?.cloudRegion ?? tenant.cloudRegion,
     statisticsId: tenant.statisticsId,

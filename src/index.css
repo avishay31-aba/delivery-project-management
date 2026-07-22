@@ -140,7 +140,7 @@
     @apply font-semibold;
   }
 
-  .configuration-change-outstanding {
+  .configuration-change-marked {
     @apply bg-yellow-50;
   }
 

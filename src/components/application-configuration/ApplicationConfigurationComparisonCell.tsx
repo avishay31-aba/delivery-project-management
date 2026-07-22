@@ -20,10 +20,10 @@ function comparisonClassName(comparison: ApplicationConfigurationComparisonResul
 function comparisonTitle(comparison: ApplicationConfigurationComparisonResult): string | undefined {
   if (comparison.matches) return undefined
   const details = [
-    `Current: ${Array.isArray(comparison.currentValue) ? comparison.currentValue.join('; ') || '-' : comparison.currentValue ?? '-'}`,
+    `Baseline: ${Array.isArray(comparison.currentValue) ? comparison.currentValue.join('; ') || '-' : comparison.currentValue ?? '-'}`,
     `Requested: ${Array.isArray(comparison.requestedValue) ? comparison.requestedValue.join('; ') || '-' : comparison.requestedValue ?? '-'}`,
-    comparison.addedItems.length > 0 ? `Add: ${comparison.addedItems.join('; ')}` : '',
-    comparison.removedItems.length > 0 ? `Remove: ${comparison.removedItems.join('; ')}` : '',
+    comparison.addedItems.length > 0 ? `Added: ${comparison.addedItems.join('; ')}` : '',
+    comparison.removedItems.length > 0 ? `Removed: ${comparison.removedItems.join('; ')}` : '',
   ].filter(Boolean)
   return details.join('\n')
 }

@@ -41,6 +41,7 @@ import {
   cloudPlatformOptionsForHosting,
   cloudRegionOptionsForCloudPlatform,
   cspOptionsForCloudPlatform,
+  requiresCloudPlatform,
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
@@ -747,7 +748,7 @@ export function InventoryForm<T extends InventoryRecord>({
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
 
-    if (field.key === 'cloudPlatform' && hostingType === 'On premise') return null
+    if (field.key === 'cloudPlatform' && !requiresCloudPlatform(hostingType)) return null
     if ((field.key === 'csp' || field.key === 'cloudRegion') && !cloudPlatform) return null
     if (field.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
 
