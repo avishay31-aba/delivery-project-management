@@ -14,7 +14,6 @@ export const STORAGE_KEY = APP_STATE_STORAGE_KEY
 export function createInitialState(): AppDataState {
   return normalizeAppDataState({
     ...(seedJson as unknown as AppDataState),
-    activityEvents: [],
     lastPersistedAt: null,
   })
 }
