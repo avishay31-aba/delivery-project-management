@@ -261,15 +261,8 @@ function RequirementSection({
                   <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
                     <span>
                       {column.label}
-                      {column.required ? <span className="ml-0.5 text-red-600">*</span> : null}
-                      {column.requiredWhen && column.key !== 'existingSystemId' ? <span className="ml-0.5 text-red-600">*</span> : null}
                     </span>
                     {column.key !== 'existingSystemId' ? <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span> : null}
-                    {column.requiredWhen && column.key !== 'existingSystemId' ? (
-                      <span className="block whitespace-nowrap text-xs font-normal leading-tight text-red-700">
-                        {column.requiredWhen}
-                      </span>
-                    ) : null}
                   </th>
                 ))}
               </tr>

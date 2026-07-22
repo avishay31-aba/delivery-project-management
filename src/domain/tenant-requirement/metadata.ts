@@ -18,7 +18,7 @@ export const TENANT_REQUIREMENT_CONTEXT_FIELDS: SharedFieldMetadata[] = [
 
 export const TENANT_REQUIREMENT_ENVIRONMENT_FIELDS: SharedFieldMetadata[] = [
   { key: 'hostingType', label: 'Hosting', group: 'Environment', editable: true, inputType: 'picklist', required: true },
-  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist', requiredWhen: 'Required when Hosting = Cloud or Hybrid' },
+  { key: 'cloudPlatform', label: 'Cloud Platform', group: 'Environment', editable: true, inputType: 'picklist' },
 ]
 
 export const TENANT_REQUIREMENT_CONFIGURATION_FIELDS: SharedFieldMetadata[] = [

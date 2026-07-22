@@ -1,4 +1,5 @@
 import type { SystemInventoryRecord, SystemInventoryValidationMessage } from './types'
+import { requiresCloudPlatform } from '@/domain/hosting-context'
 
 function textValue(value: unknown): string {
   return value == null ? '' : String(value)
@@ -39,6 +40,10 @@ export function validateSystemInventoryRequiredFields(
 
   if ('source' in record && record.source === 'Production' && 'timeGroup' in record && !textValue(record.timeGroup).trim()) {
     messages.push({ field: 'timeGroup', message: 'Used In Region is required.' })
+  }
+
+  if (requiresCloudPlatform(textValue(record.hostingType)) && !textValue(record.cloudPlatform).trim()) {
+    messages.push({ field: 'cloudPlatform', message: 'Cloud Platform is required.' })
   }
 
   return messages

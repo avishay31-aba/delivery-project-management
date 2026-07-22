@@ -747,9 +747,11 @@ export function InventoryForm<T extends InventoryRecord>({
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
+    const isRequired = field.key === 'cloudPlatform' && requiresCloudPlatform(hostingType)
+    const error = isInvalid ? messages.find((message) => message.includes(`${field.label} is required.`)) : undefined
 
     if (field.key === 'cloudPlatform' && !requiresCloudPlatform(hostingType)) return null
-    if ((field.key === 'csp' || field.key === 'cloudRegion') && !cloudPlatform) return null
+    if ((field.key === 'csp' || field.key === 'cloudRegion') && (!requiresCloudPlatform(hostingType) || !cloudPlatform)) return null
     if (field.key === 'cloudRegion' && cloudPlatform === "Customer's datacenter") return null
 
     const optionsByKey: Record<string, string[]> = {
@@ -763,7 +765,7 @@ export function InventoryForm<T extends InventoryRecord>({
     const isDisabled = field.key === 'cloudPlatform' && options.length === 0
 
     return (
-      <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
+      <FormField key={field.key} label={field.label} controlWidthClassName="w-56" required={isRequired} error={error}>
         <select
           className={fieldClassName(isChanged, isInvalid)}
           value={isDisabled ? '' : value}
