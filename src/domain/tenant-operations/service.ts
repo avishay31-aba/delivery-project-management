@@ -342,6 +342,7 @@ export function tenantDashboardRowClassName(tenant: Tenant): string {
 }
 
 export const TENANT_DASHBOARD_COLOR_LEGEND = [
+  { label: 'Delivery', rowClassName: 'bg-white', swatchClassName: 'bg-white' },
   { label: 'POC', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
 ]
 

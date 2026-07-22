@@ -37,7 +37,7 @@ return (
     rows={activeProjects}
     columns={projectListColumns}
     enableInlineEditing={false}
-    initialSorting={[{ id: 'deliveryDate', desc: false }]}
+    initialSorting={[{ id: 'deliveryDate', desc: true }]}
     colorLegend={PROJECT_DASHBOARD_COLOR_LEGEND}
     toolbar={
       <button
