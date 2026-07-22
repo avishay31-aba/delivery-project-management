@@ -40,10 +40,12 @@ import {
   subscribeToCommittedStateChanges,
 } from '@/store/crossTabSync'
 import {
+  activeProjectSystemLinks,
   createProjectSystemLink,
   createProjectTenantLink,
   deallocateProjectSystemLink,
   deallocateProjectTenantLink,
+  projectBusinessRegionForAllocation,
   unlinkProjectFromSystem,
   validateExistingSystemLink,
   validateProductionAllocation,
@@ -57,6 +59,7 @@ import {
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
   occupyReusedInternalSystem,
+  applyReusedSystemOccupationWindow,
   purposeHistoryContextFromProject,
   releaseReusedInternalSystem,
   systemApplicationConfigurationSummary,
@@ -72,6 +75,7 @@ import {
 } from '@/domain/opportunity-lifecycle'
 import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
+import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import {
   normalizeReferenceLabel,
   referenceDataLabel,
@@ -118,6 +122,27 @@ function opportunityWithCommittedRequirementContext(opportunity: Opportunity, te
       )
     }),
   }
+}
+
+function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity {
+  const region = getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
+  return applyGeographicTimeZone(
+    {
+      ...opportunity,
+      region,
+      timeGroup: region || normalizeBusinessRegion(opportunity.timeGroup),
+    },
+    opportunity.deliveryDate ?? opportunity.pocStartDate,
+  )
+}
+
+function accountWithDerivedGeography(account: AppDataState['accounts'][number]): AppDataState['accounts'][number] {
+  const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+  return applyGeographicTimeZone({
+    ...account,
+    region,
+    timeGroup: region || normalizeBusinessRegion(account.timeGroup),
+  })
 }
 
 function appendActivityEvent(
@@ -379,16 +404,35 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   const account = state.accounts.find((candidate) => candidate.accountName === project.accountName)
   const context = { linkedOpportunity, account }
   return {
-    region: projectHeaderFieldValue(project, 'region', context),
+    region: projectBusinessRegionForAllocation(project, state),
     timeZone: projectHeaderFieldValue(project, 'timeZone', context),
-    timeGroup: projectHeaderFieldValue(project, 'timeGroup', context),
+    timeGroup: projectBusinessRegionForAllocation(project, state),
   }
+}
+
+function recalculateReusedSystemOccupationWindows(
+  reusedSystems: AppDataState['reusedInternalSystems'],
+  projectSystems: AppDataState['projectSystems'],
+  projects: AppDataState['projects'],
+  now: string,
+): AppDataState['reusedInternalSystems'] {
+  const activeLinks = activeProjectSystemLinks(projectSystems)
+  return reusedSystems.map((system) =>
+    applyReusedSystemOccupationWindow(
+      system,
+      activeLinks,
+      projects,
+      now,
+    ),
+  )
 }
 
 function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['projects'][number]) {
   const location = projectAssignmentLocation(state, project)
   return {
     ...project,
+    region: location.region,
+    timeGroup: location.timeGroup,
     timeZone: location.timeZone,
   }
 }
@@ -900,6 +944,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           })
       }
 
+      const reusedInternalSystems = sourceMachineIds.size > 0
+        ? state.reusedInternalSystems.map((system) =>
+            sourceMachineIds.has(system.machineId) && system.currentProjectIds.includes(id)
+              ? releaseReusedInternalSystem(system, id, now, sourceMachinePurposeContext.get(system.machineId))
+              : system,
+          )
+        : state.reusedInternalSystems
+
       return {
         projects,
         activityEvents:
@@ -909,14 +961,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 account: state.accounts.find((candidate) => candidate.accountName === updatedProject?.accountName),
               })
             : state.activityEvents,
-        reusedInternalSystems:
-          sourceMachineIds.size > 0
-            ? state.reusedInternalSystems.map((system) =>
-                sourceMachineIds.has(system.machineId) && system.currentProjectIds.includes(id)
-                  ? releaseReusedInternalSystem(system, id, now, sourceMachinePurposeContext.get(system.machineId))
-                  : system,
-              )
-            : state.reusedInternalSystems,
+        reusedInternalSystems: recalculateReusedSystemOccupationWindows(reusedInternalSystems, state.projectSystems, projects, now),
       }
     })
     get().saveToStorage()
@@ -1084,7 +1129,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
           })
         }
       }
-      const auditedResult = { ...result, activityEvents }
+      const auditedResult = {
+        ...result,
+        reusedInternalSystems: collection === 'reused'
+          ? recalculateReusedSystemOccupationWindows(result.reusedInternalSystems, result.projectSystems, state.projects, now)
+          : result.reusedInternalSystems,
+        activityEvents,
+      }
       if (collection !== 'allocated' || typeof allocatedMapCenter !== 'string') return auditedResult
       const mapCenterState = updateSystemMapCenterTransaction(
         { ...state, ...auditedResult },
@@ -1833,7 +1884,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const accounts = state.accounts.map((account) => {
         if (account.id !== id) return account
         previousAccount = account
-        nextAccount = applyGeographicTimeZone({ ...account, ...patch, updatedAt: now })
+        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now })
         return nextAccount
       })
       return {
@@ -1925,7 +1976,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now },
           state.tenants,
         )
-        nextOpportunityRecord = applyGeographicTimeZone(nextOpportunity, nextOpportunity.deliveryDate ?? nextOpportunity.pocStartDate)
+        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity)
         return nextOpportunityRecord
       })
       return {
@@ -1957,7 +2008,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       state.opportunities.map((opportunity) => opportunity.opportunityId),
     )
 
-    const opportunity: AppDataState['opportunities'][number] = applyGeographicTimeZone({
+    const opportunity: AppDataState['opportunities'][number] = opportunityWithDerivedGeography({
       id: `opp-${crypto.randomUUID()}`,
       opportunityId: nextOpportunityId.id,
       opportunityName: 'New opportunity',
@@ -2106,7 +2157,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => {
       const opportunities = currentState.opportunities.map((candidate) =>
         candidate.id === savedOpportunity.id
-          ? applyGeographicTimeZone(result.opportunity, result.opportunity.deliveryDate ?? result.opportunity.pocStartDate)
+          ? opportunityWithDerivedGeography(result.opportunity)
           : candidate
       )
       const committedState = { ...currentState, opportunities }
@@ -2177,7 +2228,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return {
-      opportunity: applyGeographicTimeZone(result.opportunity, result.opportunity.deliveryDate ?? result.opportunity.pocStartDate),
+      opportunity: opportunityWithDerivedGeography(result.opportunity),
       projectChanges: result.projectChanges,
     }
   },
@@ -2289,11 +2340,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     const now = new Date().toISOString()
     const tenantIds: string[] = []
+    const assignmentLocation = projectAssignmentLocation(state, project)
 
     const allocatedSystem = systemFromProductionInventoryAllocation(
       productionSystem,
       project.id,
-      projectAssignmentLocation(state, project),
+      assignmentLocation,
       tenantIds,
       now,
     )
@@ -2335,11 +2387,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const idCounters = nextSystemId.counters
     const tenantIds: string[] = []
     const allocatedSystemId = `sys-${crypto.randomUUID()}`
+    const assignmentLocation = projectAssignmentLocation(state, project)
 
     const allocatedSystem = systemFromReusedInternalAllocation(
       reusedSystem,
       project.id,
-      projectAssignmentLocation(state, project),
+      assignmentLocation,
       allocatedSystemId,
       nextSystemId.id,
       project.pid,
@@ -2358,7 +2411,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
       idCounters,
       reusedInternalSystems: current.reusedInternalSystems.map((candidate) =>
         candidate.id === reusedSystemId
-          ? occupyReusedInternalSystem(candidate, projectId, now, purposeHistoryContextFromProject(project, allocatedSystem))
+          ? {
+              ...occupyReusedInternalSystem(
+                candidate,
+                projectId,
+                now,
+                purposeHistoryContextFromProject(project, allocatedSystem),
+                [
+                  ...activeProjectSystemLinks(current.projectSystems).filter((link) => link.sourceMachineId === candidate.machineId),
+                  allocation,
+                ],
+                current.projects,
+              ),
+              usedInRegion: assignmentLocation.region,
+              timeGroup: assignmentLocation.region,
+            }
           : candidate,
       ),
       systems: [allocatedSystem, ...current.systems],
@@ -2386,6 +2453,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const tenantIds: string[] = []
     const assignmentLocation = project ? projectAssignmentLocation(state, project) : { region: '', timeGroup: '' }
+    const activeLinksForSystem = activeProjectSystemLinks(state.projectSystems).filter((link) => link.systemId === systemId)
 
     const allocation = createProjectSystemLink(
       projectId,
@@ -2402,7 +2470,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
               ...candidate,
               linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), projectId])),
               tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
-              timeGroup: appendUniqueSemicolonValue(candidate.timeGroup, assignmentLocation.region || assignmentLocation.timeGroup),
+              region: activeLinksForSystem.length === 0 ? assignmentLocation.region : candidate.region || assignmentLocation.region,
+              timeGroup: activeLinksForSystem.length === 0 ? assignmentLocation.region : candidate.timeGroup || assignmentLocation.region,
               updatedAt: now,
             }
           : candidate,
@@ -2444,30 +2513,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
         candidate.allocationStatus !== 'DEALLOCATED',
     )
 
-    set((current) => ({
-      projectSystems: current.projectSystems.map((candidate) =>
+    set((current) => {
+      const projectSystems = current.projectSystems.map((candidate) =>
         candidate.id === allocationId
           ? deallocateProjectSystemLink(candidate, now)
           : candidate,
-      ),
-      projectTenants: current.projectTenants.map((candidate) =>
+      )
+      const projectTenants = current.projectTenants.map((candidate) =>
         candidate.projectId === allocation.projectId &&
         (candidate.systemId === allocation.systemId || hostedTenantIds.has(candidate.tenantId)) &&
         candidate.allocationStatus !== 'DEALLOCATED'
           ? deallocateProjectTenantLink(candidate, now)
           : candidate,
-      ),
-      systems: current.systems.map((system) =>
+      )
+      const systems = current.systems.map((system) =>
         system.id === allocation.systemId
           ? unlinkProjectFromSystem(system, allocation.projectId, now)
           : system,
-      ),
-      reusedInternalSystems: current.reusedInternalSystems.map((system) =>
+      )
+      const releasedReusedSystems = current.reusedInternalSystems.map((system) =>
         allocation.allocationType === 'REUSED_INTERNAL' && system.machineId === allocation.sourceMachineId
           ? releaseReusedInternalSystem(system, allocation.projectId, now, project && allocatedSystemForPurposeHistory ? purposeHistoryContextFromProject(project, allocatedSystemForPurposeHistory) : {})
           : system,
-      ),
-      activityEvents: tenantLinksToUnlink.reduce(
+      )
+      return {
+        projectSystems,
+        projectTenants,
+        systems,
+        reusedInternalSystems: recalculateReusedSystemOccupationWindows(releasedReusedSystems, projectSystems, current.projects, now),
+        activityEvents: tenantLinksToUnlink.reduce(
         (events, link) => {
           const tenant = current.tenants.find((candidate) => candidate.id === link.tenantId)
           if (!project || !tenant) return events
@@ -2489,7 +2563,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
         }),
       ),
-    }))
+      }
+    })
     get().saveToStorage()
     return { ok: true, message: 'System deallocated from project.', allocationId }
   },

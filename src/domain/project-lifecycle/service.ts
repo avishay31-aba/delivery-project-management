@@ -4,6 +4,7 @@ import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/all
 import { tenantVisibleInProjectTenantCollections } from '@/domain/tenant-operations/lifecycle'
 import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
 import { projectTimeZoneDisplayValue, resolveGeographicTimeZone } from '@/domain/geographic-time-zone'
+import { getBusinessRegionForCountry } from '@/domain/business-region'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -90,12 +91,13 @@ function projectLocationContext(
 ) {
   const country = linkedOpportunity?.country ?? account?.country ?? project.country ?? ''
   const state = linkedOpportunity?.state ?? account?.state ?? project.state ?? ''
+  const businessRegion = getBusinessRegionForCountry(country, state)
   return {
-    region: linkedOpportunity?.region ?? account?.region ?? project.region ?? '',
+    region: businessRegion || (project.region ?? ''),
     country,
     state,
     timeZone: projectTimeZoneDisplayValue(country, state, project.deliveryDate),
-    timeGroup: linkedOpportunity?.timeGroup ?? account?.timeGroup ?? project.timeGroup ?? '',
+    timeGroup: businessRegion || (project.timeGroup ?? ''),
   }
 }
 

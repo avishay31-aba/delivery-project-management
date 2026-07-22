@@ -2,14 +2,16 @@ import type { AppDataState } from '@/data/seed.types'
 import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 import {
+  activeProjectSystemLinks,
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
 } from '@/domain/allocation-context'
 import { normalizeActivityEvents } from '@/domain/activity-log'
 import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
 import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
-import { normalizeSystemInventoryRecord } from '@/domain/system-inventory'
+import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } from '@/domain/system-inventory'
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
+import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
@@ -21,10 +23,23 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     usedOpportunityIds.push(normalized.opportunityId)
     return normalized
   })
+  const projectSystems = Array.isArray(state.projectSystems)
+    ? state.projectSystems.map(normalizeProjectSystemLink)
+    : seedState.projectSystems.map(normalizeProjectSystemLink)
   const normalizedState = {
     ...state,
-    salesManagers: Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers,
-    accounts: Array.isArray(state.accounts) ? state.accounts : seedState.accounts,
+    salesManagers: (Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers).map((manager) => ({
+      ...manager,
+      region: normalizeBusinessRegion(manager.region) || manager.region,
+    })),
+    accounts: (Array.isArray(state.accounts) ? state.accounts : seedState.accounts).map((account) => {
+      const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+      return {
+        ...account,
+        region,
+        timeGroup: region || normalizeBusinessRegion(account.timeGroup),
+      }
+    }),
     opportunities,
     projects,
     productionSystemInventory: Array.isArray(state.productionSystemInventory)
@@ -43,16 +58,20 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     referenceData: Array.isArray(state.referenceData) ? state.referenceData : [],
     versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
-    projectSystems: Array.isArray(state.projectSystems)
-      ? state.projectSystems.map(normalizeProjectSystemLink)
-      : seedState.projectSystems.map(normalizeProjectSystemLink),
+    projectSystems,
     projectTenants: Array.isArray(state.projectTenants)
       ? state.projectTenants.map(normalizeProjectTenantLink)
       : seedState.projectTenants.map(normalizeProjectTenantLink),
   }
 
+  const activeSystemLinks = activeProjectSystemLinks(normalizedState.projectSystems)
+  const reusedInternalSystems = normalizedState.reusedInternalSystems.map((system) =>
+    applyReusedSystemOccupationWindow(system, activeSystemLinks, normalizedState.projects, system.updatedAt ?? new Date().toISOString()),
+  )
+
   return {
     ...normalizedState,
+    reusedInternalSystems,
     idCounters: normalizeIdCounters(state.idCounters, normalizedState),
   }
 }

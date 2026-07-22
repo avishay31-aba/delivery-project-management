@@ -1,5 +1,6 @@
 import type { Project } from './types'
 import { normalizeMilestonePlanProject } from '@/domain/milestone-plan'
+import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 
 export function cloneProjectDraft(project: Project): Project {
   return JSON.parse(JSON.stringify(project)) as Project
@@ -42,11 +43,14 @@ export function projectSourceFor(project: Project): Project['projectSource'] {
 }
 
 export function normalizeProjectLifecycleProject(project: Project): Project {
+  const region = getBusinessRegionForCountry(project.country, project.state) || normalizeBusinessRegion(project.region)
   return {
     ...normalizeMilestonePlanProject(project),
     projectSource: projectSourceFor(project),
     pocStartDate: project.pocStartDate ?? null,
     pocEndDate: project.pocEndDate ?? null,
+    region,
+    timeGroup: region || normalizeBusinessRegion(project.timeGroup),
     progressStatus: projectStatusFromTaskCompletion(project),
   }
 }

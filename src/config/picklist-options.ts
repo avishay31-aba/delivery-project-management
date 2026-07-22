@@ -1,3 +1,5 @@
+import { BUSINESS_REGION_OPTIONS } from '@/domain/business-region'
+
 export const YES_NO_OPTIONS = ['', 'YES', 'NO']
 export const YES_NO_REQUIRED_OPTIONS = ['YES', 'NO']
 
@@ -5,8 +7,8 @@ export const CROSS_SYSTEM_OPTIONS = ['Weaver', 'Dark web', 'Lynx']
 export const AI_OPTIONS = ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst']
 export const ADDITIONAL_FEATURE_OPTIONS = ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation', 'Advanced Search']
 
-export const REGION_OPTIONS = ['EMEA', 'APAC', 'NA', 'LATAM']
-export const COGNITO_REGION_OPTIONS = ['NA', 'EU', 'APAC']
+export const REGION_OPTIONS = BUSINESS_REGION_OPTIONS
+export const COGNITO_REGION_OPTIONS = BUSINESS_REGION_OPTIONS
 export { PERFORMANCE_TIER_OPTIONS, VPN_TYPE_OPTIONS } from '@/domain/hosting-context'
 
 export {

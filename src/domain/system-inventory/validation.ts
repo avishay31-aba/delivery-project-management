@@ -1,5 +1,6 @@
 import type { SystemInventoryRecord, SystemInventoryValidationMessage } from './types'
 import { requiresCloudPlatform } from '@/domain/hosting-context'
+import { REUSED_INTERNAL_PURPOSE_AVAILABLE, SYSTEM_PURPOSE_POC } from './metadata'
 
 function textValue(value: unknown): string {
   return value == null ? '' : String(value)
@@ -34,8 +35,19 @@ export function validateSystemInventoryRequiredFields(
     messages.push({ field: 'cognitoRegion', message: 'Cognito Region is required.' })
   }
 
-  if ('usedInRegion' in record && !textValue(record.usedInRegion).trim()) {
+  const hasActiveProject = 'currentProjectIds' in record ? record.currentProjectIds.length > 0 : true
+  if ('usedInRegion' in record && hasActiveProject && !textValue(record.usedInRegion).trim()) {
     messages.push({ field: 'usedInRegion', message: 'Used In Region is required.' })
+  }
+
+  if ('occupationEndDate' in record && 'purpose' in record && record.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE && record.purpose !== SYSTEM_PURPOSE_POC) {
+    if (!textValue(record.occupationEndDate).trim()) {
+      messages.push({ field: 'occupationEndDate', message: 'Occupation End Date is required.' })
+    }
+  }
+
+  if ('occupationStartDate' in record && 'occupationEndDate' in record && record.occupationStartDate && record.occupationEndDate && record.occupationEndDate < record.occupationStartDate) {
+    messages.push({ field: 'occupationEndDate', message: 'Occupation End Date must be on or after Occupation Start Date.' })
   }
 
   return messages

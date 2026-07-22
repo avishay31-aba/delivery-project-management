@@ -290,6 +290,7 @@ function derivedValue(
   if (key === 'currentBuild') return systemCurrentBuildLabel(versionUpdates, referenceData, record.id, record.currentVersionUpdateId)
   if (key === 'linkedProjects') return deriveLinkedProjects(record, projects, projectSystems)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
+  if (key === 'usedInRegion') return textValue(readRecordValue(record, 'usedInRegion')) || textValue(readRecordValue(record, 'region')) || textValue(readRecordValue(record, 'timeGroup'))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
   if (key === 'availability' && 'source' in record && record.source === SYSTEM_SOURCE_PRODUCTION) return 'Available'
   if (key === 'timeGroupAlert') {
@@ -705,7 +706,13 @@ export function InventoryForm<T extends InventoryRecord>({
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     if (field.key === 'cognitoRegion' && !requiresCloudPlatform(hostingType)) return null
 
-    const sourceRecord = field.editable ? activeDraft : activeRecord
+    const hasActiveSystemAllocation = projectSystems.some(
+      (link) =>
+        link.allocationStatus !== 'DEALLOCATED' &&
+        (link.systemId === activeRecord.id || ('machineId' in activeRecord && link.sourceMachineId === activeRecord.machineId)),
+    )
+    const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation)
+    const sourceRecord = businessEditable ? activeDraft : activeRecord
     const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
@@ -718,7 +725,7 @@ export function InventoryForm<T extends InventoryRecord>({
           ? 'w-80'
           : 'w-48'
 
-    if (!field.editable) {
+    if (!businessEditable) {
       if (field.key === 'logo') {
         const productType = applicationSummaryProduct()
         return (
@@ -726,7 +733,7 @@ export function InventoryForm<T extends InventoryRecord>({
             key={field.key}
             label={field.label}
             controlWidthClassName={width}
-            required={field.required}
+            required={false}
             businessEditable={false}
             editor={null}
             readOnlyValue={productType ? <ProductLogoIcon product={productType} /> : ''}
@@ -739,7 +746,7 @@ export function InventoryForm<T extends InventoryRecord>({
           key={field.key}
           label={field.label}
           controlWidthClassName={width}
-          required={field.required}
+          required={false}
           businessEditable={false}
           editor={null}
           readOnlyValue={field.inputType === 'date' ? (

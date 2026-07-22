@@ -33,6 +33,74 @@ export function isReusedInternalOccupied(status: string | undefined): boolean {
   return status === REUSED_INTERNAL_STATUS_OCCUPIED
 }
 
+export interface ReusedSystemOccupationWindow {
+  ok: boolean
+  message?: string
+  occupationStartDate?: string | null
+  occupationEndDate?: string | null
+}
+
+function sortedDate(values: string[], direction: 'asc' | 'desc'): string {
+  return [...values].sort((first, second) => direction === 'asc' ? first.localeCompare(second) : second.localeCompare(first))[0] ?? ''
+}
+
+export function deriveReusedSystemOccupationWindow(
+  system: ReusedInternalSystem,
+  activeAllocations: ProjectSystemLink[],
+  projects: Project[],
+  effectiveDate: string,
+): ReusedSystemOccupationWindow {
+  if (system.purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE) {
+    return { ok: true, occupationStartDate: system.occupationStartDate ?? null, occupationEndDate: system.occupationEndDate ?? null }
+  }
+
+  const activePocProjects = activeAllocations
+    .filter((link) =>
+      link.allocationStatus !== 'DEALLOCATED' &&
+      (link.sourceMachineId === system.machineId || system.currentProjectIds.includes(link.projectId)) &&
+      system.currentProjectIds.includes(link.projectId),
+    )
+    .map((link) => projects.find((project) => project.id === link.projectId))
+    .filter((project): project is Project => Boolean(project && project.mainType === 'POC'))
+
+  if (system.purpose === SYSTEM_PURPOSE_POC && activePocProjects.length > 0) {
+    const missingStartDate = activePocProjects.find((project) => !project.pocStartDate)
+    if (missingStartDate) {
+      return { ok: false, message: `Project ${missingStartDate.pid} must have a POC Start Date before this Reused System can be allocated.` }
+    }
+    const missingEndDate = activePocProjects.find((project) => !project.pocEndDate)
+    if (missingEndDate) {
+      return { ok: false, message: `Project ${missingEndDate.pid} must have a POC End Date before this Reused System can be allocated.` }
+    }
+    return {
+      ok: true,
+      occupationStartDate: sortedDate(activePocProjects.map((project) => project.pocStartDate as string), 'asc'),
+      occupationEndDate: sortedDate(activePocProjects.map((project) => project.pocEndDate as string), 'desc'),
+    }
+  }
+
+  return {
+    ok: true,
+    occupationStartDate: system.occupationStartDate || effectiveDate,
+    occupationEndDate: system.occupationEndDate ?? null,
+  }
+}
+
+export function applyReusedSystemOccupationWindow(
+  system: ReusedInternalSystem,
+  activeAllocations: ProjectSystemLink[],
+  projects: Project[],
+  effectiveDate: string,
+): ReusedInternalSystem {
+  const window = deriveReusedSystemOccupationWindow(system, activeAllocations, projects, effectiveDate)
+  if (!window.ok) return system
+  return {
+    ...system,
+    occupationStartDate: window.occupationStartDate ?? null,
+    occupationEndDate: window.occupationEndDate ?? null,
+  }
+}
+
 export function systemDashboardRowClassName(record: SystemInventoryRecord | AllocatedSystemDashboardRow): string {
   if (isAllocatedSystem(record)) {
     return record.purpose === SYSTEM_PURPOSE_POC

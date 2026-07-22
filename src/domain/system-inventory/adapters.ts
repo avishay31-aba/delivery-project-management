@@ -3,9 +3,10 @@ import {
   defaultSystemHostingContext,
   hostingContextFromSource,
 } from '@/domain/hosting-context'
+import { normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeOwners } from '@/domain/owners'
 import { normalizeRemarks } from '@/domain/remarks'
-import type { ProductionSystemInventoryItem, Project, ReusedInternalPurposeHistoryRecord, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
+import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalPurposeHistoryRecord, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
   REUSED_INTERNAL_PURPOSE_AVAILABLE,
   REUSED_INTERNAL_STATUS_AVAILABLE,
@@ -21,7 +22,7 @@ import {
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
 } from './metadata'
-import { systemIdentity, systemSource } from './service'
+import { applyReusedSystemOccupationWindow, systemIdentity, systemSource } from './service'
 import { reserveBusinessId } from '@/domain/business-identity'
 
 export function systemDisplayName(record: SystemInventoryRecord): string {
@@ -35,6 +36,10 @@ export function systemSourceLabel(record: SystemInventoryRecord): string {
 export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(record: T): T {
   return {
     ...record,
+    ...('cognitoRegion' in record ? { cognitoRegion: normalizeBusinessRegion(record.cognitoRegion) || record.cognitoRegion || '' } : {}),
+    ...('usedInRegion' in record ? { usedInRegion: normalizeBusinessRegion(record.usedInRegion) } : {}),
+    ...('region' in record ? { region: normalizeBusinessRegion(record.region) } : {}),
+    ...('timeGroup' in record ? { timeGroup: normalizeBusinessRegion(record.timeGroup) || record.timeGroup || '' } : {}),
     documents: Array.isArray(record.documents) ? record.documents : [],
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
@@ -179,16 +184,17 @@ export function occupyReusedInternalSystem(
   projectId: string,
   updatedAt: string,
   context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+  activeAllocations: ProjectSystemLink[] = [],
+  projects: Project[] = [],
 ): ReusedInternalSystem {
-  return {
+  const occupiedSystem: ReusedInternalSystem = {
     ...appendReusedInternalPurposeHistory(system, 'POC', updatedAt, context),
     purpose: SYSTEM_PURPOSE_POC,
     status: REUSED_INTERNAL_STATUS_OCCUPIED,
     currentProjectIds: Array.from(new Set([...system.currentProjectIds, projectId])),
-    occupationStartDate: system.occupationStartDate ?? updatedAt,
-    occupationEndDate: null,
     updatedAt,
   }
+  return applyReusedSystemOccupationWindow(occupiedSystem, activeAllocations, projects, updatedAt)
 }
 
 export function releaseReusedInternalSystem(

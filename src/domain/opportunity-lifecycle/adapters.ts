@@ -1,5 +1,6 @@
 import { incrementCounter } from '@/data/id-generator'
 import { ensureBusinessId } from '@/domain/business-identity'
+import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeOpportunityEngagementCircles } from '@/domain/engagement-circle'
 import {
   activePocProjectForOpportunity,
@@ -139,6 +140,7 @@ export function normalizeOpportunityLifecycleOpportunity(
   existingOpportunityIds: Array<string | null | undefined> = [],
 ): Opportunity {
   const opportunityId = ensureBusinessId('opportunity', opportunity.opportunityId, existingOpportunityIds)
+  const region = getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
   const linkedProjects = projects.filter(
     (project) => project.opportunityId === opportunity.opportunityId || project.opportunityId === opportunityId,
   )
@@ -158,6 +160,8 @@ export function normalizeOpportunityLifecycleOpportunity(
   return {
     ...opportunity,
     opportunityId,
+    region,
+    timeGroup: region || normalizeBusinessRegion(opportunity.timeGroup),
     stage: opportunity.stage === 'WON' ? 'WON' : opportunity.stage === 'POC' ? 'POC' : 'OPEN',
     engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
     pocProjectIds,

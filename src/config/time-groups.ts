@@ -1,15 +1,5 @@
-const COUNTRY_TIME_GROUPS: Record<string, string> = {
-  Australia: 'APAC',
-  Canada: 'AMER',
-  Germany: 'EMEA',
-  Israel: 'EMEA',
-  Japan: 'APAC',
-  Singapore: 'APAC',
-  UK: 'EMEA',
-  USA: 'AMER',
-}
+import { getBusinessRegionForCountry } from '@/domain/business-region'
 
 export function timeGroupForCountry(country: string | null | undefined): string {
-  if (!country) return ''
-  return COUNTRY_TIME_GROUPS[country] ?? ''
+  return getBusinessRegionForCountry(country)
 }
