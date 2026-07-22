@@ -3,6 +3,7 @@ import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-do
 import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
+  projectHeaderFieldRows,
   projectTabLabel,
   type ProjectFormTab,
   type ProjectHeaderFieldMetadata,
@@ -1905,9 +1906,9 @@ export function ProjectFormPage() {
         onToggle={() => toggleSection('projectHeader')}
       >
         <div className="space-y-3">
-          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(0, 8).map(renderHeaderField)}</div>
-          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(8, 15).map(renderHeaderField)}</div>
-          <div className="flex flex-wrap items-start gap-3">{formMetadata.headerFields.slice(15).map(renderHeaderField)}</div>
+          {projectHeaderFieldRows(formMetadata.headerFields).map((row, index) => (
+            <div key={index} className="flex flex-wrap items-start gap-3">{row.map(renderHeaderField)}</div>
+          ))}
         </div>
       </CollapsibleSection>
 

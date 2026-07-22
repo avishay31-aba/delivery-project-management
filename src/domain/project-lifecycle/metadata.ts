@@ -114,8 +114,19 @@ const POC_ONLY_EDITABLE_DATES: ProjectHeaderFieldMetadata[] = [
 ]
 
 const POC_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = DELIVERY_RENEWAL_HEADER_FIELDS.flatMap((field) =>
-  field.key === 'projectAlerts' ? [field, ...POC_ONLY_EDITABLE_DATES] : [field],
+  field.key === 'deliveryDate' ? [field, ...POC_ONLY_EDITABLE_DATES] : [field],
 )
+
+export function projectHeaderFieldRows(fields: ProjectHeaderFieldMetadata[]): ProjectHeaderFieldMetadata[][] {
+  const firstRowEnd = fields.findIndex((field) => field.key === 'projectAlerts')
+  const secondRowEnd = fields.findIndex((field) => field.key === 'timeGroup')
+  if (firstRowEnd < 0 || secondRowEnd < firstRowEnd) return [fields]
+  return [
+    fields.slice(0, firstRowEnd + 1),
+    fields.slice(firstRowEnd + 1, secondRowEnd + 1),
+    fields.slice(secondRowEnd + 1),
+  ].filter((row) => row.length > 0)
+}
 
 export const NEW_TENANT_PROJECT_SECTION: ProjectRequirementSectionMetadata = {
   kind: 'A',
