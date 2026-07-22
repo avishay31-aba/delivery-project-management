@@ -15,7 +15,7 @@ const idCounters = {
   project: 8,
   productionSystem: 12,
   tenant: 10,
-  warranty: 10,
+  warranty: 12,
   remark: 20,
   activity: 32,
   configurationHistory: 14,
@@ -23,8 +23,8 @@ const idCounters = {
   document: 12,
   versionNumber: 3,
   buildNumber: 6,
-  versionUpdate: 6,
-  versionUpdateAttachment: 18,
+  versionUpdate: 21,
+  versionUpdateAttachment: 63,
   pid: 8,
   sid: 12,
   tid: 10,
@@ -390,6 +390,9 @@ function productionInventory(n, sid, country, state, overrides = {}) {
     alerts: [],
     remarks: [],
     configurationHistory: [],
+    currentVersionUpdateId: overrides.currentVersionUpdateId ?? null,
+    currentVersionNumberRefId: overrides.currentVersionNumberRefId ?? null,
+    currentBuildNumberRefId: overrides.currentBuildNumberRefId ?? null,
     createdAt: iso(1 + n),
     updatedAt: iso(1 + n),
   }
@@ -719,6 +722,8 @@ const warranties = {
   t8a: warranty(8, 'T000008', 'P000007', 'OPP000007', 'RENEWED', '2025-01-01', '2025-12-31'),
   t8b: warranty(9, 'T000008', 'P000007', 'OPP000007', 'VALID', '2026-01-01', '2026-12-31', 'W000008T000008'),
   t9: warranty(10, 'T000009', 'P000001', 'OPP000001', 'NO_WARRANTY', null, null, '', 'YES'),
+  t7: warranty(11, 'T000007', 'P000006', 'OPP000006', 'NOT_SET', null, null),
+  t10: warranty(12, 'T000010', 'P000008', 'OPP000008', 'NOT_SET', null, null),
 }
 warranties.t1a.successor = 'W000002'
 warranties.t8a.successor = 'W000009'
@@ -730,10 +735,10 @@ const tenants = [
   tenant(4, accounts[2], 'S000002', 'S000002', 'P000005', 'CUSTOMER', tenantCfg[3], [warranties.t4], { sourceRequirementId: 'REQ-NORTH-REN-001' }),
   tenant(5, accounts[2], 'S000002', 'S000002', 'P000005', 'CUSTOMER', tenantCfg[4], [warranties.t5], { sourceRequirementId: 'REQ-NORTH-REN-002' }),
   tenant(6, accounts[3], 'S000003', 'S000003', 'P000006', 'CUSTOMER', tenantCfg[5], [warranties.t6], { sourceRequirementId: 'REQ-MERIDIAN-001' }),
-  tenant(7, accounts[3], 'S000003', 'S000003', 'P000006', 'CUSTOMER', tenantCfg[6], [], { sourceRequirementId: 'REQ-MERIDIAN-002', warrantyStatus: 'NOT_SET' }),
+  tenant(7, accounts[3], 'S000003', 'S000003', 'P000006', 'CUSTOMER', tenantCfg[6], [warranties.t7], { sourceRequirementId: 'REQ-MERIDIAN-002' }),
   tenant(8, accounts[4], 'S000004', 'S000004', 'P000007', 'CUSTOMER', tenantCfg[7], [warranties.t8a, warranties.t8b], { sourceRequirementId: 'REQ-KING-REN-001' }),
   tenant(9, accounts[0], 'S000006', 'S000006', 'P000001', 'POC', tenantCfg[8], [warranties.t9], { sourceRequirementId: 'REQ-CIVIC-POC-001', machineId: 'M000001' }),
-  tenant(10, accounts[5], 'S000007', 'S000007', 'P000008', 'POC', tenantCfg[9], [], { sourceRequirementId: 'REQ-SOUTH-POC-001', machineId: 'M000002', warrantyStatus: 'NOT_SET' }),
+  tenant(10, accounts[5], 'S000007', 'S000007', 'P000008', 'POC', tenantCfg[9], [warranties.t10], { sourceRequirementId: 'REQ-SOUTH-POC-001', machineId: 'M000002' }),
 ]
 
 const opportunities = [
@@ -775,35 +780,50 @@ const versionUpdates = [
   versionUpdate(4, 'S000003', 'allocated', 'S000003', '', 'VN000003', 'BN000005', 'Meridian pilot release installed.'),
   versionUpdate(5, 'S000006', 'allocated', 'S000006', 'M000001', 'VN000002', 'BN000004', 'Civic POC environment prepared.'),
   versionUpdate(6, 'M000003', 'reused', '', 'M000003', 'VN000001', 'BN000001', 'Demo lab baseline image refreshed.'),
+  versionUpdate(7, 'S000004', 'allocated', 'S000004', '', 'VN000001', 'BN000002', 'Kingsport production baseline recorded.'),
+  versionUpdate(8, 'S000005', 'allocated', 'S000005', '', 'VN000001', 'BN000001', 'Metro historical host baseline preserved.'),
+  versionUpdate(9, 'S000007', 'allocated', 'S000007', 'M000002', 'VN000002', 'BN000004', 'Southern Cross POC environment prepared.'),
+  versionUpdate(10, 'S000008', 'production', 'S000008', '', 'VN000002', 'BN000003', 'Production inventory baseline recorded.'),
+  versionUpdate(11, 'S000009', 'production', 'S000009', '', 'VN000001', 'BN000002', 'Production inventory baseline recorded.'),
+  versionUpdate(12, 'S000010', 'production', 'S000010', '', 'VN000002', 'BN000004', 'Production inventory baseline recorded.'),
+  versionUpdate(13, 'S000011', 'production', 'S000011', '', 'VN000003', 'BN000005', 'Production inventory baseline recorded.'),
+  versionUpdate(14, 'S000012', 'production', 'S000012', '', 'VN000003', 'BN000006', 'Production inventory baseline recorded.'),
+  versionUpdate(15, 'M000001', 'reused', '', 'M000001', 'VN000002', 'BN000004', 'Civic reused internal source baseline recorded.'),
+  versionUpdate(16, 'M000002', 'reused', '', 'M000002', 'VN000002', 'BN000004', 'Southern Cross reused internal source baseline recorded.'),
+  versionUpdate(17, 'M000004', 'reused', '', 'M000004', 'VN000001', 'BN000001', 'Demo lab baseline image refreshed.'),
+  versionUpdate(18, 'M000005', 'reused', '', 'M000005', 'VN000001', 'BN000002', 'Training lab baseline image refreshed.'),
+  versionUpdate(19, 'M000006', 'reused', '', 'M000006', 'VN000002', 'BN000003', 'Support lab baseline image refreshed.'),
+  versionUpdate(20, 'M000007', 'reused', '', 'M000007', 'VN000002', 'BN000004', 'Available lab baseline image refreshed.'),
+  versionUpdate(21, 'M000008', 'reused', '', 'M000008', 'VN000003', 'BN000005', 'Demo lab baseline image refreshed.'),
 ]
 
 const systems = [
   system(1, accounts[1], 'S000001', ['P000002','P000003','P000004'], tenants.slice(0, 3), { deliveryPid: 'P000002', currentVersionUpdateId: 'VU000002', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
   system(2, accounts[2], 'S000002', ['P000005'], tenants.slice(3, 5), { deliveryPid: 'P000005', currentVersionUpdateId: 'VU000003', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000002' }),
   system(3, accounts[3], 'S000003', ['P000006'], tenants.slice(5, 7), { deliveryPid: 'P000006', currentVersionUpdateId: 'VU000004', currentVersionNumberRefId: 'VN000003', currentBuildNumberRefId: 'BN000005' }),
-  system(4, accounts[4], 'S000004', ['P000007'], tenants.slice(7, 8), { deliveryPid: 'P000007', operationalStatus: 'Access blocked' }),
-  system(5, accounts[1], 'S000005', ['P000002'], [], { deliveryPid: 'P000002', operationalStatus: 'On' }),
+  system(4, accounts[4], 'S000004', ['P000007'], tenants.slice(7, 8), { deliveryPid: 'P000007', operationalStatus: 'Access blocked', currentVersionUpdateId: 'VU000007', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000002' }),
+  system(5, accounts[1], 'S000005', ['P000002'], [], { deliveryPid: 'P000002', operationalStatus: 'On', currentVersionUpdateId: 'VU000008', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
   system(6, accounts[0], 'S000006', ['P000001'], tenants.slice(8, 9), { deliveryPid: 'P000001', machineId: 'M000001', source: 'Reused Internal Systems', systemClass: 'POC_DEMO_TRAINING', purpose: 'POC', currentVersionUpdateId: 'VU000005', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
-  system(7, accounts[5], 'S000007', ['P000008'], tenants.slice(9, 10), { deliveryPid: 'P000008', machineId: 'M000002', source: 'Reused Internal Systems', systemClass: 'POC_DEMO_TRAINING', purpose: 'POC' }),
+  system(7, accounts[5], 'S000007', ['P000008'], tenants.slice(9, 10), { deliveryPid: 'P000008', machineId: 'M000002', source: 'Reused Internal Systems', systemClass: 'POC_DEMO_TRAINING', purpose: 'POC', currentVersionUpdateId: 'VU000009', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
 ]
 
 const productionSystemInventory = [
-  productionInventory(1, 'S000008', 'United States', 'Virginia'),
-  productionInventory(2, 'S000009', 'Canada', 'Ontario'),
-  productionInventory(3, 'S000010', 'Germany', 'Berlin'),
-  productionInventory(4, 'S000011', 'Singapore', 'Central Region'),
-  productionInventory(5, 'S000012', 'Australia', 'New South Wales'),
+  productionInventory(1, 'S000008', 'United States', 'Virginia', { currentVersionUpdateId: 'VU000010', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000003' }),
+  productionInventory(2, 'S000009', 'Canada', 'Ontario', { currentVersionUpdateId: 'VU000011', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000002' }),
+  productionInventory(3, 'S000010', 'Germany', 'Berlin', { currentVersionUpdateId: 'VU000012', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
+  productionInventory(4, 'S000011', 'Singapore', 'Central Region', { currentVersionUpdateId: 'VU000013', currentVersionNumberRefId: 'VN000003', currentBuildNumberRefId: 'BN000005' }),
+  productionInventory(5, 'S000012', 'Australia', 'New South Wales', { currentVersionUpdateId: 'VU000014', currentVersionNumberRefId: 'VN000003', currentBuildNumberRefId: 'BN000006' }),
 ]
 
 const reusedInternalSystems = [
-  reusedInternal(1, 'M000001', 'POC', 'Germany', { occupationStartDate: '2026-07-12', occupationEndDate: '2026-08-02', currentProjectIds: ['P000001'], tenantCount: 1, historyContext: { pid: 'P000001', sid: 'S000006', projectName: 'Civic Sentinel POC Evaluation', accountName: accounts[0].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
-  reusedInternal(2, 'M000002', 'POC', 'Australia', { occupationStartDate: '2026-07-25', occupationEndDate: '2026-08-18', currentProjectIds: ['P000008'], tenantCount: 1, historyContext: { pid: 'P000008', sid: 'S000007', projectName: 'Southern Cross Paid POC', accountName: accounts[5].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
-  reusedInternal(3, 'M000003', 'Available', 'United States'),
-  reusedInternal(4, 'M000004', 'Demo', 'Singapore'),
-  reusedInternal(5, 'M000005', 'Training', 'United Kingdom'),
-  reusedInternal(6, 'M000006', 'Support', 'Canada'),
-  reusedInternal(7, 'M000007', 'Available', 'Germany'),
-  reusedInternal(8, 'M000008', 'Demo', 'Australia'),
+  reusedInternal(1, 'M000001', 'POC', 'Germany', { occupationStartDate: '2026-07-12', occupationEndDate: '2026-08-02', currentProjectIds: ['P000001'], tenantCount: 1, currentVersionUpdateId: 'VU000015', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004', historyContext: { pid: 'P000001', sid: 'S000006', projectName: 'Civic Sentinel POC Evaluation', accountName: accounts[0].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
+  reusedInternal(2, 'M000002', 'POC', 'Australia', { occupationStartDate: '2026-07-25', occupationEndDate: '2026-08-18', currentProjectIds: ['P000008'], tenantCount: 1, currentVersionUpdateId: 'VU000016', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004', historyContext: { pid: 'P000008', sid: 'S000007', projectName: 'Southern Cross Paid POC', accountName: accounts[5].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
+  reusedInternal(3, 'M000003', 'Available', 'United States', { currentVersionUpdateId: 'VU000006', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
+  reusedInternal(4, 'M000004', 'Demo', 'Singapore', { currentVersionUpdateId: 'VU000017', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
+  reusedInternal(5, 'M000005', 'Training', 'United Kingdom', { currentVersionUpdateId: 'VU000018', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000002' }),
+  reusedInternal(6, 'M000006', 'Support', 'Canada', { currentVersionUpdateId: 'VU000019', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000003' }),
+  reusedInternal(7, 'M000007', 'Available', 'Germany', { currentVersionUpdateId: 'VU000020', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
+  reusedInternal(8, 'M000008', 'Demo', 'Australia', { currentVersionUpdateId: 'VU000021', currentVersionNumberRefId: 'VN000003', currentBuildNumberRefId: 'BN000005' }),
 ]
 
 const projectSystems = [
@@ -935,9 +955,12 @@ function validate(state) {
     opportunity: new Set(state.opportunities.map((row) => row.id)),
     project: new Set(state.projects.map((row) => row.id)),
     system: new Set(state.systems.map((row) => row.id)),
+    productionSystem: new Set(state.productionSystemInventory.map((row) => row.id)),
+    reusedInternalSystem: new Set(state.reusedInternalSystems.map((row) => row.id)),
     tenant: new Set(state.tenants.map((row) => row.id)),
     referenceData: new Set(state.referenceData.map((row) => row.id)),
   }
+  const versionUpdateBySystem = new Map(state.versionUpdates.map((row) => [row.systemId, row]))
   for (const accountRow of state.accounts) {
     if (!ids.salesManager.has(accountRow.salesManagerId)) errors.push(`Account ${accountRow.accountCode} missing sales manager`)
     if (!['NA','EMEA','APAC'].includes(accountRow.region)) errors.push(`Account ${accountRow.accountCode} invalid region ${accountRow.region}`)
@@ -952,11 +975,20 @@ function validate(state) {
   for (const systemRow of state.systems) {
     for (const projectId of systemRow.linkedProjectIds ?? []) if (!ids.project.has(projectId)) errors.push(`System ${systemRow.sid} linked missing project ${projectId}`)
     for (const tenantId of systemRow.tenantIds ?? []) if (!ids.tenant.has(tenantId)) errors.push(`System ${systemRow.sid} linked missing tenant ${tenantId}`)
-    if (!systemRow.currentVersionUpdateId && ['S000001','S000002','S000003','S000006'].includes(systemRow.sid)) errors.push(`System ${systemRow.sid} missing current version update`)
+  }
+  for (const systemRow of [...state.systems, ...state.productionSystemInventory, ...state.reusedInternalSystems]) {
+    const currentUpdate = versionUpdateBySystem.get(systemRow.id)
+    const versionRef = systemRow.currentVersionNumberRefId ?? currentUpdate?.versionNumberRefId
+    const buildRef = systemRow.currentBuildNumberRefId ?? currentUpdate?.buildNumberRefId
+    const buildRecord = buildRef ? state.referenceData.find((row) => row.id === buildRef) : null
+    if (!versionRef || !ids.referenceData.has(versionRef)) errors.push(`System ${systemRow.sid ?? systemRow.machineId} missing current Version Number`)
+    if (!buildRef || !ids.referenceData.has(buildRef)) errors.push(`System ${systemRow.sid ?? systemRow.machineId} missing current Build Number`)
+    if (buildRecord?.referenceType === 'BUILD_NUMBER' && buildRecord.versionNumberId !== versionRef) errors.push(`System ${systemRow.sid ?? systemRow.machineId} current Build Number does not belong to Version Number`)
   }
   for (const tenantRow of state.tenants) {
     if (!ids.account.has(tenantRow.accountId)) errors.push(`Tenant ${tenantRow.tid} missing account`)
     if (!ids.system.has(tenantRow.hostedSystemId)) errors.push(`Tenant ${tenantRow.tid} missing hosted system`)
+    if (!(tenantRow.warranties ?? []).some((warrantyRow) => warrantyRow.warrantyId && warrantyRow.warrantyStatus)) errors.push(`Tenant ${tenantRow.tid} missing explicit warranty coverage`)
     for (const key of ['product','licenses','users','concurrentSearches','concurrentAnalyses','mapCenter']) {
       if (tenantRow.configuration?.[key] == null || tenantRow.configuration?.[key] === '') errors.push(`Tenant ${tenantRow.tid} missing configuration ${key}`)
     }
