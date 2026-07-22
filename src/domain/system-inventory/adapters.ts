@@ -22,7 +22,7 @@ import {
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
 } from './metadata'
-import { applyReusedSystemOccupationWindow, systemIdentity, systemSource } from './service'
+import { applyReusedSystemOccupationWindow, reusedInternalStatusForPurpose, systemIdentity, systemSource } from './service'
 import { reserveBusinessId } from '@/domain/business-identity'
 
 export function systemDisplayName(record: SystemInventoryRecord): string {
@@ -44,7 +44,10 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
     configurationHistory: Array.isArray(record.configurationHistory) ? record.configurationHistory : [],
-    ...('currentProjectIds' in record ? { purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory) } : {}),
+    ...('currentProjectIds' in record ? {
+      purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory),
+      status: reusedInternalStatusForPurpose(record.purpose),
+    } : {}),
   }
 }
 
@@ -171,10 +174,11 @@ export function purposeHistoryContextFromProject(project: Project, allocatedSyst
 }
 
 export function updateReusedInternalPurpose(system: ReusedInternalSystem, purpose: ReusedInternalSystem['purpose'], updatedAt: string): ReusedInternalSystem {
-  if (system.purpose === purpose) return { ...system, updatedAt }
+  if (system.purpose === purpose) return { ...system, status: reusedInternalStatusForPurpose(purpose), updatedAt }
   return {
     ...appendReusedInternalPurposeHistory(system, purpose, updatedAt),
     purpose,
+    status: reusedInternalStatusForPurpose(purpose),
     updatedAt,
   }
 }
@@ -210,7 +214,7 @@ export function releaseReusedInternalSystem(
   return {
     ...releasedSystem,
     purpose: currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose,
-    status: currentProjectIds.length === 0 ? REUSED_INTERNAL_STATUS_AVAILABLE : system.status,
+    status: reusedInternalStatusForPurpose(currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose),
     currentProjectIds,
     occupationEndDate: currentProjectIds.length === 0 ? updatedAt : system.occupationEndDate ?? null,
     updatedAt,

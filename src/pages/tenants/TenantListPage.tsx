@@ -4,6 +4,7 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createTenantColumns } from '@/config/tenant-columns'
 import { tenantReference } from '@/domain/business-reference'
+import { TENANT_DASHBOARD_COLOR_LEGEND, tenantDashboardRowClassName } from '@/domain/tenant-operations'
 
 export function TenantListPage() {
 const navigate = useNavigate()
@@ -26,6 +27,9 @@ return (
     dashboardScope="tenants"
     rows={tenants}
     columns={tenantListColumns}
+    initialSorting={[{ id: 'tid', desc: false }]}
+    getRowClassName={tenantDashboardRowClassName}
+    colorLegend={TENANT_DASHBOARD_COLOR_LEGEND}
     toolbar={
       <button
         type="button"

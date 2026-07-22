@@ -3,7 +3,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
-import { allocatedSystemDashboardRows, systemDashboardRowClassName } from '@/domain/system-inventory'
+import { ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND, allocatedSystemDashboardRows, systemDashboardRowClassName } from '@/domain/system-inventory'
 import { systemReference } from '@/domain/business-reference'
 
 export function SystemListPage() {
@@ -28,6 +28,8 @@ export function SystemListPage() {
         rows={allocatedSystems}
         columns={systemListColumns}
         getRowClassName={systemDashboardRowClassName}
+        initialSorting={[{ id: 'sid', desc: true }]}
+        colorLegend={ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND}
         onEdit={(row, columnId, value) => {
           const column = systemListColumns.find((candidate) => candidate.id === columnId)
           if (!column?.editKey) return

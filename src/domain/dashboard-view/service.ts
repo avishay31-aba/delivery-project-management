@@ -42,12 +42,15 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
   }
 }
 
-export function createFullDashboardViewState(columnIds: string[]): DashboardViewState {
+export function createFullDashboardViewState(
+  columnIds: string[],
+  defaultSorting: DashboardViewState['sorting'] = [],
+): DashboardViewState {
   return {
     columnOrder: columnIds,
     columnVisibility: Object.fromEntries(columnIds.map((columnId) => [columnId, true])),
     columnFilters: [],
-    sorting: [],
+    sorting: defaultSorting.filter((sort) => columnIds.includes(sort.id)),
     grouping: [],
     globalFilter: '',
   }
@@ -74,13 +77,14 @@ export function normalizeDashboardViewState(state: DashboardViewState, columnIds
 export function createFullDashboardView(
   columnIds: string[],
   defaultViewId: string = FULL_DASHBOARD_VIEW_ID,
+  defaultSorting: DashboardViewState['sorting'] = [],
 ): RuntimeDashboardView {
   const now = new Date(0).toISOString()
 
   return {
     id: FULL_DASHBOARD_VIEW_ID,
     name: FULL_DASHBOARD_VIEW_NAME,
-    state: createFullDashboardViewState(columnIds),
+    state: createFullDashboardViewState(columnIds, defaultSorting),
     createdAt: now,
     updatedAt: now,
     isFullDashboard: true,
@@ -92,9 +96,10 @@ export function getRuntimeDashboardViews(
   persistedViews: PersistedDashboardViews,
   scope: DashboardViewScope,
   columnIds: string[],
+  defaultSorting: DashboardViewState['sorting'] = [],
 ): RuntimeDashboardView[] {
   const scopedViews = persistedViews.dashboards[scope]
-  const fullDashboardView = createFullDashboardView(columnIds, scopedViews.defaultViewId)
+  const fullDashboardView = createFullDashboardView(columnIds, scopedViews.defaultViewId, defaultSorting)
   const savedViews = scopedViews.views.map((view) => ({
     ...view,
     state: normalizeDashboardViewState(view.state, columnIds),

@@ -9,8 +9,10 @@ import {
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
 import type { ConfigurationHistoryRecord, TenantConfiguration } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
+import type { ReusedInternalSystemStatus } from './types'
 import {
   REUSED_INTERNAL_PURPOSE_AVAILABLE,
+  REUSED_INTERNAL_STATUS_AVAILABLE,
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
@@ -31,6 +33,17 @@ export function isAllocatedSystem(record: SystemInventoryRecord): record is Syst
 
 export function isReusedInternalOccupied(status: string | undefined): boolean {
   return status === REUSED_INTERNAL_STATUS_OCCUPIED
+}
+
+export function reusedInternalStatusForPurpose(purpose: string | undefined): ReusedInternalSystemStatus {
+  return purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE
+    ? REUSED_INTERNAL_STATUS_AVAILABLE
+    : REUSED_INTERNAL_STATUS_OCCUPIED
+}
+
+export function isAllocationEligibleSystem(system: System): boolean {
+  if (system.source === SYSTEM_SOURCE_PRODUCTION || !system.source) return true
+  return system.source === SYSTEM_SOURCE_REUSED_INTERNAL && system.purpose === SYSTEM_PURPOSE_POC
 }
 
 export interface ReusedSystemOccupationWindow {
@@ -129,6 +142,18 @@ export function systemDashboardRowClassName(record: SystemInventoryRecord | Allo
 
   return 'bg-white hover:bg-sf-surface-alt'
 }
+
+export const REUSED_INTERNAL_SYSTEM_DASHBOARD_COLOR_LEGEND = [
+  { label: 'Available', rowClassName: 'bg-yellow-50', swatchClassName: 'bg-yellow-50' },
+  { label: 'POC', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
+  { label: 'Demo', rowClassName: 'bg-red-50', swatchClassName: 'bg-red-50' },
+  { label: 'Training', rowClassName: 'bg-purple-50', swatchClassName: 'bg-purple-50' },
+  { label: 'Support', rowClassName: 'bg-slate-50', swatchClassName: 'bg-slate-50' },
+]
+
+export const ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND = [
+  { label: 'POC', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
+]
 
 export function systemIdentity(record: SystemInventoryRecord): string {
   if ('sid' in record && record.sid) return record.sid
@@ -328,6 +353,7 @@ export function allocatedSystemDashboardRows(
 
   return systems
     .filter((system) => activeLinksBySystemId.has(system.id))
+    .filter(isAllocationEligibleSystem)
     .map((system) => {
       const links = activeLinksBySystemId.get(system.id) ?? []
       return {

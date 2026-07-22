@@ -80,6 +80,16 @@ export function uniqueOpportunityValues(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)))
 }
 
+export function opportunityDashboardRowClassName(opportunity: Opportunity): string {
+  return opportunity.stage === 'OPEN'
+    ? 'bg-red-50 hover:bg-red-100'
+    : 'bg-white hover:bg-sf-surface-alt'
+}
+
+export const OPPORTUNITY_DASHBOARD_COLOR_LEGEND = [
+  { label: 'Open', rowClassName: 'bg-red-50', swatchClassName: 'bg-red-50' },
+]
+
 export function linkedPocProjectsForOpportunity(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project[] {
   const linkedIds = new Set(uniqueOpportunityValues([...(opportunity.pocProjectIds ?? []), ...(savedOpportunity.pocProjectIds ?? [])]))
   const opportunityIds = new Set([opportunity.opportunityId, savedOpportunity.opportunityId])

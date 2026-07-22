@@ -123,6 +123,7 @@ export interface ProjectDeliveryDashboardReadModel {
   pocStartDate: string
   pocEndDate: string
   type: string
+  subType: string
   hosting: string
   product: string
   modules: string[]

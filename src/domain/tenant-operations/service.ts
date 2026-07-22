@@ -335,6 +335,16 @@ export function tenantRequirementIdDisplay(tenant: Tenant): string {
   return tenant.sourceRequirementId ?? ''
 }
 
+export function tenantDashboardRowClassName(tenant: Tenant): string {
+  return tenant.tenantType === 'POC'
+    ? 'bg-blue-50 hover:bg-blue-100'
+    : 'bg-white hover:bg-sf-surface-alt'
+}
+
+export const TENANT_DASHBOARD_COLOR_LEGEND = [
+  { label: 'POC', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
+]
+
 export function tenantTimeZoneDisplayValue(
   tenant: Tenant,
   opportunity?: Opportunity,

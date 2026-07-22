@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { opportunityReference } from '@/domain/business-reference'
+import { OPPORTUNITY_DASHBOARD_COLOR_LEGEND, opportunityDashboardRowClassName } from '@/domain/opportunity-lifecycle'
 
 export function OpportunityListPage() {
   const navigate = useNavigate()
@@ -45,9 +46,8 @@ export function OpportunityListPage() {
             + New Opportunity
           </button>
         }
-        getRowClassName={(row) =>
-          row.stage === 'OPEN' ? 'bg-red-50 hover:bg-red-100' : ''
-        }
+        getRowClassName={opportunityDashboardRowClassName}
+        colorLegend={OPPORTUNITY_DASHBOARD_COLOR_LEGEND}
         onEdit={(row, columnId, value) => {
           const column = columns.find((candidate) => candidate.id === columnId)
           if (!column?.editKey) return

@@ -4,7 +4,7 @@ import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader } from '@/components/record'
 import { createProjectListColumns } from '@/config/project-columns'
-import { projectListRowClassName } from '@/domain/project-lifecycle'
+import { PROJECT_DASHBOARD_COLOR_LEGEND, projectListRowClassName } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
 
 export function ProjectListPage() {
@@ -37,6 +37,8 @@ return (
     rows={activeProjects}
     columns={projectListColumns}
     enableInlineEditing={false}
+    initialSorting={[{ id: 'deliveryDate', desc: false }]}
+    colorLegend={PROJECT_DASHBOARD_COLOR_LEGEND}
     toolbar={
       <button
         type="button"

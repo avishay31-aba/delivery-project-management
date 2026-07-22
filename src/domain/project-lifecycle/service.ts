@@ -264,6 +264,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     pocStartDate: context.project.pocStartDate ?? opportunity?.pocStartDate ?? '',
     pocEndDate: context.project.pocEndDate ?? opportunity?.pocEndDate ?? '',
     type: context.project.mainType,
+    subType: context.project.subType === 'NONE' ? '' : context.project.subType,
     hosting: configuration.hosting,
     product: configuration.product,
     modules: configuration.modules,
@@ -471,6 +472,12 @@ export function projectListRowClassName(project: Project): string {
     ? 'bg-blue-50 hover:bg-blue-100'
     : 'bg-green-50 hover:bg-green-100'
 }
+
+export const PROJECT_DASHBOARD_COLOR_LEGEND = [
+  { label: 'Open', rowClassName: 'bg-green-50', swatchClassName: 'bg-green-50' },
+  { label: 'Done', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
+  { label: 'Archived', rowClassName: 'bg-gray-50', swatchClassName: 'bg-gray-50' },
+]
 
 function textValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ')

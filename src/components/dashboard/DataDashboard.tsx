@@ -67,6 +67,12 @@ export interface DashboardColumn<T> {
   semanticType?: DateTimeSemanticType
 }
 
+export interface DashboardColorLegendItem {
+  label: string
+  rowClassName: string
+  swatchClassName: string
+}
+
 
 
 interface DataDashboardProps<T extends { id: string }> {
@@ -82,6 +88,7 @@ interface DataDashboardProps<T extends { id: string }> {
   enableInlineEditing?: boolean
   enableRecordActions?: boolean
   initialSorting?: SortingState
+  colorLegend?: DashboardColorLegendItem[]
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -111,18 +118,73 @@ const COLUMN_DRAG_DATA_TYPE = 'application/x-dashboard-column-id'
 const ACTION_COLUMN_ID = '__actions'
 const ROW_INDICATOR_COLUMN_ID = '__rowIndicator'
 const CREATION_DATE_COLUMN_ID = '__createdAt'
-const AUTO_GENERATED_ID_COLUMN_IDS = new Set([
+const BUSINESS_IDENTIFIER_COLUMN_PRIORITY = [
   'accountCode',
+  'customerId',
   'opportunityId',
+  'oid',
   'pid',
+  'deliveryPid',
+  'requirementId',
+  'pocPid',
   'sid',
+  'machineId',
+  'mid',
   'tid',
   'warrantyId',
+  'activityId',
+  'eventId',
   'documentId',
-])
-
+]
+const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardViewScope, string[]>> = {
+  customers: ['accountCode', 'customerId'],
+  opportunities: ['opportunityId', 'oid', 'accountCode'],
+  projects: ['pid', 'opportunityId'],
+  systems: ['sid', 'machineId', 'mid', 'pid'],
+  productionSystemInventory: ['sid'],
+  reusedInternalSystems: ['machineId', 'mid', 'sid'],
+  tenants: ['tid', 'pid', 'deliveryPid', 'requirementId', 'pocPid', 'sid'],
+  warranties: ['warrantyId', 'tid'],
+  activityLog: ['activityId', 'eventId'],
+}
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
   return classNames.filter(Boolean).join(' ')
+}
+
+function isBusinessIdentifierColumn<T>(column: DashboardColumn<T>): boolean {
+  if (BUSINESS_IDENTIFIER_COLUMN_PRIORITY.includes(column.id)) return true
+  return /\b(ID|PID|SID|MID|TID|CID|OID)\b/i.test(column.label)
+}
+
+function orderedDashboardColumns<T>(
+  columns: DashboardColumn<T>[],
+  dashboardScope: DashboardViewScope,
+): DashboardColumn<T>[] {
+  const scopedPriority = BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE[dashboardScope] ?? []
+  const columnPriority = [...scopedPriority, ...BUSINESS_IDENTIFIER_COLUMN_PRIORITY.filter((columnId) => !scopedPriority.includes(columnId))]
+  const priorityByColumnId = new Map(columnPriority.map((columnId, index) => [columnId, index]))
+  const businessIdColumns = columns
+    .filter(isBusinessIdentifierColumn)
+    .sort((first, second) =>
+      (priorityByColumnId.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+      (priorityByColumnId.get(second.id) ?? Number.MAX_SAFE_INTEGER),
+    )
+  const businessIdColumnIds = new Set(businessIdColumns.map((column) => column.id))
+  return [...businessIdColumns, ...columns.filter((column) => !businessIdColumnIds.has(column.id))]
+}
+
+function DashboardColorLegend({ items }: { items: DashboardColorLegendItem[] }) {
+  if (items.length === 0) return null
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Dashboard color legend">
+      {items.map((item) => (
+        <span key={`${item.label}-${item.rowClassName}`} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-sf-text-muted">
+          <span className={joinClassNames('h-3 w-5 rounded-sm border border-sf-border', item.swatchClassName)} aria-hidden="true" />
+          {item.label}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function RowIndicator({ row }: { row: unknown }) {
@@ -841,24 +903,28 @@ export function DataDashboard<T extends { id: string }>({
   onEdit,
   getRowClassName,
   toolbar,
-  enableInlineEditing = true,
+  enableInlineEditing = false,
   enableRecordActions = true,
   initialSorting = [],
+  colorLegend = [],
 }: DataDashboardProps<T>) {
   const regionalDateFormat = useDateTimePresentationPreference()
-  const hasAuthoritativeCreationDateColumn = columns.some(
+  const initialSortingKey = JSON.stringify(initialSorting)
+  const defaultSorting = useMemo(() => initialSorting, [initialSortingKey])
+  const orderedColumns = useMemo(() => orderedDashboardColumns(columns, dashboardScope), [columns, dashboardScope])
+  const hasAuthoritativeCreationDateColumn = orderedColumns.some(
     (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
   )
   const sourceColumnIds = useMemo(
     () => [
       ROW_INDICATOR_COLUMN_ID,
       ...(hasAuthoritativeCreationDateColumn ? [] : [CREATION_DATE_COLUMN_ID]),
-      ...columns.map((column) => column.id),
+      ...orderedColumns.map((column) => column.id),
     ],
-    [columns, hasAuthoritativeCreationDateColumn],
+    [hasAuthoritativeCreationDateColumn, orderedColumns],
   )
   const [globalFilter, setGlobalFilter] = useState('')
-  const [sorting, setSorting] = useState<SortingState>(() => initialSorting)
+  const [sorting, setSorting] = useState<SortingState>(() => defaultSorting)
   const [grouping, setGrouping] = useState<GroupingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(() => sourceColumnIds)
@@ -874,7 +940,7 @@ export function DataDashboard<T extends { id: string }>({
   const [pendingViewId, setPendingViewId] = useState<string | null>(null)
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false)
   const [saveSuccessContinuation, setSaveSuccessContinuation] = useState<(() => void) | null>(null)
-  const [replaceColumnId, setReplaceColumnId] = useState(columns.find((column) => column.editable)?.id ?? columns[0]?.id ?? '')
+  const [replaceColumnId, setReplaceColumnId] = useState(orderedColumns.find((column) => column.editable)?.id ?? orderedColumns[0]?.id ?? '')
   const [replaceFindValue, setReplaceFindValue] = useState('')
   const [replaceValue, setReplaceValue] = useState('')
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
@@ -1007,7 +1073,7 @@ export function DataDashboard<T extends { id: string }>({
           return <ClampedTableCellContent title={raw}>{raw}</ClampedTableCellContent>
         },
       } satisfies ColumnDef<T>]),
-      ...columns.map((column): ColumnDef<T> => ({
+      ...orderedColumns.map((column): ColumnDef<T> => ({
         id: column.id,
         header: column.label,
         accessorFn: (row) => String(column.getValue(row) ?? ''),
@@ -1025,34 +1091,6 @@ export function DataDashboard<T extends { id: string }>({
         cell: ({ row }) => {
           const raw = String(column.getValue(row.original) ?? '')
 
-          if (enableInlineEditing && column.editable && onEdit && !AUTO_GENERATED_ID_COLUMN_IDS.has(column.id)) {
-            if (column.options?.length) {
-              return (
-                <select
-                  className="w-full rounded border border-sf-border px-2 py-1"
-                  value={raw}
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => onEdit(row.original, column.id, event.target.value)}
-                >
-                  {column.options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              )
-            }
-
-            return (
-              <input
-                className="w-full rounded border border-sf-border px-2 py-1"
-                value={raw}
-                onClick={(event) => event.stopPropagation()}
-                onChange={(event) => onEdit(row.original, column.id, event.target.value)}
-              />
-            )
-          }
-
           const renderedValue = column.render?.(row.original) ?? formattedDashboardCellValue(column, raw)
 
           return (
@@ -1063,7 +1101,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [columns, dashboardScope, enableInlineEditing, enableRecordActions, hasAuthoritativeCreationDateColumn, onEdit, onEditRecord, onView, regionalDateFormat],
+    [dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat],
   )
 
   const table = useReactTable({
@@ -1150,14 +1188,14 @@ export function DataDashboard<T extends { id: string }>({
   }
 
   const runtimeDashboardViews = useMemo(
-    () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds),
-    [dashboardScope, persistedDashboardViews, sourceColumnIds],
+    () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds, defaultSorting),
+    [dashboardScope, defaultSorting, persistedDashboardViews, sourceColumnIds],
   )
   const selectedDashboardView =
     runtimeDashboardViews.find((view) => view.id === selectedViewId) ?? runtimeDashboardViews[0]
   const dashboardColumnById = useMemo(
-    () => new Map(columns.map((column) => [column.id, column] as const)),
-    [columns],
+    () => new Map(orderedColumns.map((column) => [column.id, column] as const)),
+    [orderedColumns],
   )
   const currentDashboardViewState: SavedDashboardViewState = useMemo(
     () =>
@@ -1171,13 +1209,20 @@ export function DataDashboard<T extends { id: string }>({
     ? !areDashboardViewStatesEqual(currentDashboardViewState, selectedDashboardView.state, sourceColumnIds)
     : false
   const replaceColumns = useMemo(
-    () => columns.filter((column) => (column.replaceable ?? Boolean(column.editKey)) && onEdit),
-    [columns, onEdit],
+    () => enableInlineEditing ? orderedColumns.filter((column) => (column.replaceable ?? Boolean(column.editKey)) && onEdit) : [],
+    [enableInlineEditing, onEdit, orderedColumns],
   )
   const replaceColumn = replaceColumns.find((column) => column.id === replaceColumnId) ?? replaceColumns[0]
   const replaceMatchCount = replaceColumn
     ? rows.filter((row) => String(replaceColumn.getValue(row) ?? '') === replaceFindValue).length
     : 0
+  const visibleColorLegend = useMemo(() => {
+    if (!getRowClassName || colorLegend.length === 0) return []
+    const rowClassNames = rows.map((row) => getRowClassName(row)).filter(Boolean)
+    return colorLegend.filter((legendItem) =>
+      rowClassNames.some((rowClassName) => rowClassName.includes(legendItem.rowClassName)),
+    )
+  }, [colorLegend, getRowClassName, rows])
 
   const applyDashboardView = useCallback(
     (view: RuntimeDashboardView) => {
@@ -1752,6 +1797,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           {' · '}Showing {table.getFilteredRowModel().rows.length} record
           {table.getFilteredRowModel().rows.length === 1 ? '' : 's'}
         </p>
+        <DashboardColorLegend items={visibleColorLegend} />
         {toolbar}
       </div>
 
@@ -1903,7 +1949,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header, headerIndex) => {
-                    const sourceColumn = columns.find((column) => column.id === header.column.id)
+                    const sourceColumn = orderedColumns.find((column) => column.id === header.column.id)
                     const isActionColumn = header.column.id === ACTION_COLUMN_ID
 
                     return (

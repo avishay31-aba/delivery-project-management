@@ -92,6 +92,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project).pocStartDate, semanticType: 'date' },
     { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project).pocEndDate, semanticType: 'date' },
     { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
+    { id: 'subType', label: 'Sub Type', getValue: (project) => projectRow(project).subType },
     { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project).hosting },
     {
       id: 'product',

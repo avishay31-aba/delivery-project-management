@@ -58,6 +58,7 @@ import {
   createReusedInternalInventorySystem,
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
+  normalizeSystemInventoryRecord,
   occupyReusedInternalSystem,
   applyReusedSystemOccupationWindow,
   purposeHistoryContextFromProject,
@@ -1944,7 +1945,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const nextSystem = patch.purpose && patch.purpose !== system.purpose
           ? updateReusedInternalPurpose(system, patch.purpose, now)
           : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
-        nextCommittedSystem = { ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        nextCommittedSystem = normalizeSystemInventoryRecord({ ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now })
         return nextCommittedSystem
       })
       return {
