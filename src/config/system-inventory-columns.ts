@@ -3,6 +3,8 @@ import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
+import { systemCurrentVersionLabel } from '@/domain/system-version-update'
+import { useAppStore } from '@/store/useAppStore'
 import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
 import {
   joinUniqueValues,
@@ -36,6 +38,17 @@ function systemUrlColumn<T extends { url?: string }>(options: { replaceable?: bo
   }
 }
 
+function systemVersionColumn<T extends { id: string; currentVersionUpdateId?: string | null }>(): DashboardColumn<T> {
+  return {
+    id: 'currentVersion',
+    label: 'Version',
+    getValue: (row) => {
+      const state = useAppStore.getState()
+      return systemCurrentVersionLabel(state.versionUpdates, state.referenceData, row.id, row.currentVersionUpdateId)
+    },
+  }
+}
+
 export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemInventoryItem>[] = [
   {
     id: 'sid',
@@ -45,8 +58,10 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
-  systemUrlColumn<ProductionSystemInventoryItem>(),
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
+  systemVersionColumn<ProductionSystemInventoryItem>(),
+  systemUrlColumn<ProductionSystemInventoryItem>(),
+  { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
@@ -56,7 +71,6 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   { id: 'state', label: 'State', getValue: (row) => row.state ?? '', editable: true, editKey: 'state' },
   { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
   { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
-  { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
 ]
 
@@ -71,8 +85,10 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
   { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: REUSED_STATUS_OPTIONS },
-  systemUrlColumn<ReusedInternalSystem>(),
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
+  systemVersionColumn<ReusedInternalSystem>(),
+  systemUrlColumn<ReusedInternalSystem>(),
+  { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
@@ -90,7 +106,6 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
       }),
   },
   { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
-  { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
   ]
 }
@@ -122,8 +137,6 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
-    { id: 'allocationType', label: 'Allocation Type', getValue: (row) => row.allocationTypes.join('; ') },
-    { id: 'allocationStatus', label: 'Allocation Status', getValue: (row) => row.allocationStatus },
     { id: 'allocatedAt', label: 'Allocated At', getValue: (row) => row.allocatedAt, semanticType: 'datetime' },
     {
       id: 'projects',
@@ -136,11 +149,6 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
         }),
     },
     {
-      id: 'tenantCount',
-      label: '# Tenants',
-      getValue: (row) => tenantCountForSystem(row, tenants),
-    },
-    {
       id: 'tenants',
       label: 'Hosted Tenants',
       getValue: (row) => joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.tid)),
@@ -150,8 +158,14 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
           businessIds: joinUniqueValues(hostedTenantsForSystem(row.id, tenants).map((tenant) => tenant.tid)),
         }),
     },
-    systemUrlColumn<AllocatedSystemDashboardRow>({ replaceable: true }),
     { id: 'productType', label: 'Product', getValue: (row) => row.productType, editKey: 'productType', replaceable: true },
+    systemVersionColumn<AllocatedSystemDashboardRow>(),
+    systemUrlColumn<AllocatedSystemDashboardRow>({ replaceable: true }),
+    {
+      id: 'tenantCount',
+      label: '# Tenants',
+      getValue: (row) => tenantCountForSystem(row, tenants),
+    },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editKey: 'cloudRegion', replaceable: true },
