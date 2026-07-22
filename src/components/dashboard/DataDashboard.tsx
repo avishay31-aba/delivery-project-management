@@ -1092,13 +1092,15 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: column.sortable !== false,
         enableGrouping: column.groupable !== false,
         enableColumnFilter: column.filterable !== false,
-        sortingFn: column.sortValue
-          ? (firstRow, secondRow) => {
-              const firstValue = column.sortValue?.(firstRow.original)
-              const secondValue = column.sortValue?.(secondRow.original)
-              return String(firstValue ?? '').localeCompare(String(secondValue ?? ''), undefined, { numeric: true })
+        ...(column.sortValue
+          ? {
+              sortingFn: (firstRow, secondRow) => {
+                const firstValue = column.sortValue?.(firstRow.original)
+                const secondValue = column.sortValue?.(secondRow.original)
+                return String(firstValue ?? '').localeCompare(String(secondValue ?? ''), undefined, { numeric: true })
+              },
             }
-          : undefined,
+          : {}),
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true
           const rowValue = String(row.getValue(columnId) ?? '')
