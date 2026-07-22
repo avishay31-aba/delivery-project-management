@@ -95,21 +95,6 @@ const LOCATION_FIELDS: ProjectHeaderFieldMetadata[] = [
   { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header' },
 ]
 
-const POC_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = [
-  { key: 'opportunityName', label: 'Project name', editable: true, required: true, inputType: 'text', source: '2. Header' },
-  { key: 'mainType', label: 'Project Type', editable: false, source: '2. Header' },
-  { key: 'subType', label: 'Project sub type', editable: false, source: '2. Header' },
-  { key: 'deliveryDate', label: 'Delivery date', editable: true, inputType: 'date', source: '2. Header' },
-  { key: 'pocStartDate', label: 'Start Date', editable: true, inputType: 'date', source: '2. Header' },
-  { key: 'pocEndDate', label: 'End Date', editable: true, inputType: 'date', source: '2. Header' },
-  { key: 'financialProfile', label: 'Financial Profile', editable: false, source: '2. Header' },
-  { key: 'progressStatus', label: 'Project status', editable: false, source: '2. Header' },
-  { key: 'currentMilestone', label: 'Current milestone', editable: false, source: '2. Header' },
-  { key: 'projectAlerts', label: 'Project Alerts', editable: false, source: '2. Header' },
-  ...LOCATION_FIELDS,
-  ...REPORTING_FIELDS,
-]
-
 const DELIVERY_RENEWAL_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = [
   { key: 'opportunityName', label: 'Project name', editable: true, required: true, inputType: 'text', source: '2. Header' },
   { key: 'mainType', label: 'Project Type', editable: false, source: '2. Header' },
@@ -122,6 +107,15 @@ const DELIVERY_RENEWAL_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = [
   ...LOCATION_FIELDS,
   ...REPORTING_FIELDS,
 ]
+
+const POC_ONLY_EDITABLE_DATES: ProjectHeaderFieldMetadata[] = [
+  { key: 'pocStartDate', label: 'Start Date', editable: true, inputType: 'date', source: '2. Header' },
+  { key: 'pocEndDate', label: 'End Date', editable: true, inputType: 'date', source: '2. Header' },
+]
+
+const POC_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = DELIVERY_RENEWAL_HEADER_FIELDS.flatMap((field) =>
+  field.key === 'deliveryDate' ? [field, ...POC_ONLY_EDITABLE_DATES] : [field],
+)
 
 export const NEW_TENANT_PROJECT_SECTION: ProjectRequirementSectionMetadata = {
   kind: 'A',
