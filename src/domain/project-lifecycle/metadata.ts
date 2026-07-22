@@ -114,6 +114,7 @@ const POC_ONLY_EDITABLE_DATES: ProjectHeaderFieldMetadata[] = [
 ]
 
 const POC_HEADER_FIELDS: ProjectHeaderFieldMetadata[] = DELIVERY_RENEWAL_HEADER_FIELDS.flatMap((field) =>
+  field.key === 'warrantyServiceMonths' ? [] :
   field.key === 'deliveryDate' ? [field, ...POC_ONLY_EDITABLE_DATES] : [field],
 )
 
