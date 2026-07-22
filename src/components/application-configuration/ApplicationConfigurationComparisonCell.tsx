@@ -12,9 +12,13 @@ function comparisonClassName(comparison: ApplicationConfigurationComparisonResul
     return comparison.requestedBooleanValue ? 'configuration-change-boolean-yes' : 'configuration-change-boolean-no'
   }
   if (comparison.dataType === 'list') {
-    return comparison.removedItems.length > 0 ? 'configuration-change-removal' : ''
+    return comparison.addedItems.length > 0 ? 'configuration-change-addition' : ''
   }
   return 'configuration-change-changed'
+}
+
+export function applicationConfigurationComparisonCellClassName(comparison: ApplicationConfigurationComparisonResult | null): string {
+  return comparison && !comparison.matches ? 'configuration-change-marked' : ''
 }
 
 function comparisonTitle(comparison: ApplicationConfigurationComparisonResult): string | undefined {
@@ -39,10 +43,9 @@ export function ApplicationConfigurationComparisonCell({
 
   if (comparison.dataType === 'list' && Array.isArray(comparison.requestedValue)) {
     const addedKeys = new Set(comparison.addedItems.map((item) => item.toLocaleLowerCase()))
-    const className = comparisonClassName(comparison)
 
     return (
-      <span className={className} title={comparisonTitle(comparison)} aria-label={comparisonTitle(comparison)}>
+      <span title={comparisonTitle(comparison)} aria-label={comparisonTitle(comparison)}>
         {comparison.requestedValue.map((item, index) => (
           <span key={`${item}-${index}`}>
             {index > 0 ? '; ' : ''}

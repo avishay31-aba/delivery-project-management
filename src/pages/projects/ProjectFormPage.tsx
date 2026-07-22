@@ -21,7 +21,10 @@ import { BusinessObjectLink, FormField, MetadataHeaderField, PlaceholderCard, Pr
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
-import { ApplicationConfigurationComparisonCell } from '@/components/application-configuration/ApplicationConfigurationComparisonCell'
+import {
+  ApplicationConfigurationComparisonCell,
+  applicationConfigurationComparisonCellClassName,
+} from '@/components/application-configuration/ApplicationConfigurationComparisonCell'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import {
@@ -237,10 +240,6 @@ function RequirementSection({
     if (section.kind !== 'B') return null
     const field = applicationConfigurationFieldForRequirementKey(columnKey)
     if (!field) return null
-    const tenantId = typeof row.tenantId === 'string' ? row.tenantId : ''
-    if (!tenantId) return null
-    const tenant = tenants.find((candidate) => candidate.id === tenantId)
-    if (!tenant) return null
     const baselineConfiguration = (row as unknown as ChangeRequestRequirement).baselineConfiguration
     if (!baselineConfiguration) return null
     return compareApplicationConfigurationField(field, row, baselineConfiguration)
@@ -274,7 +273,7 @@ function RequirementSection({
                     const comparison = comparisonForCell(row as unknown as Record<string, unknown>, column.key)
                     const cellClassName = [
                       'whitespace-nowrap border border-sf-border px-1.5 py-px align-top text-sm text-sf-text',
-                      comparison && !comparison.matches ? 'configuration-change-marked' : '',
+                      applicationConfigurationComparisonCellClassName(comparison),
                     ].filter(Boolean).join(' ')
 
                     return (
