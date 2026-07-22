@@ -41,7 +41,10 @@ import {
   cloudPlatformOptionsForHosting,
   cloudRegionOptionsForCloudPlatform,
   cspOptionsForCloudPlatform,
+  isCloudRegionWithinUsedRegion,
+  isCognitoRegionCompatibleWithUsedRegion,
   requiresCloudPlatform,
+  requiresCloudRegion,
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
@@ -422,7 +425,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const [pendingTenantCreationIds, setPendingTenantCreationIds] = useState<string[]>([])
   const [pendingTenantRemovalIds, setPendingTenantRemovalIds] = useState<string[]>([])
-  const isDirty = Boolean(record && draft && (!valuesEqual(systemParentSaveScope(record), systemParentSaveScope(draft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
+  const isDirty = Boolean(record && draft && (isNewRecordSession || !valuesEqual(systemParentSaveScope(record), systemParentSaveScope(draft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
@@ -513,6 +516,28 @@ export function InventoryForm<T extends InventoryRecord>({
     updateField(key, value)
   }
 
+  function validationMessageForField(label: string, key: string): string | undefined {
+    if (!invalidFields.has(key) || messages.length === 0) return undefined
+    if (key === 'machineId') return messages.find((message) => message === 'MID is required.' || message === 'MID must be unique.')
+    if (key === 'url') return messages.find((message) => message === 'URL is required.' || message.startsWith('URL must '))
+    return messages.find((message) => message === `${label} is required.`)
+  }
+
+  function isFieldLevelValidationMessage(message: string): boolean {
+    return [
+      'MID is required.',
+      'MID must be unique.',
+      'Cognito Region is required.',
+      'Used In Region is required.',
+      'URL is required.',
+      'Hosting is required.',
+      'Cloud Platform is required.',
+      'CSP is required.',
+      'Cloud Region is required.',
+      'VPN Type is required.',
+    ].includes(message) || message.startsWith('URL must ')
+  }
+
   function renderAddNewEditor(key: string) {
     if (pendingAddNew?.key !== key) return null
 
@@ -571,12 +596,35 @@ export function InventoryForm<T extends InventoryRecord>({
     return sanitizeHostingContext(activeDraft)
   }
 
+  function regionWarningMessages(record: T): string[] {
+    const hostingType = textValue(readRecordValue(record, 'hostingType'))
+    if (!requiresCloudPlatform(hostingType)) return []
+    const usedInRegion = textValue(readRecordValue(record, 'usedInRegion'))
+    const cognitoRegion = textValue(readRecordValue(record, 'cognitoRegion'))
+    const cloudRegion = textValue(readRecordValue(record, 'cloudRegion'))
+    return [
+      cognitoRegion && !isCognitoRegionCompatibleWithUsedRegion(cognitoRegion, usedInRegion)
+        ? 'Cognito Region does not match Used In Region. Please confirm that this is intentional.'
+        : '',
+      cloudRegion && !isCloudRegionWithinUsedRegion(cloudRegion, usedInRegion)
+        ? `Cloud Region is not geographically located in ${usedInRegion}. Please confirm that this is intentional.`
+        : '',
+    ].filter(Boolean)
+  }
+
+  function confirmRegionWarnings(record: T): boolean {
+    const warnings = regionWarningMessages(record)
+    if (warnings.length === 0) return true
+    return window.confirm(warnings.join('\n\n'))
+  }
+
   validate()
   const lines = new Map<number, SystemInventoryHeaderField[]>()
   metadata.headerFields.forEach((field) => {
     lines.set(field.line, [...(lines.get(field.line) ?? []), field])
   })
   const headerLines = Array.from(lines.entries()).sort(([first], [second]) => first - second)
+  const summaryMessages = messages.filter((message) => !isFieldLevelValidationMessage(message))
   function save(stayOnPage: boolean) {
     if (isViewMode) return
     const nextMessages = validate()
@@ -585,10 +633,11 @@ export function InventoryForm<T extends InventoryRecord>({
       return
     }
 
+    const nextDraft = sanitizedDraftForSave()
+    if (!confirmRegionWarnings(nextDraft)) return
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    const nextDraft = sanitizedDraftForSave()
     const hasBusinessChanges = !valuesEqual(systemParentSaveScope(activeRecord), systemParentSaveScope(nextDraft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
     if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
@@ -623,6 +672,10 @@ export function InventoryForm<T extends InventoryRecord>({
     }
 
     const nextDraft = sanitizedDraftForSave()
+    if (!confirmRegionWarnings(nextDraft)) {
+      navigationBlocker.reset?.()
+      return
+    }
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
@@ -649,10 +702,15 @@ export function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderHeaderField(field: SystemInventoryHeaderField) {
+    const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
+    if (field.key === 'cognitoRegion' && !requiresCloudPlatform(hostingType)) return null
+
     const sourceRecord = field.editable ? activeDraft : activeRecord
     const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
+    const error = validationMessageForField(field.label, field.key)
+    const isRequired = field.key === 'cognitoRegion' ? requiresCloudPlatform(hostingType) : field.required
     const width =
       field.key === 'url'
         ? 'w-96'
@@ -709,7 +767,7 @@ export function InventoryForm<T extends InventoryRecord>({
       }
 
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
+        <FormField key={field.key} label={field.label} controlWidthClassName={width} required={isRequired} error={error}>
           <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)}>
             <option value="" />
             {(field.options ?? []).map((option) => (
@@ -722,7 +780,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
     if (field.inputType === 'date') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName="w-40" required={field.required}>
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-40" required={isRequired} error={error}>
           <input
             className={fieldClassName(isChanged, isInvalid)}
             type="date"
@@ -735,7 +793,7 @@ export function InventoryForm<T extends InventoryRecord>({
     }
 
     return (
-      <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
+      <FormField key={field.key} label={field.label} controlWidthClassName={width} required={isRequired} error={error}>
         <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
       </FormField>
     )
@@ -747,8 +805,6 @@ export function InventoryForm<T extends InventoryRecord>({
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     const cloudPlatform = textValue(readRecordValue(activeDraft, 'cloudPlatform'))
-    const isRequired = field.key === 'cloudPlatform' && requiresCloudPlatform(hostingType)
-    const error = isInvalid ? messages.find((message) => message.includes(`${field.label} is required.`)) : undefined
 
     if (field.key === 'cloudPlatform' && !requiresCloudPlatform(hostingType)) return null
     if ((field.key === 'csp' || field.key === 'cloudRegion') && (!requiresCloudPlatform(hostingType) || !cloudPlatform)) return null
@@ -763,6 +819,13 @@ export function InventoryForm<T extends InventoryRecord>({
     }
     const options = optionsByKey[field.key] ?? []
     const isDisabled = field.key === 'cloudPlatform' && options.length === 0
+    const isRequired =
+      field.key === 'hostingType' ||
+      field.key === 'performanceTier' ||
+      (field.key === 'cloudPlatform' && requiresCloudPlatform(hostingType)) ||
+      (field.key === 'csp' && options.length > 0) ||
+      (field.key === 'cloudRegion' && requiresCloudRegion(cloudPlatform))
+    const error = validationMessageForField(field.label, field.key)
 
     return (
       <FormField key={field.key} label={field.label} controlWidthClassName="w-56" required={isRequired} error={error}>
@@ -796,21 +859,26 @@ export function InventoryForm<T extends InventoryRecord>({
   function renderAccessDetailField(field: { key: string; label: string; inputType?: string }) {
     const value = textValue(readRecordValue(activeDraft, field.key))
     const isChanged = fieldChanged(field.key)
+    const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
 
     if (field.key === 'vpnType' && vpnEnabled !== 'YES') return null
+    const isRequired = field.key === 'url' || field.key === 'ipRestrictionEnabled' || field.key === 'vpnEnabled' || (field.key === 'vpnType' && vpnEnabled === 'YES')
+    const error = field.key === 'url'
+      ? messages.find((message) => invalidFields.has(field.key) && (message === 'URL is required.' || message.startsWith('URL must ')))
+      : validationMessageForField(field.label, field.key)
 
     if (field.inputType === 'text') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName="w-96">
-          <input className={fieldClassName(isChanged, invalidFields.has(field.key) && messages.length > 0)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-96" required={isRequired} error={error}>
+          <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
         </FormField>
       )
     }
 
     if (field.inputType === 'yesNo') {
       return (
-        <FormField key={field.key} label={field.label} controlWidthClassName="w-36">
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-36" required={isRequired} error={error}>
           <div className={[fieldClassName(isChanged), 'flex items-center gap-3'].join(' ')}>
             {YES_NO_REQUIRED_OPTIONS.map((option) => (
               <label key={option} className="inline-flex items-center gap-1 text-sm">
@@ -830,8 +898,8 @@ export function InventoryForm<T extends InventoryRecord>({
     }
 
     return (
-      <FormField key={field.key} label={field.label} controlWidthClassName="w-56">
-        <select className={fieldClassName(isChanged)} value={value} onChange={(event) => handlePicklistChange(field.key, event.target.value)}>
+      <FormField key={field.key} label={field.label} controlWidthClassName="w-56" required={isRequired} error={error}>
+        <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => handlePicklistChange(field.key, event.target.value)}>
           <option value="" />
           {optionsWithCustom(field.key, VPN_TYPE_OPTIONS).map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -1662,9 +1730,9 @@ export function InventoryForm<T extends InventoryRecord>({
       />
 
       <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
-      {messages.length > 0 ? (
-        <div className={formMessageClassName(messages)}>
-          {messages.map((message) => (
+      {summaryMessages.length > 0 ? (
+        <div className={formMessageClassName(summaryMessages)}>
+          {summaryMessages.map((message) => (
             <div key={message}>{message}</div>
           ))}
         </div>
@@ -1793,7 +1861,7 @@ export function ReusedInternalSystemFormPage() {
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source === SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
-  const record = useMemo(() => records.find((system) => system.machineId === mid), [records, mid])
+  const record = useMemo(() => records.find((system) => system.machineId === mid || system.id === mid), [records, mid])
 
   return (
     <InventoryForm

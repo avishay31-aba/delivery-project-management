@@ -30,20 +30,12 @@ export function validateSystemInventoryRequiredFields(
 ): SystemInventoryValidationMessage[] {
   const messages: SystemInventoryValidationMessage[] = []
 
-  if ('cognitoRegion' in record && !textValue(record.cognitoRegion).trim()) {
+  if ('cognitoRegion' in record && requiresCloudPlatform(textValue(record.hostingType)) && !textValue(record.cognitoRegion).trim()) {
     messages.push({ field: 'cognitoRegion', message: 'Cognito Region is required.' })
   }
 
   if ('usedInRegion' in record && !textValue(record.usedInRegion).trim()) {
     messages.push({ field: 'usedInRegion', message: 'Used In Region is required.' })
-  }
-
-  if ('source' in record && record.source === 'Production' && 'timeGroup' in record && !textValue(record.timeGroup).trim()) {
-    messages.push({ field: 'timeGroup', message: 'Used In Region is required.' })
-  }
-
-  if (requiresCloudPlatform(textValue(record.hostingType)) && !textValue(record.cloudPlatform).trim()) {
-    messages.push({ field: 'cloudPlatform', message: 'Cloud Platform is required.' })
   }
 
   return messages

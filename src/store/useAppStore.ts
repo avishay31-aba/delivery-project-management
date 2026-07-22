@@ -775,7 +775,7 @@ interface AppStore extends AppDataState {
   createOpportunity: (type?: OpportunityType, subType?: OpportunitySubType) => AppDataState['opportunities'][number]
   createProject: () => AppDataState['projects'][number]
   createProductionSystemInventoryItem: () => AppDataState['productionSystemInventory'][number]
-  createReusedInternalSystem: (machineId: string) => AppDataState['reusedInternalSystems'][number] | null
+  createReusedInternalSystem: (machineId?: string) => AppDataState['reusedInternalSystems'][number]
   saveOpportunityWithProjectSync: (
     opportunity: Opportunity,
     savedOpportunity: Opportunity,
@@ -2049,14 +2049,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return system
   },
 
-  createReusedInternalSystem: (machineId) => {
-    const state = get()
+  createReusedInternalSystem: (machineId = '') => {
     const nextMid = machineId.trim()
-    const midExists = [
-      ...state.reusedInternalSystems.map((system) => system.machineId),
-      ...state.systems.map((system) => system.machineId),
-    ].some((existingMid) => String(existingMid ?? '').trim().toLocaleUpperCase() === nextMid.toLocaleUpperCase())
-    if (!nextMid || midExists) return null
     const now = new Date().toISOString()
     const system = createReusedInternalInventorySystem(nextMid, now)
 

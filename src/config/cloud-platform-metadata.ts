@@ -12,6 +12,8 @@ export {
   cloudPlatformOptionsForHosting,
   cloudRegionOptionsForCloudPlatform,
   cspOptionsForCloudPlatform,
+  isCloudRegionWithinUsedRegion,
+  isCognitoRegionCompatibleWithUsedRegion,
   requiresCloudPlatform,
   requiresCloudRegion,
 } from '@/domain/hosting-context'

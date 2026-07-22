@@ -45,6 +45,68 @@ export function requiresCloudRegion(cloudPlatform: string): boolean {
   return cloudPlatform === 'AWS' || cloudPlatform === 'AWS Gov' || cloudPlatform === 'Azure' || cloudPlatform === 'Azure Gov'
 }
 
+export function usedRegionForCognitoRegion(cognitoRegion: string | null | undefined): string {
+  const normalized = String(cognitoRegion ?? '').trim().toLocaleUpperCase()
+  if (normalized === 'EU') return 'EMEA'
+  if (normalized === 'NA') return 'NA'
+  if (normalized === 'APAC') return 'APAC'
+  return ''
+}
+
+export function isCognitoRegionCompatibleWithUsedRegion(
+  cognitoRegion: string | null | undefined,
+  usedInRegion: string | null | undefined,
+): boolean {
+  const expectedRegion = usedRegionForCognitoRegion(cognitoRegion)
+  const usedRegion = String(usedInRegion ?? '').trim().toLocaleUpperCase()
+  return !expectedRegion || !usedRegion || expectedRegion.toLocaleUpperCase() === usedRegion
+}
+
+export function usedRegionForCloudRegion(cloudRegion: string | null | undefined): string {
+  const normalized = String(cloudRegion ?? '').trim().toLocaleLowerCase()
+  if (!normalized) return ''
+  if (normalized.startsWith('us-') || normalized.startsWith('ca-') || normalized.startsWith('usgov') || normalized.includes(' us') || normalized.includes('canada')) return 'NA'
+  if (normalized.startsWith('sa-') || normalized.includes('brazil')) return 'LATAM'
+  if (
+    normalized.startsWith('eu-') ||
+    normalized.startsWith('af-') ||
+    normalized.startsWith('me-') ||
+    normalized.includes('europe') ||
+    normalized.includes('uk ') ||
+    normalized.includes('france') ||
+    normalized.includes('germany') ||
+    normalized.includes('switzerland') ||
+    normalized.includes('norway') ||
+    normalized.includes('sweden') ||
+    normalized.includes('poland') ||
+    normalized.includes('italy') ||
+    normalized.includes('spain') ||
+    normalized.includes('uae') ||
+    normalized.includes('qatar') ||
+    normalized.includes('israel') ||
+    normalized.includes('south africa')
+  ) return 'EMEA'
+  if (
+    normalized.startsWith('ap-') ||
+    normalized.includes('india') ||
+    normalized.includes('asia') ||
+    normalized.includes('singapore') ||
+    normalized.includes('japan') ||
+    normalized.includes('korea') ||
+    normalized.includes('australia')
+  ) return 'APAC'
+  return ''
+}
+
+export function isCloudRegionWithinUsedRegion(
+  cloudRegion: string | null | undefined,
+  usedInRegion: string | null | undefined,
+): boolean {
+  const expectedRegion = usedRegionForCloudRegion(cloudRegion)
+  const usedRegion = String(usedInRegion ?? '').trim().toLocaleUpperCase()
+  return !expectedRegion || !usedRegion || expectedRegion === usedRegion
+}
+
 export function isServerHosting(value: string | null | undefined): boolean {
   const normalized = normalizeHostingType(value).toLowerCase()
   return normalized.includes('prem') || normalized.includes('hybrid') || normalized.includes('server')
