@@ -145,7 +145,7 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   systems: ['sid', 'machineId', 'mid', 'projects', 'pid'],
   productionSystemInventory: ['sid'],
   reusedInternalSystems: ['machineId', 'mid', 'sid'],
-  tenants: ['tid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'sid'],
+  tenants: ['tid', 'sid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'systemVersion', 'systemUrl', 'accountId'],
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
 }

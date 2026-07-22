@@ -3,6 +3,8 @@ import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, CountryFlag, WarrantyStatusPresentation } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { systemCurrentVersionLabel } from '@/domain/system-version-update'
+import { useAppStore } from '@/store/useAppStore'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
   objectDefinitionToRuntimeFormModel,
@@ -12,7 +14,22 @@ import {
 export const TENANT_RUNTIME_FORM_MODEL = objectDefinitionToRuntimeFormModel(TENANT_OBJECT_DEFINITION)
 
 function sidForTenant(tenant: Tenant, systems: System[]): string {
-  return systems.find((system) => system.id === tenant.systemId)?.sid ?? ''
+  return systemForTenant(tenant, systems)?.sid ?? ''
+}
+
+function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {
+  return systems.find((system) => system.id === tenant.systemId)
+}
+
+function systemUrlForTenant(tenant: Tenant, systems: System[]): string {
+  return systemForTenant(tenant, systems)?.url ?? ''
+}
+
+function systemVersionForTenant(tenant: Tenant, systems: System[]): string {
+  const system = systemForTenant(tenant, systems)
+  if (!system) return ''
+  const state = useAppStore.getState()
+  return systemCurrentVersionLabel(state.versionUpdates, state.referenceData, system.id, system.currentVersionUpdateId)
 }
 
 function joinValues(values?: string[]): string {
@@ -32,16 +49,18 @@ function tenantRuntimeColumn(
 export function createTenantColumns(systems: System[], projects: Project[] = [], projectTenants: ProjectTenantLink[] = []): DashboardColumn<Tenant>[] {
   return [
     { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tid }, row.tid) },
-    { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
-    { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
-    { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
     {
       id: 'sid',
       label: 'SID',
       getValue: (row) => sidForTenant(row, systems),
       render: (row) => createElement(BusinessIdLink, { objectType: 'SYSTEM', businessId: sidForTenant(row, systems) }, sidForTenant(row, systems)),
     },
-    { id: 'systemId', label: 'System ID/reference', getValue: (row) => row.systemId },
+    {
+      id: 'pocPid',
+      label: 'POC PID',
+      getValue: (row) => tenantPocPidDisplay(row, projects, projectTenants),
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantPocPidDisplay(row, projects, projectTenants) }),
+    },
     {
       id: 'deliveryPid',
       label: 'Delivery PID',
@@ -49,13 +68,31 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
       render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDeliveryPidDisplay(row, projects, projectTenants) }),
     },
     { id: 'requirementId', label: 'Requirement ID', getValue: (row) => tenantRequirementIdDisplay(row) },
-    {
-      id: 'pocPid',
-      label: 'POC PID',
-      getValue: (row) => tenantPocPidDisplay(row, projects, projectTenants),
-      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantPocPidDisplay(row, projects, projectTenants) }),
-    },
+    { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
+    { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
+    { id: 'systemVersion', label: 'Version', getValue: (row) => systemVersionForTenant(row, systems) },
+    {
+      id: 'systemUrl',
+      label: 'System URL',
+      getValue: (row) => systemUrlForTenant(row, systems),
+      render: (row) => {
+        const url = systemUrlForTenant(row, systems)
+        if (!url) return ''
+        return createElement(
+          'a',
+          {
+            href: url,
+            target: '_blank',
+            rel: 'noreferrer',
+            className: 'text-sf-brand hover:underline',
+            onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
+          },
+          url,
+        )
+      },
+    },
+    { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
     {
