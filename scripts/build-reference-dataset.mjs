@@ -971,6 +971,11 @@ function validate(state) {
   }
   for (const projectRow of state.projects) {
     if (!ids.opportunity.has(projectRow.opportunityId)) errors.push(`Project ${projectRow.pid} missing opportunity`)
+    const tasks = projectRow.tasks ?? []
+    const expectedStatus = tasks.length > 0 && tasks.every((taskRow) => taskRow.status === 'DONE') ? 'DONE' : 'OPEN'
+    if (projectRow.progressStatus !== expectedStatus) {
+      errors.push(`Project ${projectRow.pid} status ${projectRow.progressStatus} conflicts with Task completion; expected ${expectedStatus}`)
+    }
   }
   for (const systemRow of state.systems) {
     for (const projectId of systemRow.linkedProjectIds ?? []) if (!ids.project.has(projectId)) errors.push(`System ${systemRow.sid} linked missing project ${projectId}`)
