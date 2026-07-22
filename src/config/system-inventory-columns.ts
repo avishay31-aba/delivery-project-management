@@ -107,6 +107,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       id: 'pid',
       label: 'PID',
       getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
+      hideInFullDashboard: true,
       render: (row) =>
         createElement(BusinessIdListLinks, {
           objectType: 'PROJECT',

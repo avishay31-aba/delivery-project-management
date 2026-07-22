@@ -75,6 +75,8 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
   return [
     { id: 'pid', label: 'PID', getValue: (project) => projectRow(project).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
     { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project).projectName, editable: true, editKey: 'opportunityName' },
+    { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
+    { id: 'subType', label: 'Sub Type', getValue: (project) => projectRow(project).subType },
     { id: 'endUser', label: 'End User', getValue: (project) => projectRow(project).endUser },
     { id: 'payingCustomer', label: 'Paying Customer', getValue: (project) => projectRow(project).payingCustomer },
     { id: 'region', label: 'Region', getValue: (project) => projectRow(project).region },
@@ -88,11 +90,17 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
         return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })
       },
     },
-    { id: 'deliveryDate', label: 'Delivery Date', getValue: (project) => projectRow(project).deliveryDate, editable: true, editKey: 'deliveryDate', semanticType: 'date' },
+    {
+      id: 'deliveryDate',
+      label: 'Delivery Date',
+      getValue: (project) => projectRow(project).deliveryDate,
+      sortValue: (project) => projectRow(project).type === 'POC' ? projectRow(project).pocStartDate : projectRow(project).deliveryDate,
+      editable: true,
+      editKey: 'deliveryDate',
+      semanticType: 'date',
+    },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (project) => projectRow(project).pocStartDate, semanticType: 'date' },
     { id: 'pocEndDate', label: 'POC End Date', getValue: (project) => projectRow(project).pocEndDate, semanticType: 'date' },
-    { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },
-    { id: 'subType', label: 'Sub Type', getValue: (project) => projectRow(project).subType },
     { id: 'hosting', label: 'Hosting', getValue: (project) => projectRow(project).hosting },
     {
       id: 'product',

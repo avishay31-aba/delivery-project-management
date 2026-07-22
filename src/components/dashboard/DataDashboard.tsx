@@ -65,6 +65,8 @@ export interface DashboardColumn<T> {
   replaceable?: boolean
   options?: string[]
   semanticType?: DateTimeSemanticType
+  sortValue?: (row: T) => string | number | null
+  hideInFullDashboard?: boolean
 }
 
 export interface DashboardColorLegendItem {
@@ -140,10 +142,10 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   customers: ['accountCode', 'customerId'],
   opportunities: ['opportunityId', 'oid', 'accountCode'],
   projects: ['pid', 'opportunityId'],
-  systems: ['sid', 'machineId', 'mid', 'pid'],
+  systems: ['sid', 'machineId', 'mid', 'projects', 'pid'],
   productionSystemInventory: ['sid'],
   reusedInternalSystems: ['machineId', 'mid', 'sid'],
-  tenants: ['tid', 'pid', 'deliveryPid', 'requirementId', 'pocPid', 'sid'],
+  tenants: ['tid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'sid'],
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
 }
@@ -151,7 +153,8 @@ function joinClassNames(...classNames: Array<string | false | undefined>): strin
   return classNames.filter(Boolean).join(' ')
 }
 
-function isBusinessIdentifierColumn<T>(column: DashboardColumn<T>): boolean {
+function isBusinessIdentifierColumn<T>(column: DashboardColumn<T>, dashboardScope: DashboardViewScope): boolean {
+  if ((BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE[dashboardScope] ?? []).includes(column.id)) return true
   if (BUSINESS_IDENTIFIER_COLUMN_PRIORITY.includes(column.id)) return true
   return /\b(ID|PID|SID|MID|TID|CID|OID)\b/i.test(column.label)
 }
@@ -164,7 +167,7 @@ function orderedDashboardColumns<T>(
   const columnPriority = [...scopedPriority, ...BUSINESS_IDENTIFIER_COLUMN_PRIORITY.filter((columnId) => !scopedPriority.includes(columnId))]
   const priorityByColumnId = new Map(columnPriority.map((columnId, index) => [columnId, index]))
   const businessIdColumns = columns
-    .filter(isBusinessIdentifierColumn)
+    .filter((column) => isBusinessIdentifierColumn(column, dashboardScope))
     .sort((first, second) =>
       (priorityByColumnId.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
       (priorityByColumnId.get(second.id) ?? Number.MAX_SAFE_INTEGER),
@@ -176,10 +179,10 @@ function orderedDashboardColumns<T>(
 function DashboardColorLegend({ items }: { items: DashboardColorLegendItem[] }) {
   if (items.length === 0) return null
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Dashboard color legend">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-2" aria-label="Dashboard color legend">
       {items.map((item) => (
         <span key={`${item.label}-${item.rowClassName}`} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-sf-text-muted">
-          <span className={joinClassNames('h-3 w-5 rounded-sm border border-sf-border', item.swatchClassName)} aria-hidden="true" />
+          <span className={joinClassNames('h-4 w-8 rounded-sm border border-sf-border', item.swatchClassName)} aria-hidden="true" />
           {item.label}
         </span>
       ))}
@@ -912,6 +915,15 @@ export function DataDashboard<T extends { id: string }>({
   const initialSortingKey = JSON.stringify(initialSorting)
   const defaultSorting = useMemo(() => initialSorting, [initialSortingKey])
   const orderedColumns = useMemo(() => orderedDashboardColumns(columns, dashboardScope), [columns, dashboardScope])
+  const fullDashboardColumnVisibility = useMemo(
+    () =>
+      Object.fromEntries(
+        orderedColumns
+          .filter((column) => column.hideInFullDashboard)
+          .map((column) => [column.id, false]),
+      ),
+    [orderedColumns],
+  )
   const hasAuthoritativeCreationDateColumn = orderedColumns.some(
     (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
   )
@@ -1080,6 +1092,13 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: column.sortable !== false,
         enableGrouping: column.groupable !== false,
         enableColumnFilter: column.filterable !== false,
+        sortingFn: column.sortValue
+          ? (firstRow, secondRow) => {
+              const firstValue = column.sortValue?.(firstRow.original)
+              const secondValue = column.sortValue?.(secondRow.original)
+              return String(firstValue ?? '').localeCompare(String(secondValue ?? ''), undefined, { numeric: true })
+            }
+          : undefined,
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true
           const rowValue = String(row.getValue(columnId) ?? '')
@@ -1188,8 +1207,8 @@ export function DataDashboard<T extends { id: string }>({
   }
 
   const runtimeDashboardViews = useMemo(
-    () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds, defaultSorting),
-    [dashboardScope, defaultSorting, persistedDashboardViews, sourceColumnIds],
+    () => getRuntimeDashboardViews(persistedDashboardViews, dashboardScope, sourceColumnIds, defaultSorting, fullDashboardColumnVisibility),
+    [dashboardScope, defaultSorting, fullDashboardColumnVisibility, persistedDashboardViews, sourceColumnIds],
   )
   const selectedDashboardView =
     runtimeDashboardViews.find((view) => view.id === selectedViewId) ?? runtimeDashboardViews[0]

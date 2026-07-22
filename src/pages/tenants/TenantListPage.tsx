@@ -27,7 +27,7 @@ return (
     dashboardScope="tenants"
     rows={tenants}
     columns={tenantListColumns}
-    initialSorting={[{ id: 'tid', desc: false }]}
+    initialSorting={[{ id: 'tid', desc: true }]}
     getRowClassName={tenantDashboardRowClassName}
     colorLegend={TENANT_DASHBOARD_COLOR_LEGEND}
     toolbar={
