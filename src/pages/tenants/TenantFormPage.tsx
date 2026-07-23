@@ -120,10 +120,10 @@ const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'configuration', label: 'Configuration' },
   { id: 'hosting', label: 'Hosting' },
-  { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
+  { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'activity', label: 'Activity Log' },
 ]
 

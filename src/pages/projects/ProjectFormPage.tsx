@@ -113,6 +113,9 @@ type AllocationCandidate = SystemCandidate
 type AllocationCandidateSortKey = SystemCandidateSortKey
 type AllocationCandidateFilters = SystemCandidateFilters
 type NewMilestoneTaskDraft = Pick<NonNullable<Project['tasks']>[number], 'name' | 'department' | 'resource' | 'status' | 'deadline' | 'comment'>
+type PendingPlanDeletion =
+  | { kind: 'milestone'; id: string; name: string; taskCount: number }
+  | { kind: 'task'; id: string; name: string }
 
 const EMPTY_ALLOCATION_CANDIDATE_FILTERS = EMPTY_SYSTEM_CANDIDATE_FILTERS
 
@@ -351,6 +354,7 @@ export function ProjectFormPage() {
   const [dragOverMilestoneId, setDragOverMilestoneId] = useState<string | null>(null)
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
   const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const [pendingPlanDeletion, setPendingPlanDeletion] = useState<PendingPlanDeletion | null>(null)
   const [isAllocationDialogOpen, setIsAllocationDialogOpen] = useState(false)
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([])
@@ -996,12 +1000,49 @@ export function ProjectFormPage() {
     setIsAddMilestoneDialogOpen(false)
   }
 
+  function requestDeleteMilestone(milestoneId: string) {
+    if (isViewMode) return
+    const milestone = projectDraft.milestones?.find((candidate) => candidate.id === milestoneId)
+    if (!milestone) return
+    const taskCount = projectDraft.tasks?.filter((task) => task.milestoneId === milestoneId).length ?? 0
+    setPendingPlanDeletion({ kind: 'milestone', id: milestoneId, name: milestone.name, taskCount })
+  }
+
+  function deleteMilestoneFromPlan(milestoneId: string) {
+    setDraft((current) => {
+      if (!current) return current
+      const nextProject = {
+        ...current,
+        milestones: (current.milestones ?? []).filter((candidate) => candidate.id !== milestoneId),
+        tasks: (current.tasks ?? []).filter((task) => task.milestoneId !== milestoneId),
+      }
+      return {
+        ...nextProject,
+        milestones: (nextProject.milestones ?? []).map((candidate) => ({
+          ...candidate,
+          status: projectMilestoneStatus(nextProject, candidate.id),
+        })),
+      }
+    })
+    if (selectedMilestoneId === milestoneId) {
+      setSelectedMilestoneId(null)
+    }
+    setSaveMessages(['Milestone deleted. Click Save or Apply Changes to persist.'])
+  }
+
   function addTaskToMilestone(milestoneId: string) {
     const existingTasks = (projectDraft.tasks ?? []).filter((task) => task.milestoneId === milestoneId)
     const order = existingTasks.reduce((maxOrder, task) => Math.max(maxOrder, task.order), 0) + 1
     const task = createMilestoneTask(milestoneId, { name: '', department: '', resource: '', status: 'OPEN', deadline: null, comment: '' }, order)
     setDraft((current) => (current ? { ...current, tasks: [...(current.tasks ?? []), task] } : current))
     setSaveMessages([])
+  }
+
+  function requestDeleteTask(taskId: string) {
+    if (isViewMode) return
+    const task = projectDraft.tasks?.find((candidate) => candidate.id === taskId)
+    if (!task) return
+    setPendingPlanDeletion({ kind: 'task', id: taskId, name: task.name })
   }
 
   function deleteTaskFromMilestone(taskId: string) {
@@ -1019,7 +1060,17 @@ export function ProjectFormPage() {
         })),
       }
     })
-    setSaveMessages([])
+    setSaveMessages(['Task deleted. Click Save or Apply Changes to persist.'])
+  }
+
+  function confirmPlanDeletion() {
+    if (!pendingPlanDeletion) return
+    if (pendingPlanDeletion.kind === 'milestone') {
+      deleteMilestoneFromPlan(pendingPlanDeletion.id)
+    } else {
+      deleteTaskFromMilestone(pendingPlanDeletion.id)
+    }
+    setPendingPlanDeletion(null)
   }
 
   function renderTaskStatusSelect(task: NonNullable<Project['tasks']>[number]) {
@@ -1139,7 +1190,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Move', 'Order', 'Milestone', 'Deadline', 'DL Alert', 'Status', 'Progress', 'Tasks', 'Comment'].map((label) => (
+                  {['Move', 'Order', 'Milestone', 'Deadline', 'DL Alert', 'Status', 'Progress', 'Tasks', 'Comment', 'Actions'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1207,6 +1258,14 @@ export function ProjectFormPage() {
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-center text-sf-text">{taskCount}</td>
                       <td className="max-w-72 whitespace-normal border border-sf-border px-1.5 py-1 text-sf-text"><RichTextContent value={milestone.comment ?? ''} /></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                        {!isViewMode ? (
+                          <EditableChildObjectActionButton variant="danger" onClick={() => requestDeleteMilestone(milestone.id)}>
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Delete
+                          </EditableChildObjectActionButton>
+                        ) : null}
+                      </td>
                     </tr>
                   )
                 })}
@@ -1250,7 +1309,7 @@ export function ProjectFormPage() {
             <table className="table-auto border-collapse text-sm leading-tight">
               <thead className="bg-sf-surface-alt text-left">
                 <tr>
-                  {['Done', 'Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Status', 'Comment', 'Deadline', 'DL Alert'].map((label) => (
+                  {['Done', 'Move', 'Milestone', 'Order', 'Task', 'Department', 'Resource', 'Status', 'Comment', 'Deadline', 'DL Alert', 'Actions'].map((label) => (
                     <th key={label} className="whitespace-nowrap border border-sf-border px-1 py-1 text-sm font-semibold text-sf-text">
                       {label}
                     </th>
@@ -1272,7 +1331,7 @@ export function ProjectFormPage() {
                     <Fragment key={task.id}>
                       {startsMilestoneGroup ? (
                         <tr className="border-t-2 border-sf-border bg-sf-surface-alt/70">
-                          <td colSpan={11} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
+                          <td colSpan={12} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sf-text-muted">
                             <label className="inline-flex items-center gap-2">
                               <input
                                 type="checkbox"
@@ -1354,6 +1413,14 @@ export function ProjectFormPage() {
                           />
                         </td>
                         <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(task.deadline, task.status)}</td>
+                        <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
+                          {!isViewMode ? (
+                            <EditableChildObjectActionButton variant="danger" onClick={() => requestDeleteTask(task.id)}>
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Delete
+                            </EditableChildObjectActionButton>
+                          ) : null}
+                        </td>
                       </tr>
                     </Fragment>
                   )
@@ -1751,6 +1818,41 @@ export function ProjectFormPage() {
     )
   }
 
+  function renderPlanDeleteDialog() {
+    if (!pendingPlanDeletion) return null
+    const isMilestone = pendingPlanDeletion.kind === 'milestone'
+    const title = isMilestone ? `Delete milestone ${pendingPlanDeletion.name}` : `Delete task ${pendingPlanDeletion.name}`
+    const taskSummary = isMilestone && pendingPlanDeletion.taskCount > 0
+      ? `This will also remove ${pendingPlanDeletion.taskCount} task${pendingPlanDeletion.taskCount === 1 ? '' : 's'} assigned to this milestone.`
+      : null
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="plan-delete-title">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="plan-delete-title" className="text-lg font-semibold">{title}</h2>
+              <p className="text-sm text-sf-text-muted">This deletion remains in the Project draft until you click Save or Apply Changes.</p>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close delete dialog" onClick={() => setPendingPlanDeletion(null)}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          {taskSummary ? <p className="mb-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">{taskSummary}</p> : null}
+          <p>Delete this {pendingPlanDeletion.kind}?</p>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setPendingPlanDeletion(null)}>
+              Cancel
+            </button>
+            <button type="button" className="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800" onClick={confirmPlanDeletion}>
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderTemplateNameDialog() {
     if (!templateDialogMode) return null
     return (
@@ -1878,6 +1980,7 @@ export function ProjectFormPage() {
         />
       ) : null}
       {renderDeleteDialog()}
+      {renderPlanDeleteDialog()}
       {renderTemplateNameDialog()}
       <PageHeader
         title={
