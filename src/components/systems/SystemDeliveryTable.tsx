@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import type { Project, System, Tenant } from '@/data/seed.types'
+import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { APPLICATION_CONFIGURATION_SUMMARY_FIELDS } from '@/config/application-configuration-fields'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
-import { projectReference, systemReference } from '@/domain/business-reference'
+import { projectReference, systemBusinessId, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
 import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+
+type SystemDeliveryTableRecord = System | ProductionSystemInventoryItem | ReusedInternalSystem
 
 const PLATFORM_DETAIL_GROUPS: Array<{ title: string; fields: Array<{ key: string; label: string }> }> = [
   {
@@ -44,7 +46,7 @@ function formatReadOnlyValue(value: unknown): string {
   return String(value)
 }
 
-function renderSystemDetails(system: System) {
+function renderSystemDetails(system: SystemDeliveryTableRecord) {
   return (
     <div className="space-y-4 p-3">
       {PLATFORM_DETAIL_GROUPS.map((group) => (
@@ -64,8 +66,30 @@ function renderSystemDetails(system: System) {
   )
 }
 
+function systemRecordProjectIds(system: SystemDeliveryTableRecord, fallbackProjectId?: string): string[] {
+  if ('linkedProjectIds' in system && system.linkedProjectIds?.length) return system.linkedProjectIds
+  if ('linkedProjects' in system && system.linkedProjects?.length) return system.linkedProjects
+  if ('currentProjectIds' in system && system.currentProjectIds?.length) return system.currentProjectIds
+  return fallbackProjectId ? [fallbackProjectId] : []
+}
+
+function systemRecordOperationalStatus(system: SystemDeliveryTableRecord): string {
+  if ('operationalStatus' in system) return system.operationalStatus
+  return String((system as unknown as Record<string, unknown>).status ?? '')
+}
+
+function systemRecordPurpose(system: SystemDeliveryTableRecord): string {
+  return 'purpose' in system ? system.purpose : ''
+}
+
+function systemRecordRegion(system: SystemDeliveryTableRecord): string {
+  if ('region' in system) return system.region ?? system.timeGroup
+  if ('usedInRegion' in system) return system.usedInRegion ?? system.timeGroup
+  return system.timeGroup
+}
+
 interface SystemDeliveryTableProps {
-  systems: System[]
+  systems: SystemDeliveryTableRecord[]
   tenants: Tenant[]
   projects: Project[]
   fallbackProjectId?: string
@@ -125,15 +149,15 @@ export function SystemDeliveryTable({
           {systems.map((system) => {
             const isExpanded = expandedSystemIds.includes(system.id)
             const mismatchPresentation = productMismatchPresentation()
-            const projectIds = system.linkedProjectIds?.length ? system.linkedProjectIds : fallbackProjectId ? [fallbackProjectId] : []
+            const projectIds = systemRecordProjectIds(system, fallbackProjectId)
             const projectLabels = projectIds
               .map((projectId) => projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)?.pid)
               .filter((pid): pid is string => Boolean(pid))
-            const applicationConfigurationSummary = systemApplicationConfigurationSummary(system, tenants) as unknown as Record<string, unknown>
+            const applicationConfigurationSummary = systemApplicationConfigurationSummary(system as System, tenants) as unknown as Record<string, unknown>
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {actions?.(system)}
+                  {actions?.(system as System)}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {onToggleDetails ? (
@@ -151,13 +175,13 @@ export function SystemDeliveryTable({
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-2">
                     <BusinessObjectLink reference={systemReference(system)}>
-                      {system.sid ?? system.machineId ?? system.id}
+                      {systemBusinessId(system)}
                     </BusinessObjectLink>
                     <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
                   </span>
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
+                  {'machineId' in system && system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text" title={projectLabels.join('; ')}>
                   <span>
@@ -172,11 +196,11 @@ export function SystemDeliveryTable({
                   </span>
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.region ?? system.timeGroup}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(system.operationalStatus)}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.purpose}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemRecordRegion(system)}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(systemRecordOperationalStatus(system))}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemRecordPurpose(system)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {productMismatch?.(system) ? (
+                  {productMismatch?.(system as System) ? (
                     <span className="group relative inline-flex" title={mismatchPresentation.tooltip}>
                       <AlertStatusIcon variant="warning" label={mismatchPresentation.label} />
                       <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-700 shadow group-hover:block">

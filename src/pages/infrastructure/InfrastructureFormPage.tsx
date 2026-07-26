@@ -4,8 +4,8 @@ import { ActivityTimeline } from '@/components/activity'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { PageHeader } from '@/components/record'
+import { SystemDeliveryTable } from '@/components/systems'
 import {
-  BusinessObjectLink,
   FormField,
   OperationalStatusIcon,
   PlaceholderCard,
@@ -39,7 +39,7 @@ import {
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
-import { infrastructureItemReference, systemBusinessId, systemReference } from '@/domain/business-reference'
+import { infrastructureItemReference } from '@/domain/business-reference'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
@@ -48,6 +48,9 @@ import { isRouteViewMode } from '@/utils/route-mode'
 import { useAppStore } from '@/store/useAppStore'
 
 type InfrastructureTab = 'linkedSystems' | 'documents' | 'activity'
+const STANDARD_FIELD_WIDTH = 'w-56'
+const WIDE_FIELD_WIDTH = 'w-72'
+const ADDRESS_FIELD_WIDTH = 'w-[48rem] max-w-full'
 
 const TABS: Array<{ id: InfrastructureTab; label: string }> = [
   { id: 'linkedSystems', label: 'Linked Systems' },
@@ -87,6 +90,7 @@ export function InfrastructureFormPage() {
   const systems = useAppStore((state) => state.systems)
   const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
+  const projects = useAppStore((state) => state.projects)
   const tenants = useAppStore((state) => state.tenants)
   const activityEvents = useAppStore((state) => state.activityEvents)
   const createReferenceDataRecord = useAppStore((state) => state.createReferenceDataRecord)
@@ -108,6 +112,7 @@ export function InfrastructureFormPage() {
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<InfrastructureTab>('linkedSystems')
+  const [expandedSystemIds, setExpandedSystemIds] = useState<string[]>([])
 
   const allSystems = useMemo(() => allSystemRecords(systems, productionSystemInventory, reusedInternalSystems), [productionSystemInventory, reusedInternalSystems, systems])
   const categoryOptions = infrastructureCategories(referenceData)
@@ -203,7 +208,7 @@ export function InfrastructureFormPage() {
 
   function renderTextInput(label: string, key: keyof InfrastructureItem, required = false) {
     return (
-      <FormField label={label} required={required}>
+      <FormField label={label} required={required} controlWidthClassName={STANDARD_FIELD_WIDTH}>
         <input
           className={`h-9 w-full rounded border px-2 py-1 text-sm ${fieldClass(String(key))}`}
           value={text(draft[key])}
@@ -214,12 +219,16 @@ export function InfrastructureFormPage() {
     )
   }
 
+  function toggleLinkedSystemDetails(systemId: string) {
+    setExpandedSystemIds((current) => (current.includes(systemId) ? current.filter((id) => id !== systemId) : [...current, systemId]))
+  }
+
   function renderReferenceSelect(label: string, key: keyof InfrastructureItem, options: Array<{ id: string; label: string }>, referenceType: ReferenceDataType, required = false, parentId?: string, disabled = false) {
     return (
-      <FormField label={label} required={required}>
+      <FormField label={label} required={required} controlWidthClassName={WIDE_FIELD_WIDTH}>
         <div className="flex gap-2">
           <select
-            className={`h-9 min-w-0 flex-1 rounded border px-2 py-1 text-sm ${fieldClass(String(key))}`}
+            className={`h-9 min-w-0 flex-1 rounded border px-2 py-1 pr-8 text-sm ${fieldClass(String(key))}`}
             value={text(draft[key])}
             disabled={isViewMode || disabled}
             onChange={(event) => updateDraft({ [key]: event.target.value } as Partial<InfrastructureItem>)}
@@ -239,10 +248,10 @@ export function InfrastructureFormPage() {
 
   function renderOwnerSelect() {
     return (
-      <FormField label="Item Owner" required>
+      <FormField label="Item Owner" required controlWidthClassName={WIDE_FIELD_WIDTH}>
         <div className="flex gap-2">
           <select
-            className={`h-9 min-w-0 flex-1 rounded border px-2 py-1 text-sm ${fieldClass('owner')}`}
+            className={`h-9 min-w-0 flex-1 rounded border px-2 py-1 pr-8 text-sm ${fieldClass('owner')}`}
             value={draft.ownerRefId ?? ''}
             disabled={isViewMode}
             onChange={(event) => {
@@ -261,37 +270,20 @@ export function InfrastructureFormPage() {
 
   function renderLinkedSystemsTab() {
     return (
-      <div className="sf-scroll-x rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-sm leading-tight">
-          <thead className="bg-sf-surface-alt text-left">
-            <tr>
-              {['SID', 'MID', 'Product', 'Purpose', 'Operational Status', 'URL', 'Time Group', 'Used In Region', 'Tenants'].map((label) => (
-                <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 font-semibold text-sf-text">{label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {linkedSystems.map((system) => (
-              <tr key={system.id} className="hover:bg-sf-surface-alt">
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
-                  <BusinessObjectLink reference={systemReference(system)}>{systemBusinessId(system)}</BusinessObjectLink>
-                </td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{'machineId' in system && system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{system.productType || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{'purpose' in system ? system.purpose : '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{text((system as unknown as Record<string, unknown>).operationalStatus ?? (system as unknown as Record<string, unknown>).status) || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{system.url || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{system.timeGroup || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{'region' in system ? system.region ?? '-' : 'usedInRegion' in system ? system.usedInRegion ?? '-' : '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">{tenants.filter((tenant) => tenant.systemId === system.id || tenant.hostedSystemId === system.id).length}</td>
-              </tr>
-            ))}
-            {linkedSystems.length === 0 ? (
-              <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={9}>No Systems are linked to this Infrastructure Item.</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <SystemDeliveryTable
+        systems={linkedSystems}
+        tenants={tenants}
+        projects={projects}
+        emptyText="No Systems are linked to this Infrastructure Item."
+        expandedSystemIds={expandedSystemIds}
+        onToggleDetails={toggleLinkedSystemDetails}
+        renderOperationalStatus={(status) => (
+          <span className="inline-flex items-center gap-1">
+            <OperationalStatusIcon status={status} className="h-5 w-5" />
+            {status || '-'}
+          </span>
+        )}
+      />
     )
   }
 
@@ -333,28 +325,31 @@ export function InfrastructureFormPage() {
 
         <section className="sf-card space-y-3 p-3">
           <h2 className="text-lg font-semibold text-sf-text">Item Details</h2>
-          <div className="grid gap-3 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="flex flex-wrap items-start gap-3">
             {renderReferenceSelect('Category', 'categoryRefId', categoryOptions, INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE, true)}
             {renderReferenceSelect('Type', 'typeRefId', typeOptions, INFRASTRUCTURE_TYPE_REFERENCE_TYPE, true, draft.categoryRefId, !draft.categoryRefId)}
             {renderTextInput('Identifier', 'identifier', true)}
             {renderReferenceSelect('Manufacturer', 'manufacturerRefId', manufacturerOptions, INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, true, draft.typeRefId, !draft.typeRefId)}
-            {renderTextInput('Model', 'model')}
-            <FormField label="Last Updated">
-              <input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.lastUpdatedDate ?? ''} onChange={(event) => updateDraft({ lastUpdatedDate: event.target.value || null })} />
-            </FormField>
-            <FormField label="Warranty Status">
+            <FormField label="Warranty Status" controlWidthClassName={WIDE_FIELD_WIDTH}>
               <div className="flex h-9 items-center gap-2 px-2 text-sm">
                 <WarrantyStatusPresentation status={dashboardPreview?.warrantyStatus ?? infrastructureWarrantyStatus(draft)} />
                 {infrastructureWarrantyAlert(draft) ? <StatusBadge label={infrastructureWarrantyAlert(draft)} variant="warning" /> : null}
               </div>
             </FormField>
-            <FormField label="Maintenance Status">
-              <div className="flex h-9 items-center px-2 text-sm"><StatusBadge label={dashboardPreview?.maintenanceStatus ?? draft.maintenanceStatus} variant={dashboardPreview?.maintenanceStatus === 'Expired' ? 'error' : dashboardPreview?.maintenanceStatus === 'Pending' ? 'warning' : 'default'} /></div>
+            <FormField label="Operational Status" required controlWidthClassName={WIDE_FIELD_WIDTH}>
+              <div className="flex items-center gap-2">
+                <OperationalStatusIcon status={draft.operationalStatus} className="h-5 w-5 shrink-0" />
+                <select className={`h-9 min-w-0 flex-1 rounded border px-2 py-1 pr-8 text-sm ${fieldClass('operationalStatus')}`} value={draft.operationalStatus} disabled={isViewMode} onChange={(event) => updateDraft({ operationalStatus: event.target.value as InfrastructureItem['operationalStatus'] })}>
+                  {INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </div>
             </FormField>
-            <FormField label="Operational Status" required>
-              <select className={`h-9 w-full rounded border px-2 py-1 text-sm ${fieldClass('operationalStatus')}`} value={draft.operationalStatus} disabled={isViewMode} onChange={(event) => updateDraft({ operationalStatus: event.target.value as InfrastructureItem['operationalStatus'] })}>
-                {INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
+            {renderTextInput('Model', 'model')}
+            <FormField label="Last Updated" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+              <input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.lastUpdatedDate ?? ''} onChange={(event) => updateDraft({ lastUpdatedDate: event.target.value || null })} />
+            </FormField>
+            <FormField label="Maintenance Status" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+              <div className="flex h-9 items-center px-2 text-sm"><StatusBadge label={dashboardPreview?.maintenanceStatus ?? draft.maintenanceStatus} variant={dashboardPreview?.maintenanceStatus === 'Expired' ? 'error' : dashboardPreview?.maintenanceStatus === 'Pending' ? 'warning' : 'default'} /></div>
             </FormField>
             {renderOwnerSelect()}
             {renderReferenceSelect('Billing Method', 'billingMethodRefId', billingMethodOptions, INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE)}
@@ -369,19 +364,25 @@ export function InfrastructureFormPage() {
 
         <section className="sf-card space-y-3 p-3">
           <h2 className="text-lg font-semibold text-sf-text">Warranty Details</h2>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <FormField label="Initial Warranty Start Date"><input type="date" readOnly={isViewMode || Boolean(savedItem?.initialWarrantyStartDate)} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.initialWarrantyStartDate ?? ''} onChange={(event) => updateDraft({ initialWarrantyStartDate: event.target.value || null })} /></FormField>
-            <FormField label="Current Warranty Start Date"><input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.currentWarrantyStartDate ?? ''} onChange={(event) => updateDraft({ currentWarrantyStartDate: event.target.value || null, initialWarrantyStartDate: draft.initialWarrantyStartDate || event.target.value || null })} /></FormField>
-            <FormField label="Current Warranty End Date"><input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.currentWarrantyEndDate ?? ''} onChange={(event) => updateDraft({ currentWarrantyEndDate: event.target.value || null })} /></FormField>
+          <div className="flex flex-wrap items-start gap-3">
+            <FormField label="Initial Warranty Start Date" controlWidthClassName={STANDARD_FIELD_WIDTH}><input type="date" readOnly={isViewMode || Boolean(savedItem?.initialWarrantyStartDate)} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.initialWarrantyStartDate ?? ''} onChange={(event) => updateDraft({ initialWarrantyStartDate: event.target.value || null })} /></FormField>
+            <FormField label="Current Warranty Start Date" controlWidthClassName={STANDARD_FIELD_WIDTH}><input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.currentWarrantyStartDate ?? ''} onChange={(event) => updateDraft({ currentWarrantyStartDate: event.target.value || null, initialWarrantyStartDate: draft.initialWarrantyStartDate || event.target.value || null })} /></FormField>
+            <FormField label="Current Warranty End Date" controlWidthClassName={STANDARD_FIELD_WIDTH}><input type="date" readOnly={isViewMode} className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={draft.currentWarrantyEndDate ?? ''} onChange={(event) => updateDraft({ currentWarrantyEndDate: event.target.value || null })} /></FormField>
             {renderReferenceSelect('Warranty Type', 'warrantyTypeRefId', warrantyTypeOptions, INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE)}
           </div>
-          <FormField label="Location Address">
-            {isViewMode ? <RichTextContent value={draft.locationAddress} /> : <RichTextEditor value={draft.locationAddress} onChange={(value) => updateDraft({ locationAddress: value })} minHeightClassName="min-h-24" />}
+          <FormField label="Location Address" controlWidthClassName={ADDRESS_FIELD_WIDTH} renderAs="div">
+            {isViewMode ? (
+              <RichTextContent value={draft.locationAddress} />
+            ) : (
+              <div className="resize-y overflow-auto">
+                <RichTextEditor value={draft.locationAddress} onChange={(value) => updateDraft({ locationAddress: value })} minHeightClassName="min-h-32" />
+              </div>
+            )}
           </FormField>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <FormField label="Contact Person Name"><input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" readOnly={isViewMode} value={draft.warrantyContact.name} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, name: event.target.value } })} /></FormField>
-            <FormField label="Contact Person Email"><input className={`h-9 w-full rounded border px-2 py-1 text-sm ${fieldClass('warrantyContact.email')}`} readOnly={isViewMode} value={draft.warrantyContact.email} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, email: event.target.value } })} /></FormField>
-            <FormField label="Contact Person Phone"><input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" readOnly={isViewMode} value={draft.warrantyContact.phone} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, phone: event.target.value } })} /></FormField>
+          <div className="flex flex-wrap items-start gap-3">
+            <FormField label="Contact Person Name" controlWidthClassName={STANDARD_FIELD_WIDTH}><input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" readOnly={isViewMode} value={draft.warrantyContact.name} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, name: event.target.value } })} /></FormField>
+            <FormField label="Contact Person Email" controlWidthClassName={STANDARD_FIELD_WIDTH}><input className={`h-9 w-full rounded border px-2 py-1 text-sm ${fieldClass('warrantyContact.email')}`} readOnly={isViewMode} value={draft.warrantyContact.email} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, email: event.target.value } })} /></FormField>
+            <FormField label="Contact Person Phone" controlWidthClassName={STANDARD_FIELD_WIDTH}><input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" readOnly={isViewMode} value={draft.warrantyContact.phone} onChange={(event) => updateDraft({ warrantyContact: { ...draft.warrantyContact, phone: event.target.value } })} /></FormField>
           </div>
         </section>
 
