@@ -4,13 +4,27 @@ export const VERSION_NUMBER_REFERENCE_TYPE: ReferenceDataType = 'VERSION_NUMBER'
 export const BUILD_NUMBER_REFERENCE_TYPE: ReferenceDataType = 'BUILD_NUMBER'
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_CATEGORY'
 export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_TYPE'
+export const INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_MANUFACTURER'
+export const INFRASTRUCTURE_OWNER_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_OWNER'
+export const INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_BILLING_METHOD'
+export const INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_WARRANTY_TYPE'
 
 export const REFERENCE_DATA_TYPE_LABELS: Record<ReferenceDataType, string> = {
   VERSION_NUMBER: 'Version Number',
   BUILD_NUMBER: 'Build Number',
   INFRASTRUCTURE_CATEGORY: 'Infrastructure Category',
   INFRASTRUCTURE_TYPE: 'Infrastructure Type',
+  INFRASTRUCTURE_MANUFACTURER: 'Infrastructure Manufacturer',
+  INFRASTRUCTURE_OWNER: 'Infrastructure Item Owner',
+  INFRASTRUCTURE_BILLING_METHOD: 'Infrastructure Billing Method',
+  INFRASTRUCTURE_WARRANTY_TYPE: 'Infrastructure Warranty Type',
 }
+
+const PARENT_SCOPED_REFERENCE_TYPES = new Set<ReferenceDataType>([
+  BUILD_NUMBER_REFERENCE_TYPE,
+  INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
+  INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
+])
 
 export function normalizeReferenceLabel(value: string): string {
   return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
@@ -60,7 +74,7 @@ export function referenceDataDuplicate(
     record.referenceType === referenceType &&
     record.normalizedLabel === normalizedLabel &&
     (
-      (referenceType !== BUILD_NUMBER_REFERENCE_TYPE && referenceType !== INFRASTRUCTURE_TYPE_REFERENCE_TYPE) ||
+      !PARENT_SCOPED_REFERENCE_TYPES.has(referenceType) ||
       (record.versionNumberId ?? record.parentReferenceId ?? null) === versionNumberId
     ) &&
     record.id !== excludeId,
@@ -80,6 +94,7 @@ export function validateReferenceDataLabel(
   if (!nextLabel) messages.push(`${typeLabel} is required.`)
   if (referenceType === BUILD_NUMBER_REFERENCE_TYPE && !versionNumberId) messages.push('Version Number is required before adding a Build Number.')
   if (referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE && !versionNumberId) messages.push('Category is required before adding an Infrastructure Type.')
+  if (referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE && !versionNumberId) messages.push('Type is required before adding an Infrastructure Manufacturer.')
   if (nextLabel && referenceDataDuplicate(records, referenceType, nextLabel, excludeId, versionNumberId)) {
     messages.push(`${typeLabel} "${nextLabel}" already exists.`)
   }

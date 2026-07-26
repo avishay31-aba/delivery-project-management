@@ -103,7 +103,13 @@ import { requiresCloudPlatform } from '@/domain/hosting-context'
 import { changeRequestRequirementWithTenantBaseline } from '@/domain/tenant-requirement'
 import {
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
+  INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
+  INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
+  INFRASTRUCTURE_OWNER_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
+  INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE,
+  infrastructureMaintenanceStatus,
+  normalizeInfrastructureItem,
   normalizeInfrastructureIdentifier,
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
@@ -1181,6 +1187,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const parentCategory = state.referenceData.find((record) => record.id === options?.versionNumberId && record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE)
       if (!parentCategory) return { ok: false, message: 'Category is required before adding an Infrastructure Type.' }
     }
+    if (referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE) {
+      const parentType = state.referenceData.find((record) => record.id === options?.versionNumberId && record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE)
+      if (!parentType) return { ok: false, message: 'Type is required before adding an Infrastructure Manufacturer.' }
+    }
     const messages = validateReferenceDataLabel(state.referenceData, referenceType, label, undefined, options?.versionNumberId)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const now = new Date().toISOString()
@@ -1188,13 +1198,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       referenceType === 'VERSION_NUMBER' ? 'versionNumber'
         : referenceType === 'BUILD_NUMBER' ? 'buildNumber'
           : referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE ? 'infrastructureCategory'
-            : 'infrastructureType'
+            : referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE ? 'infrastructureType'
+              : referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE ? 'infrastructureManufacturer'
+                : referenceType === INFRASTRUCTURE_OWNER_REFERENCE_TYPE ? 'infrastructureOwner'
+                  : referenceType === INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE ? 'infrastructureBillingMethod'
+                    : referenceType === INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE ? 'infrastructureWarrantyType'
+                      : 'infrastructureType'
     const nextId = generateBusinessIdFromCounter(entityType, state.idCounters, state.referenceData.map((record) => record.id))
     const record: ReferenceDataRecord = {
       id: nextId.id,
       referenceType,
-      versionNumberId: referenceType === 'BUILD_NUMBER' || referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
-      parentReferenceId: referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
+      versionNumberId: referenceType === 'BUILD_NUMBER' || referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
+      parentReferenceId: referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
       label: referenceDataLabel(label),
       normalizedLabel: normalizeReferenceLabel(label),
       active: true,
@@ -1275,23 +1290,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createInfrastructureItem: (draft) => {
     const state = get()
-    const normalizedDraft: InfrastructureItem = {
+    const normalizedDraft: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       identifier: draft.identifier.trim(),
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
+      maintenanceStatus: infrastructureMaintenanceStatus(draft.lastUpdatedDate),
       linkedSystemIds: Array.from(new Set((draft.linkedSystemIds ?? []).filter(Boolean))),
       initialWarrantyStartDate: draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
-    }
+    })
     const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const now = new Date().toISOString()
     const nextIdentity = generateBusinessIdFromCounter('infrastructureItem', state.idCounters, state.infrastructureItems.map((item) => item.infrastructureId))
-    const record: InfrastructureItem = {
+    const record: InfrastructureItem = normalizeInfrastructureItem({
       ...normalizedDraft,
       infrastructureId: nextIdentity.id,
       createdAt: now,
       updatedAt: now,
-    }
+    })
     set((current) => ({
       idCounters: nextIdentity.counters,
       infrastructureItems: [...current.infrastructureItems, record],
@@ -1316,17 +1332,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const existing = state.infrastructureItems.find((item) => item.id === id)
     if (!existing) return { ok: false, message: 'Infrastructure Item not found.' }
-    const record: InfrastructureItem = {
+    const record: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       id: existing.id,
       infrastructureId: existing.infrastructureId,
       identifier: draft.identifier.trim(),
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
+      maintenanceStatus: infrastructureMaintenanceStatus(draft.lastUpdatedDate),
       linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
       initialWarrantyStartDate: existing.initialWarrantyStartDate || draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
-    }
+    })
     const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const now = record.updatedAt

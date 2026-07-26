@@ -1359,7 +1359,7 @@ export function InventoryForm<T extends InventoryRecord>({
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
                   <tr>
-                    {['Item ID', 'Identifier', 'Category', 'Type', 'Owner', 'Operational Status', 'Maintenance Status', 'Products', 'Linked Systems', 'Initial Warranty Start', 'Current Warranty Start', 'Current Warranty End', 'Days Before Expiration', 'Warranty Status', 'Warranty Contact', 'Physical Address', 'Actions'].map((label) => (
+                    {['Item ID', 'Identifier', 'Category', 'Type', 'Manufacturer', 'Owner', 'Operational Status', 'Maintenance Status', 'Products', 'Linked Systems', 'Initial Warranty Start', 'Current Warranty Start', 'Current Warranty End', 'Item Warranty Days Left', 'Warranty Status', 'Warranty Type', 'Contact Person', 'Address', 'Actions'].map((label) => (
                       <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                     ))}
                   </tr>
@@ -1373,7 +1373,8 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.identifier}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.categoryLabel}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.typeLabel}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.owner}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.manufacturerLabel}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.ownerLabel}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.operationalStatus}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.maintenanceStatus}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.productsDisplay || '-'}</td>
@@ -1383,10 +1384,11 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.initialWarrantyStartDate} semanticType="date" /></td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyStartDate} semanticType="date" /></td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyEndDate} semanticType="date" /></td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.daysBeforeExpiration ?? '-'}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.itemWarrantyDaysLeft ?? '-'}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyStatus}{infrastructureWarrantyAlert(row) ? ` - ${infrastructureWarrantyAlert(row)}` : ''}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyTypeLabel}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyContactDisplay}</td>
-                      <td className="max-w-80 whitespace-pre-wrap border border-sf-border px-1.5 py-1 text-sf-text">{row.physicalAddress}</td>
+                      <td className="max-w-80 whitespace-pre-wrap border border-sf-border px-1.5 py-1 text-sf-text">{row.locationAddress}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
                         <div className="flex flex-wrap gap-1">
                           <button type="button" className="font-semibold text-sf-brand hover:underline" onClick={() => navigate(`/infrastructure/${row.infrastructureId}`, { state: { mode: 'view', returnTo: `${location.pathname}${location.search}` } })}>Open</button>
@@ -1397,7 +1399,7 @@ export function InventoryForm<T extends InventoryRecord>({
                   ))}
                   {infrastructureRows.length === 0 ? (
                     <tr>
-                      <td colSpan={17} className="border border-sf-border px-3 py-4 text-sf-text-muted">No Infrastructure Items are linked to this System.</td>
+                      <td colSpan={19} className="border border-sf-border px-3 py-4 text-sf-text-muted">No Infrastructure Items are linked to this System.</td>
                     </tr>
                   ) : null}
                 </tbody>

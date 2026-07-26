@@ -17,6 +17,10 @@ export type BusinessEntityType =
   | 'infrastructureItem'
   | 'infrastructureCategory'
   | 'infrastructureType'
+  | 'infrastructureManufacturer'
+  | 'infrastructureOwner'
+  | 'infrastructureBillingMethod'
+  | 'infrastructureWarrantyType'
 
 export interface BusinessIdentityPolicy {
   entityType: BusinessEntityType

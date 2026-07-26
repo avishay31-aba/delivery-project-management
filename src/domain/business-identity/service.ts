@@ -20,6 +20,10 @@ export const BUSINESS_IDENTITY_POLICIES: Record<BusinessEntityType, BusinessIden
   infrastructureItem: { entityType: 'infrastructureItem', prefix: 'I', minimumCounter: 1000 },
   infrastructureCategory: { entityType: 'infrastructureCategory', prefix: 'IC', minimumCounter: 0, minDigits: 6 },
   infrastructureType: { entityType: 'infrastructureType', prefix: 'ITY', minimumCounter: 0, minDigits: 6 },
+  infrastructureManufacturer: { entityType: 'infrastructureManufacturer', prefix: 'IM', minimumCounter: 0, minDigits: 6 },
+  infrastructureOwner: { entityType: 'infrastructureOwner', prefix: 'IO', minimumCounter: 0, minDigits: 6 },
+  infrastructureBillingMethod: { entityType: 'infrastructureBillingMethod', prefix: 'IBM', minimumCounter: 0, minDigits: 6 },
+  infrastructureWarrantyType: { entityType: 'infrastructureWarrantyType', prefix: 'IWT', minimumCounter: 0, minDigits: 6 },
 }
 
 const BUSINESS_ID_RESERVATIONS_STORAGE_KEY = 'delivery-erp.business-id-reservations.v1'

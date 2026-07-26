@@ -53,6 +53,10 @@ export type IdCounterKey =
   | 'infrastructureItem'
   | 'infrastructureCategory'
   | 'infrastructureType'
+  | 'infrastructureManufacturer'
+  | 'infrastructureOwner'
+  | 'infrastructureBillingMethod'
+  | 'infrastructureWarrantyType'
   | 'pid'
   | 'sid'
   | 'tid'
@@ -81,6 +85,10 @@ export interface IdCounters {
   infrastructureItem: number
   infrastructureCategory: number
   infrastructureType: number
+  infrastructureManufacturer: number
+  infrastructureOwner: number
+  infrastructureBillingMethod: number
+  infrastructureWarrantyType: number
   pid: number
   sid: number
   tid: number
@@ -551,7 +559,15 @@ export interface DocumentRecord {
 
 export type TenantDocument = DocumentRecord
 
-export type ReferenceDataType = 'VERSION_NUMBER' | 'BUILD_NUMBER' | 'INFRASTRUCTURE_CATEGORY' | 'INFRASTRUCTURE_TYPE'
+export type ReferenceDataType =
+  | 'VERSION_NUMBER'
+  | 'BUILD_NUMBER'
+  | 'INFRASTRUCTURE_CATEGORY'
+  | 'INFRASTRUCTURE_TYPE'
+  | 'INFRASTRUCTURE_MANUFACTURER'
+  | 'INFRASTRUCTURE_OWNER'
+  | 'INFRASTRUCTURE_BILLING_METHOD'
+  | 'INFRASTRUCTURE_WARRANTY_TYPE'
 
 export interface ReferenceDataRecord {
   id: string
@@ -571,7 +587,7 @@ export type InfrastructureOwner = 'Penlink' | 'Agent' | 'Customer'
 export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew'
 export type InfrastructureMaintenanceStatus = 'Not Set Yet' | 'Planned' | 'Current' | 'Pending' | 'Expired' | 'No Warranty' | 'Obsolete'
 export type InfrastructureManualWarrantyStatus = 'NO_WARRANTY' | 'OBSOLETE'
-export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'EXPIRED' | InfrastructureManualWarrantyStatus
+export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'PENDING' | 'EXPIRED' | InfrastructureManualWarrantyStatus
 
 export interface InfrastructureWarrantyContact {
   name: string
@@ -587,16 +603,22 @@ export interface InfrastructureItem {
   normalizedIdentifier: string
   categoryRefId: string
   typeRefId: string
+  manufacturerRefId: string
+  model: string
+  lastUpdatedDate: string | null
   owner: InfrastructureOwner | ''
+  ownerRefId?: string
+  billingMethodRefId: string
   operationalStatus: InfrastructureOperationalStatus
   maintenanceStatus: InfrastructureMaintenanceStatus
   linkedSystemIds: string[]
   initialWarrantyStartDate: string | null
   currentWarrantyStartDate: string | null
   currentWarrantyEndDate: string | null
+  warrantyTypeRefId: string
   manualWarrantyStatus: InfrastructureManualWarrantyStatus | ''
   warrantyContact: InfrastructureWarrantyContact
-  physicalAddress: string
+  locationAddress: string
   remarks: RemarkRecord[]
   documents: DocumentRecord[]
   createdAt: string
