@@ -50,6 +50,9 @@ export type IdCounterKey =
   | 'buildNumber'
   | 'versionUpdate'
   | 'versionUpdateAttachment'
+  | 'infrastructureItem'
+  | 'infrastructureCategory'
+  | 'infrastructureType'
   | 'pid'
   | 'sid'
   | 'tid'
@@ -75,6 +78,9 @@ export interface IdCounters {
   buildNumber: number
   versionUpdate: number
   versionUpdateAttachment: number
+  infrastructureItem: number
+  infrastructureCategory: number
+  infrastructureType: number
   pid: number
   sid: number
   tid: number
@@ -545,12 +551,13 @@ export interface DocumentRecord {
 
 export type TenantDocument = DocumentRecord
 
-export type ReferenceDataType = 'VERSION_NUMBER' | 'BUILD_NUMBER'
+export type ReferenceDataType = 'VERSION_NUMBER' | 'BUILD_NUMBER' | 'INFRASTRUCTURE_CATEGORY' | 'INFRASTRUCTURE_TYPE'
 
 export interface ReferenceDataRecord {
   id: string
   referenceType: ReferenceDataType
   versionNumberId?: string | null
+  parentReferenceId?: string | null
   label: string
   normalizedLabel: string
   active: boolean
@@ -558,6 +565,42 @@ export interface ReferenceDataRecord {
   createdBy: string
   updatedAt: string
   updatedBy: string
+}
+
+export type InfrastructureOwner = 'Penlink' | 'Agent' | 'Customer'
+export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew'
+export type InfrastructureMaintenanceStatus = 'Not Set Yet' | 'Planned' | 'Current' | 'Pending' | 'Expired' | 'No Warranty' | 'Obsolete'
+export type InfrastructureManualWarrantyStatus = 'NO_WARRANTY' | 'OBSOLETE'
+export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'EXPIRED' | InfrastructureManualWarrantyStatus
+
+export interface InfrastructureWarrantyContact {
+  name: string
+  email: string
+  phone: string
+  address: string
+}
+
+export interface InfrastructureItem {
+  id: string
+  infrastructureId: string
+  identifier: string
+  normalizedIdentifier: string
+  categoryRefId: string
+  typeRefId: string
+  owner: InfrastructureOwner | ''
+  operationalStatus: InfrastructureOperationalStatus
+  maintenanceStatus: InfrastructureMaintenanceStatus
+  linkedSystemIds: string[]
+  initialWarrantyStartDate: string | null
+  currentWarrantyStartDate: string | null
+  currentWarrantyEndDate: string | null
+  manualWarrantyStatus: InfrastructureManualWarrantyStatus | ''
+  warrantyContact: InfrastructureWarrantyContact
+  physicalAddress: string
+  remarks: RemarkRecord[]
+  documents: DocumentRecord[]
+  createdAt: string
+  updatedAt: string
 }
 
 export type VersionUpdateAttachmentCategory = 'CONFIG' | 'ATP' | 'CHECKLIST'
@@ -779,6 +822,7 @@ export interface AppDataState {
   warrantyRecords: WarrantyRecord[]
   referenceData: ReferenceDataRecord[]
   versionUpdates: VersionUpdateRecord[]
+  infrastructureItems: InfrastructureItem[]
   activityEvents: ActivityEvent[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]

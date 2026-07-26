@@ -148,6 +148,7 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   tenants: ['tid', 'sid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'systemVersion', 'systemUrl', 'accountId'],
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
+  infrastructure: ['infrastructureId'],
 }
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
   return classNames.filter(Boolean).join(' ')

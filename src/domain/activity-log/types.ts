@@ -17,6 +17,7 @@ export type ActivityEventCategory =
   | 'ADMINISTRATION'
   | 'DASHBOARD_VIEW'
   | 'DOCUMENT'
+  | 'INFRASTRUCTURE'
   | 'OTHER'
 
 export type ActivityEventSource = 'USER' | 'SYSTEM' | 'MIGRATION' | 'IMPORT'

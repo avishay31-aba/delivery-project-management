@@ -21,6 +21,7 @@ export const ACTIVITY_EVENT_CATEGORIES: ActivityEventCategory[] = [
   'ADMINISTRATION',
   'DASHBOARD_VIEW',
   'DOCUMENT',
+  'INFRASTRUCTURE',
   'OTHER',
 ]
 
@@ -47,6 +48,7 @@ export const ACTIVITY_EVENT_CATEGORY_LABELS: Record<ActivityEventCategory, strin
   ADMINISTRATION: 'Administration',
   DASHBOARD_VIEW: 'Dashboard View',
   DOCUMENT: 'Document',
+  INFRASTRUCTURE: 'Infrastructure',
   OTHER: 'Other',
 }
 

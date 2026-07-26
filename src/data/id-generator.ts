@@ -24,6 +24,9 @@ const MINIMUM_SEED_COUNTERS: IdCounters = {
   buildNumber: 0,
   versionUpdate: 0,
   versionUpdateAttachment: 0,
+  infrastructureItem: 1000,
+  infrastructureCategory: 0,
+  infrastructureType: 0,
   pid: 0,
   sid: 0,
   tid: 0,
@@ -101,7 +104,7 @@ function allTenantWarranties(state: Partial<AppDataState>) {
 
 export function deriveIdCountersFromRecords(
   state: Pick<AppDataState, 'projects' | 'systems' | 'tenants'> &
-    Partial<Pick<AppDataState, 'accounts' | 'opportunities' | 'productionSystemInventory' | 'reusedInternalSystems' | 'warrantyRecords' | 'activityEvents' | 'referenceData' | 'versionUpdates'>>,
+    Partial<Pick<AppDataState, 'accounts' | 'opportunities' | 'productionSystemInventory' | 'reusedInternalSystems' | 'warrantyRecords' | 'activityEvents' | 'referenceData' | 'versionUpdates' | 'infrastructureItems'>>,
 ): IdCounters {
   const productionSystemIds = [
     ...state.systems.map((system) => system.sid),
@@ -129,6 +132,9 @@ export function deriveIdCountersFromRecords(
     buildNumber: maxCounter((state.referenceData ?? []).filter((record) => record.referenceType === 'BUILD_NUMBER').map((record) => record.id), 'buildNumber'),
     versionUpdate: maxCounter((state.versionUpdates ?? []).map((record) => record.id), 'versionUpdate'),
     versionUpdateAttachment: maxCounter((state.versionUpdates ?? []).flatMap((record) => record.attachments ?? []).map((attachment) => attachment.id), 'versionUpdateAttachment'),
+    infrastructureItem: maxCounter((state.infrastructureItems ?? []).map((item) => item.infrastructureId), 'infrastructureItem', MINIMUM_SEED_COUNTERS.infrastructureItem),
+    infrastructureCategory: maxCounter((state.referenceData ?? []).filter((record) => record.referenceType === 'INFRASTRUCTURE_CATEGORY').map((record) => record.id), 'infrastructureCategory'),
+    infrastructureType: maxCounter((state.referenceData ?? []).filter((record) => record.referenceType === 'INFRASTRUCTURE_TYPE').map((record) => record.id), 'infrastructureType'),
     pid: 0,
     sid: 0,
     tid: 0,

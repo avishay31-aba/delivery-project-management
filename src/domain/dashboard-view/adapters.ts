@@ -115,6 +115,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
       customers: sanitizeDashboardScopeViews(value.dashboards.customers),
       requirementCoverage: sanitizeDashboardScopeViews(value.dashboards.requirementCoverage),
       activityLog: sanitizeDashboardScopeViews(value.dashboards.activityLog),
+      infrastructure: sanitizeDashboardScopeViews(value.dashboards.infrastructure),
     },
   }
 }

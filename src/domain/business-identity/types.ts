@@ -14,6 +14,9 @@ export type BusinessEntityType =
   | 'buildNumber'
   | 'versionUpdate'
   | 'versionUpdateAttachment'
+  | 'infrastructureItem'
+  | 'infrastructureCategory'
+  | 'infrastructureType'
 
 export interface BusinessIdentityPolicy {
   entityType: BusinessEntityType

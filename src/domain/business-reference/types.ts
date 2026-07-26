@@ -6,6 +6,7 @@ import type {
   ProductionSystemInventoryItem,
   Project,
   ReusedInternalSystem,
+  InfrastructureItem,
   System,
   Tenant,
   WarrantyRecord,
@@ -24,6 +25,7 @@ export type BusinessObjectType =
   | 'REQUIREMENT'
   | 'MILESTONE'
   | 'TASK'
+  | 'INFRASTRUCTURE_ITEM'
 
 export interface BusinessObjectReference {
   objectType: BusinessObjectType
@@ -51,6 +53,7 @@ export type BusinessReferenceContext = Pick<
   | 'systems'
   | 'tenants'
   | 'warrantyRecords'
+  | 'infrastructureItems'
 >
 
 export type BusinessReferenceRecord =
@@ -62,4 +65,5 @@ export type BusinessReferenceRecord =
   | System
   | Tenant
   | WarrantyRecord
+  | InfrastructureItem
   | DocumentRecord

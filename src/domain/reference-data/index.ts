@@ -2,10 +2,14 @@ import type { ReferenceDataRecord, ReferenceDataType } from '@/data/seed.types'
 
 export const VERSION_NUMBER_REFERENCE_TYPE: ReferenceDataType = 'VERSION_NUMBER'
 export const BUILD_NUMBER_REFERENCE_TYPE: ReferenceDataType = 'BUILD_NUMBER'
+export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_CATEGORY'
+export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE: ReferenceDataType = 'INFRASTRUCTURE_TYPE'
 
 export const REFERENCE_DATA_TYPE_LABELS: Record<ReferenceDataType, string> = {
   VERSION_NUMBER: 'Version Number',
   BUILD_NUMBER: 'Build Number',
+  INFRASTRUCTURE_CATEGORY: 'Infrastructure Category',
+  INFRASTRUCTURE_TYPE: 'Infrastructure Type',
 }
 
 export function normalizeReferenceLabel(value: string): string {
@@ -55,7 +59,10 @@ export function referenceDataDuplicate(
   return records.find((record) =>
     record.referenceType === referenceType &&
     record.normalizedLabel === normalizedLabel &&
-    (referenceType !== BUILD_NUMBER_REFERENCE_TYPE || record.versionNumberId === versionNumberId) &&
+    (
+      (referenceType !== BUILD_NUMBER_REFERENCE_TYPE && referenceType !== INFRASTRUCTURE_TYPE_REFERENCE_TYPE) ||
+      (record.versionNumberId ?? record.parentReferenceId ?? null) === versionNumberId
+    ) &&
     record.id !== excludeId,
   )
 }
@@ -72,6 +79,7 @@ export function validateReferenceDataLabel(
   const typeLabel = REFERENCE_DATA_TYPE_LABELS[referenceType]
   if (!nextLabel) messages.push(`${typeLabel} is required.`)
   if (referenceType === BUILD_NUMBER_REFERENCE_TYPE && !versionNumberId) messages.push('Version Number is required before adding a Build Number.')
+  if (referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE && !versionNumberId) messages.push('Category is required before adding an Infrastructure Type.')
   if (nextLabel && referenceDataDuplicate(records, referenceType, nextLabel, excludeId, versionNumberId)) {
     messages.push(`${typeLabel} "${nextLabel}" already exists.`)
   }

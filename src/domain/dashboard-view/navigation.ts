@@ -48,6 +48,8 @@ export function dashboardRecordRoutePath(scope: DashboardViewScope, row: unknown
       )
     case 'activityLog':
       return routeForActivityObject(record.primaryObject)
+    case 'infrastructure':
+      return routePathForBusinessReference('INFRASTRUCTURE_ITEM', text(record.infrastructureId) || text(record.id))
     default:
       return null
   }

@@ -29,7 +29,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessIdListLinks, BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -68,7 +68,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
-import { projectReference, tenantReference } from '@/domain/business-reference'
+import { infrastructureItemReference, projectReference, tenantReference } from '@/domain/business-reference'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 import {
   hostingContextPatchForFieldChange,
@@ -94,6 +94,11 @@ import {
 import { linkedProjectRowsForSystem } from '@/domain/linked-projects'
 import { systemCurrentBuildLabel, systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
+import {
+  allSystemRecords,
+  infrastructureItemsForSystem,
+  infrastructureWarrantyAlert,
+} from '@/domain/infrastructure-item'
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
 import {
@@ -383,7 +388,10 @@ export function InventoryForm<T extends InventoryRecord>({
   const activityEvents = useAppStore((state) => state.activityEvents)
   const referenceData = useAppStore((state) => state.referenceData)
   const versionUpdates = useAppStore((state) => state.versionUpdates)
+  const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const allocatedSystems = useAppStore((state) => state.systems)
+  const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
+  const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
   const createTenantFromSystemRequirement = useAppStore((state) => state.createTenantFromSystemRequirement)
@@ -392,6 +400,8 @@ export function InventoryForm<T extends InventoryRecord>({
   const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
   const cancelTenantFromSystem = useAppStore((state) => state.cancelTenantFromSystem)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
+  const linkInfrastructureItemToSystem = useAppStore((state) => state.linkInfrastructureItemToSystem)
+  const unlinkInfrastructureItemFromSystem = useAppStore((state) => state.unlinkInfrastructureItemFromSystem)
   const {
     value: draft,
     setValue: setDraft,
@@ -413,6 +423,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const [moveTenantId, setMoveTenantId] = useState('')
   const [moveMode, setMoveMode] = useState<TenantMoveMode>('DELIVERED')
   const [selectedMoveDestinationIds, setSelectedMoveDestinationIds] = useState<string[]>([])
+  const [selectedInfrastructureItemId, setSelectedInfrastructureItemId] = useState('')
   const [moveCandidateSearch, setMoveCandidateSearch] = useState('')
   const [moveCandidateFilters, setMoveCandidateFilters] = useState<SystemCandidateFilters>(EMPTY_SYSTEM_CANDIDATE_FILTERS)
   const [moveCandidateSortKey, setMoveCandidateSortKey] = useState<SystemCandidateSortKey>('id')
@@ -1265,6 +1276,22 @@ export function InventoryForm<T extends InventoryRecord>({
       { id: 'environment', label: 'Environment' },
       { id: 'infrastructure', label: 'Infrastructure' },
     ]
+    const systemRecords = allSystemRecords(allocatedSystems, productionSystemInventory, reusedInternalSystems)
+    const infrastructureRows = infrastructureItemsForSystem(infrastructureItems, activeRecord.id, referenceData, systemRecords)
+    const linkableInfrastructureItems = infrastructureItems.filter((item) => !item.linkedSystemIds.includes(activeRecord.id))
+
+    function linkExistingInfrastructureItem() {
+      if (!selectedInfrastructureItemId) return
+      const result = linkInfrastructureItemToSystem(selectedInfrastructureItemId, activeRecord.id)
+      setMessages([result.message])
+      if (result.ok) setSelectedInfrastructureItemId('')
+    }
+
+    function removeInfrastructureRelationship(itemId: string) {
+      if (!window.confirm('Remove this Infrastructure Item relationship from the current System?')) return
+      const result = unlinkInfrastructureItemFromSystem(itemId, activeRecord.id)
+      setMessages([result.message])
+    }
 
     return (
       <div className="space-y-4">
@@ -1308,8 +1335,74 @@ export function InventoryForm<T extends InventoryRecord>({
             </section>
           </div>
         ) : (
-          <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-            Infrastructure workspace is reserved for later system execution phases.
+          <div className="space-y-3">
+            {!isViewMode ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className="h-9 min-w-72 rounded border border-sf-border bg-white px-2 py-1 text-sm"
+                  value={selectedInfrastructureItemId}
+                  onChange={(event) => setSelectedInfrastructureItemId(event.target.value)}
+                >
+                  <option value="">Link Existing Infrastructure Item</option>
+                  {linkableInfrastructureItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.infrastructureId} - {item.identifier}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:opacity-50" disabled={!selectedInfrastructureItemId} onClick={linkExistingInfrastructureItem}>
+                  Link Existing
+                </button>
+              </div>
+            ) : null}
+            <div className="sf-scroll-x rounded border border-sf-border bg-white">
+              <table className="min-w-full border-collapse text-sm leading-tight">
+                <thead className="bg-sf-surface-alt text-left">
+                  <tr>
+                    {['Item ID', 'Identifier', 'Category', 'Type', 'Owner', 'Operational Status', 'Maintenance Status', 'Products', 'Linked Systems', 'Initial Warranty Start', 'Current Warranty Start', 'Current Warranty End', 'Days Before Expiration', 'Warranty Status', 'Warranty Contact', 'Physical Address', 'Actions'].map((label) => (
+                      <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {infrastructureRows.map((row) => (
+                    <tr key={row.id} className="hover:bg-sf-surface-alt">
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
+                        <BusinessObjectLink reference={infrastructureItemReference(row)}>{row.infrastructureId}</BusinessObjectLink>
+                      </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.identifier}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.categoryLabel}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.typeLabel}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.owner}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.operationalStatus}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.maintenanceStatus}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.productsDisplay || '-'}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        <BusinessIdListLinks objectType="SYSTEM" businessIds={row.linkedSystemBusinessIds} />
+                      </td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.initialWarrantyStartDate} semanticType="date" /></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyStartDate} semanticType="date" /></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyEndDate} semanticType="date" /></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.daysBeforeExpiration ?? '-'}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyStatus}{infrastructureWarrantyAlert(row) ? ` - ${infrastructureWarrantyAlert(row)}` : ''}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyContactDisplay}</td>
+                      <td className="max-w-80 whitespace-pre-wrap border border-sf-border px-1.5 py-1 text-sf-text">{row.physicalAddress}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
+                        <div className="flex flex-wrap gap-1">
+                          <button type="button" className="font-semibold text-sf-brand hover:underline" onClick={() => navigate(`/infrastructure/${row.infrastructureId}`, { state: { mode: 'view', returnTo: `${location.pathname}${location.search}` } })}>Open</button>
+                          {!isViewMode ? <button type="button" className="font-semibold text-red-700 hover:underline" onClick={() => removeInfrastructureRelationship(row.id)}>Remove SID</button> : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {infrastructureRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={17} className="border border-sf-border px-3 py-4 text-sf-text-muted">No Infrastructure Items are linked to this System.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

@@ -18,6 +18,8 @@ import { WarrantyDashboardPage } from '@/pages/warranties/WarrantyDashboardPage'
 import { RequirementCoverageDashboardPage } from '@/pages/requirement-coverage/RequirementCoverageDashboardPage'
 import { RenewalWorkQueuePage } from '@/pages/renewals/RenewalWorkQueuePage'
 import { ActivityLogDashboardPage } from '@/pages/activity-log/ActivityLogDashboardPage'
+import { InfrastructureListPage } from '@/pages/infrastructure/InfrastructureListPage'
+import { InfrastructureFormPage } from '@/pages/infrastructure/InfrastructureFormPage'
 
 export const router = createHashRouter([
   {
@@ -44,6 +46,8 @@ export const router = createHashRouter([
       { path: 'renewals', element: <RenewalWorkQueuePage /> },
       { path: 'requirement-coverage', element: <RequirementCoverageDashboardPage /> },
       { path: 'activity-log', element: <ActivityLogDashboardPage /> },
+      { path: 'infrastructure', element: <InfrastructureListPage /> },
+      { path: 'infrastructure/:infrastructureId', element: <InfrastructureFormPage /> },
     ],
   },
 ])

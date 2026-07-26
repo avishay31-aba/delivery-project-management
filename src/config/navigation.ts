@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, HardDrive, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -48,6 +48,12 @@ export const consoleNavigation: NavConsoleGroup[] = [
         path: '/systems',
         icon: Server,
         description: 'System operations and inventory',
+      },
+      {
+        label: 'Infrastructure',
+        path: '/infrastructure',
+        icon: HardDrive,
+        description: 'Global infrastructure item inventory',
       },
       {
         label: 'Tenants',

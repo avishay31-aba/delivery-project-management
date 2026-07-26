@@ -5,6 +5,7 @@ import type {
   ProductionSystemInventoryItem,
   Project,
   ReusedInternalSystem,
+  InfrastructureItem,
   System,
   Tenant,
   WarrantyRecord,
@@ -55,6 +56,7 @@ export function routePathForBusinessReference(objectType: string, businessId: st
   if (objectType === 'OPPORTUNITY') return `/opportunities/${id}`
   if (objectType === 'PROJECT') return `/projects/${id}`
   if (objectType === 'TENANT') return `/tenants/${id}`
+  if (objectType === 'INFRASTRUCTURE_ITEM') return `/infrastructure/${id}`
   if (objectType === 'PRODUCTION_SYSTEM') return `/systems/production-inventory/${id}`
   if (objectType === 'INTERNAL_REUSED_SYSTEM') return `/systems/reused-internal/${id}`
   if (objectType === 'SYSTEM') return `/systems/${id}`
@@ -150,6 +152,18 @@ export function documentReference(document: DocumentRecord, lookup: Partial<Busi
   }
 }
 
+export function infrastructureItemReference(item: InfrastructureItem, lookup: Partial<BusinessReferenceLookup> = {}): BusinessObjectReference {
+  return {
+    objectType: 'INFRASTRUCTURE_ITEM',
+    internalId: item.id,
+    businessId: item.infrastructureId,
+    displayLabel: item.identifier ? `${item.infrastructureId} - ${item.identifier}` : item.infrastructureId,
+    routePath: routePathForBusinessReference('INFRASTRUCTURE_ITEM', item.infrastructureId),
+    isMissing: false,
+    isStale: isStaleReference(item.id, item.infrastructureId, { objectType: 'INFRASTRUCTURE_ITEM', ...lookup }),
+  }
+}
+
 export function resolveBusinessReference(
   context: BusinessReferenceContext,
   lookup: BusinessReferenceLookup,
@@ -173,6 +187,9 @@ export function resolveBusinessReference(
 
   const warranty = lookup.objectType === 'WARRANTY' ? resolveWarranty(context.warrantyRecords, lookup) : null
   if (warranty) return warrantyReference(warranty, lookup)
+
+  const infrastructureItem = lookup.objectType === 'INFRASTRUCTURE_ITEM' ? resolveInfrastructureItem(context.infrastructureItems ?? [], lookup) : null
+  if (infrastructureItem) return infrastructureItemReference(infrastructureItem, lookup)
 
   return missingReference(lookup)
 }
@@ -217,6 +234,12 @@ function resolveOpportunity(opportunities: Opportunity[], lookup: BusinessRefere
   const internalId = normalized(lookup.internalId)
   const businessId = normalized(lookup.businessId)
   return opportunities.find((opportunity) => opportunity.id === internalId || opportunity.opportunityId === businessId) ?? null
+}
+
+function resolveInfrastructureItem(items: InfrastructureItem[], lookup: BusinessReferenceLookup): InfrastructureItem | null {
+  const internalId = normalized(lookup.internalId)
+  const businessId = normalized(lookup.businessId)
+  return items.find((item) => item.id === internalId || item.infrastructureId === businessId) ?? null
 }
 
 function resolveProject(projects: Project[], lookup: BusinessReferenceLookup): Project | null {

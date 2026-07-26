@@ -7,6 +7,7 @@ import type {
   OpportunityType,
   ReferenceDataRecord,
   ReferenceDataType,
+  InfrastructureItem,
   VersionUpdateAttachmentRecord,
   VersionUpdateRecord,
 } from '@/data/seed.types'
@@ -100,6 +101,12 @@ import {
 } from '@/domain/tenant-operations'
 import { requiresCloudPlatform } from '@/domain/hosting-context'
 import { changeRequestRequirementWithTenantBaseline } from '@/domain/tenant-requirement'
+import {
+  INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
+  INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
+  normalizeInfrastructureIdentifier,
+  validateInfrastructureItemDraft,
+} from '@/domain/infrastructure-item'
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'id' | 'occurredAt'>
 type SaveTimestampOptions = { preserveNewState?: boolean }
@@ -212,6 +219,16 @@ function versionUpdateRef(record: VersionUpdateRecord): ActivityObjectRefInput {
     id: record.id,
     businessId: record.id,
     displayLabel: `Version Update ${record.id}`,
+  }
+}
+
+function infrastructureRef(record: InfrastructureItem): ActivityObjectRefInput {
+  return {
+    objectType: 'INFRASTRUCTURE_ITEM',
+    id: record.id,
+    businessId: record.infrastructureId,
+    displayLabel: `Infrastructure Item ${record.infrastructureId}`,
+    routePath: `/infrastructure/${record.infrastructureId}`,
   }
 }
 
@@ -793,6 +810,10 @@ interface AppStore extends AppDataState {
   createReferenceDataRecord: (referenceType: ReferenceDataType, label: string, options?: { versionNumberId?: string | null }) => AllocationActionResult & { record?: ReferenceDataRecord }
   updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
   setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
+  createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
+  updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
+  linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
+  unlinkInfrastructureItemFromSystem: (itemId: string, systemId: string) => AllocationActionResult
   saveVersionUpdate: (
     systemCollection: 'production' | 'reused' | 'allocated',
     systemId: string,
@@ -873,6 +894,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       warrantyRecords: state.warrantyRecords,
       referenceData: state.referenceData,
       versionUpdates: state.versionUpdates,
+      infrastructureItems: state.infrastructureItems,
       activityEvents: state.activityEvents,
       projectSystems: state.projectSystems,
       projectTenants: state.projectTenants,
@@ -1155,15 +1177,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const parentVersion = state.referenceData.find((record) => record.id === options?.versionNumberId && record.referenceType === 'VERSION_NUMBER')
       if (!parentVersion) return { ok: false, message: 'Version Number is required before adding a Build Number.' }
     }
+    if (referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE) {
+      const parentCategory = state.referenceData.find((record) => record.id === options?.versionNumberId && record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE)
+      if (!parentCategory) return { ok: false, message: 'Category is required before adding an Infrastructure Type.' }
+    }
     const messages = validateReferenceDataLabel(state.referenceData, referenceType, label, undefined, options?.versionNumberId)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const now = new Date().toISOString()
-    const entityType = referenceType === 'VERSION_NUMBER' ? 'versionNumber' : 'buildNumber'
+    const entityType =
+      referenceType === 'VERSION_NUMBER' ? 'versionNumber'
+        : referenceType === 'BUILD_NUMBER' ? 'buildNumber'
+          : referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE ? 'infrastructureCategory'
+            : 'infrastructureType'
     const nextId = generateBusinessIdFromCounter(entityType, state.idCounters, state.referenceData.map((record) => record.id))
     const record: ReferenceDataRecord = {
       id: nextId.id,
       referenceType,
-      versionNumberId: referenceType === 'BUILD_NUMBER' ? options?.versionNumberId ?? null : null,
+      versionNumberId: referenceType === 'BUILD_NUMBER' || referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
+      parentReferenceId: referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
       label: referenceDataLabel(label),
       normalizedLabel: normalizeReferenceLabel(label),
       active: true,
@@ -1240,6 +1271,128 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }))
     get().saveToStorage()
     return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} ${active ? 'activated' : 'deactivated'}.` }
+  },
+
+  createInfrastructureItem: (draft) => {
+    const state = get()
+    const normalizedDraft: InfrastructureItem = {
+      ...draft,
+      identifier: draft.identifier.trim(),
+      normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
+      linkedSystemIds: Array.from(new Set((draft.linkedSystemIds ?? []).filter(Boolean))),
+      initialWarrantyStartDate: draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
+    }
+    const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const now = new Date().toISOString()
+    const nextIdentity = generateBusinessIdFromCounter('infrastructureItem', state.idCounters, state.infrastructureItems.map((item) => item.infrastructureId))
+    const record: InfrastructureItem = {
+      ...normalizedDraft,
+      infrastructureId: nextIdentity.id,
+      createdAt: now,
+      updatedAt: now,
+    }
+    set((current) => ({
+      idCounters: nextIdentity.counters,
+      infrastructureItems: [...current.infrastructureItems, record],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'INFRASTRUCTURE',
+        eventType: 'infrastructureItem.created',
+        severity: 'SUCCESS',
+        summary: `Infrastructure Item ${record.infrastructureId} created.`,
+        primaryObject: infrastructureRef(record),
+        relatedObjects: relatedRefs(...record.linkedSystemIds.map((systemId) => {
+          const system = [...current.systems, ...current.productionSystemInventory, ...current.reusedInternalSystems].find((candidate) => candidate.id === systemId)
+          return system ? systemRef(system) : null
+        })),
+        after: record as unknown as Record<string, unknown>,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} created.`, record }
+  },
+
+  updateInfrastructureItem: (id, draft) => {
+    const state = get()
+    const existing = state.infrastructureItems.find((item) => item.id === id)
+    if (!existing) return { ok: false, message: 'Infrastructure Item not found.' }
+    const record: InfrastructureItem = {
+      ...draft,
+      id: existing.id,
+      infrastructureId: existing.infrastructureId,
+      identifier: draft.identifier.trim(),
+      normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
+      linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
+      initialWarrantyStartDate: existing.initialWarrantyStartDate || draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
+    }
+    const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const now = record.updatedAt
+    set((current) => ({
+      infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
+      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
+        previous: existing as unknown as Record<string, unknown>,
+        next: record as unknown as Record<string, unknown>,
+        category: 'INFRASTRUCTURE',
+        eventTypePrefix: 'infrastructureItem',
+        objectLabel: `Infrastructure Item ${record.infrastructureId}`,
+        primaryObject: infrastructureRef(record),
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} saved.`, record }
+  },
+
+  linkInfrastructureItemToSystem: (itemId, systemId) => {
+    const state = get()
+    const item = state.infrastructureItems.find((candidate) => candidate.id === itemId)
+    const system = [...state.systems, ...state.productionSystemInventory, ...state.reusedInternalSystems].find((candidate) => candidate.id === systemId)
+    if (!item) return { ok: false, message: 'Infrastructure Item not found.' }
+    if (!system) return { ok: false, message: 'System not found.' }
+    if (item.linkedSystemIds.includes(systemId)) return { ok: false, message: 'Infrastructure Item is already linked to this SID.' }
+    const now = new Date().toISOString()
+    const record: InfrastructureItem = { ...item, linkedSystemIds: [...item.linkedSystemIds, systemId], updatedAt: now }
+    set((current) => ({
+      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === itemId ? record : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'INFRASTRUCTURE',
+        eventType: 'infrastructureItem.systemLinked',
+        severity: 'SUCCESS',
+        summary: `Infrastructure Item ${record.infrastructureId} linked to System ${systemBusinessId(system)}.`,
+        primaryObject: infrastructureRef(record),
+        relatedObjects: relatedRefs(systemRef(system)),
+        after: { linkedSystemIds: record.linkedSystemIds },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Linked Infrastructure Item ${record.infrastructureId} to ${systemBusinessId(system)}.` }
+  },
+
+  unlinkInfrastructureItemFromSystem: (itemId, systemId) => {
+    const state = get()
+    const item = state.infrastructureItems.find((candidate) => candidate.id === itemId)
+    const system = [...state.systems, ...state.productionSystemInventory, ...state.reusedInternalSystems].find((candidate) => candidate.id === systemId)
+    if (!item) return { ok: false, message: 'Infrastructure Item not found.' }
+    if (!item.linkedSystemIds.includes(systemId)) return { ok: false, message: 'Infrastructure Item is not linked to this System.' }
+    const now = new Date().toISOString()
+    const record: InfrastructureItem = { ...item, linkedSystemIds: item.linkedSystemIds.filter((id) => id !== systemId), updatedAt: now }
+    set((current) => ({
+      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === itemId ? record : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'INFRASTRUCTURE',
+        eventType: 'infrastructureItem.systemUnlinked',
+        severity: 'WARNING',
+        summary: `Infrastructure Item ${record.infrastructureId} unlinked from System ${system ? systemBusinessId(system) : systemId}.`,
+        primaryObject: infrastructureRef(record),
+        relatedObjects: relatedRefs(system ? systemRef(system) : null),
+        before: { linkedSystemIds: item.linkedSystemIds },
+        after: { linkedSystemIds: record.linkedSystemIds },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Removed System link from Infrastructure Item ${record.infrastructureId}.` }
   },
 
   saveVersionUpdate: (systemCollection, systemId, draft) => {
