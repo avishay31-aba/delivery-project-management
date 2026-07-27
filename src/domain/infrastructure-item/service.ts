@@ -1,5 +1,7 @@
 import type {
   InfrastructureItem,
+  InfrastructureMaintenanceTask,
+  InfrastructureMaintenanceTaskStatus,
   InfrastructureItemProperties,
   InfrastructureMaintenanceStatus,
   InfrastructureOperationalStatus,
@@ -28,6 +30,7 @@ export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
 export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['Not Set Yet', 'Planned', 'Current', 'Pending', 'Expired', 'No Warranty', 'Obsolete']
+export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'Done']
 
 export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContact = {
   name: '',
@@ -54,8 +57,6 @@ const INFRASTRUCTURE_WARRANTY_TYPE_DEFAULTS = ['Standard', 'Extended', 'No Warra
 
 export const INFRASTRUCTURE_PROPERTY_SCOPES = {
   serverHardwareType: 'server.hardwareType',
-  serverModel: 'server.model',
-  serverFirmwareVersion: 'server.firmwareVersion',
   serverEsxiVersion: 'server.esxiVersion',
   serverMemoryType: 'server.memoryType',
   serverMemorySize: 'server.memorySize',
@@ -71,11 +72,15 @@ export const INFRASTRUCTURE_PROPERTY_SCOPES = {
   laptopManufacturer: 'laptop.manufacturer',
 } as const
 
-export type InfrastructurePropertyScope = typeof INFRASTRUCTURE_PROPERTY_SCOPES[keyof typeof INFRASTRUCTURE_PROPERTY_SCOPES] | `firewall.model.${string}` | `laptop.${string}`
+export type InfrastructurePropertyScope =
+  | typeof INFRASTRUCTURE_PROPERTY_SCOPES[keyof typeof INFRASTRUCTURE_PROPERTY_SCOPES]
+  | `firewall.model.${string}`
+  | `laptop.${string}`
+  | `manufacturer.${string}.model`
+  | `manufacturer.${string}.firmwareVersion`
 
 const INFRASTRUCTURE_PROPERTY_DEFAULTS: Record<string, string[]> = {
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverHardwareType]: ['U1', 'U2', 'U3'],
-  [INFRASTRUCTURE_PROPERTY_SCOPES.serverModel]: ['HPE ProLiant DL360 Gen10', 'HPE ProLiant DL360 Gen12'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemoryType]: ['DDR4', 'DDR5'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemorySize]: ['32G'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType]: ['Intel(R) Xeon(R) Silver 4110 CPU @ 8 Cores 2.10GHz', 'Intel Xeon 6505P 2.2GHz 12-core 150W'],
@@ -83,6 +88,8 @@ const INFRASTRUCTURE_PROPERTY_DEFAULTS: Record<string, string[]> = {
   [INFRASTRUCTURE_PROPERTY_SCOPES.firewallModelFortiGate]: ['60E', '60F', '70E'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.domainType]: ['Product', 'Trapdoor'],
 }
+
+const HP_SERVER_MODEL_DEFAULTS = ['HPE ProLiant DL360 Gen10', 'HPE ProLiant DL360 Gen12']
 
 export interface InfrastructureDashboardRow extends InfrastructureItem {
   categoryLabel: string
@@ -132,8 +139,17 @@ function todayTimestamp(today = new Date()): number {
   return new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
 }
 
+function businessDate(today = new Date()): string {
+  return today.toISOString().slice(0, 10)
+}
+
 export function normalizeInfrastructureIdentifier(value: string): string {
   return value.trim().toLocaleLowerCase()
+}
+
+export function infrastructureManufacturerPropertyScope(referenceData: ReferenceDataRecord[], manufacturerRefId: string | null | undefined, property: 'model' | 'firmwareVersion'): InfrastructurePropertyScope {
+  const label = infrastructureReferenceDataLabel(referenceData, manufacturerRefId)
+  return `manufacturer.${normalizeReferenceLabel(label || 'unassigned')}.${property}` as InfrastructurePropertyScope
 }
 
 export function infrastructureReferenceDataParentId(record: ReferenceDataRecord): string | null {
@@ -260,7 +276,83 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
   Object.entries(INFRASTRUCTURE_PROPERTY_DEFAULTS).forEach(([scope, values]) => {
     values.forEach((value) => appendReference(INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, value, scope, 'IPV'))
   })
+  HP_SERVER_MODEL_DEFAULTS.forEach((value) => appendReference(INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, value, 'manufacturer.hp.model', 'IPV'))
   return next
+}
+
+function normalizeMaintenanceTask(record: Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index: number, now: string): InfrastructureMaintenanceTask {
+  const status = INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(record.taskStatus as InfrastructureMaintenanceTaskStatus)
+    ? record.taskStatus as InfrastructureMaintenanceTaskStatus
+    : 'Open'
+  return {
+    id: text(record.id) || `infrastructure-maintenance-${crypto.randomUUID()}`,
+    taskId: text(record.taskId) || `MT${String(index + 1).padStart(6, '0')}`,
+    task: text(record.task),
+    dueDate: text(record.dueDate) || null,
+    taskStatus: status,
+    completionDate: status === 'Done' ? text(record.completionDate) || businessDate(new Date(now)) : null,
+    createdAt: text(record.createdAt) || now,
+    createdBy: text(record.createdBy) || 'System',
+    updatedAt: text(record.updatedAt) || now,
+    updatedBy: text(record.updatedBy) || 'System',
+  }
+}
+
+export function normalizeInfrastructureMaintenanceTasks(tasks: InfrastructureMaintenanceTask[] | undefined, now = new Date().toISOString()): InfrastructureMaintenanceTask[] {
+  return (Array.isArray(tasks) ? tasks : []).map((task, index) => normalizeMaintenanceTask(task as Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index, now))
+}
+
+export function createInfrastructureMaintenanceTask(tasks: InfrastructureMaintenanceTask[], now = new Date().toISOString()): InfrastructureMaintenanceTask {
+  return normalizeMaintenanceTask({
+    id: `infrastructure-maintenance-${crypto.randomUUID()}`,
+    taskId: `MT${String(tasks.length + 1).padStart(6, '0')}`,
+    task: '',
+    dueDate: null,
+    taskStatus: 'Open',
+    completionDate: null,
+    createdAt: now,
+    createdBy: 'Demo User',
+    updatedAt: now,
+    updatedBy: 'Demo User',
+  }, tasks.length, now)
+}
+
+export function commitInfrastructureMaintenanceTask(
+  draft: InfrastructureMaintenanceTask,
+  previous: InfrastructureMaintenanceTask | undefined,
+  now = new Date().toISOString(),
+  user = 'Demo User',
+): InfrastructureMaintenanceTask {
+  const normalized = normalizeMaintenanceTask({ ...draft, updatedAt: now, updatedBy: user }, 0, now)
+  const previousStatus = previous?.taskStatus ?? 'Open'
+  if (previousStatus !== 'Done' && normalized.taskStatus === 'Done') {
+    return { ...normalized, completionDate: businessDate(new Date(now)) }
+  }
+  if (previousStatus === 'Done' && normalized.taskStatus === 'Done') {
+    return { ...normalized, completionDate: previous?.completionDate ?? normalized.completionDate }
+  }
+  if (previousStatus === 'Done' && normalized.taskStatus === 'Open') {
+    return { ...normalized, completionDate: null }
+  }
+  return { ...normalized, completionDate: null }
+}
+
+export function infrastructureMaintenanceAlert(task: Pick<InfrastructureMaintenanceTask, 'taskStatus' | 'dueDate'>, today = new Date()): '' | 'Pending' | 'Overdue' {
+  if (task.taskStatus === 'Done' || !task.dueDate) return ''
+  const due = dateTimestamp(task.dueDate)
+  if (due === null) return ''
+  const now = todayTimestamp(today)
+  if (now > due) return 'Overdue'
+  const pendingStart = due - (90 * 86_400_000)
+  return now >= pendingStart ? 'Pending' : ''
+}
+
+export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem, 'maintenanceTasks'>): string | null {
+  const completedDates = (item.maintenanceTasks ?? [])
+    .filter((task) => task.taskStatus === 'Done' && Boolean(task.completionDate))
+    .map((task) => task.completionDate as string)
+    .sort((first, second) => second.localeCompare(first))
+  return completedDates[0] ?? null
 }
 
 function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & Record<string, unknown>): InfrastructureItemProperties {
@@ -429,6 +521,7 @@ export function createInfrastructureDraft(now = new Date().toISOString()): Infra
     warrantyContact: { ...EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT },
     locationAddress: '',
     properties: { disks: [], vms: [] },
+    maintenanceTasks: [],
     warranties: [],
     remarks: [],
     documents: [],
@@ -447,6 +540,7 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
   }
   const properties = normalizeInfrastructureProperties(item)
   const warranties = normalizeInfrastructureWarranties(item)
+  const maintenanceTasks = normalizeInfrastructureMaintenanceTasks(item.maintenanceTasks, now)
   const currentWarranty = normalizeInfrastructureWarrantyCollection(warranties).find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1]
   return {
     id: text(item.id) || `infrastructure-${crypto.randomUUID()}`,
@@ -472,6 +566,7 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
     warrantyContact,
     locationAddress: text(item.locationAddress) || warrantyContact.address || legacyPhysicalAddress,
     properties,
+    maintenanceTasks,
     warranties: normalizeInfrastructureWarrantyCollection(warranties),
     remarks: Array.isArray(item.remarks) ? item.remarks : [],
     documents: Array.isArray(item.documents) ? item.documents : [],

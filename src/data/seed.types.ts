@@ -612,6 +612,21 @@ export interface InfrastructureVmProperty {
   rdmName: string
 }
 
+export type InfrastructureMaintenanceTaskStatus = 'Open' | 'Done'
+
+export interface InfrastructureMaintenanceTask {
+  id: string
+  taskId: string
+  task: string
+  dueDate: string | null
+  taskStatus: InfrastructureMaintenanceTaskStatus
+  completionDate: string | null
+  createdAt: string
+  createdBy: string
+  updatedAt: string
+  updatedBy: string
+}
+
 export interface InfrastructureItemProperties {
   manufacturerRefId?: string
   hardwareTypeRefId?: string
@@ -662,6 +677,7 @@ export interface InfrastructureItem {
   warrantyContact: InfrastructureWarrantyContact
   locationAddress: string
   properties: InfrastructureItemProperties
+  maintenanceTasks: InfrastructureMaintenanceTask[]
   warranties: TenantWarranty[]
   remarks: RemarkRecord[]
   documents: DocumentRecord[]

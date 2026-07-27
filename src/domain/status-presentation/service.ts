@@ -56,7 +56,7 @@ const OPERATIONAL_PRESENTATIONS: Record<string, StatusPresentation> = {
   on: { ...DEFAULT_PRESENTATION, key: 'on', kind: 'operational', label: 'On', icon: CircleCheck, iconClassName: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]', tooltip: 'Operational status: On' },
   active: { ...DEFAULT_PRESENTATION, key: 'active', kind: 'operational', label: 'Active', icon: CircleCheck, iconClassName: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]', tooltip: 'Operational status: Active' },
   operative: { ...DEFAULT_PRESENTATION, key: 'operative', kind: 'operational', label: 'Operative', icon: CircleCheck, iconClassName: 'text-emerald-500 drop-shadow-[0_0_4px_rgba(16,185,129,0.45)]', tooltip: 'Operational status: Operative' },
-  obsolete: { ...DEFAULT_PRESENTATION, key: 'obsolete', kind: 'operational', label: 'Obsolete', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Obsolete' },
+  obsolete: { ...DEFAULT_PRESENTATION, key: 'obsolete', kind: 'operational', label: 'Obsolete', icon: Trash2, iconClassName: 'text-red-600', tooltip: 'Operational status: Obsolete' },
   'will not renew': { ...DEFAULT_PRESENTATION, key: 'will not renew', kind: 'operational', label: 'Will Not Renew', icon: Ban, iconClassName: 'text-gray-500', tooltip: 'Operational status: Will Not Renew' },
   off: { ...DEFAULT_PRESENTATION, key: 'off', kind: 'operational', label: 'Off', icon: PowerOff, iconClassName: 'text-red-500', tooltip: 'Operational status: Off' },
   'access blocked': { ...DEFAULT_PRESENTATION, key: 'access blocked', kind: 'operational', label: 'Access Blocked', icon: LockKeyhole, iconClassName: 'text-amber-500', tooltip: 'Operational status: Access Blocked' },

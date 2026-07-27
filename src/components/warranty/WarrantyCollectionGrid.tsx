@@ -186,7 +186,7 @@ export function WarrantyCollectionGrid({
                     {isEditing ? (
                       <>
                         <select className="h-8 w-56 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.warrantyType} onChange={(event) => handleTypeChange(warranty.id, event.target.value)}>
-                          <option value="">Select Type</option>
+                          <option value=""></option>
                           {typeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                           <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
                         </select>

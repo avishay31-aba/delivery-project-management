@@ -109,6 +109,7 @@ import {
   INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE,
+  normalizeInfrastructureMaintenanceTasks,
   normalizeInfrastructureWarrantyCollection,
   normalizeInfrastructureItem,
   normalizeInfrastructureIdentifier,
@@ -286,6 +287,121 @@ function auditEventTypeForField(prefix: string, field: string): string {
   if (normalized.includes('task')) return `${prefix}.taskChanged`
   if (normalized.includes('requirement')) return `${prefix}.requirementChanged`
   return `${prefix}.fieldChanged`
+}
+
+function readableRichTextSummary(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'Maintenance Task'
+}
+
+function appendInfrastructureMaintenanceActivityEvents(
+  events: ActivityEvent[],
+  now: string,
+  previous: InfrastructureItem,
+  next: InfrastructureItem,
+): ActivityEvent[] {
+  let nextEvents = events
+  const previousById = new Map((previous.maintenanceTasks ?? []).map((task) => [task.id, task]))
+  const nextById = new Map((next.maintenanceTasks ?? []).map((task) => [task.id, task]))
+
+  nextById.forEach((task, id) => {
+    const before = previousById.get(id)
+    const taskSummary = readableRichTextSummary(task.task)
+    if (!before) {
+      nextEvents = appendActivityEvent(nextEvents, now, {
+        category: 'TASK',
+        eventType: 'infrastructureItem.maintenanceTaskCreated',
+        severity: 'SUCCESS',
+        summary: `Maintenance Task added: "${taskSummary}".`,
+        primaryObject: infrastructureRef(next),
+        after: task as unknown as Record<string, unknown>,
+      })
+      if (task.taskStatus === 'Done') {
+        nextEvents = appendActivityEvent(nextEvents, now, {
+          category: 'TASK',
+          eventType: 'infrastructureItem.maintenanceTaskCompleted',
+          severity: 'SUCCESS',
+          summary: 'Maintenance Task completed.',
+          primaryObject: infrastructureRef(next),
+          after: { taskId: task.taskId, completionDate: task.completionDate },
+        })
+      }
+      return
+    }
+
+    if (!valuesEqual(before.task, task.task) || before.dueDate !== task.dueDate) {
+      nextEvents = appendActivityEvent(nextEvents, now, {
+        category: 'TASK',
+        eventType: 'infrastructureItem.maintenanceTaskEdited',
+        severity: 'INFO',
+        summary: `Maintenance Task edited: "${taskSummary}".`,
+        primaryObject: infrastructureRef(next),
+        before: before as unknown as Record<string, unknown>,
+        after: task as unknown as Record<string, unknown>,
+      })
+    }
+    if (before.dueDate !== task.dueDate) {
+      nextEvents = appendActivityEvent(nextEvents, now, {
+        category: 'TASK',
+        eventType: 'infrastructureItem.maintenanceDueDateChanged',
+        severity: 'INFO',
+        summary: `Maintenance Task due date changed from ${auditValue(before.dueDate)} to ${auditValue(task.dueDate)}.`,
+        primaryObject: infrastructureRef(next),
+        before: { dueDate: before.dueDate },
+        after: { dueDate: task.dueDate },
+      })
+    }
+    if (before.taskStatus !== task.taskStatus) {
+      nextEvents = appendActivityEvent(nextEvents, now, {
+        category: 'TASK',
+        eventType: 'infrastructureItem.maintenanceTaskStatusChanged',
+        severity: 'INFO',
+        summary: `Maintenance Task Status changed from ${before.taskStatus} to ${task.taskStatus}.`,
+        primaryObject: infrastructureRef(next),
+        before: { taskStatus: before.taskStatus },
+        after: { taskStatus: task.taskStatus },
+      })
+      if (task.taskStatus === 'Done') {
+        nextEvents = appendActivityEvent(nextEvents, now, {
+          category: 'TASK',
+          eventType: 'infrastructureItem.maintenanceTaskCompleted',
+          severity: 'SUCCESS',
+          summary: 'Maintenance Task completed.',
+          primaryObject: infrastructureRef(next),
+          after: { taskId: task.taskId, completionDate: task.completionDate },
+        })
+      }
+      if (task.taskStatus === 'Open') {
+        nextEvents = appendActivityEvent(nextEvents, now, {
+          category: 'TASK',
+          eventType: 'infrastructureItem.maintenanceTaskReopened',
+          severity: 'WARNING',
+          summary: 'Maintenance Task reopened.',
+          primaryObject: infrastructureRef(next),
+          before: { completionDate: before.completionDate },
+          after: { completionDate: null },
+        })
+      }
+    }
+  })
+
+  previousById.forEach((task, id) => {
+    if (nextById.has(id)) return
+    nextEvents = appendActivityEvent(nextEvents, now, {
+      category: 'TASK',
+      eventType: 'infrastructureItem.maintenanceTaskDeleted',
+      severity: 'WARNING',
+      summary: `Maintenance Task deleted: "${readableRichTextSummary(task.task)}".`,
+      primaryObject: infrastructureRef(next),
+      before: task as unknown as Record<string, unknown>,
+    })
+  })
+
+  return nextEvents
 }
 
 function appendFieldChangeActivityEvents<T extends Record<string, unknown>>(
@@ -1299,6 +1415,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
       lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set((draft.linkedSystemIds ?? []).filter(Boolean))),
+      maintenanceTasks: normalizeInfrastructureMaintenanceTasks(draft.maintenanceTasks ?? [], now),
       warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
     })
     const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
@@ -1343,23 +1460,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
       lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
+      maintenanceTasks: normalizeInfrastructureMaintenanceTasks(draft.maintenanceTasks ?? [], now),
       warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
       createdAt: existing.createdAt,
       updatedAt: now,
     })
     const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
-    set((current) => ({
-      infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
-      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
+    set((current) => {
+      const fieldActivityEvents = appendFieldChangeActivityEvents(current.activityEvents, now, {
         previous: existing as unknown as Record<string, unknown>,
         next: record as unknown as Record<string, unknown>,
         category: 'INFRASTRUCTURE',
         eventTypePrefix: 'infrastructureItem',
         objectLabel: `Infrastructure Item ${record.infrastructureId}`,
         primaryObject: infrastructureRef(record),
-      }),
-    }))
+        excludeFields: ['maintenanceTasks'],
+      })
+      return {
+        infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
+        activityEvents: appendInfrastructureMaintenanceActivityEvents(fieldActivityEvents, now, existing, record),
+      }
+    })
     get().saveToStorage()
     return { ok: true, message: `Infrastructure Item ${record.infrastructureId} saved.`, record }
   },
