@@ -9,6 +9,7 @@ import { SystemDeliveryTable } from '@/components/systems'
 import { WarrantyCollectionGrid } from '@/components/warranty/WarrantyCollectionGrid'
 import {
   FormField,
+  HeaderReadonlyValue,
   OperationalStatusIcon,
   OperationalStatusSelect,
   PlaceholderCard,
@@ -450,6 +451,9 @@ export function InfrastructureFormPage() {
               onChange={(value) => updateDraft({ operationalStatus: value as InfrastructureItem['operationalStatus'] })}
             />
           </FormField>
+          <FormField label="Item ID" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+            <HeaderReadonlyValue>{draft.infrastructureId}</HeaderReadonlyValue>
+          </FormField>
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderSelect('Item Owner', draft.ownerRefId ?? '', ownerPicklistOptions, (value) => {
@@ -648,8 +652,8 @@ export function InfrastructureFormPage() {
   ) : (
     <span className="inline-flex flex-wrap items-center gap-2">
       <OperationalStatusIcon status={draft.operationalStatus} className="h-7 w-7" />
-      <span>{draft.operationalStatus}</span>
       <span>{draft.infrastructureId}</span>
+      <span>{draft.identifier}</span>
     </span>
   )
 
