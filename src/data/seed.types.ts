@@ -89,6 +89,7 @@ export interface IdCounters {
   infrastructureOwner: number
   infrastructureBillingMethod: number
   infrastructureWarrantyType: number
+  infrastructurePropertyValue: number
   pid: number
   sid: number
   tid: number
@@ -568,6 +569,7 @@ export type ReferenceDataType =
   | 'INFRASTRUCTURE_OWNER'
   | 'INFRASTRUCTURE_BILLING_METHOD'
   | 'INFRASTRUCTURE_WARRANTY_TYPE'
+  | 'INFRASTRUCTURE_PROPERTY_VALUE'
 
 export interface ReferenceDataRecord {
   id: string
@@ -596,6 +598,46 @@ export interface InfrastructureWarrantyContact {
   address: string
 }
 
+export interface InfrastructureDiskProperty {
+  id: string
+  diskTypeRefId: string
+  quantity: number | null
+}
+
+export interface InfrastructureVmProperty {
+  id: string
+  vmTypeRefId: string
+  operatingSystemRefId: string
+  quantity: number | null
+  rdmName: string
+}
+
+export interface InfrastructureItemProperties {
+  manufacturerRefId?: string
+  hardwareTypeRefId?: string
+  modelRefId?: string
+  modelText?: string
+  firmwareVersionRefId?: string
+  firmwareLastUpdatedDate?: string | null
+  esxiVersionRefId?: string
+  esxiLastUpdatedDate?: string | null
+  memoryTypeRefId?: string
+  memorySizeRefId?: string
+  memoryQuantity?: number | null
+  cpuTypeRefId?: string
+  cpuQuantity?: number | null
+  disks?: InfrastructureDiskProperty[]
+  vms?: InfrastructureVmProperty[]
+  fortiManager?: YesNo | ''
+  firewallKit?: YesNo | ''
+  fwToken?: YesNo | ''
+  fwTokenQuantity?: number | null
+  domainTypeRefId?: string
+  domainName?: string
+  expirationDate?: string | null
+  sslExpirationDate?: string | null
+}
+
 export interface InfrastructureItem {
   id: string
   infrastructureId: string
@@ -619,6 +661,8 @@ export interface InfrastructureItem {
   manualWarrantyStatus: InfrastructureManualWarrantyStatus | ''
   warrantyContact: InfrastructureWarrantyContact
   locationAddress: string
+  properties: InfrastructureItemProperties
+  warranties: TenantWarranty[]
   remarks: RemarkRecord[]
   documents: DocumentRecord[]
   createdAt: string

@@ -1,10 +1,12 @@
 import type {
   InfrastructureItem,
+  InfrastructureItemProperties,
   InfrastructureMaintenanceStatus,
   InfrastructureOperationalStatus,
   InfrastructureOwner,
   InfrastructureWarrantyContact,
   InfrastructureWarrantyStatus,
+  TenantWarranty,
   ReferenceDataRecord,
   System,
   ProductionSystemInventoryItem,
@@ -12,6 +14,7 @@ import type {
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
+import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel } from '@/domain/warranty-collection'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
 export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_TYPE'
@@ -19,6 +22,8 @@ export const INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE = 'INFRASTRUCTURE_MANUFA
 export const INFRASTRUCTURE_OWNER_REFERENCE_TYPE = 'INFRASTRUCTURE_OWNER'
 export const INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE = 'INFRASTRUCTURE_BILLING_METHOD'
 export const INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_WARRANTY_TYPE'
+export const INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE = 'INFRASTRUCTURE_PROPERTY_VALUE'
+export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
@@ -32,22 +37,52 @@ export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContac
 }
 
 export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; types: string[] }> = [
-  { category: 'Hardware', types: ['Server', 'Firewall', 'Firewall Kit', 'Laptop', 'Storage Server', 'FW Token', 'Disk'] },
-  { category: 'Software', types: ['Windows Server Standard 2019', 'Linux Ubuntu 22.04', 'VMware vSphere 7 Essentials Plus Kit', 'ESXi', 'VM', 'OpenVPN License', 'Firmware'] },
-  { category: 'Certificate', types: ['SSL'] },
-  { category: 'Domain', types: ['Product Domain', 'Trapdoor Domain'] },
+  { category: 'Hardware', types: ['Server', 'Storage Server', 'Firewall', 'Laptop'] },
+  { category: 'Domain', types: ['Domain'] },
 ]
 
 const INFRASTRUCTURE_MANUFACTURER_DEFAULTS: Record<string, string[]> = {
   Server: ['HP', 'Dell'],
   'Storage Server': ['HP', 'Dell'],
-  Firewall: ['FortiGate', 'Palo Alto'],
-  Laptop: ['Lenovo'],
+  Firewall: ['FortiGate', 'Palo Alto', 'Cisco'],
   'FW Token': ['FortiGate'],
 }
 
 const INFRASTRUCTURE_OWNER_DEFAULTS = ['Penlink', 'Agent', 'Customer']
 const INFRASTRUCTURE_BILLING_METHOD_DEFAULTS = ['One Time Payment', 'Recurring Payment']
+const INFRASTRUCTURE_WARRANTY_TYPE_DEFAULTS = ['Standard', 'Extended', 'No Warranty']
+
+export const INFRASTRUCTURE_PROPERTY_SCOPES = {
+  serverHardwareType: 'server.hardwareType',
+  serverModel: 'server.model',
+  serverFirmwareVersion: 'server.firmwareVersion',
+  serverEsxiVersion: 'server.esxiVersion',
+  serverMemoryType: 'server.memoryType',
+  serverMemorySize: 'server.memorySize',
+  serverCpuType: 'server.cpuType',
+  serverDiskType: 'server.diskType',
+  serverVmType: 'server.vmType',
+  serverOperatingSystem: 'server.operatingSystem',
+  firewallModelFortiGate: 'firewall.model.fortigate',
+  firewallModelPaloAlto: 'firewall.model.paloAlto',
+  firewallModelCisco: 'firewall.model.cisco',
+  firewallFirmwareVersion: 'firewall.firmwareVersion',
+  domainType: 'domain.domainType',
+  laptopManufacturer: 'laptop.manufacturer',
+} as const
+
+export type InfrastructurePropertyScope = typeof INFRASTRUCTURE_PROPERTY_SCOPES[keyof typeof INFRASTRUCTURE_PROPERTY_SCOPES] | `firewall.model.${string}` | `laptop.${string}`
+
+const INFRASTRUCTURE_PROPERTY_DEFAULTS: Record<string, string[]> = {
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverHardwareType]: ['U1', 'U2', 'U3'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverModel]: ['HPE ProLiant DL360 Gen10', 'HPE ProLiant DL360 Gen12'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemoryType]: ['DDR4', 'DDR5'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemorySize]: ['32G'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType]: ['Intel(R) Xeon(R) Silver 4110 CPU @ 8 Cores 2.10GHz', 'Intel Xeon 6505P 2.2GHz 12-core 150W'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverDiskType]: ['HP 2.4TB SAS', 'HPE 1.92TB SATA 6G'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.firewallModelFortiGate]: ['60E', '60F', '70E'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.domainType]: ['Product', 'Trapdoor'],
+}
 
 export interface InfrastructureDashboardRow extends InfrastructureItem {
   categoryLabel: string
@@ -66,6 +101,15 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   tidMonthsLeft: number | null
   tidDaysLeft: number | null
   warrantyContactDisplay: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function numberOrNull(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function text(value: unknown): string {
@@ -142,6 +186,16 @@ export function infrastructureWarrantyTypes(referenceData: ReferenceDataRecord[]
     .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
 }
 
+export function infrastructurePropertyValues(referenceData: ReferenceDataRecord[], scope: string): ReferenceDataRecord[] {
+  return referenceData
+    .filter((record) =>
+      record.referenceType === INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE &&
+      record.active &&
+      infrastructureReferenceDataParentId(record) === scope,
+    )
+    .sort((first, second) => first.label.localeCompare(second.label, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
 export function infrastructureReferenceDataLabel(referenceData: ReferenceDataRecord[], id: string | null | undefined): string {
   if (!id) return ''
   return referenceData.find((record) => record.id === id)?.label ?? ''
@@ -202,7 +256,152 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
   })
   INFRASTRUCTURE_OWNER_DEFAULTS.forEach((owner) => appendReference(INFRASTRUCTURE_OWNER_REFERENCE_TYPE, owner, null, 'IO'))
   INFRASTRUCTURE_BILLING_METHOD_DEFAULTS.forEach((method) => appendReference(INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE, method, null, 'IBM'))
+  INFRASTRUCTURE_WARRANTY_TYPE_DEFAULTS.forEach((type) => appendReference(INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE, type, null, 'IWT'))
+  Object.entries(INFRASTRUCTURE_PROPERTY_DEFAULTS).forEach(([scope, values]) => {
+    values.forEach((value) => appendReference(INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, value, scope, 'IPV'))
+  })
   return next
+}
+
+function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & Record<string, unknown>): InfrastructureItemProperties {
+  const raw = isRecord(item.properties) ? item.properties : {}
+  return {
+    ...raw,
+    manufacturerRefId: text(raw.manufacturerRefId) || text(item.manufacturerRefId),
+    hardwareTypeRefId: text(raw.hardwareTypeRefId),
+    modelRefId: text(raw.modelRefId),
+    modelText: text(raw.modelText) || text(item.model),
+    firmwareVersionRefId: text(raw.firmwareVersionRefId),
+    firmwareLastUpdatedDate: text(raw.firmwareLastUpdatedDate) || null,
+    esxiVersionRefId: text(raw.esxiVersionRefId),
+    esxiLastUpdatedDate: text(raw.esxiLastUpdatedDate) || null,
+    memoryTypeRefId: text(raw.memoryTypeRefId),
+    memorySizeRefId: text(raw.memorySizeRefId),
+    memoryQuantity: numberOrNull(raw.memoryQuantity),
+    cpuTypeRefId: text(raw.cpuTypeRefId),
+    cpuQuantity: numberOrNull(raw.cpuQuantity),
+    disks: Array.isArray(raw.disks)
+      ? raw.disks.map((disk) => ({
+          id: text((disk as Record<string, unknown>).id) || `disk-${crypto.randomUUID()}`,
+          diskTypeRefId: text((disk as Record<string, unknown>).diskTypeRefId),
+          quantity: numberOrNull((disk as Record<string, unknown>).quantity),
+        }))
+      : [],
+    vms: Array.isArray(raw.vms)
+      ? raw.vms.map((vm) => ({
+          id: text((vm as Record<string, unknown>).id) || `vm-${crypto.randomUUID()}`,
+          vmTypeRefId: text((vm as Record<string, unknown>).vmTypeRefId),
+          operatingSystemRefId: text((vm as Record<string, unknown>).operatingSystemRefId),
+          quantity: numberOrNull((vm as Record<string, unknown>).quantity),
+          rdmName: text((vm as Record<string, unknown>).rdmName),
+        }))
+      : [],
+    fortiManager: raw.fortiManager === 'YES' || raw.fortiManager === 'NO' ? raw.fortiManager : '',
+    firewallKit: raw.firewallKit === 'YES' || raw.firewallKit === 'NO' ? raw.firewallKit : '',
+    fwToken: raw.fwToken === 'YES' || raw.fwToken === 'NO' ? raw.fwToken : '',
+    fwTokenQuantity: numberOrNull(raw.fwTokenQuantity),
+    domainTypeRefId: text(raw.domainTypeRefId),
+    domainName: text(raw.domainName),
+    expirationDate: text(raw.expirationDate) || null,
+    sslExpirationDate: text(raw.sslExpirationDate) || null,
+  }
+}
+
+function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty[] {
+  if (Array.isArray(item.warranties)) {
+    return item.warranties.map((warranty, index) => normalizeInfrastructureWarrantyRecord(warranty as Partial<TenantWarranty>, index, item))
+  }
+
+  const hasLegacyWarranty =
+    Boolean(text(item.warrantyTypeRefId)) ||
+    Boolean(text(item.initialWarrantyStartDate)) ||
+    Boolean(text(item.currentWarrantyStartDate)) ||
+    Boolean(text(item.currentWarrantyEndDate)) ||
+    item.manualWarrantyStatus === 'NO_WARRANTY'
+
+  if (!hasLegacyWarranty) return []
+
+  return [normalizeInfrastructureWarrantyRecord({
+    id: `infrastructure-warranty-${crypto.randomUUID()}`,
+    warrantyId: '',
+    warrantyType: text(item.warrantyTypeRefId),
+    startDate: text(item.currentWarrantyStartDate) || null,
+    endDate: text(item.currentWarrantyEndDate) || null,
+    noWarranty: item.manualWarrantyStatus === 'NO_WARRANTY' ? 'YES' : 'NO',
+    remark: text((item.warrantyContact as InfrastructureWarrantyContact | undefined)?.address) || text(item.locationAddress),
+  }, 0, item)]
+}
+
+function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>, index: number, item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty {
+  const normalized: TenantWarranty = {
+    id: text(warranty.id) || `infrastructure-warranty-${crypto.randomUUID()}`,
+    warrantyId: text(warranty.warrantyId) || `W${String(index + 1).padStart(6, '0')}`,
+    firstWarranty: index === 0,
+    predecessor: '',
+    successor: '',
+    accountId: '',
+    relatedProjectId: '',
+    warrantyType: text(warranty.warrantyType) || text(item.warrantyTypeRefId),
+    warrantySubType: '',
+    opportunityId: '',
+    startDate: text(warranty.startDate) || text(item.currentWarrantyStartDate) || null,
+    endDate: text(warranty.endDate) || text(item.currentWarrantyEndDate) || null,
+    durationDays: null,
+    daysBeforeExpiration: null,
+    warrantyStatus: 'NOT_SET',
+    noWarranty: warranty.noWarranty === 'YES' ? 'YES' : 'NO',
+    outOfContract: 'NO',
+    alerts: '',
+    remark: text(warranty.remark),
+  }
+  return normalizeInfrastructureWarrantyCollection([normalized])[0]
+}
+
+export function createInfrastructureWarranty(warranties: TenantWarranty[], warrantyType = ''): TenantWarranty {
+  return {
+    id: `infrastructure-warranty-${crypto.randomUUID()}`,
+    warrantyId: nextWarrantyId(warranties),
+    firstWarranty: warranties.length === 0,
+    predecessor: '',
+    successor: '',
+    accountId: '',
+    relatedProjectId: '',
+    warrantyType,
+    warrantySubType: '',
+    opportunityId: '',
+    startDate: null,
+    endDate: null,
+    durationDays: null,
+    daysBeforeExpiration: null,
+    warrantyStatus: 'NOT_SET',
+    noWarranty: 'NO',
+    outOfContract: 'NO',
+    alerts: '',
+    remark: '',
+  }
+}
+
+export function normalizeInfrastructureWarrantyCollection(warranties: TenantWarranty[]): TenantWarranty[] {
+  const readModel = warrantyCollectionReadModel(warranties, '')
+  return readModel.map((row, index) => ({
+    ...row.warranty,
+    firstWarranty: index === 0,
+    accountId: '',
+    relatedProjectId: '',
+    warrantySubType: '',
+    opportunityId: '',
+    predecessor: '',
+    successor: '',
+    durationDays: daysBetween(row.warranty.startDate, row.warranty.endDate),
+    daysBeforeExpiration: daysBeforeExpiration(row.warranty.endDate),
+    warrantyStatus: row.generatedStatus,
+    alerts: warrantyAlertForStatus(row.generatedStatus),
+  }))
+}
+
+export function currentInfrastructureWarranty(item: InfrastructureItem): TenantWarranty | null {
+  const warranties = normalizeInfrastructureWarrantyCollection(item.warranties ?? [])
+  return warranties.find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1] ?? null
 }
 
 export function createInfrastructureDraft(now = new Date().toISOString()): InfrastructureItem {
@@ -229,6 +428,8 @@ export function createInfrastructureDraft(now = new Date().toISOString()): Infra
     manualWarrantyStatus: '',
     warrantyContact: { ...EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT },
     locationAddress: '',
+    properties: { disks: [], vms: [] },
+    warranties: [],
     remarks: [],
     documents: [],
     createdAt: now,
@@ -244,6 +445,9 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
     ...EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT,
     ...(typeof item.warrantyContact === 'object' && item.warrantyContact ? item.warrantyContact as InfrastructureWarrantyContact : {}),
   }
+  const properties = normalizeInfrastructureProperties(item)
+  const warranties = normalizeInfrastructureWarranties(item)
+  const currentWarranty = normalizeInfrastructureWarrantyCollection(warranties).find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1]
   return {
     id: text(item.id) || `infrastructure-${crypto.randomUUID()}`,
     infrastructureId: normalizeInfrastructureBusinessId(item.infrastructureId),
@@ -251,22 +455,24 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
     normalizedIdentifier: text(item.normalizedIdentifier) || normalizeInfrastructureIdentifier(identifier),
     categoryRefId: text(item.categoryRefId),
     typeRefId: text(item.typeRefId),
-    manufacturerRefId: text(item.manufacturerRefId),
-    model: text(item.model),
+    manufacturerRefId: properties.manufacturerRefId ?? '',
+    model: properties.modelText ?? '',
     lastUpdatedDate: text(item.lastUpdatedDate) || null,
     owner: (text(item.owner) as InfrastructureOwner | '') || 'Penlink',
     ownerRefId: text(item.ownerRefId),
     billingMethodRefId: text(item.billingMethodRefId),
     operationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.operationalStatus as InfrastructureOperationalStatus) ? item.operationalStatus as InfrastructureOperationalStatus : 'Active',
-    maintenanceStatus: infrastructureMaintenanceStatus(text(item.lastUpdatedDate) || null),
+    maintenanceStatus: INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS.includes(item.maintenanceStatus as InfrastructureMaintenanceStatus) ? item.maintenanceStatus as InfrastructureMaintenanceStatus : 'Not Set Yet',
     linkedSystemIds: Array.isArray(item.linkedSystemIds) ? item.linkedSystemIds.map(text).filter(Boolean) : [],
-    initialWarrantyStartDate: text(item.initialWarrantyStartDate) || null,
-    currentWarrantyStartDate: text(item.currentWarrantyStartDate) || null,
-    currentWarrantyEndDate: text(item.currentWarrantyEndDate) || null,
+    initialWarrantyStartDate: text(item.initialWarrantyStartDate) || currentWarranty?.startDate || null,
+    currentWarrantyStartDate: (currentWarranty?.startDate ?? text(item.currentWarrantyStartDate)) || null,
+    currentWarrantyEndDate: (currentWarranty?.endDate ?? text(item.currentWarrantyEndDate)) || null,
     warrantyTypeRefId: text(item.warrantyTypeRefId),
     manualWarrantyStatus: item.manualWarrantyStatus === 'NO_WARRANTY' || item.manualWarrantyStatus === 'OBSOLETE' ? item.manualWarrantyStatus : '',
     warrantyContact,
     locationAddress: text(item.locationAddress) || warrantyContact.address || legacyPhysicalAddress,
+    properties,
+    warranties: normalizeInfrastructureWarrantyCollection(warranties),
     remarks: Array.isArray(item.remarks) ? item.remarks : [],
     documents: Array.isArray(item.documents) ? item.documents : [],
     createdAt: text(item.createdAt) || now,
@@ -286,6 +492,12 @@ export function infrastructureWarrantyStatus(item: Pick<InfrastructureItem, 'man
   return 'VALID'
 }
 
+export function infrastructureWarrantyStatusFromCollection(item: InfrastructureItem, today = new Date()): InfrastructureWarrantyStatus {
+  const warranty = currentInfrastructureWarranty(item)
+  if (!warranty) return infrastructureWarrantyStatus(item, today)
+  return warranty.warrantyStatus === 'RENEWED' || warranty.warrantyStatus === 'OUT_OF_CONTRACT' ? 'NOT_SET' : warranty.warrantyStatus
+}
+
 export function infrastructureMaintenanceStatus(lastUpdatedDate: string | null | undefined, today = new Date()): InfrastructureMaintenanceStatus {
   const updated = dateTimestamp(lastUpdatedDate)
   if (updated === null) return 'Not Set Yet'
@@ -303,10 +515,17 @@ export function infrastructureDaysBeforeExpiration(item: Pick<InfrastructureItem
   return Math.ceil((end - todayTimestamp(today)) / 86_400_000)
 }
 
+export function infrastructureDaysBeforeExpirationFromCollection(item: InfrastructureItem, today = new Date()): number | null {
+  const warranty = currentInfrastructureWarranty(item)
+  if (!warranty) return infrastructureDaysBeforeExpiration(item, today)
+  if (warranty.noWarranty === 'YES') return null
+  return daysBeforeExpiration(warranty.endDate)
+}
+
 export function infrastructureWarrantyAlert(item: InfrastructureItem, today = new Date()): string {
-  const status = infrastructureWarrantyStatus(item, today)
+  const status = infrastructureWarrantyStatusFromCollection(item, today)
   if (status === 'NO_WARRANTY' || status === 'OBSOLETE' || status === 'NOT_SET' || status === 'PLANNED') return ''
-  const days = infrastructureDaysBeforeExpiration(item, today)
+  const days = infrastructureDaysBeforeExpirationFromCollection(item, today)
   if (status === 'EXPIRED' || (days !== null && days < 0)) return 'Expired'
   if (status === 'PENDING' || (days !== null && days <= 90)) return 'Pending'
   return ''
@@ -353,25 +572,30 @@ export function infrastructureDashboardRows(
   return items
     .map((item) => {
       const linkedSystemIds = linkedSystemBusinessIds(item, systems)
+      const currentWarranty = currentInfrastructureWarranty(item)
       return {
         ...item,
         categoryLabel: infrastructureReferenceDataLabel(referenceData, item.categoryRefId),
         typeLabel: infrastructureReferenceDataLabel(referenceData, item.typeRefId),
-        manufacturerLabel: infrastructureReferenceDataLabel(referenceData, item.manufacturerRefId),
+        manufacturerLabel: infrastructureReferenceDataLabel(referenceData, item.properties?.manufacturerRefId ?? item.manufacturerRefId),
         ownerLabel: infrastructureReferenceDataLabel(referenceData, item.ownerRefId) || item.owner,
         billingMethodLabel: infrastructureReferenceDataLabel(referenceData, item.billingMethodRefId),
-        warrantyTypeLabel: infrastructureReferenceDataLabel(referenceData, item.warrantyTypeRefId),
-        maintenanceStatus: infrastructureMaintenanceStatus(item.lastUpdatedDate),
+        warrantyTypeLabel: currentWarranty?.warrantyType ? infrastructureReferenceDataLabel(referenceData, currentWarranty.warrantyType) || currentWarranty.warrantyType : infrastructureReferenceDataLabel(referenceData, item.warrantyTypeRefId),
+        maintenanceStatus: item.maintenanceStatus,
         productsDisplay: linkedSystemProducts(item, systems).join('; '),
         linkedSystemBusinessIds: linkedSystemIds,
         linkedSystemsDisplay: linkedSystemIds.join('; '),
-        warrantyStatus: infrastructureWarrantyStatus(item),
-        itemWarrantyDaysLeft: infrastructureDaysBeforeExpiration(item),
+        warrantyStatus: infrastructureWarrantyStatusFromCollection(item),
+        itemWarrantyDaysLeft: infrastructureDaysBeforeExpirationFromCollection(item),
         latestWarrantyTid: '',
-        latestWarrantyEndDate: '',
+        latestWarrantyEndDate: currentWarranty?.endDate ?? '',
         tidMonthsLeft: null,
         tidDaysLeft: null,
         warrantyContactDisplay: infrastructureWarrantyContactDisplay(item.warrantyContact),
+        initialWarrantyStartDate: item.initialWarrantyStartDate ?? currentWarranty?.startDate ?? null,
+        currentWarrantyStartDate: currentWarranty?.startDate ?? item.currentWarrantyStartDate,
+        currentWarrantyEndDate: currentWarranty?.endDate ?? item.currentWarrantyEndDate,
+        model: infrastructureReferenceDataLabel(referenceData, item.properties?.modelRefId) || item.properties?.modelText || item.model,
       }
     })
     .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
@@ -401,7 +625,6 @@ export function validateInfrastructureItemDraft(
   if (!draft.categoryRefId) messages.push('Category is required.')
   if (!draft.typeRefId) messages.push('Type is required.')
   if (!identifier) messages.push('Identifier is required.')
-  if (!draft.manufacturerRefId) messages.push('Manufacturer is required.')
   if (!draft.owner && !draft.ownerRefId) messages.push('Owner is required.')
   if (draft.owner && !INFRASTRUCTURE_OWNER_OPTIONS.includes(draft.owner as InfrastructureOwner)) messages.push('Owner is invalid.')
   if (!INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(draft.operationalStatus)) messages.push('Operational Status is invalid.')
@@ -409,9 +632,19 @@ export function validateInfrastructureItemDraft(
   if (draft.typeRefId && !infrastructureTypesForCategory(referenceData, draft.categoryRefId).some((type) => type.id === draft.typeRefId)) {
     messages.push('Type must belong to the selected Category.')
   }
-  if (draft.manufacturerRefId && !infrastructureManufacturersForType(referenceData, draft.typeRefId).some((manufacturer) => manufacturer.id === draft.manufacturerRefId)) {
+  if (draft.properties?.manufacturerRefId && !infrastructureManufacturersForType(referenceData, draft.typeRefId).some((manufacturer) => manufacturer.id === draft.properties.manufacturerRefId)) {
     messages.push('Manufacturer must belong to the selected Type.')
   }
+  const typeLabel = infrastructureReferenceDataLabel(referenceData, draft.typeRefId)
+  if ((typeLabel === 'Server' || typeLabel === 'Storage Server') && (draft.properties?.memoryQuantity ?? 0) < 0) messages.push('Memory Quantity cannot be negative.')
+  if ((typeLabel === 'Server' || typeLabel === 'Storage Server') && (draft.properties?.cpuQuantity ?? 0) < 0) messages.push('CPU Quantity cannot be negative.')
+  ;(draft.properties?.disks ?? []).forEach((disk, index) => {
+    if ((disk.quantity ?? 0) <= 0) messages.push(`Disk ${index + 1} Quantity must be greater than zero.`)
+  })
+  ;(draft.properties?.vms ?? []).forEach((vm, index) => {
+    if ((vm.quantity ?? 0) <= 0) messages.push(`VM ${index + 1} Quantity must be greater than zero.`)
+  })
+  if (draft.properties?.fwToken === 'YES' && (draft.properties.fwTokenQuantity ?? 0) <= 0) messages.push('FW Token Quantity must be greater than zero.')
   if (identifier && items.some((item) => item.id !== draft.id && item.normalizedIdentifier === normalizedIdentifier)) {
     messages.push('Identifier must be unique.')
   }

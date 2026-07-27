@@ -24,6 +24,7 @@ export const BUSINESS_IDENTITY_POLICIES: Record<BusinessEntityType, BusinessIden
   infrastructureOwner: { entityType: 'infrastructureOwner', prefix: 'IO', minimumCounter: 0, minDigits: 6 },
   infrastructureBillingMethod: { entityType: 'infrastructureBillingMethod', prefix: 'IBM', minimumCounter: 0, minDigits: 6 },
   infrastructureWarrantyType: { entityType: 'infrastructureWarrantyType', prefix: 'IWT', minimumCounter: 0, minDigits: 6 },
+  infrastructurePropertyValue: { entityType: 'infrastructurePropertyValue', prefix: 'IPV', minimumCounter: 0, minDigits: 6 },
 }
 
 const BUSINESS_ID_RESERVATIONS_STORAGE_KEY = 'delivery-erp.business-id-reservations.v1'

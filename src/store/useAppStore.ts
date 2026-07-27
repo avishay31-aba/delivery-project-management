@@ -106,9 +106,10 @@ import {
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
   INFRASTRUCTURE_OWNER_REFERENCE_TYPE,
+  INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE,
-  infrastructureMaintenanceStatus,
+  normalizeInfrastructureWarrantyCollection,
   normalizeInfrastructureItem,
   normalizeInfrastructureIdentifier,
   validateInfrastructureItemDraft,
@@ -1203,13 +1204,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 : referenceType === INFRASTRUCTURE_OWNER_REFERENCE_TYPE ? 'infrastructureOwner'
                   : referenceType === INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE ? 'infrastructureBillingMethod'
                     : referenceType === INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE ? 'infrastructureWarrantyType'
-                      : 'infrastructureType'
+                      : referenceType === INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE ? 'infrastructurePropertyValue'
+                        : 'infrastructureType'
     const nextId = generateBusinessIdFromCounter(entityType, state.idCounters, state.referenceData.map((record) => record.id))
     const record: ReferenceDataRecord = {
       id: nextId.id,
       referenceType,
-      versionNumberId: referenceType === 'BUILD_NUMBER' || referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
-      parentReferenceId: referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
+      versionNumberId: referenceType === 'BUILD_NUMBER' || referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
+      parentReferenceId: referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE || referenceType === INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE ? options?.versionNumberId ?? null : null,
       label: referenceDataLabel(label),
       normalizedLabel: normalizeReferenceLabel(label),
       active: true,
@@ -1290,17 +1292,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   createInfrastructureItem: (draft) => {
     const state = get()
+    const now = new Date().toISOString()
     const normalizedDraft: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       identifier: draft.identifier.trim(),
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
-      maintenanceStatus: infrastructureMaintenanceStatus(draft.lastUpdatedDate),
+      lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set((draft.linkedSystemIds ?? []).filter(Boolean))),
-      initialWarrantyStartDate: draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
+      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
     })
     const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
-    const now = new Date().toISOString()
     const nextIdentity = generateBusinessIdFromCounter('infrastructureItem', state.idCounters, state.infrastructureItems.map((item) => item.infrastructureId))
     const record: InfrastructureItem = normalizeInfrastructureItem({
       ...normalizedDraft,
@@ -1332,21 +1334,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const existing = state.infrastructureItems.find((item) => item.id === id)
     if (!existing) return { ok: false, message: 'Infrastructure Item not found.' }
+    const now = new Date().toISOString()
     const record: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       id: existing.id,
       infrastructureId: existing.infrastructureId,
       identifier: draft.identifier.trim(),
       normalizedIdentifier: normalizeInfrastructureIdentifier(draft.identifier),
-      maintenanceStatus: infrastructureMaintenanceStatus(draft.lastUpdatedDate),
+      lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
-      initialWarrantyStartDate: existing.initialWarrantyStartDate || draft.initialWarrantyStartDate || draft.currentWarrantyStartDate || null,
+      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
       createdAt: existing.createdAt,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     })
     const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
-    const now = record.updatedAt
     set((current) => ({
       infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
       activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
