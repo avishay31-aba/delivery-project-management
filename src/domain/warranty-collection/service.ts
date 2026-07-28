@@ -79,29 +79,6 @@ export function displayWarrantyStatus(status: WarrantyStatus): string {
   return WARRANTY_STATUS_LABELS[status]
 }
 
-export function tenantWarrantyHeaderStatusDisplay(
-  warranties: TenantWarranty[],
-  fallbackStatus: WarrantyStatus | string = 'NOT_SET',
-): string {
-  const headerStatus = tenantWarrantyHeaderStatusReadModelFromRows(warranties.map((warranty) => ({
-    warranty,
-    predecessorRefs: [],
-    successorRefs: warranty.successor ? [{ warrantyId: warranty.successor, tenantId: '', recordId: undefined }] : [],
-    firstWarranty: warranty.firstWarranty,
-    generatedStatus: warranty.warrantyStatus,
-    canEditNoWarranty: !warranty.successor,
-    alert: warranty.alerts,
-  })))
-  if (headerStatus.status !== 'NOT_SET_YET' || warranties.length === 0 || warranties.every((warranty) => warranty.warrantyStatus === 'NOT_SET')) {
-    return headerStatus.label
-  }
-
-  if (fallbackStatus in WARRANTY_STATUS_LABELS) {
-    return WARRANTY_STATUS_LABELS[fallbackStatus as WarrantyStatus]
-  }
-  return String(fallbackStatus || WARRANTY_STATUS_LABELS.NOT_SET)
-}
-
 export function deriveTenantWarrantyContractStatus(statuses: WarrantyStatus[]): TenantWarrantyHeaderStatusReadModel {
   if (statuses.some((status) => UNDER_CONTRACT_ROW_STATUSES.has(status))) {
     return { status: 'UNDER_CONTRACT', label: 'Under Contract', visualStatus: 'VALID' }

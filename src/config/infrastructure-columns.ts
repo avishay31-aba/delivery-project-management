@@ -1,13 +1,8 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
+import { displayWarrantyStatus } from '@/domain/warranty-collection'
 import type { InfrastructureDashboardRow } from '@/domain/infrastructure-item'
-
-function warrantyStatusLabel(value: string): string {
-  if (value === 'NOT_SET') return 'Not Set Yet'
-  if (value === 'NO_WARRANTY') return 'No Warranty'
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
 
 export function createInfrastructureColumns(options: { includeActions?: boolean } = {}): DashboardColumn<InfrastructureDashboardRow>[] {
   const columns: DashboardColumn<InfrastructureDashboardRow>[] = [
@@ -41,7 +36,7 @@ export function createInfrastructureColumns(options: { includeActions?: boolean 
     { id: 'currentWarrantyStartDate', label: 'Current Warranty Start', getValue: (row) => row.currentWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyEndDate', label: 'Current Warranty End', getValue: (row) => row.currentWarrantyEndDate ?? '', semanticType: 'date' },
     { id: 'itemWarrantyDaysLeft', label: 'Item Warranty Days Left', getValue: (row) => row.itemWarrantyDaysLeft },
-    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => warrantyStatusLabel(row.warrantyStatus) },
+    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => displayWarrantyStatus(row.warrantyStatus) },
     { id: 'billingMethod', label: 'Billing Method', getValue: (row) => row.billingMethodLabel },
     { id: 'address', label: 'Address', getValue: (row) => row.locationAddress },
     { id: 'contactPersonName', label: 'Contact Person Name', getValue: (row) => row.warrantyContact.name },

@@ -747,18 +747,6 @@ export function normalizeInfrastructureItemsForReferenceData(
   })
 }
 
-export function infrastructureWarrantyStatus(item: Pick<InfrastructureItem, 'manualWarrantyStatus' | 'currentWarrantyStartDate' | 'currentWarrantyEndDate'>, today = new Date()): InfrastructureWarrantyStatus {
-  if (item.manualWarrantyStatus === 'NO_WARRANTY' || item.manualWarrantyStatus === 'OBSOLETE') return item.manualWarrantyStatus
-  if (!item.currentWarrantyStartDate && !item.currentWarrantyEndDate) return 'NOT_SET'
-  const start = dateTimestamp(item.currentWarrantyStartDate)
-  const end = dateTimestamp(item.currentWarrantyEndDate)
-  const todayValue = todayTimestamp(today)
-  if (start !== null && start > todayValue) return 'PLANNED'
-  if (end !== null && end < todayValue) return 'EXPIRED'
-  if (end !== null && Math.ceil((end - todayValue) / 86_400_000) <= 90) return 'PENDING'
-  return 'VALID'
-}
-
 export function infrastructureWarrantyStatusFromCollection(item: InfrastructureItem): InfrastructureWarrantyStatus {
   const warranties = normalizeInfrastructureWarrantyCollection(item.warranties ?? [])
   if (warranties.length === 0) return 'NOT_SET'
