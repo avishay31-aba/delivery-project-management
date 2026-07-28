@@ -4,7 +4,6 @@ import { EditableChildObjectActionButton, editableChildObjectPermissions, useEdi
 import { RichTextContent, RichTextEditor, TableSection, WarrantyStatusPresentation } from '@/components/ui'
 import type { TenantWarranty } from '@/data/seed.types'
 import {
-  ADD_NEW_REFERENCE_OPTION,
   createInfrastructureWarranty,
   normalizeInfrastructureWarrantyCollection,
 } from '@/domain/infrastructure-item'
@@ -14,32 +13,27 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 
 interface WarrantyCollectionGridProps {
   warranties: TenantWarranty[]
-  typeOptions: Array<{ id: string; label: string }>
-  onAddTypeOption: () => string | null
   onChange: (warranties: TenantWarranty[]) => void
   readOnly?: boolean
 }
 
 function normalizedWarranty(record: TenantWarranty) {
   return {
-    warrantyType: record.warrantyType,
     startDate: record.startDate ?? null,
     endDate: record.endDate ?? null,
+    noWarranty: record.noWarranty ?? 'NO',
     remark: record.remark,
   }
 }
 
 function validateWarranty(record: TenantWarranty): string[] {
   const messages: string[] = []
-  if (!record.warrantyType.trim()) messages.push('Type is required.')
   if (record.startDate && record.endDate && record.startDate > record.endDate) messages.push('Start Date cannot be after End Date.')
   return messages
 }
 
 export function WarrantyCollectionGrid({
   warranties,
-  typeOptions,
-  onAddTypeOption,
   onChange,
   readOnly = false,
 }: WarrantyCollectionGridProps) {
@@ -56,20 +50,11 @@ export function WarrantyCollectionGrid({
   }, [committedIds])
 
   function addWarranty() {
-    editor.beginAdd(createInfrastructureWarranty(warranties, typeOptions[0]?.id ?? ''))
+    editor.beginAdd(createInfrastructureWarranty(warranties))
   }
 
   function updateDraft(id: string, patch: Partial<TenantWarranty>) {
     editor.updateDraft(id, patch)
-  }
-
-  function handleTypeChange(id: string, value: string) {
-    if (value === ADD_NEW_REFERENCE_OPTION) {
-      const nextId = onAddTypeOption()
-      if (nextId) updateDraft(id, { warrantyType: nextId })
-      return
-    }
-    updateDraft(id, { warrantyType: value })
   }
 
   function commitWarranty(draft: TenantWarranty) {
@@ -83,7 +68,7 @@ export function WarrantyCollectionGrid({
     editor.save(id, {
       validate: validateWarranty,
       normalize: normalizedWarranty,
-      isMeaningfulNewDraft: (record) => Boolean(record.warrantyType || record.startDate || record.endDate || hasMeaningfulRichText(record.remark)),
+      isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
       commit: commitWarranty,
       successMessage: 'Warranty saved.',
     })
@@ -91,7 +76,7 @@ export function WarrantyCollectionGrid({
 
   function cancelWarranty(id: string) {
     const shouldConfirmDiscard = editor.isNew(id) && editor.hasChanges(id, {
-      isMeaningfulNewDraft: (record) => Boolean(record.warrantyType || record.startDate || record.endDate || hasMeaningfulRichText(record.remark)),
+      isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
     })
     if (shouldConfirmDiscard) {
       editor.commitDelete(id, {
@@ -135,7 +120,7 @@ export function WarrantyCollectionGrid({
         <table className="w-max min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {['Actions', 'Type', 'Initial Warranty Start Date', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks'].map((header) => (
+              {['Actions', 'Initial Warranty Start Date', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
                 <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{header}</th>
               ))}
             </tr>
@@ -145,11 +130,11 @@ export function WarrantyCollectionGrid({
               const draft = editor.draftFor(warranty.id)
               const row = draft ?? warranty
               const isEditing = permissions.canEdit && Boolean(draft)
-              const errors = editor.errorsFor(warranty.id)
+              const displayRow = isEditing ? normalizeInfrastructureWarrantyCollection([row])[0] : row
               const canSave = editor.canSave(warranty.id, {
                 validate: validateWarranty,
                 normalize: normalizedWarranty,
-                isMeaningfulNewDraft: (record) => Boolean(record.warrantyType || record.startDate || record.endDate || hasMeaningfulRichText(record.remark)),
+                isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
               })
               return (
                 <tr key={warranty.id} className="hover:bg-sf-surface-alt">
@@ -182,33 +167,33 @@ export function WarrantyCollectionGrid({
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {isEditing ? (
-                      <>
-                        <select className="h-8 w-56 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.warrantyType} onChange={(event) => handleTypeChange(warranty.id, event.target.value)}>
-                          <option value=""></option>
-                          {typeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                          <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
-                        </select>
-                        {errors.length > 0 ? <div className="mt-1 text-xs text-red-700">{errors.join(' ')}</div> : null}
-                      </>
-                    ) : (
-                      typeOptions.find((option) => option.id === row.warrantyType)?.label || row.warrantyType || '-'
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><DateTimeValue value={warranties[0]?.startDate ?? row.startDate} semanticType="date" /></td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><DateTimeValue value={warranties[0]?.startDate ?? displayRow.startDate} semanticType="date" /></td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => updateDraft(warranty.id, { startDate: value }))} onChange={(event) => updateDraft(warranty.id, { startDate: event.target.value || null })} /> : <DateTimeValue value={row.startDate} semanticType="date" />}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={row.endDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => updateDraft(warranty.id, { endDate: value }))} onChange={(event) => updateDraft(warranty.id, { endDate: event.target.value || null })} /> : <DateTimeValue value={row.endDate} semanticType="date" />}
                   </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.durationDays ?? '-'}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.daysBeforeExpiration ?? '-'}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><WarrantyStatusPresentation status={row.warrantyStatus} /></td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.alerts || '-'}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{displayRow.durationDays ?? '-'}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{displayRow.daysBeforeExpiration ?? '-'}</td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><WarrantyStatusPresentation status={displayRow.warrantyStatus} /></td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{displayRow.alerts || '-'}</td>
                   <td className="min-w-80 border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? <RichTextEditor value={row.remark} onChange={(value) => updateDraft(warranty.id, { remark: value })} minHeightClassName="min-h-16" toolbarMode="focus" /> : <RichTextContent value={row.remark} />}
+                  </td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
+                    {isEditing ? (
+                      <label className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={row.noWarranty === 'YES'}
+                          onChange={(event) => updateDraft(warranty.id, { noWarranty: event.target.checked ? 'YES' : 'NO' })}
+                        />
+                        No Warranty
+                      </label>
+                    ) : (
+                      row.noWarranty === 'YES' ? 'No Warranty' : '-'
+                    )}
                   </td>
                 </tr>
               )

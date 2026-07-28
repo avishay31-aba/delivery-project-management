@@ -29,7 +29,6 @@ import {
   INFRASTRUCTURE_PROPERTY_SCOPES,
   INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
-  INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE,
   allSystemRecords,
   createInfrastructureDraft,
   infrastructureBillingMethods,
@@ -42,10 +41,8 @@ import {
   infrastructurePropertyValues,
   infrastructureReferenceDataLabel,
   infrastructureTypesForCategory,
-  infrastructureVpnAlertStatus,
   infrastructureWarrantyAlert,
   infrastructureWarrantyStatusFromCollection,
-  infrastructureWarrantyTypes,
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
@@ -200,7 +197,6 @@ export function InfrastructureFormPage() {
   const manufacturerOptions = infrastructureManufacturersForType(referenceData, draft.typeRefId)
   const billingMethodOptions = infrastructureBillingMethods(referenceData)
   const ownerPicklistOptions = infrastructureOwners(referenceData)
-  const warrantyTypeOptions = infrastructureWarrantyTypes(referenceData)
   const dashboardPreview = infrastructureDashboardRows([draft], referenceData, allSystems)[0]
   const linkedSystems = draft.linkedSystemIds
     .map((systemId) => allSystems.find((system) => system.id === systemId))
@@ -629,12 +625,10 @@ export function InfrastructureFormPage() {
           {propertySelect('Domain Provider', 'domainProviderRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainProvider)}
           {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
           {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
-          {renderDateInput('Expiration Date', draft.properties?.expirationDate, (value) => updateProperties({ expirationDate: value }))}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('SSL Type', 'sslTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.sslType)}
           {renderTextInput('SSL Version', draft.properties?.sslVersion, (value) => updateProperties({ sslVersion: value }))}
-          {renderDateInput('SSL Expiration Date', draft.properties?.sslExpirationDate, (value) => updateProperties({ sslExpirationDate: value }))}
         </div>
       </div>
     )
@@ -647,37 +641,15 @@ export function InfrastructureFormPage() {
       <div className="flex flex-wrap items-start gap-3">
         {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
         {propertySelect('Model', 'modelRefId', modelScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
-        {renderTextInput('S/N', draft.properties?.laptopSerialNumber, (value) => updateProperties({ laptopSerialNumber: value }))}
       </div>
     )
   }
 
   function renderVpnProperties() {
-    const alertStatus = infrastructureVpnAlertStatus(draft.properties)
-    const alertLabel = alertStatus === 'NOT_SET'
-      ? 'Not Set'
-      : alertStatus === 'PENDING'
-        ? 'Pending'
-        : alertStatus.charAt(0) + alertStatus.slice(1).toLocaleLowerCase()
     return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-start gap-3">
-          {propertySelect('Type', 'vpnTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.vpnType, STANDARD_FIELD_WIDTH)}
-          {renderNumberInput('Number of Licenses', draft.properties?.vpnLicenseCount, (value) => updateProperties({ vpnLicenseCount: value }))}
-          {renderDateInput('License Expiration Date', draft.properties?.vpnLicenseExpirationDate, (value) => updateProperties({ vpnLicenseExpirationDate: value }))}
-          <FormField label="Alert" controlWidthClassName={STANDARD_FIELD_WIDTH}>
-            <div className="flex h-9 items-center px-2 text-sm text-sf-text">
-              <WarrantyStatusPresentation
-                status={alertStatus}
-                label={alertLabel}
-                tooltip={`Alert: ${alertLabel}`}
-              />
-            </div>
-          </FormField>
-        </div>
-        <div className="flex flex-wrap items-start gap-3">
-          {renderYesNo('Obsolete', draft.properties?.vpnObsolete ?? 'NO', (value) => updateProperties({ vpnObsolete: value }))}
-        </div>
+      <div className="flex flex-wrap items-start gap-3">
+        {propertySelect('Type', 'vpnTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.vpnType, STANDARD_FIELD_WIDTH)}
+        {renderNumberInput('Number of Licenses', draft.properties?.vpnLicenseCount, (value) => updateProperties({ vpnLicenseCount: value }))}
       </div>
     )
   }
@@ -781,8 +753,6 @@ export function InfrastructureFormPage() {
         <section className="sf-card space-y-3 p-3">
           <WarrantyCollectionGrid
             warranties={draft.warranties ?? []}
-            typeOptions={warrantyTypeOptions}
-            onAddTypeOption={() => addReferenceData(INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE, 'Infrastructure Warranty Type')}
             onChange={(warranties) => commitChildPatch({ warranties })}
             readOnly={isViewMode}
           />

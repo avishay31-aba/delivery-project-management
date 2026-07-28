@@ -656,18 +656,13 @@ export interface InfrastructureItemProperties {
   fortiManager?: YesNo | ''
   rackmount?: YesNo | ''
   tokens?: InfrastructureTokenProperty[]
-  laptopSerialNumber?: string
   domainTypeRefId?: string
   domainProviderRefId?: string
   domainName?: string
-  expirationDate?: string | null
   sslTypeRefId?: string
   sslVersion?: string
-  sslExpirationDate?: string | null
   vpnTypeRefId?: string
   vpnLicenseCount?: number | null
-  vpnLicenseExpirationDate?: string | null
-  vpnObsolete?: YesNo | ''
 }
 
 export interface InfrastructureItem {

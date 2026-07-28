@@ -16,7 +16,6 @@ import type {
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
-import { expiryAlertStatus, type ExpiryAlertStatus } from '@/domain/status-presentation'
 import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel } from '@/domain/warranty-collection'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
@@ -118,7 +117,6 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   manufacturerLabel: string
   ownerLabel: string
   billingMethodLabel: string
-  warrantyTypeLabel: string
   productsDisplay: string
   linkedSystemBusinessIds: string[]
   linkedSystemsDisplay: string
@@ -532,18 +530,13 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     fortiManager: raw.fortiManager === 'YES' || raw.fortiManager === 'NO' ? raw.fortiManager : '',
     rackmount: raw.rackmount === 'YES' || raw.rackmount === 'NO' ? raw.rackmount : raw.firewallKit === 'YES' || raw.firewallKit === 'NO' ? raw.firewallKit : '',
     tokens: normalizeTokenProperties(raw.tokens, raw),
-    laptopSerialNumber: text(raw.laptopSerialNumber),
     domainProviderRefId: text(raw.domainProviderRefId),
     domainTypeRefId: text(raw.domainTypeRefId),
     domainName: text(raw.domainName),
-    expirationDate: text(raw.expirationDate) || null,
     sslTypeRefId: text(raw.sslTypeRefId),
     sslVersion: text(raw.sslVersion),
-    sslExpirationDate: text(raw.sslExpirationDate) || null,
     vpnTypeRefId: text(raw.vpnTypeRefId),
     vpnLicenseCount: numberOrNull(raw.vpnLicenseCount),
-    vpnLicenseExpirationDate: text(raw.vpnLicenseExpirationDate) || null,
-    vpnObsolete: raw.vpnObsolete === 'YES' || raw.vpnObsolete === 'NO' ? raw.vpnObsolete : 'NO',
   }
 }
 
@@ -581,7 +574,7 @@ function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>
     successor: '',
     accountId: '',
     relatedProjectId: '',
-    warrantyType: text(warranty.warrantyType) || text(item.warrantyTypeRefId),
+    warrantyType: '',
     warrantySubType: '',
     opportunityId: '',
     startDate: text(warranty.startDate) || text(item.currentWarrantyStartDate) || null,
@@ -597,7 +590,7 @@ function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>
   return normalizeInfrastructureWarrantyCollection([normalized])[0]
 }
 
-export function createInfrastructureWarranty(warranties: TenantWarranty[], warrantyType = ''): TenantWarranty {
+export function createInfrastructureWarranty(warranties: TenantWarranty[]): TenantWarranty {
   return {
     id: `infrastructure-warranty-${crypto.randomUUID()}`,
     warrantyId: nextWarrantyId(warranties),
@@ -606,7 +599,7 @@ export function createInfrastructureWarranty(warranties: TenantWarranty[], warra
     successor: '',
     accountId: '',
     relatedProjectId: '',
-    warrantyType,
+    warrantyType: '',
     warrantySubType: '',
     opportunityId: '',
     startDate: null,
@@ -629,6 +622,7 @@ export function normalizeInfrastructureWarrantyCollection(warranties: TenantWarr
     accountId: '',
     relatedProjectId: '',
     warrantySubType: '',
+    warrantyType: '',
     opportunityId: '',
     predecessor: '',
     successor: '',
@@ -750,13 +744,6 @@ export function normalizeInfrastructureItemsForReferenceData(
   })
 }
 
-export function infrastructureVpnAlertStatus(properties: InfrastructureItemProperties | null | undefined, today = new Date()): ExpiryAlertStatus {
-  return expiryAlertStatus(properties?.vpnLicenseExpirationDate, {
-    obsolete: properties?.vpnObsolete === 'YES',
-    today,
-  })
-}
-
 export function infrastructureWarrantyStatus(item: Pick<InfrastructureItem, 'manualWarrantyStatus' | 'currentWarrantyStartDate' | 'currentWarrantyEndDate'>, today = new Date()): InfrastructureWarrantyStatus {
   if (item.manualWarrantyStatus === 'NO_WARRANTY' || item.manualWarrantyStatus === 'OBSOLETE') return item.manualWarrantyStatus
   if (!item.currentWarrantyStartDate && !item.currentWarrantyEndDate) return 'NOT_SET'
@@ -857,7 +844,6 @@ export function infrastructureDashboardRows(
         manufacturerLabel: infrastructureReferenceDataLabel(referenceData, item.properties?.manufacturerRefId ?? item.manufacturerRefId),
         ownerLabel: infrastructureReferenceDataLabel(referenceData, item.ownerRefId) || item.owner,
         billingMethodLabel: infrastructureReferenceDataLabel(referenceData, item.billingMethodRefId),
-        warrantyTypeLabel: currentWarranty?.warrantyType ? infrastructureReferenceDataLabel(referenceData, currentWarranty.warrantyType) || currentWarranty.warrantyType : infrastructureReferenceDataLabel(referenceData, item.warrantyTypeRefId),
         maintenanceStatus: item.maintenanceStatus,
         productsDisplay: linkedSystemProducts(item, systems).join('; '),
         linkedSystemBusinessIds: linkedSystemIds,
