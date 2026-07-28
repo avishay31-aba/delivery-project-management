@@ -864,6 +864,18 @@ export function infrastructureItemsForSystem(
   return infrastructureDashboardRows(items.filter((item) => item.linkedSystemIds.includes(systemId)), referenceData, systems)
 }
 
+export function eligibleInfrastructureItemsForSystemLink(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+): InfrastructureDashboardRow[] {
+  return infrastructureDashboardRows(
+    items.filter((item) => item.operationalStatus !== 'Obsolete'),
+    referenceData,
+    systems,
+  )
+}
+
 export function infrastructureSystemReference(system: System | ProductionSystemInventoryItem | ReusedInternalSystem) {
   return systemReference(system)
 }
