@@ -46,6 +46,17 @@ export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; t
   { category: 'Network', types: ['Domain'] },
 ]
 
+const APPROVED_INFRASTRUCTURE_CATEGORY_LABELS = new Set(
+  INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS.map((group) => normalizeReferenceLabel(group.category)),
+)
+
+const APPROVED_INFRASTRUCTURE_TYPE_LABELS_BY_CATEGORY = new Map(
+  INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS.map((group) => [
+    normalizeReferenceLabel(group.category),
+    new Set(group.types.map((type) => normalizeReferenceLabel(type))),
+  ]),
+)
+
 const INFRASTRUCTURE_MANUFACTURER_DEFAULTS: Record<string, string[]> = {
   Server: ['HP', 'Dell'],
   'Storage Server': ['HP', 'Dell'],
@@ -274,7 +285,12 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
       record.normalizedLabel === normalizeReferenceLabel(label) &&
       infrastructureReferenceDataParentId(record) === parentReferenceId,
     )
-    if (existing) return existing
+    if (existing) {
+      if (existing.active) return existing
+      const reactivated = { ...existing, active: true, updatedAt: now, updatedBy: 'System' }
+      next = next.map((record) => record.id === existing.id ? reactivated : record)
+      return reactivated
+    }
     const record: ReferenceDataRecord = {
       id: `${prefix}${String(next.filter((candidate) => candidate.referenceType === referenceType).length + 1).padStart(6, '0')}`,
       referenceType: referenceType as ReferenceDataRecord['referenceType'],
@@ -326,6 +342,19 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
     values.forEach((value) => appendReference(INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, value, scope, 'IPV'))
   })
   HP_SERVER_MODEL_DEFAULTS.forEach((value) => appendReference(INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, value, 'manufacturer.hp.model', 'IPV'))
+  next = next.map((record) => {
+    if (record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE) {
+      return APPROVED_INFRASTRUCTURE_CATEGORY_LABELS.has(record.normalizedLabel)
+        ? record
+        : { ...record, active: false, updatedAt: now, updatedBy: 'System' }
+    }
+    if (record.referenceType !== INFRASTRUCTURE_TYPE_REFERENCE_TYPE) return record
+    const categoryLabel = infrastructureReferenceDataLabel(next, infrastructureReferenceDataParentId(record))
+    const allowedTypes = APPROVED_INFRASTRUCTURE_TYPE_LABELS_BY_CATEGORY.get(normalizeReferenceLabel(categoryLabel))
+    return allowedTypes?.has(record.normalizedLabel)
+      ? record
+      : { ...record, active: false, updatedAt: now, updatedBy: 'System' }
+  })
   return next
 }
 
