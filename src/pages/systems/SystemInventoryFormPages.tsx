@@ -1445,7 +1445,7 @@ export function InventoryForm<T extends InventoryRecord>({
                                   disabled={alreadyLinked}
                                   onChange={(event) => toggleInfrastructureCandidate(item.id, event.target.checked)}
                                 />
-                                {alreadyLinked ? <span className="text-xs font-semibold text-sf-text-muted">Already Linked</span> : null}
+                                {alreadyLinked ? <span className="text-xs font-semibold text-sf-text-muted">Already Selected</span> : null}
                               </label>
                             </td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.infrastructureId}</td>
