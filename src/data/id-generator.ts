@@ -24,7 +24,7 @@ const MINIMUM_SEED_COUNTERS: IdCounters = {
   buildNumber: 0,
   versionUpdate: 0,
   versionUpdateAttachment: 0,
-  infrastructureItem: 1000,
+  infrastructureItem: 0,
   infrastructureCategory: 0,
   infrastructureType: 0,
   infrastructureManufacturer: 0,

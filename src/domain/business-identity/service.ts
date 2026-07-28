@@ -17,7 +17,7 @@ export const BUSINESS_IDENTITY_POLICIES: Record<BusinessEntityType, BusinessIden
   buildNumber: { entityType: 'buildNumber', prefix: 'BN', minimumCounter: 0, minDigits: 6 },
   versionUpdate: { entityType: 'versionUpdate', prefix: 'VU', minimumCounter: 0, minDigits: 6 },
   versionUpdateAttachment: { entityType: 'versionUpdateAttachment', prefix: 'VUA', minimumCounter: 0, minDigits: 6 },
-  infrastructureItem: { entityType: 'infrastructureItem', prefix: 'I', minimumCounter: 1000 },
+  infrastructureItem: { entityType: 'infrastructureItem', prefix: 'INF', minimumCounter: 0, minDigits: 6 },
   infrastructureCategory: { entityType: 'infrastructureCategory', prefix: 'IC', minimumCounter: 0, minDigits: 6 },
   infrastructureType: { entityType: 'infrastructureType', prefix: 'ITY', minimumCounter: 0, minDigits: 6 },
   infrastructureManufacturer: { entityType: 'infrastructureManufacturer', prefix: 'IM', minimumCounter: 0, minDigits: 6 },
