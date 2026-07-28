@@ -533,6 +533,7 @@ export interface TenantWarranty {
   warrantyType: string
   warrantySubType?: string
   opportunityId: string
+  initialWarrantyDate?: string | null
   startDate: string | null
   endDate: string | null
   durationDays: number | null

@@ -16,7 +16,7 @@ import type {
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
-import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel } from '@/domain/warranty-collection'
+import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
 export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_TYPE'
@@ -577,6 +577,7 @@ function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>
     warrantyType: '',
     warrantySubType: '',
     opportunityId: '',
+    initialWarrantyDate: text(warranty.initialWarrantyDate) || null,
     startDate: text(warranty.startDate) || text(item.currentWarrantyStartDate) || null,
     endDate: text(warranty.endDate) || text(item.currentWarrantyEndDate) || null,
     durationDays: null,
@@ -602,6 +603,7 @@ export function createInfrastructureWarranty(warranties: TenantWarranty[]): Tena
     warrantyType: '',
     warrantySubType: '',
     opportunityId: '',
+    initialWarrantyDate: null,
     startDate: null,
     endDate: null,
     durationDays: null,
@@ -624,6 +626,7 @@ export function normalizeInfrastructureWarrantyCollection(warranties: TenantWarr
     warrantySubType: '',
     warrantyType: '',
     opportunityId: '',
+    initialWarrantyDate: row.warranty.initialWarrantyDate ?? null,
     predecessor: '',
     successor: '',
     durationDays: daysBetween(row.warranty.startDate, row.warranty.endDate),
@@ -756,10 +759,10 @@ export function infrastructureWarrantyStatus(item: Pick<InfrastructureItem, 'man
   return 'VALID'
 }
 
-export function infrastructureWarrantyStatusFromCollection(item: InfrastructureItem, today = new Date()): InfrastructureWarrantyStatus {
-  const warranty = currentInfrastructureWarranty(item)
-  if (!warranty) return infrastructureWarrantyStatus(item, today)
-  return warranty.warrantyStatus === 'RENEWED' || warranty.warrantyStatus === 'OUT_OF_CONTRACT' ? 'NOT_SET' : warranty.warrantyStatus
+export function infrastructureWarrantyStatusFromCollection(item: InfrastructureItem): InfrastructureWarrantyStatus {
+  const warranties = normalizeInfrastructureWarrantyCollection(item.warranties ?? [])
+  if (warranties.length === 0) return 'NOT_SET'
+  return warrantyHeaderStatusReadModel(warranties, '').visualStatus as InfrastructureWarrantyStatus
 }
 
 export function infrastructureMaintenanceStatus(lastUpdatedDate: string | null | undefined, today = new Date()): InfrastructureMaintenanceStatus {
@@ -787,7 +790,7 @@ export function infrastructureDaysBeforeExpirationFromCollection(item: Infrastru
 }
 
 export function infrastructureWarrantyAlert(item: InfrastructureItem, today = new Date()): string {
-  const status = infrastructureWarrantyStatusFromCollection(item, today)
+  const status = infrastructureWarrantyStatusFromCollection(item)
   if (status === 'NO_WARRANTY' || status === 'OBSOLETE' || status === 'NOT_SET' || status === 'PLANNED') return ''
   const days = infrastructureDaysBeforeExpirationFromCollection(item, today)
   if (status === 'EXPIRED' || (days !== null && days < 0)) return 'Expired'

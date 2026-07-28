@@ -7,6 +7,7 @@ import {
 import type {
   TenantWarranty,
   TenantWarrantyHeaderStatusReadModel,
+  WarrantyHeaderStatusReadModel,
   RenewalCandidateCategory,
   RenewalCandidateRow,
   RenewalCandidateSummary,
@@ -115,6 +116,30 @@ export function deriveTenantWarrantyContractStatus(statuses: WarrantyStatus[]): 
   }
 
   return { status: 'NOT_SET_YET', label: WARRANTY_STATUS_LABELS.NOT_SET, visualStatus: 'NOT_SET' }
+}
+
+export function deriveWarrantyHeaderStatus(statuses: WarrantyStatus[]): WarrantyHeaderStatusReadModel {
+  if (statuses.length === 0) {
+    return { status: 'NOT_SET', label: WARRANTY_STATUS_LABELS.NOT_SET, visualStatus: 'NOT_SET' }
+  }
+
+  if (statuses.every((status) => status === 'NO_WARRANTY')) {
+    return { status: 'NO_WARRANTY', label: WARRANTY_STATUS_LABELS.NO_WARRANTY, visualStatus: 'NO_WARRANTY' }
+  }
+
+  if (statuses.some((status) => status === 'NOT_SET')) {
+    return { status: 'NOT_SET', label: WARRANTY_STATUS_LABELS.NOT_SET, visualStatus: 'NOT_SET' }
+  }
+
+  const comparableStatuses = statuses.filter((status) => status !== 'NO_WARRANTY')
+  if (comparableStatuses.some((status) => status === 'EXPIRED')) {
+    return { status: 'EXPIRED', label: WARRANTY_STATUS_LABELS.EXPIRED, visualStatus: 'EXPIRED' }
+  }
+  if (comparableStatuses.some((status) => status === 'PENDING')) {
+    return { status: 'PENDING', label: WARRANTY_STATUS_LABELS.PENDING, visualStatus: 'PENDING' }
+  }
+
+  return { status: 'VALID', label: WARRANTY_STATUS_LABELS.VALID, visualStatus: 'VALID' }
 }
 
 export function calculateWarrantyStatus(warranty: TenantWarranty, hasSuccessor: boolean): WarrantyStatus {
@@ -233,6 +258,14 @@ export function tenantWarrantyHeaderStatusReadModelFromRows(rows: WarrantyRowRea
 
 export function tenantWarrantyHeaderStatusReadModel(warranties: TenantWarranty[], tenantTid: string): TenantWarrantyHeaderStatusReadModel {
   return tenantWarrantyHeaderStatusReadModelFromRows(warrantyCollectionReadModel(warranties, tenantTid))
+}
+
+export function warrantyHeaderStatusReadModelFromRows(rows: WarrantyRowReadModel[]): WarrantyHeaderStatusReadModel {
+  return deriveWarrantyHeaderStatus(rows.map((row) => row.generatedStatus))
+}
+
+export function warrantyHeaderStatusReadModel(warranties: TenantWarranty[], tenantTid: string): WarrantyHeaderStatusReadModel {
+  return warrantyHeaderStatusReadModelFromRows(warrantyCollectionReadModel(warranties, tenantTid))
 }
 
 export function isWarrantyRenewalCandidate(row: WarrantyRowReadModel): boolean {

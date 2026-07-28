@@ -37,7 +37,7 @@ export function createInfrastructureColumns(options: { includeActions?: boolean 
     { id: 'latestWarrantyEndDate', label: 'Latest Warranty End Date', getValue: (row) => row.latestWarrantyEndDate, semanticType: 'date' },
     { id: 'tidMonthsLeft', label: 'TID Months Left', getValue: (row) => row.tidMonthsLeft },
     { id: 'tidDaysLeft', label: 'TID Days Left', getValue: (row) => row.tidDaysLeft },
-    { id: 'initialWarrantyStartDate', label: 'Initial Warranty Start', getValue: (row) => row.initialWarrantyStartDate ?? '', semanticType: 'date' },
+    { id: 'initialWarrantyStartDate', label: 'Initial Warranty', getValue: (row) => row.initialWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyStartDate', label: 'Current Warranty Start', getValue: (row) => row.currentWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyEndDate', label: 'Current Warranty End', getValue: (row) => row.currentWarrantyEndDate ?? '', semanticType: 'date' },
     { id: 'itemWarrantyDaysLeft', label: 'Item Warranty Days Left', getValue: (row) => row.itemWarrantyDaysLeft },

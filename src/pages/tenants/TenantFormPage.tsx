@@ -82,6 +82,7 @@ import {
   successorRefsForWarranty,
   isSelfWarrantyPredecessorSelection,
   validateWarrantyEditDraft,
+  warrantyHeaderStatusReadModel,
   warrantyManageabilityMessage,
   warrantyRelatedProjectOptionLabel,
 } from '@/domain/warranty-collection'
@@ -94,7 +95,6 @@ import {
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
-  tenantDerivedWarrantyContractStatus,
   tenantFormType,
   tenantPocPidDisplay,
   tenantRelatedProjects,
@@ -147,6 +147,7 @@ function tenantParentSaveScope(tenant: Tenant): Partial<Tenant> {
 function normalizedWarrantySaveScope(record: TenantWarranty) {
   return {
     relatedProjectId: record.relatedProjectId ?? '',
+    initialWarrantyDate: record.initialWarrantyDate ?? null,
     startDate: record.startDate ?? null,
     endDate: record.endDate ?? null,
     noWarranty: record.noWarranty ?? 'NO',
@@ -419,7 +420,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
-  const committedWarrantyHeaderStatus = tenantDerivedWarrantyContractStatus(persistedTenant)
+  const committedWarrantyHeaderStatus = warrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
   const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
 
   useEffect(() => {
@@ -1351,7 +1352,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             Warranty can be managed only after the tenant is linked to a Project/Opportunity.
           </div>
           <ReadonlyTable
-            headers={[WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark']}
+            headers={[WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessor', 'Successor', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark']}
             rows={warranties.map((warranty, warrantyIndex) => [
               warranty.warrantyId,
               warranty.warrantyType,
@@ -1362,6 +1363,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               warranty.accountId,
               warranty.relatedProjectId,
               warranty.opportunityId,
+              <DateTimeValue value={warranty.initialWarrantyDate} semanticType="date" />,
               <DateTimeValue value={warranty.startDate} semanticType="date" />,
               <DateTimeValue value={warranty.endDate} semanticType="date" />,
               warranty.durationDays ?? '',
@@ -1402,7 +1404,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           <table className="min-w-full border-collapse text-sm leading-tight">
             <thead className="bg-sf-surface-alt text-left">
               <tr>
-                {['Actions', WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark'].map((header) => (
+                {['Actions', WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark'].map((header) => (
                   <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
                 ))}
               </tr>
@@ -1504,6 +1506,19 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                       <input
                         className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
                         type="date"
+                        value={warranty.initialWarrantyDate ?? ''}
+                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'initialWarrantyDate', nextValue))}
+                        onChange={(event) => updateWarrantyDraft(warranty.id, 'initialWarrantyDate', event.target.value || null)}
+                      />
+                    ) : (
+                      <DateTimeValue value={warranty.initialWarrantyDate} semanticType="date" />
+                    )}
+                  </td>
+                  <td className="border border-sf-border px-1.5 py-1">
+                    {isEditingWarranty ? (
+                      <input
+                        className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                        type="date"
                         value={warranty.startDate ?? ''}
                         onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'startDate', nextValue))}
                         onChange={(event) => updateWarrantyDraft(warranty.id, 'startDate', event.target.value || null)}
@@ -1545,7 +1560,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 )
               })}
               {warranties.length === 0 ? (
-                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={17}>No warranty records yet.</td></tr>
+                <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={18}>No warranty records yet.</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -1605,6 +1620,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Status</span>
               <div className="flex h-9 items-center rounded border border-sf-border bg-sf-surface-alt px-2"><WarrantyStatusPresentation status={warranty.warrantyStatus} /></div>
             </div>
+            <label className="space-y-1">
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Initial Warranty</span>
+              <input
+                className="h-9 w-full rounded border border-sf-border px-2 py-1"
+                type="date"
+                value={advancedWarrantyDraft.initialWarrantyDate ?? ''}
+                onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(advancedWarrantyId, 'initialWarrantyDate', nextValue))}
+                onChange={(event) => updateWarrantyDraft(advancedWarrantyId, 'initialWarrantyDate', event.target.value || null)}
+              />
+            </label>
             <label className="space-y-1">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
               <input

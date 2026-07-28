@@ -19,6 +19,7 @@ interface WarrantyCollectionGridProps {
 
 function normalizedWarranty(record: TenantWarranty) {
   return {
+    initialWarrantyDate: record.initialWarrantyDate ?? null,
     startDate: record.startDate ?? null,
     endDate: record.endDate ?? null,
     noWarranty: record.noWarranty ?? 'NO',
@@ -68,7 +69,7 @@ export function WarrantyCollectionGrid({
     editor.save(id, {
       validate: validateWarranty,
       normalize: normalizedWarranty,
-      isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
+      isMeaningfulNewDraft: (record) => Boolean(record.initialWarrantyDate || record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
       commit: commitWarranty,
       successMessage: 'Warranty saved.',
     })
@@ -76,7 +77,7 @@ export function WarrantyCollectionGrid({
 
   function cancelWarranty(id: string) {
     const shouldConfirmDiscard = editor.isNew(id) && editor.hasChanges(id, {
-      isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
+      isMeaningfulNewDraft: (record) => Boolean(record.initialWarrantyDate || record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
     })
     if (shouldConfirmDiscard) {
       editor.commitDelete(id, {
@@ -120,7 +121,7 @@ export function WarrantyCollectionGrid({
         <table className="w-max min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {['Actions', 'Initial Warranty Start Date', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
+              {['Actions', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
                 <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{header}</th>
               ))}
             </tr>
@@ -134,7 +135,7 @@ export function WarrantyCollectionGrid({
               const canSave = editor.canSave(warranty.id, {
                 validate: validateWarranty,
                 normalize: normalizedWarranty,
-                isMeaningfulNewDraft: (record) => Boolean(record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
+                isMeaningfulNewDraft: (record) => Boolean(record.initialWarrantyDate || record.startDate || record.endDate || record.noWarranty === 'YES' || hasMeaningfulRichText(record.remark)),
               })
               return (
                 <tr key={warranty.id} className="hover:bg-sf-surface-alt">
@@ -167,7 +168,9 @@ export function WarrantyCollectionGrid({
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><DateTimeValue value={warranties[0]?.startDate ?? displayRow.startDate} semanticType="date" /></td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
+                    {isEditing ? <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={row.initialWarrantyDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => updateDraft(warranty.id, { initialWarrantyDate: value }))} onChange={(event) => updateDraft(warranty.id, { initialWarrantyDate: event.target.value || null })} /> : <DateTimeValue value={row.initialWarrantyDate} semanticType="date" />}
+                  </td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => updateDraft(warranty.id, { startDate: value }))} onChange={(event) => updateDraft(warranty.id, { startDate: event.target.value || null })} /> : <DateTimeValue value={row.startDate} semanticType="date" />}
                   </td>

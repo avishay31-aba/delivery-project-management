@@ -12,6 +12,7 @@ export function normalizeTenantWarranties(warranties: TenantWarranty[] | undefin
   return Array.isArray(warranties)
     ? warranties.map((warranty) => ({
         ...warranty,
+        initialWarrantyDate: warranty.initialWarrantyDate ?? null,
         noWarranty: warranty.noWarranty ?? 'NO',
         outOfContract: warranty.outOfContract ?? 'NO',
       }))
@@ -35,6 +36,7 @@ export function createTenantWarranty(
     warrantyType: warrantyTypeForProject(project),
     warrantySubType: warrantySubTypeForProject(project),
     opportunityId,
+    initialWarrantyDate: null,
     startDate: null,
     endDate: null,
     durationDays: null,

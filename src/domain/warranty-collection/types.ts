@@ -34,6 +34,12 @@ export interface TenantWarrantyHeaderStatusReadModel {
   visualStatus: WarrantyStatus
 }
 
+export interface WarrantyHeaderStatusReadModel {
+  status: WarrantyStatus
+  label: string
+  visualStatus: WarrantyStatus
+}
+
 export interface WarrantyDashboardRow {
   id: string
   warrantyId: string
