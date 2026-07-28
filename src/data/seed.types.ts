@@ -607,9 +607,19 @@ export interface InfrastructureDiskProperty {
 export interface InfrastructureVmProperty {
   id: string
   vmTypeRefId: string
-  operatingSystemRefId: string
-  quantity: number | null
+  diskTypeRefId: string
+  diskSizeRefId: string
+  memoryTypeRefId: string
+  memorySizeRefId: string
+  osVersionRefId: string
   rdmName: string
+}
+
+export interface InfrastructureTokenProperty {
+  id: string
+  tokenTypeRefId: string
+  serialNumber: string
+  licenseEndDate: string | null
 }
 
 export type InfrastructureMaintenanceTaskStatus = 'Open' | 'Done'
@@ -644,12 +654,15 @@ export interface InfrastructureItemProperties {
   disks?: InfrastructureDiskProperty[]
   vms?: InfrastructureVmProperty[]
   fortiManager?: YesNo | ''
-  firewallKit?: YesNo | ''
-  fwToken?: YesNo | ''
-  fwTokenQuantity?: number | null
+  rackmount?: YesNo | ''
+  tokens?: InfrastructureTokenProperty[]
+  laptopSerialNumber?: string
   domainTypeRefId?: string
+  domainProviderRefId?: string
   domainName?: string
   expirationDate?: string | null
+  sslTypeRefId?: string
+  sslVersion?: string
   sslExpirationDate?: string | null
 }
 

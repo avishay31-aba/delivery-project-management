@@ -41,14 +41,15 @@ export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContac
 
 export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; types: string[] }> = [
   { category: 'Hardware', types: ['Server', 'Storage Server', 'Firewall', 'Laptop'] },
-  { category: 'Domain', types: ['Domain'] },
+  { category: 'Software', types: [] },
+  { category: 'Cloud', types: ['Compute/Host', 'Open VPN'] },
+  { category: 'Network', types: ['Domain'] },
 ]
 
 const INFRASTRUCTURE_MANUFACTURER_DEFAULTS: Record<string, string[]> = {
   Server: ['HP', 'Dell'],
   'Storage Server': ['HP', 'Dell'],
   Firewall: ['FortiGate', 'Palo Alto', 'Cisco'],
-  'FW Token': ['FortiGate'],
 }
 
 const INFRASTRUCTURE_OWNER_DEFAULTS = ['Penlink', 'Agent', 'Customer']
@@ -56,19 +57,26 @@ const INFRASTRUCTURE_BILLING_METHOD_DEFAULTS = ['One Time Payment', 'Recurring P
 const INFRASTRUCTURE_WARRANTY_TYPE_DEFAULTS = ['Standard', 'Extended', 'No Warranty']
 
 export const INFRASTRUCTURE_PROPERTY_SCOPES = {
-  serverHardwareType: 'server.hardwareType',
+  serverRackUnit: 'server.rackUnit',
   serverEsxiVersion: 'server.esxiVersion',
   serverMemoryType: 'server.memoryType',
   serverMemorySize: 'server.memorySize',
   serverCpuType: 'server.cpuType',
   serverDiskType: 'server.diskType',
-  serverVmType: 'server.vmType',
-  serverOperatingSystem: 'server.operatingSystem',
+  vmType: 'vm.type',
+  vmDiskType: 'vm.diskType',
+  vmDiskSize: 'vm.diskSize',
+  vmMemoryType: 'vm.memoryType',
+  vmMemorySize: 'vm.memorySize',
+  vmOsVersion: 'vm.osVersion',
+  firewallTokenType: 'firewall.tokenType',
   firewallModelFortiGate: 'firewall.model.fortigate',
   firewallModelPaloAlto: 'firewall.model.paloAlto',
   firewallModelCisco: 'firewall.model.cisco',
   firewallFirmwareVersion: 'firewall.firmwareVersion',
+  domainProvider: 'domain.provider',
   domainType: 'domain.domainType',
+  sslType: 'domain.sslType',
   laptopManufacturer: 'laptop.manufacturer',
 } as const
 
@@ -80,13 +88,12 @@ export type InfrastructurePropertyScope =
   | `manufacturer.${string}.firmwareVersion`
 
 const INFRASTRUCTURE_PROPERTY_DEFAULTS: Record<string, string[]> = {
-  [INFRASTRUCTURE_PROPERTY_SCOPES.serverHardwareType]: ['U1', 'U2', 'U3'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.serverRackUnit]: ['U1', 'U2', 'U3'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemoryType]: ['DDR4', 'DDR5'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemorySize]: ['32G'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType]: ['Intel(R) Xeon(R) Silver 4110 CPU @ 8 Cores 2.10GHz', 'Intel Xeon 6505P 2.2GHz 12-core 150W'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverDiskType]: ['HP 2.4TB SAS', 'HPE 1.92TB SATA 6G'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.firewallModelFortiGate]: ['60E', '60F', '70E'],
-  [INFRASTRUCTURE_PROPERTY_SCOPES.domainType]: ['Product', 'Trapdoor'],
 }
 
 const HP_SERVER_MODEL_DEFAULTS = ['HPE ProLiant DL360 Gen10', 'HPE ProLiant DL360 Gen12']
@@ -123,10 +130,17 @@ function text(value: unknown): string {
   return value == null ? '' : String(value)
 }
 
+function orderedLabelIndex(order: string[], label: string): number {
+  const index = order.findIndex((value) => normalizeReferenceLabel(value) === normalizeReferenceLabel(label))
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index
+}
+
 function normalizeInfrastructureBusinessId(value: unknown): string {
   const current = text(value).trim()
-  const legacy = /^IT(\d+)$/i.exec(current)
-  return legacy ? `I${legacy[1]}` : current
+  const canonical = /^INF(\d+)$/i.exec(current)
+  if (canonical) return `INF${canonical[1].padStart(6, '0')}`
+  const legacy = /^(?:IT|I)(\d+)$/i.exec(current)
+  return legacy ? `INF${legacy[1].padStart(6, '0')}` : current
 }
 
 function dateTimestamp(value: string | null | undefined): number | null {
@@ -157,20 +171,29 @@ export function infrastructureReferenceDataParentId(record: ReferenceDataRecord)
 }
 
 export function infrastructureCategories(referenceData: ReferenceDataRecord[]): ReferenceDataRecord[] {
+  const order = INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS.map((group) => group.category)
   return referenceData
     .filter((record) => record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE && record.active)
-    .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
+    .sort((first, second) => {
+      const ordered = orderedLabelIndex(order, first.label) - orderedLabelIndex(order, second.label)
+      return ordered || first.label.localeCompare(second.label, undefined, { sensitivity: 'base' })
+    })
 }
 
 export function infrastructureTypesForCategory(referenceData: ReferenceDataRecord[], categoryRefId: string | null | undefined): ReferenceDataRecord[] {
   if (!categoryRefId) return []
+  const categoryLabel = infrastructureReferenceDataLabel(referenceData, categoryRefId)
+  const order = INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS.find((group) => normalizeReferenceLabel(group.category) === normalizeReferenceLabel(categoryLabel))?.types ?? []
   return referenceData
     .filter((record) =>
       record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE &&
       record.active &&
       infrastructureReferenceDataParentId(record) === categoryRefId,
     )
-    .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
+    .sort((first, second) => {
+      const ordered = orderedLabelIndex(order, first.label) - orderedLabelIndex(order, second.label)
+      return ordered || first.label.localeCompare(second.label, undefined, { sensitivity: 'base' })
+    })
 }
 
 export function infrastructureManufacturersForType(referenceData: ReferenceDataRecord[], typeRefId: string | null | undefined): ReferenceDataRecord[] {
@@ -219,6 +242,32 @@ export function infrastructureReferenceDataLabel(referenceData: ReferenceDataRec
 
 export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRecord[], now = new Date().toISOString()): ReferenceDataRecord[] {
   let next = [...referenceData]
+  const legacyDomainCategory = next.find((record) => record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE && record.normalizedLabel === normalizeReferenceLabel('Domain'))
+  const networkCategory = next.find((record) => record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE && record.normalizedLabel === normalizeReferenceLabel('Network'))
+  if (legacyDomainCategory && !networkCategory) {
+    next = next.map((record) =>
+      record.id === legacyDomainCategory.id
+        ? {
+            ...record,
+            label: 'Network',
+            normalizedLabel: normalizeReferenceLabel('Network'),
+            updatedAt: now,
+            updatedBy: 'System',
+          }
+        : record,
+    )
+  } else if (legacyDomainCategory && networkCategory) {
+    next = next.map((record) => {
+      if (record.id === legacyDomainCategory.id) {
+        return { ...record, active: false, updatedAt: now, updatedBy: 'System' }
+      }
+      if (record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE && infrastructureReferenceDataParentId(record) === legacyDomainCategory.id) {
+        return { ...record, parentReferenceId: networkCategory.id, versionNumberId: networkCategory.id, updatedAt: now, updatedBy: 'System' }
+      }
+      return record
+    })
+  }
+
   function appendReference(referenceType: string, label: string, parentReferenceId: string | null, prefix: string): ReferenceDataRecord {
     const existing = next.find((record) =>
       record.referenceType === referenceType &&
@@ -355,10 +404,53 @@ export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem,
   return completedDates[0] ?? null
 }
 
+function normalizeVmProperties(value: unknown): InfrastructureItemProperties['vms'] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((vm) => {
+    const raw = isRecord(vm) ? vm : {}
+    const quantity = Math.max(1, numberOrNull(raw.quantity) ?? 1)
+    const base = {
+      vmTypeRefId: text(raw.vmTypeRefId),
+      diskTypeRefId: text(raw.diskTypeRefId),
+      diskSizeRefId: text(raw.diskSizeRefId),
+      memoryTypeRefId: text(raw.memoryTypeRefId),
+      memorySizeRefId: text(raw.memorySizeRefId),
+      osVersionRefId: text(raw.osVersionRefId) || text(raw.operatingSystemRefId),
+      rdmName: text(raw.rdmName),
+    }
+    return Array.from({ length: quantity }, (_, index) => ({
+      id: index === 0 ? text(raw.id) || `vm-${crypto.randomUUID()}` : `vm-${crypto.randomUUID()}`,
+      ...base,
+    }))
+  })
+}
+
+function normalizeTokenProperties(value: unknown, raw: Record<string, unknown>): InfrastructureItemProperties['tokens'] {
+  if (Array.isArray(value)) {
+    return value.map((token) => {
+      const record = isRecord(token) ? token : {}
+      return {
+        id: text(record.id) || `token-${crypto.randomUUID()}`,
+        tokenTypeRefId: text(record.tokenTypeRefId),
+        serialNumber: text(record.serialNumber),
+        licenseEndDate: text(record.licenseEndDate) || null,
+      }
+    })
+  }
+  const legacyHasToken = raw.fwToken === 'YES' || (numberOrNull(raw.fwTokenQuantity) ?? 0) > 0
+  if (!legacyHasToken) return []
+  const count = Math.max(1, numberOrNull(raw.fwTokenQuantity) ?? 1)
+  return Array.from({ length: count }, () => ({
+    id: `token-${crypto.randomUUID()}`,
+    tokenTypeRefId: '',
+    serialNumber: '',
+    licenseEndDate: null,
+  }))
+}
+
 function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & Record<string, unknown>): InfrastructureItemProperties {
   const raw = isRecord(item.properties) ? item.properties : {}
   return {
-    ...raw,
     manufacturerRefId: text(raw.manufacturerRefId) || text(item.manufacturerRefId),
     hardwareTypeRefId: text(raw.hardwareTypeRefId),
     modelRefId: text(raw.modelRefId),
@@ -379,22 +471,17 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
           quantity: numberOrNull((disk as Record<string, unknown>).quantity),
         }))
       : [],
-    vms: Array.isArray(raw.vms)
-      ? raw.vms.map((vm) => ({
-          id: text((vm as Record<string, unknown>).id) || `vm-${crypto.randomUUID()}`,
-          vmTypeRefId: text((vm as Record<string, unknown>).vmTypeRefId),
-          operatingSystemRefId: text((vm as Record<string, unknown>).operatingSystemRefId),
-          quantity: numberOrNull((vm as Record<string, unknown>).quantity),
-          rdmName: text((vm as Record<string, unknown>).rdmName),
-        }))
-      : [],
+    vms: normalizeVmProperties(raw.vms),
     fortiManager: raw.fortiManager === 'YES' || raw.fortiManager === 'NO' ? raw.fortiManager : '',
-    firewallKit: raw.firewallKit === 'YES' || raw.firewallKit === 'NO' ? raw.firewallKit : '',
-    fwToken: raw.fwToken === 'YES' || raw.fwToken === 'NO' ? raw.fwToken : '',
-    fwTokenQuantity: numberOrNull(raw.fwTokenQuantity),
+    rackmount: raw.rackmount === 'YES' || raw.rackmount === 'NO' ? raw.rackmount : raw.firewallKit === 'YES' || raw.firewallKit === 'NO' ? raw.firewallKit : '',
+    tokens: normalizeTokenProperties(raw.tokens, raw),
+    laptopSerialNumber: text(raw.laptopSerialNumber),
+    domainProviderRefId: text(raw.domainProviderRefId),
     domainTypeRefId: text(raw.domainTypeRefId),
     domainName: text(raw.domainName),
     expirationDate: text(raw.expirationDate) || null,
+    sslTypeRefId: text(raw.sslTypeRefId),
+    sslVersion: text(raw.sslVersion),
     sslExpirationDate: text(raw.sslExpirationDate) || null,
   }
 }
@@ -736,10 +823,6 @@ export function validateInfrastructureItemDraft(
   ;(draft.properties?.disks ?? []).forEach((disk, index) => {
     if ((disk.quantity ?? 0) <= 0) messages.push(`Disk ${index + 1} Quantity must be greater than zero.`)
   })
-  ;(draft.properties?.vms ?? []).forEach((vm, index) => {
-    if ((vm.quantity ?? 0) <= 0) messages.push(`VM ${index + 1} Quantity must be greater than zero.`)
-  })
-  if (draft.properties?.fwToken === 'YES' && (draft.properties.fwTokenQuantity ?? 0) <= 0) messages.push('FW Token Quantity must be greater than zero.')
   if (identifier && items.some((item) => item.id !== draft.id && item.normalizedIdentifier === normalizedIdentifier)) {
     messages.push('Identifier must be unique.')
   }

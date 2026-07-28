@@ -18,7 +18,7 @@ import {
   formMessageClassName,
 } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import type { InfrastructureItem, InfrastructureItemProperties, ReferenceDataRecord, ReferenceDataType, YesNo } from '@/data/seed.types'
+import type { InfrastructureItem, InfrastructureItemProperties, InfrastructureTokenProperty, InfrastructureVmProperty, ReferenceDataRecord, ReferenceDataType, YesNo } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
@@ -345,10 +345,10 @@ export function InfrastructureFormPage() {
     return invalidFields.has(key) ? 'border-red-400 bg-red-50' : 'border-sf-border bg-white'
   }
 
-  function renderTextInput(label: string, value: string | null | undefined, onChange: (value: string) => void, required = false) {
+  function renderTextInput(label: string, value: string | null | undefined, onChange: (value: string) => void, required = false, disabled = false) {
     return (
       <FormField label={label} required={required} controlWidthClassName={STANDARD_FIELD_WIDTH}>
-        <input className={`h-9 w-full rounded border px-2 py-1 text-sm ${fieldClass(label)}`} value={value ?? ''} readOnly={isViewMode} onChange={(event) => onChange(event.target.value)} />
+        <input className={`h-9 w-full rounded border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted ${fieldClass(label)}`} value={value ?? ''} readOnly={isViewMode} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       </FormField>
     )
   }
@@ -482,11 +482,7 @@ export function InfrastructureFormPage() {
         <div className="flex flex-wrap items-start gap-3">
           {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, changeServerManufacturer, 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
           {propertySelect('Model', 'modelRefId', modelScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {propertySelect('Type', 'hardwareTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverHardwareType, STANDARD_FIELD_WIDTH, !hasManufacturer)}
-          {propertySelect('Firmware Version', 'firmwareVersionRefId', firmwareScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderDateInput('Firmware Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
-          {propertySelect('ESXi Version', 'esxiVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverEsxiVersion, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderDateInput('ESXi Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
+          {propertySelect('Rack Unit', 'hardwareTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverRackUnit, STANDARD_FIELD_WIDTH, !hasManufacturer)}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('Memory Type', 'memoryTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverMemoryType, STANDARD_FIELD_WIDTH, !hasManufacturer)}
@@ -494,6 +490,12 @@ export function InfrastructureFormPage() {
           {renderNumberInput('Memory Quantity', draft.properties?.memoryQuantity, (value) => updateProperties({ memoryQuantity: value }), 0, !hasManufacturer)}
           {propertySelect('CPU Type', 'cpuTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType, WIDE_FIELD_WIDTH, !hasManufacturer)}
           {renderNumberInput('CPU Quantity', draft.properties?.cpuQuantity, (value) => updateProperties({ cpuQuantity: value }), 0, !hasManufacturer)}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {propertySelect('Firmware Version', 'firmwareVersionRefId', firmwareScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
+          {renderDateInput('Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
+          {propertySelect('ESXi Version', 'esxiVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverEsxiVersion, WIDE_FIELD_WIDTH, !hasManufacturer)}
+          {renderDateInput('Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
         </div>
         {renderDiskGroups(!hasManufacturer)}
         {renderVmGroups(!hasManufacturer)}
@@ -530,31 +532,25 @@ export function InfrastructureFormPage() {
 
   function renderVmGroups(disabled = false) {
     const vms = draft.properties?.vms ?? []
+    const updateVm = (id: string, patch: Partial<InfrastructureVmProperty>) => {
+      updateProperties({ vms: vms.map((candidate) => candidate.id === id ? { ...candidate, ...patch } : candidate) })
+    }
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-sf-text">Virtual Machines</h3>
-          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" disabled={disabled} onClick={() => updateProperties({ vms: [...vms, { id: `vm-${crypto.randomUUID()}`, vmTypeRefId: '', operatingSystemRefId: '', quantity: null, rdmName: '' }] })}>+ Add VM</button> : null}
+          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" disabled={disabled} onClick={() => updateProperties({ vms: [...vms, { id: `vm-${crypto.randomUUID()}`, vmTypeRefId: '', diskTypeRefId: '', diskSizeRefId: '', memoryTypeRefId: '', memorySizeRefId: '', osVersionRefId: '', rdmName: '' }] })}>+ Add VM</button> : null}
         </div>
         {vms.map((vm, index) => (
           <div key={vm.id} className="flex flex-wrap items-end gap-3 rounded border border-sf-border bg-white p-2">
             <span className="pb-2 text-sm font-semibold text-sf-text-muted">VM {index + 1}</span>
-            <FormField label="VM Type" controlWidthClassName={STANDARD_FIELD_WIDTH}>
-              <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" value={vm.vmTypeRefId} disabled={isViewMode || disabled} onChange={(event) => handleAddNewSelect(event.target.value, 'VM Type', INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, INFRASTRUCTURE_PROPERTY_SCOPES.serverVmType, (value) => updateProperties({ vms: vms.map((candidate) => candidate.id === vm.id ? { ...candidate, vmTypeRefId: value } : candidate) }))}>
-                <option value=""></option>
-                {propertyOptions(INFRASTRUCTURE_PROPERTY_SCOPES.serverVmType).map((record) => <option key={record.id} value={record.id}>{record.label}</option>)}
-                <option value={ADD_NEW_REFERENCE_OPTION}>{ADD_NEW_PROMPT_LABEL}</option>
-              </select>
-            </FormField>
-            <FormField label="Operating System" controlWidthClassName={STANDARD_FIELD_WIDTH}>
-              <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" value={vm.operatingSystemRefId} disabled={isViewMode || disabled} onChange={(event) => handleAddNewSelect(event.target.value, 'Operating System', INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, INFRASTRUCTURE_PROPERTY_SCOPES.serverOperatingSystem, (value) => updateProperties({ vms: vms.map((candidate) => candidate.id === vm.id ? { ...candidate, operatingSystemRefId: value } : candidate) }))}>
-                <option value=""></option>
-                {propertyOptions(INFRASTRUCTURE_PROPERTY_SCOPES.serverOperatingSystem).map((record) => <option key={record.id} value={record.id}>{record.label}</option>)}
-                <option value={ADD_NEW_REFERENCE_OPTION}>{ADD_NEW_PROMPT_LABEL}</option>
-              </select>
-            </FormField>
-            {renderNumberInput('Quantity', vm.quantity, (value) => updateProperties({ vms: vms.map((candidate) => candidate.id === vm.id ? { ...candidate, quantity: value } : candidate) }), 1, disabled)}
-            {renderTextInput('RDM Name', vm.rdmName, (value) => updateProperties({ vms: vms.map((candidate) => candidate.id === vm.id ? { ...candidate, rdmName: value } : candidate) }))}
+            {renderVmSelect('VM Type', vm.vmTypeRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmType, disabled, (value) => updateVm(vm.id, { vmTypeRefId: value }))}
+            {renderVmSelect('Disk Type', vm.diskTypeRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmDiskType, disabled, (value) => updateVm(vm.id, { diskTypeRefId: value }))}
+            {renderVmSelect('Disk Size', vm.diskSizeRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmDiskSize, disabled, (value) => updateVm(vm.id, { diskSizeRefId: value }))}
+            {renderVmSelect('Memory Type', vm.memoryTypeRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmMemoryType, disabled, (value) => updateVm(vm.id, { memoryTypeRefId: value }))}
+            {renderVmSelect('Memory Size', vm.memorySizeRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmMemorySize, disabled, (value) => updateVm(vm.id, { memorySizeRefId: value }))}
+            {renderVmSelect('OS Version', vm.osVersionRefId, INFRASTRUCTURE_PROPERTY_SCOPES.vmOsVersion, disabled, (value) => updateVm(vm.id, { osVersionRefId: value }))}
+            {renderTextInput('RDM Name', vm.rdmName, (value) => updateVm(vm.id, { rdmName: value }), false, disabled)}
             {!isViewMode ? <button type="button" className="mb-0.5 rounded border border-red-200 bg-white px-3 py-1.5 text-sm font-semibold text-red-700" onClick={() => updateProperties({ vms: vms.filter((candidate) => candidate.id !== vm.id) })}>Remove</button> : null}
           </div>
         ))}
@@ -563,37 +559,94 @@ export function InfrastructureFormPage() {
     )
   }
 
+  function renderVmSelect(label: string, value: string, scope: string, disabled: boolean, onChange: (value: string) => void) {
+    return (
+      <FormField label={label} controlWidthClassName={STANDARD_FIELD_WIDTH}>
+        <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" value={value} disabled={isViewMode || disabled} onChange={(event) => handleAddNewSelect(event.target.value, label, INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, scope, onChange)}>
+          <option value=""></option>
+          {propertyOptions(scope).map((record) => <option key={record.id} value={record.id}>{record.label}</option>)}
+          <option value={ADD_NEW_REFERENCE_OPTION}>{ADD_NEW_PROMPT_LABEL}</option>
+        </select>
+      </FormField>
+    )
+  }
+
   function renderFirewallProperties() {
     const modelScope = selectedManufacturerLabel ? parentScopeForFirewallModel(selectedManufacturerLabel) : INFRASTRUCTURE_PROPERTY_SCOPES.firewallModelFortiGate
     return (
-      <div className="flex flex-wrap items-start gap-3">
-        {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
-        {selectedManufacturerLabel === 'FortiGate' ? renderYesNo('FortiManager', draft.properties?.fortiManager ?? '', (value) => updateProperties({ fortiManager: value })) : null}
-        {propertySelect('Model', 'modelRefId', modelScope)}
-        {propertySelect('Firmware Version', 'firmwareVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.firewallFirmwareVersion)}
-        {renderDateInput('Firmware Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }))}
-        {renderYesNo('Firewall Kit', draft.properties?.firewallKit ?? '', (value) => updateProperties({ firewallKit: value }))}
-        {renderYesNo('FW Token', draft.properties?.fwToken ?? '', (value) => updateProperties({ fwToken: value, fwTokenQuantity: value === 'YES' ? draft.properties?.fwTokenQuantity ?? null : null }))}
-        {draft.properties?.fwToken === 'YES' ? renderNumberInput('FW Token Quantity', draft.properties?.fwTokenQuantity, (value) => updateProperties({ fwTokenQuantity: value }), 1) : null}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start gap-3">
+          {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
+          {selectedManufacturerLabel === 'FortiGate' ? renderYesNo('FortiManager', draft.properties?.fortiManager ?? '', (value) => updateProperties({ fortiManager: value })) : null}
+          {propertySelect('Model', 'modelRefId', modelScope)}
+          {propertySelect('Firmware Version', 'firmwareVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.firewallFirmwareVersion)}
+          {renderDateInput('Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }))}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {renderYesNo('Rackmount', draft.properties?.rackmount ?? '', (value) => updateProperties({ rackmount: value }))}
+        </div>
+        {renderTokenGroups()}
+      </div>
+    )
+  }
+
+  function renderTokenGroups() {
+    const tokens = draft.properties?.tokens ?? []
+    const updateToken = (id: string, patch: Partial<InfrastructureTokenProperty>) => {
+      updateProperties({ tokens: tokens.map((candidate) => candidate.id === id ? { ...candidate, ...patch } : candidate) })
+    }
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-sf-text">Tokens</h3>
+          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={() => updateProperties({ tokens: [...tokens, { id: `token-${crypto.randomUUID()}`, tokenTypeRefId: '', serialNumber: '', licenseEndDate: null }] })}>+ Add Token</button> : null}
+        </div>
+        {tokens.map((token, index) => (
+          <div key={token.id} className="flex flex-wrap items-end gap-3 rounded border border-sf-border bg-white p-2">
+            <span className="pb-2 text-sm font-semibold text-sf-text-muted">Token {index + 1}</span>
+            <FormField label="Type" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+              <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" value={token.tokenTypeRefId} disabled={isViewMode} onChange={(event) => handleAddNewSelect(event.target.value, 'Token Type', INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, INFRASTRUCTURE_PROPERTY_SCOPES.firewallTokenType, (value) => updateToken(token.id, { tokenTypeRefId: value }))}>
+                <option value=""></option>
+                {propertyOptions(INFRASTRUCTURE_PROPERTY_SCOPES.firewallTokenType).map((record) => <option key={record.id} value={record.id}>{record.label}</option>)}
+                <option value={ADD_NEW_REFERENCE_OPTION}>{ADD_NEW_PROMPT_LABEL}</option>
+              </select>
+            </FormField>
+            {renderTextInput('S/N', token.serialNumber, (value) => updateToken(token.id, { serialNumber: value }))}
+            {renderDateInput('License End Date', token.licenseEndDate, (value) => updateToken(token.id, { licenseEndDate: value }))}
+            {!isViewMode ? <button type="button" className="mb-0.5 rounded border border-red-200 bg-white px-3 py-1.5 text-sm font-semibold text-red-700" onClick={() => updateProperties({ tokens: tokens.filter((candidate) => candidate.id !== token.id) })}>Remove</button> : null}
+          </div>
+        ))}
+        {tokens.length === 0 ? <div className="rounded border border-dashed border-sf-border bg-white p-3 text-sm text-sf-text-muted">No tokens configured.</div> : null}
       </div>
     )
   }
 
   function renderDomainProperties() {
     return (
-      <div className="flex flex-wrap items-start gap-3">
-        {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
-        {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
-        {renderDateInput('Expiration Date', draft.properties?.expirationDate, (value) => updateProperties({ expirationDate: value }))}
-        {renderDateInput('SSL Expiration Date', draft.properties?.sslExpirationDate, (value) => updateProperties({ sslExpirationDate: value }))}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start gap-3">
+          {propertySelect('Domain Provider', 'domainProviderRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainProvider)}
+          {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
+          {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
+          {renderDateInput('Expiration Date', draft.properties?.expirationDate, (value) => updateProperties({ expirationDate: value }))}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {propertySelect('SSL Type', 'sslTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.sslType)}
+          {renderTextInput('SSL Version', draft.properties?.sslVersion, (value) => updateProperties({ sslVersion: value }))}
+          {renderDateInput('SSL Expiration Date', draft.properties?.sslExpirationDate, (value) => updateProperties({ sslExpirationDate: value }))}
+        </div>
       </div>
     )
   }
 
   function renderLaptopProperties() {
+    const modelScope = infrastructureManufacturerPropertyScope(referenceData, draft.properties?.manufacturerRefId, 'model')
+    const hasManufacturer = Boolean(draft.properties?.manufacturerRefId)
     return (
       <div className="flex flex-wrap items-start gap-3">
-        {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
+        {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
+        {propertySelect('Model', 'modelRefId', modelScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
+        {renderTextInput('S/N', draft.properties?.laptopSerialNumber, (value) => updateProperties({ laptopSerialNumber: value }))}
       </div>
     )
   }
@@ -604,6 +657,7 @@ export function InfrastructureFormPage() {
     if (selectedTypeLabel === 'Firewall') return renderFirewallProperties()
     if (selectedTypeLabel === 'Domain') return renderDomainProperties()
     if (selectedTypeLabel === 'Laptop') return renderLaptopProperties()
+    if (selectedTypeLabel === 'Compute/Host') return renderVmGroups(false)
     return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">No Properties are configured for this Item Type.</div>
   }
 
