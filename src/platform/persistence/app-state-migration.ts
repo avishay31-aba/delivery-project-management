@@ -12,7 +12,7 @@ import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
 import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } from '@/domain/system-inventory'
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
-import { ensureInfrastructureReferenceData, normalizeInfrastructureItem } from '@/domain/infrastructure-item'
+import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
@@ -27,6 +27,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
   const projectSystems = Array.isArray(state.projectSystems)
     ? state.projectSystems.map(normalizeProjectSystemLink)
     : seedState.projectSystems.map(normalizeProjectSystemLink)
+  const referenceData = ensureInfrastructureReferenceData(Array.isArray(state.referenceData) ? state.referenceData : [])
   const normalizedState = {
     ...state,
     salesManagers: (Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers).map((manager) => ({
@@ -56,9 +57,9 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
       : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
-    referenceData: ensureInfrastructureReferenceData(Array.isArray(state.referenceData) ? state.referenceData : []),
+    referenceData,
     versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
-    infrastructureItems: Array.isArray(state.infrastructureItems) ? state.infrastructureItems.map((item) => normalizeInfrastructureItem(item as never)) : [],
+    infrastructureItems: normalizeInfrastructureItemsForReferenceData(Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : [], referenceData),
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
     projectSystems,
     projectTenants: Array.isArray(state.projectTenants)

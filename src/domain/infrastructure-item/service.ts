@@ -16,6 +16,7 @@ import type {
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
+import { expiryAlertStatus, type ExpiryAlertStatus } from '@/domain/status-presentation'
 import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel } from '@/domain/warranty-collection'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
@@ -42,7 +43,7 @@ export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContac
 export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; types: string[] }> = [
   { category: 'Hardware', types: ['Server', 'Storage Server', 'Firewall', 'Laptop'] },
   { category: 'Software', types: [] },
-  { category: 'Cloud', types: ['Compute/Host', 'Open VPN'] },
+  { category: 'Cloud', types: ['Compute/Host', 'VPN'] },
   { category: 'Network', types: ['Domain'] },
 ]
 
@@ -80,6 +81,7 @@ export const INFRASTRUCTURE_PROPERTY_SCOPES = {
   vmMemoryType: 'vm.memoryType',
   vmMemorySize: 'vm.memorySize',
   vmOsVersion: 'vm.osVersion',
+  vpnType: 'vpn.type',
   firewallTokenType: 'firewall.tokenType',
   firewallModelFortiGate: 'firewall.model.fortigate',
   firewallModelPaloAlto: 'firewall.model.paloAlto',
@@ -104,6 +106,7 @@ const INFRASTRUCTURE_PROPERTY_DEFAULTS: Record<string, string[]> = {
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverMemorySize]: ['32G'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType]: ['Intel(R) Xeon(R) Silver 4110 CPU @ 8 Cores 2.10GHz', 'Intel Xeon 6505P 2.2GHz 12-core 150W'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.serverDiskType]: ['HP 2.4TB SAS', 'HPE 1.92TB SATA 6G'],
+  [INFRASTRUCTURE_PROPERTY_SCOPES.vpnType]: ['Open VPN'],
   [INFRASTRUCTURE_PROPERTY_SCOPES.firewallModelFortiGate]: ['60E', '60F', '70E'],
 }
 
@@ -277,6 +280,31 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
       }
       return record
     })
+  }
+  const cloudCategory = next.find((record) => record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE && record.normalizedLabel === normalizeReferenceLabel('Cloud'))
+  const legacyOpenVpnType = next.find((record) =>
+    record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE &&
+    record.normalizedLabel === normalizeReferenceLabel('Open VPN') &&
+    (!cloudCategory || infrastructureReferenceDataParentId(record) === cloudCategory.id),
+  )
+  const vpnType = next.find((record) =>
+    record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE &&
+    record.normalizedLabel === normalizeReferenceLabel('VPN') &&
+    (!cloudCategory || infrastructureReferenceDataParentId(record) === cloudCategory.id),
+  )
+  if (legacyOpenVpnType && !vpnType) {
+    next = next.map((record) =>
+      record.id === legacyOpenVpnType.id
+        ? {
+            ...record,
+            label: 'VPN',
+            normalizedLabel: normalizeReferenceLabel('VPN'),
+            active: true,
+            updatedAt: now,
+            updatedBy: 'System',
+          }
+        : record,
+    )
   }
 
   function appendReference(referenceType: string, label: string, parentReferenceId: string | null, prefix: string): ReferenceDataRecord {
@@ -512,6 +540,10 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     sslTypeRefId: text(raw.sslTypeRefId),
     sslVersion: text(raw.sslVersion),
     sslExpirationDate: text(raw.sslExpirationDate) || null,
+    vpnTypeRefId: text(raw.vpnTypeRefId),
+    vpnLicenseCount: numberOrNull(raw.vpnLicenseCount),
+    vpnLicenseExpirationDate: text(raw.vpnLicenseExpirationDate) || null,
+    vpnObsolete: raw.vpnObsolete === 'YES' || raw.vpnObsolete === 'NO' ? raw.vpnObsolete : 'NO',
   }
 }
 
@@ -689,6 +721,40 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
     createdAt: text(item.createdAt) || now,
     updatedAt: text(item.updatedAt) || now,
   }
+}
+
+export function normalizeInfrastructureItemsForReferenceData(
+  items: Array<Partial<InfrastructureItem> & Record<string, unknown>>,
+  referenceData: ReferenceDataRecord[],
+): InfrastructureItem[] {
+  const cloudCategory = referenceData.find((record) => record.referenceType === INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE && record.normalizedLabel === normalizeReferenceLabel('Cloud'))
+  const vpnType = referenceData.find((record) =>
+    record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE &&
+    record.normalizedLabel === normalizeReferenceLabel('VPN') &&
+    (!cloudCategory || infrastructureReferenceDataParentId(record) === cloudCategory.id),
+  )
+  const legacyOpenVpnTypeIds = new Set(
+    referenceData
+      .filter((record) =>
+        record.referenceType === INFRASTRUCTURE_TYPE_REFERENCE_TYPE &&
+        record.normalizedLabel === normalizeReferenceLabel('Open VPN') &&
+        (!cloudCategory || infrastructureReferenceDataParentId(record) === cloudCategory.id),
+      )
+      .map((record) => record.id),
+  )
+  return items.map((item) => {
+    const normalized = normalizeInfrastructureItem(item)
+    return vpnType && legacyOpenVpnTypeIds.has(normalized.typeRefId)
+      ? { ...normalized, typeRefId: vpnType.id, updatedAt: normalized.updatedAt }
+      : normalized
+  })
+}
+
+export function infrastructureVpnAlertStatus(properties: InfrastructureItemProperties | null | undefined, today = new Date()): ExpiryAlertStatus {
+  return expiryAlertStatus(properties?.vpnLicenseExpirationDate, {
+    obsolete: properties?.vpnObsolete === 'YES',
+    today,
+  })
 }
 
 export function infrastructureWarrantyStatus(item: Pick<InfrastructureItem, 'manualWarrantyStatus' | 'currentWarrantyStartDate' | 'currentWarrantyEndDate'>, today = new Date()): InfrastructureWarrantyStatus {

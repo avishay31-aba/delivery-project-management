@@ -664,6 +664,10 @@ export interface InfrastructureItemProperties {
   sslTypeRefId?: string
   sslVersion?: string
   sslExpirationDate?: string | null
+  vpnTypeRefId?: string
+  vpnLicenseCount?: number | null
+  vpnLicenseExpirationDate?: string | null
+  vpnObsolete?: YesNo | ''
 }
 
 export interface InfrastructureItem {

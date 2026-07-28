@@ -26,6 +26,8 @@ import type {
 import type { WarrantyStatus } from '@/data/seed.types'
 import { WARRANTY_STATUS_LABELS } from '@/domain/warranty-collection/metadata'
 
+export type ExpiryAlertStatus = 'NOT_SET' | 'VALID' | 'PENDING' | 'EXPIRED' | 'OBSOLETE'
+
 const DEFAULT_PRESENTATION: StatusPresentation = {
   key: 'default',
   kind: 'badge',
@@ -124,6 +126,26 @@ export function recordChangePresentation(state: 'New' | 'Updated'): StatusPresen
 export function warrantyStatusPresentation(status: string | null | undefined): StatusPresentation {
   const normalized = String(status ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_')
   return WARRANTY_PRESENTATIONS[normalized as WarrantyStatus] ?? WARRANTY_PRESENTATIONS.NOT_SET
+}
+
+export function expiryAlertStatus(
+  expirationDate: string | null | undefined,
+  {
+    obsolete = false,
+    pendingWindowDays = 90,
+    today = new Date(),
+  }: { obsolete?: boolean; pendingWindowDays?: number; today?: Date } = {},
+): ExpiryAlertStatus {
+  if (obsolete) return 'OBSOLETE'
+  if (!expirationDate) return 'NOT_SET'
+  const expiration = new Date(`${expirationDate}T00:00:00`)
+  if (Number.isNaN(expiration.valueOf())) return 'NOT_SET'
+  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const expirationDay = new Date(expiration.getFullYear(), expiration.getMonth(), expiration.getDate())
+  const daysUntilExpiration = Math.ceil((expirationDay.getTime() - current.getTime()) / 86_400_000)
+  if (daysUntilExpiration < 0) return 'EXPIRED'
+  if (daysUntilExpiration <= pendingWindowDays) return 'PENDING'
+  return 'VALID'
 }
 
 export function progressPresentation(value: number): ProgressPresentation {

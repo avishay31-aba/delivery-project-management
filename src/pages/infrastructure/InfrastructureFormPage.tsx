@@ -42,6 +42,7 @@ import {
   infrastructurePropertyValues,
   infrastructureReferenceDataLabel,
   infrastructureTypesForCategory,
+  infrastructureVpnAlertStatus,
   infrastructureWarrantyAlert,
   infrastructureWarrantyStatusFromCollection,
   infrastructureWarrantyTypes,
@@ -651,6 +652,36 @@ export function InfrastructureFormPage() {
     )
   }
 
+  function renderVpnProperties() {
+    const alertStatus = infrastructureVpnAlertStatus(draft.properties)
+    const alertLabel = alertStatus === 'NOT_SET'
+      ? 'Not Set'
+      : alertStatus === 'PENDING'
+        ? 'Pending'
+        : alertStatus.charAt(0) + alertStatus.slice(1).toLocaleLowerCase()
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start gap-3">
+          {propertySelect('Type', 'vpnTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.vpnType, STANDARD_FIELD_WIDTH)}
+          {renderNumberInput('Number of Licenses', draft.properties?.vpnLicenseCount, (value) => updateProperties({ vpnLicenseCount: value }))}
+          {renderDateInput('License Expiration Date', draft.properties?.vpnLicenseExpirationDate, (value) => updateProperties({ vpnLicenseExpirationDate: value }))}
+          <FormField label="Alert" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+            <div className="flex h-9 items-center px-2 text-sm text-sf-text">
+              <WarrantyStatusPresentation
+                status={alertStatus}
+                label={alertLabel}
+                tooltip={`Alert: ${alertLabel}`}
+              />
+            </div>
+          </FormField>
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {renderYesNo('Obsolete', draft.properties?.vpnObsolete ?? 'NO', (value) => updateProperties({ vpnObsolete: value }))}
+        </div>
+      </div>
+    )
+  }
+
   function renderPropertiesTab() {
     if (!selectedTypeLabel) return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">Select an Item Type to configure Properties.</div>
     if (selectedTypeLabel === 'Server' || selectedTypeLabel === 'Storage Server') return renderServerProperties()
@@ -658,6 +689,7 @@ export function InfrastructureFormPage() {
     if (selectedTypeLabel === 'Domain') return renderDomainProperties()
     if (selectedTypeLabel === 'Laptop') return renderLaptopProperties()
     if (selectedTypeLabel === 'Compute/Host') return renderVmGroups(false)
+    if (selectedTypeLabel === 'VPN') return renderVpnProperties()
     return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">No Properties are configured for this Item Type.</div>
   }
 
