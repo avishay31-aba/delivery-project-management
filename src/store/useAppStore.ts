@@ -13,7 +13,7 @@ import type {
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
-import { generateBusinessIdFromCounter, reserveBusinessId } from '@/domain/business-identity'
+import { generateBusinessIdFromCounter, idCountersWithBusinessId, reserveBusinessId } from '@/domain/business-identity'
 import {
   createActivityEvent,
   type ActivityObjectRefInput,
@@ -1420,7 +1420,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
-    const nextIdentity = generateBusinessIdFromCounter('infrastructureItem', state.idCounters, state.infrastructureItems.map((item) => item.infrastructureId))
+    const nextIdentity = normalizedDraft.infrastructureId
+      ? { id: normalizedDraft.infrastructureId, counters: idCountersWithBusinessId('infrastructureItem', state.idCounters, normalizedDraft.infrastructureId) }
+      : generateBusinessIdFromCounter('infrastructureItem', state.idCounters, state.infrastructureItems.map((item) => item.infrastructureId))
     const record: InfrastructureItem = normalizeInfrastructureItem({
       ...normalizedDraft,
       infrastructureId: nextIdentity.id,

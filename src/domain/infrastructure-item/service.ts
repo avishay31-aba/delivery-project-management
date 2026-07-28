@@ -496,10 +496,10 @@ export function currentInfrastructureWarranty(item: InfrastructureItem): TenantW
   return warranties.find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1] ?? null
 }
 
-export function createInfrastructureDraft(now = new Date().toISOString()): InfrastructureItem {
+export function createInfrastructureDraft(now = new Date().toISOString(), infrastructureId = ''): InfrastructureItem {
   return {
     id: `infrastructure-${crypto.randomUUID()}`,
-    infrastructureId: '',
+    infrastructureId,
     identifier: '',
     normalizedIdentifier: '',
     categoryRefId: '',

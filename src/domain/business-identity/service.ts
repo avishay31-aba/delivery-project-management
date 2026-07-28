@@ -165,6 +165,25 @@ export function generateBusinessIdFromCounter(
   }
 }
 
+export function idCountersWithBusinessId(
+  entityType: BusinessEntityType,
+  counters: IdCounters,
+  value: string | null | undefined,
+): IdCounters {
+  const policy = businessIdentityPolicy(entityType)
+  const counter = numericSuffix(value ?? '', policy.prefix)
+  if (counter == null) return counters
+  const nextCounter = Math.max(counters[entityType] ?? policy.minimumCounter, counter)
+
+  return {
+    ...counters,
+    [entityType]: nextCounter,
+    ...(entityType === 'project' ? { pid: nextCounter } : {}),
+    ...(entityType === 'productionSystem' ? { sid: nextCounter } : {}),
+    ...(entityType === 'tenant' ? { tid: nextCounter } : {}),
+  }
+}
+
 export function ensureBusinessId(
   entityType: BusinessEntityType,
   value: string | null | undefined,

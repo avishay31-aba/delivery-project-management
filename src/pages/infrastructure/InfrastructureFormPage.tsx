@@ -48,6 +48,7 @@ import {
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
+import { reserveBusinessId } from '@/domain/business-identity'
 import { infrastructureItemReference } from '@/domain/business-reference'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -171,7 +172,14 @@ export function InfrastructureFormPage() {
     () => infrastructureItems.find((item) => item.infrastructureId === infrastructureId || item.id === infrastructureId),
     [infrastructureId, infrastructureItems],
   )
-  const initialDraft = useMemo(() => draftWithDefaultOwner(savedItem ? cloneInfrastructureItem(savedItem) : createInfrastructureDraft(), ownerOptions), [ownerOptions, savedItem])
+  const newInfrastructureDraft = useMemo(() => {
+    if (!isNew) return null
+    return createInfrastructureDraft(undefined, reserveBusinessId('infrastructureItem', infrastructureItems.map((item) => item.infrastructureId)))
+  }, [infrastructureItems, isNew])
+  const initialDraft = useMemo(
+    () => draftWithDefaultOwner(savedItem ? cloneInfrastructureItem(savedItem) : newInfrastructureDraft ?? createInfrastructureDraft(), ownerOptions),
+    [newInfrastructureDraft, ownerOptions, savedItem],
+  )
   const { value: draft, setValue: setDraft, reset: resetDraft, undo: undoDraft, canUndo } = useUndoHistory<InfrastructureItem>(initialDraft, {
     clone: cloneInfrastructureItem,
     isEqual: valuesEqual,
@@ -201,7 +209,7 @@ export function InfrastructureFormPage() {
 
   useBeforeUnloadWarning(isDirty && !isViewMode)
   useReactiveDraftSync({
-    source: draftWithDefaultOwner(savedItem ? cloneInfrastructureItem(savedItem) : createInfrastructureDraft(), ownerOptions),
+    source: draftWithDefaultOwner(savedItem ? cloneInfrastructureItem(savedItem) : newInfrastructureDraft ?? createInfrastructureDraft(), ownerOptions),
     draft,
     resetDraft,
     clone: cloneInfrastructureItem,
@@ -643,13 +651,13 @@ export function InfrastructureFormPage() {
     )
   }
 
-  const title = isNew ? (
-    'New Infrastructure Item'
-  ) : (
+  const title = draft.infrastructureId ? (
     <span className="inline-flex flex-wrap items-center gap-2">
       <OperationalStatusIcon status={draft.operationalStatus} className="h-7 w-7" />
       <span>{`Infrastructure Item ${draft.infrastructureId}`}</span>
     </span>
+  ) : (
+    'New Infrastructure Item'
   )
 
   return (
