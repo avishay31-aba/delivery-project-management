@@ -6,11 +6,13 @@ import {
   Crosshair,
   Database,
   DoorOpen,
+  Edit2,
   Globe2,
   Grid3X3,
   Network,
   Plus,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/record'
@@ -29,7 +31,8 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessIdListLinks, BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessIdListLinks, BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
+import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -1530,16 +1533,17 @@ export function InventoryForm<T extends InventoryRecord>({
             </section>
           </div>
         ) : (
-          <div className="space-y-3">
-            {renderInfrastructureDialog()}
-            {!isViewMode ? (
-              <div className="flex flex-wrap items-center justify-start gap-2">
-                <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={openInfrastructureDialog}>
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add Item
-                </button>
-              </div>
+          <TableSection
+            title="Infrastructure"
+            actions={!isViewMode ? (
+              <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt" onClick={openInfrastructureDialog}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add Item
+              </button>
             ) : null}
+            className="space-y-3"
+          >
+            {renderInfrastructureDialog()}
             <div className="sf-scroll-x rounded border border-sf-border bg-white">
               <table className="min-w-full border-collapse text-sm leading-tight">
                 <thead className="bg-sf-surface-alt text-left">
@@ -1554,8 +1558,16 @@ export function InventoryForm<T extends InventoryRecord>({
                     <tr key={row.id} className="hover:bg-sf-surface-alt">
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
                         <div className="flex flex-wrap gap-1">
-                          <button type="button" className="font-semibold text-sf-brand hover:underline" onClick={() => navigate(`/infrastructure/${row.infrastructureId}`, { state: { mode: 'edit', returnTo: `${location.pathname}${location.search}` } })}>Edit</button>
-                          {!isViewMode ? <button type="button" className="font-semibold text-red-700 hover:underline" onClick={() => removeInfrastructureRelationship(row.id)}>Remove</button> : null}
+                          <EditableChildObjectActionButton onClick={() => navigate(`/infrastructure/${row.infrastructureId}`, { state: { mode: 'edit', returnTo: `${location.pathname}${location.search}` } })}>
+                            <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Edit
+                          </EditableChildObjectActionButton>
+                          {!isViewMode ? (
+                            <EditableChildObjectActionButton variant="danger" onClick={() => removeInfrastructureRelationship(row.id)}>
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Remove
+                            </EditableChildObjectActionButton>
+                          ) : null}
                         </div>
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1">
@@ -1589,7 +1601,7 @@ export function InventoryForm<T extends InventoryRecord>({
                 </tbody>
               </table>
             </div>
-          </div>
+          </TableSection>
         )}
       </div>
     )
