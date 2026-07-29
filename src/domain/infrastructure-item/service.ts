@@ -161,6 +161,24 @@ function normalizeInfrastructureBusinessId(value: unknown): string {
   return legacy ? `INF${legacy[1].padStart(6, '0')}` : current
 }
 
+function normalizeInfrastructureMaintenanceTaskId(
+  value: unknown,
+  existingTaskIds: Array<string | null | undefined>,
+  index: number,
+): string {
+  const current = text(value).trim()
+  const canonical = /^IMT(\d+)$/i.exec(current)
+  const legacy = /^MT(\d+)$/i.exec(current)
+  const candidate = canonical
+    ? `IMT${canonical[1].padStart(6, '0')}`
+    : legacy
+      ? `IMT${legacy[1].padStart(6, '0')}`
+      : ''
+  const used = new Set(existingTaskIds.map((id) => text(id).trim()).filter(Boolean))
+  if (candidate && !used.has(candidate)) return candidate
+  return reserveBusinessId('infrastructureMaintenanceTask', existingTaskIds, index)
+}
+
 function dateTimestamp(value: string | null | undefined): number | null {
   if (!value) return null
   const parsed = new Date(`${value}T00:00:00`)
@@ -407,7 +425,7 @@ function normalizeMaintenanceTask(
     : 'Open'
   return {
     id: text(record.id) || `infrastructure-maintenance-${crypto.randomUUID()}`,
-    taskId: text(record.taskId) || reserveBusinessId('infrastructureMaintenanceTask', existingTaskIds, index),
+    taskId: normalizeInfrastructureMaintenanceTaskId(record.taskId, existingTaskIds, index),
     taskTypeRefId: text(record.taskTypeRefId),
     task: text(record.task),
     startDate: text(record.startDate) || null,
@@ -421,8 +439,12 @@ function normalizeMaintenanceTask(
   }
 }
 
-export function normalizeInfrastructureMaintenanceTasks(tasks: InfrastructureMaintenanceTask[] | undefined, now = new Date().toISOString()): InfrastructureMaintenanceTask[] {
-  const usedTaskIds: string[] = []
+export function normalizeInfrastructureMaintenanceTasks(
+  tasks: InfrastructureMaintenanceTask[] | undefined,
+  now = new Date().toISOString(),
+  existingTaskIds: Array<string | null | undefined> = [],
+): InfrastructureMaintenanceTask[] {
+  const usedTaskIds = [...existingTaskIds.map((id) => text(id).trim()).filter(Boolean)]
   return (Array.isArray(tasks) ? tasks : []).map((task, index) => {
     const normalized = normalizeMaintenanceTask(task as Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index, now, usedTaskIds)
     usedTaskIds.push(normalized.taskId)
@@ -582,7 +604,9 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
 
 function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty[] {
   if (Array.isArray(item.warranties)) {
-    return item.warranties.map((warranty, index) => normalizeInfrastructureWarrantyRecord(warranty as Partial<TenantWarranty>, index, item))
+    return item.warranties.length > 0
+      ? item.warranties.map((warranty, index) => normalizeInfrastructureWarrantyRecord(warranty as Partial<TenantWarranty>, index, item))
+      : [defaultInfrastructureWarranty(item)]
   }
 
   const hasLegacyWarranty =
@@ -592,7 +616,7 @@ function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & R
     Boolean(text(item.currentWarrantyEndDate)) ||
     item.manualWarrantyStatus === 'NO_WARRANTY'
 
-  if (!hasLegacyWarranty) return []
+  if (!hasLegacyWarranty) return [defaultInfrastructureWarranty(item)]
 
   return [normalizeInfrastructureWarrantyRecord({
     id: `infrastructure-warranty-${crypto.randomUUID()}`,
@@ -603,6 +627,14 @@ function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & R
     noWarranty: item.manualWarrantyStatus === 'NO_WARRANTY' ? 'YES' : 'NO',
     remark: text((item.warrantyContact as InfrastructureWarrantyContact | undefined)?.address) || text(item.locationAddress),
   }, 0, item)]
+}
+
+function defaultInfrastructureWarranty(item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty {
+  return normalizeInfrastructureWarrantyRecord({
+    id: `infrastructure-warranty-${normalizeInfrastructureBusinessId(item.infrastructureId) || text(item.id) || 'default'}`,
+    warrantyId: 'W000001',
+    noWarranty: 'YES',
+  }, 0, item)
 }
 
 function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>, index: number, item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty {
@@ -715,7 +747,10 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
   }
 }
 
-export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & Record<string, unknown>): InfrastructureItem {
+export function normalizeInfrastructureItem(
+  item: Partial<InfrastructureItem> & Record<string, unknown>,
+  existingMaintenanceTaskIds: Array<string | null | undefined> = [],
+): InfrastructureItem {
   const now = new Date().toISOString()
   const identifier = text(item.identifier).trim()
   const legacyPhysicalAddress = text(item.physicalAddress)
@@ -725,7 +760,7 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
   }
   const properties = normalizeInfrastructureProperties(item)
   const warranties = normalizeInfrastructureWarranties(item)
-  const maintenanceTasks = normalizeInfrastructureMaintenanceTasks(item.maintenanceTasks, now)
+  const maintenanceTasks = normalizeInfrastructureMaintenanceTasks(item.maintenanceTasks, now, existingMaintenanceTaskIds)
   const currentWarranty = normalizeInfrastructureWarrantyCollection(warranties).find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1]
   return {
     id: text(item.id) || `infrastructure-${crypto.randomUUID()}`,
@@ -779,8 +814,10 @@ export function normalizeInfrastructureItemsForReferenceData(
       )
       .map((record) => record.id),
   )
+  const usedMaintenanceTaskIds: string[] = []
   return items.map((item) => {
-    const normalized = normalizeInfrastructureItem(item)
+    const normalized = normalizeInfrastructureItem(item, usedMaintenanceTaskIds)
+    usedMaintenanceTaskIds.push(...(normalized.maintenanceTasks ?? []).map((task) => task.taskId))
     return vpnType && legacyOpenVpnTypeIds.has(normalized.typeRefId)
       ? { ...normalized, typeRefId: vpnType.id, updatedAt: normalized.updatedAt }
       : normalized
