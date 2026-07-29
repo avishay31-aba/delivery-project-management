@@ -120,7 +120,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       onClick={addTask}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
-      Add Task
+      + Add Task
     </button>
   ) : null
 
