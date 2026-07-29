@@ -16,7 +16,6 @@ import {
   infrastructureReferenceDataLabel,
   INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS,
 } from '@/domain/infrastructure-item'
-import { hasMeaningfulRichText } from '@/domain/rich-text'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { handleDateInputPaste } from '@/utils/date-input'
 
@@ -78,7 +77,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
 
   function validateTask(draft: InfrastructureMaintenanceTask): string[] {
     const errors: string[] = []
-    if (!hasMeaningfulRichText(draft.task)) errors.push('Description is required.')
+    if (!draft.taskTypeRefId) errors.push('Task Type is required.')
     if (draft.startDate && Number.isNaN(new Date(`${draft.startDate}T00:00:00`).valueOf())) errors.push('Start Date is invalid.')
     if (draft.dueDate && Number.isNaN(new Date(`${draft.dueDate}T00:00:00`).valueOf())) errors.push('Due Date is invalid.')
     if (!INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(draft.taskStatus)) errors.push('Task Status is invalid.')
@@ -108,7 +107,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       validate: validateTask,
       commit: commitTask,
       normalize: normalizedTask,
-      isMeaningfulNewDraft: (draft) => hasMeaningfulRichText(draft.task) || Boolean(draft.taskTypeRefId || draft.startDate || draft.dueDate) || draft.taskStatus !== 'Open',
+      isMeaningfulNewDraft: () => true,
       successMessage: 'Maintenance Task saved.',
     })
   }
@@ -120,7 +119,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       onClick={addTask}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
-      + Add Task
+      Add Task
     </button>
   ) : null
 
@@ -190,7 +189,14 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-2 py-2">
                     {isEditing ? (
-                      <select className="h-8 w-56 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.taskTypeRefId} onChange={(event) => changeTaskType(task.id, event.target.value)}>
+                      <select
+                        className={[
+                          'h-8 w-56 rounded border px-2 py-1 pr-8 text-sm',
+                          errors.some((error) => error.includes('Task Type')) ? 'border-red-500' : 'border-sf-border',
+                        ].join(' ')}
+                        value={row.taskTypeRefId}
+                        onChange={(event) => changeTaskType(task.id, event.target.value)}
+                      >
                         <option value=""></option>
                         {taskTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                         <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
