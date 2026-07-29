@@ -22,6 +22,7 @@ export type BusinessEntityType =
   | 'infrastructureBillingMethod'
   | 'infrastructureWarrantyType'
   | 'infrastructurePropertyValue'
+  | 'infrastructureMaintenanceTask'
 
 export interface BusinessIdentityPolicy {
   entityType: BusinessEntityType

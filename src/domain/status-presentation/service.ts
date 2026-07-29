@@ -8,6 +8,7 @@ import {
   CircleCheck,
   CircleHelp,
   CircleX,
+  Hourglass,
   Info,
   LockKeyhole,
   OctagonAlert,
@@ -92,6 +93,14 @@ const WARRANTY_PRESENTATIONS: Record<WarrantyStatus, StatusPresentation> = {
   OBSOLETE: { ...DEFAULT_PRESENTATION, key: 'OBSOLETE', kind: 'warranty', label: WARRANTY_STATUS_LABELS.OBSOLETE, icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.OBSOLETE}` },
 }
 
+const MAINTENANCE_PRESENTATIONS: Record<string, StatusPresentation> = {
+  none: { ...DEFAULT_PRESENTATION, key: 'none', kind: 'maintenance', label: 'None', icon: Ban, iconClassName: 'text-sf-text-muted', badgeClassName: 'bg-gray-100 text-gray-700', tooltip: 'Maintenance status: None' },
+  planned: { ...DEFAULT_PRESENTATION, key: 'planned', kind: 'maintenance', label: 'Planned', icon: Calendar, iconClassName: 'text-sf-brand-light', badgeClassName: 'bg-blue-50 text-blue-700', tooltip: 'Maintenance status: Planned' },
+  pending: { ...DEFAULT_PRESENTATION, key: 'pending', kind: 'maintenance', label: 'Pending', icon: AlertTriangle, iconClassName: 'text-sf-warning', badgeClassName: 'bg-orange-100 text-orange-800', tooltip: 'Maintenance status: Pending' },
+  overdue: { ...DEFAULT_PRESENTATION, key: 'overdue', kind: 'maintenance', label: 'Overdue', icon: Hourglass, iconClassName: 'text-sf-error', badgeClassName: 'bg-red-100 text-red-800', tooltip: 'Maintenance status: Overdue' },
+  delayed: { ...DEFAULT_PRESENTATION, key: 'delayed', kind: 'maintenance', label: 'Delayed', icon: Calendar, iconClassName: 'text-sf-error', badgeClassName: 'bg-red-100 text-red-800', tooltip: 'Maintenance status: Delayed' },
+}
+
 export function statusBadgePresentation(variant: StatusBadgeVariant): StatusPresentation {
   return BADGE_PRESENTATIONS[variant] ?? BADGE_PRESENTATIONS.default
 }
@@ -126,6 +135,11 @@ export function recordChangePresentation(state: 'New' | 'Updated'): StatusPresen
 export function warrantyStatusPresentation(status: string | null | undefined): StatusPresentation {
   const normalized = String(status ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_')
   return WARRANTY_PRESENTATIONS[normalized as WarrantyStatus] ?? WARRANTY_PRESENTATIONS.NOT_SET
+}
+
+export function maintenanceStatusPresentation(status: string | null | undefined): StatusPresentation {
+  const key = String(status ?? '').trim().toLocaleLowerCase()
+  return MAINTENANCE_PRESENTATIONS[key] ?? MAINTENANCE_PRESENTATIONS.none
 }
 
 export function expiryAlertStatus(

@@ -57,6 +57,8 @@ export type IdCounterKey =
   | 'infrastructureOwner'
   | 'infrastructureBillingMethod'
   | 'infrastructureWarrantyType'
+  | 'infrastructurePropertyValue'
+  | 'infrastructureMaintenanceTask'
   | 'pid'
   | 'sid'
   | 'tid'
@@ -90,6 +92,7 @@ export interface IdCounters {
   infrastructureBillingMethod: number
   infrastructureWarrantyType: number
   infrastructurePropertyValue: number
+  infrastructureMaintenanceTask: number
   pid: number
   sid: number
   tid: number
@@ -571,6 +574,7 @@ export type ReferenceDataType =
   | 'INFRASTRUCTURE_BILLING_METHOD'
   | 'INFRASTRUCTURE_WARRANTY_TYPE'
   | 'INFRASTRUCTURE_PROPERTY_VALUE'
+  | 'INFRASTRUCTURE_MAINTENANCE_TASK_TYPE'
 
 export interface ReferenceDataRecord {
   id: string
@@ -588,7 +592,7 @@ export interface ReferenceDataRecord {
 
 export type InfrastructureOwner = 'Penlink' | 'Agent' | 'Customer'
 export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew'
-export type InfrastructureMaintenanceStatus = 'Not Set Yet' | 'Planned' | 'Current' | 'Pending' | 'Expired' | 'No Warranty' | 'Obsolete'
+export type InfrastructureMaintenanceStatus = 'None' | 'Planned' | 'Pending' | 'Overdue' | 'Delayed' | 'Not Set Yet' | 'Current' | 'Expired' | 'No Warranty' | 'Obsolete'
 export type InfrastructureManualWarrantyStatus = 'NO_WARRANTY' | 'OBSOLETE'
 export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'PENDING' | 'EXPIRED' | InfrastructureManualWarrantyStatus
 
@@ -628,7 +632,9 @@ export type InfrastructureMaintenanceTaskStatus = 'Open' | 'Done'
 export interface InfrastructureMaintenanceTask {
   id: string
   taskId: string
+  taskTypeRefId: string
   task: string
+  startDate: string | null
   dueDate: string | null
   taskStatus: InfrastructureMaintenanceTaskStatus
   completionDate: string | null

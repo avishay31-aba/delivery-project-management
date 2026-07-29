@@ -9,6 +9,7 @@ import { SystemDeliveryTable } from '@/components/systems'
 import { WarrantyCollectionGrid } from '@/components/warranty/WarrantyCollectionGrid'
 import {
   FormField,
+  MaintenanceStatusPresentation,
   OperationalStatusIcon,
   OperationalStatusSelect,
   PlaceholderCard,
@@ -24,6 +25,7 @@ import {
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
   INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
+  INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS,
   INFRASTRUCTURE_OWNER_REFERENCE_TYPE,
   INFRASTRUCTURE_PROPERTY_SCOPES,
@@ -35,6 +37,7 @@ import {
   infrastructureCategories,
   infrastructureDashboardRows,
   infrastructureLastMaintenanceDate,
+  infrastructureMaintenanceStatusFromTasks,
   infrastructureManufacturerPropertyScope,
   infrastructureManufacturersForType,
   infrastructureOwners,
@@ -465,6 +468,11 @@ export function InfrastructureFormPage() {
           <FormField label="Last Maintenance Date" controlWidthClassName={STANDARD_FIELD_WIDTH}>
             <div className="flex h-9 items-center px-2 text-sm text-sf-text"><DateTimeValue value={infrastructureLastMaintenanceDate(draft)} semanticType="date" /></div>
           </FormField>
+          <FormField label="Maintenance Status" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+            <div className="flex h-9 items-center px-2 text-sm text-sf-text">
+              <MaintenanceStatusPresentation status={infrastructureMaintenanceStatusFromTasks(draft)} />
+            </div>
+          </FormField>
         </div>
       </section>
     )
@@ -747,6 +755,8 @@ export function InfrastructureFormPage() {
           <InfrastructureMaintenanceGrid
             tasks={draft.maintenanceTasks ?? []}
             onChange={(maintenanceTasks) => commitChildPatch({ maintenanceTasks })}
+            referenceData={referenceData}
+            onAddTaskType={(label) => createReferenceDataRecord(INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE, label)}
             readOnly={isViewMode}
           />
         </section>

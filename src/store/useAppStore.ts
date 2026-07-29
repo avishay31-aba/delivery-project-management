@@ -105,6 +105,7 @@ import {
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
+  INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_OWNER_REFERENCE_TYPE,
   INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
@@ -1321,7 +1322,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
                   : referenceType === INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE ? 'infrastructureBillingMethod'
                     : referenceType === INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE ? 'infrastructureWarrantyType'
                       : referenceType === INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE ? 'infrastructurePropertyValue'
-                        : 'infrastructureType'
+                        : referenceType === INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE ? 'infrastructureMaintenanceTask'
+                          : 'infrastructureType'
     const nextId = generateBusinessIdFromCounter(entityType, state.idCounters, state.referenceData.map((record) => record.id))
     const record: ReferenceDataRecord = {
       id: nextId.id,

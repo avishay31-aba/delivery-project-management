@@ -16,6 +16,7 @@ import type {
   ReusedInternalSystem,
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
+import { reserveBusinessId } from '@/domain/business-identity'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
 import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
@@ -27,11 +28,12 @@ export const INFRASTRUCTURE_OWNER_REFERENCE_TYPE = 'INFRASTRUCTURE_OWNER'
 export const INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE = 'INFRASTRUCTURE_BILLING_METHOD'
 export const INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_WARRANTY_TYPE'
 export const INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE = 'INFRASTRUCTURE_PROPERTY_VALUE'
+export const INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_MAINTENANCE_TASK_TYPE'
 export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
-export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['Not Set Yet', 'Planned', 'Current', 'Pending', 'Expired', 'No Warranty', 'Obsolete']
+export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['None', 'Planned', 'Pending', 'Overdue', 'Delayed', 'Not Set Yet', 'Current', 'Expired', 'No Warranty', 'Obsolete']
 export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'Done']
 
 export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContact = {
@@ -123,6 +125,7 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   linkedSystemBusinessIds: string[]
   linkedSystemsDisplay: string
   linkedSidTidDisplay: string
+  lastMaintenanceDate: string | null
   warrantyStatus: InfrastructureWarrantyStatus
   itemWarrantyDaysLeft: number | null
   latestExpiringTenantId: string
@@ -237,6 +240,12 @@ export function infrastructureBillingMethods(referenceData: ReferenceDataRecord[
 export function infrastructureWarrantyTypes(referenceData: ReferenceDataRecord[]): ReferenceDataRecord[] {
   return referenceData
     .filter((record) => record.referenceType === INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE && record.active)
+    .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
+}
+
+export function infrastructureMaintenanceTaskTypes(referenceData: ReferenceDataRecord[]): ReferenceDataRecord[] {
+  return referenceData
+    .filter((record) => record.referenceType === INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE && record.active)
     .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
 }
 
@@ -387,14 +396,21 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
   return next
 }
 
-function normalizeMaintenanceTask(record: Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index: number, now: string): InfrastructureMaintenanceTask {
+function normalizeMaintenanceTask(
+  record: Partial<InfrastructureMaintenanceTask> & Record<string, unknown>,
+  index: number,
+  now: string,
+  existingTaskIds: Array<string | null | undefined> = [],
+): InfrastructureMaintenanceTask {
   const status = INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(record.taskStatus as InfrastructureMaintenanceTaskStatus)
     ? record.taskStatus as InfrastructureMaintenanceTaskStatus
     : 'Open'
   return {
     id: text(record.id) || `infrastructure-maintenance-${crypto.randomUUID()}`,
-    taskId: text(record.taskId) || `MT${String(index + 1).padStart(6, '0')}`,
+    taskId: text(record.taskId) || reserveBusinessId('infrastructureMaintenanceTask', existingTaskIds, index),
+    taskTypeRefId: text(record.taskTypeRefId),
     task: text(record.task),
+    startDate: text(record.startDate) || null,
     dueDate: text(record.dueDate) || null,
     taskStatus: status,
     completionDate: status === 'Done' ? text(record.completionDate) || businessDate(new Date(now)) : null,
@@ -406,14 +422,21 @@ function normalizeMaintenanceTask(record: Partial<InfrastructureMaintenanceTask>
 }
 
 export function normalizeInfrastructureMaintenanceTasks(tasks: InfrastructureMaintenanceTask[] | undefined, now = new Date().toISOString()): InfrastructureMaintenanceTask[] {
-  return (Array.isArray(tasks) ? tasks : []).map((task, index) => normalizeMaintenanceTask(task as Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index, now))
+  const usedTaskIds: string[] = []
+  return (Array.isArray(tasks) ? tasks : []).map((task, index) => {
+    const normalized = normalizeMaintenanceTask(task as Partial<InfrastructureMaintenanceTask> & Record<string, unknown>, index, now, usedTaskIds)
+    usedTaskIds.push(normalized.taskId)
+    return normalized
+  })
 }
 
 export function createInfrastructureMaintenanceTask(tasks: InfrastructureMaintenanceTask[], now = new Date().toISOString()): InfrastructureMaintenanceTask {
   return normalizeMaintenanceTask({
     id: `infrastructure-maintenance-${crypto.randomUUID()}`,
-    taskId: `MT${String(tasks.length + 1).padStart(6, '0')}`,
+    taskId: reserveBusinessId('infrastructureMaintenanceTask', tasks.map((task) => task.taskId)),
+    taskTypeRefId: '',
     task: '',
+    startDate: null,
     dueDate: null,
     taskStatus: 'Open',
     completionDate: null,
@@ -421,7 +444,7 @@ export function createInfrastructureMaintenanceTask(tasks: InfrastructureMainten
     createdBy: 'Demo User',
     updatedAt: now,
     updatedBy: 'Demo User',
-  }, tasks.length, now)
+  }, tasks.length, now, tasks.map((task) => task.taskId))
 }
 
 export function commitInfrastructureMaintenanceTask(
@@ -444,22 +467,36 @@ export function commitInfrastructureMaintenanceTask(
   return { ...normalized, completionDate: null }
 }
 
-export function infrastructureMaintenanceAlert(task: Pick<InfrastructureMaintenanceTask, 'taskStatus' | 'dueDate'>, today = new Date()): '' | 'Pending' | 'Overdue' {
-  if (task.taskStatus === 'Done' || !task.dueDate) return ''
+export type InfrastructureMaintenanceAlert = '' | 'Planned' | 'Pending' | 'Overdue' | 'Delayed'
+
+export function infrastructureMaintenanceAlert(task: Pick<InfrastructureMaintenanceTask, 'taskStatus' | 'startDate' | 'dueDate'>, today = new Date()): InfrastructureMaintenanceAlert {
+  if (task.taskStatus === 'Done') return ''
   const due = dateTimestamp(task.dueDate)
-  if (due === null) return ''
   const now = todayTimestamp(today)
-  if (now > due) return 'Overdue'
-  const pendingStart = due - (90 * 86_400_000)
-  return now >= pendingStart ? 'Pending' : ''
+  if (due !== null && now > due) return 'Overdue'
+  const start = dateTimestamp(task.startDate)
+  if (start === null) return ''
+  if (now > start) return 'Delayed'
+  if (now >= start - (90 * 86_400_000)) return 'Pending'
+  return 'Planned'
 }
 
 export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem, 'maintenanceTasks'>): string | null {
-  const completedDates = (item.maintenanceTasks ?? [])
-    .filter((task) => task.taskStatus === 'Done' && Boolean(task.completionDate))
-    .map((task) => task.completionDate as string)
-    .sort((first, second) => second.localeCompare(first))
-  return completedDates[0] ?? null
+  const latestActivity = (item.maintenanceTasks ?? [])
+    .map((task) => text(task.updatedAt) || text(task.completionDate) || text(task.dueDate) || text(task.startDate))
+    .filter(Boolean)
+    .sort((first, second) => second.localeCompare(first))[0]
+  return latestActivity ? businessDate(new Date(latestActivity)) : null
+}
+
+export function infrastructureMaintenanceStatusFromTasks(item: Pick<InfrastructureItem, 'maintenanceTasks'>): InfrastructureMaintenanceStatus {
+  const severity: Exclude<InfrastructureMaintenanceAlert, ''>[] = ['Delayed', 'Overdue', 'Pending', 'Planned']
+  const alerts = new Set<Exclude<InfrastructureMaintenanceAlert, ''>>(
+    (item.maintenanceTasks ?? [])
+      .map((task) => infrastructureMaintenanceAlert(task))
+      .filter((alert): alert is Exclude<InfrastructureMaintenanceAlert, ''> => Boolean(alert)),
+  )
+  return severity.find((status) => alerts.has(status)) ?? 'None'
 }
 
 function normalizeVmProperties(value: unknown): InfrastructureItemProperties['vms'] {
@@ -659,7 +696,7 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
     ownerRefId: '',
     billingMethodRefId: '',
     operationalStatus: 'Active',
-    maintenanceStatus: 'Not Set Yet',
+    maintenanceStatus: 'None',
     linkedSystemIds: [],
     initialWarrantyStartDate: null,
     currentWarrantyStartDate: null,
@@ -704,7 +741,7 @@ export function normalizeInfrastructureItem(item: Partial<InfrastructureItem> & 
     ownerRefId: text(item.ownerRefId),
     billingMethodRefId: text(item.billingMethodRefId),
     operationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.operationalStatus as InfrastructureOperationalStatus) ? item.operationalStatus as InfrastructureOperationalStatus : 'Active',
-    maintenanceStatus: INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS.includes(item.maintenanceStatus as InfrastructureMaintenanceStatus) ? item.maintenanceStatus as InfrastructureMaintenanceStatus : 'Not Set Yet',
+    maintenanceStatus: infrastructureMaintenanceStatusFromTasks({ maintenanceTasks }),
     linkedSystemIds: Array.isArray(item.linkedSystemIds) ? item.linkedSystemIds.map(text).filter(Boolean) : [],
     initialWarrantyStartDate: text(item.initialWarrantyStartDate) || currentWarranty?.startDate || null,
     currentWarrantyStartDate: (currentWarranty?.startDate ?? text(item.currentWarrantyStartDate)) || null,
@@ -924,7 +961,8 @@ export function infrastructureDashboardRows(
         manufacturerLabel: infrastructureReferenceDataLabel(referenceData, item.properties?.manufacturerRefId ?? item.manufacturerRefId),
         ownerLabel: infrastructureReferenceDataLabel(referenceData, item.ownerRefId) || item.owner,
         billingMethodLabel: infrastructureReferenceDataLabel(referenceData, item.billingMethodRefId),
-        maintenanceStatus: item.maintenanceStatus,
+        lastMaintenanceDate: infrastructureLastMaintenanceDate(item),
+        maintenanceStatus: infrastructureMaintenanceStatusFromTasks(item),
         productsDisplay: linkedSystemProducts(item, systems).join('; '),
         linkedSystemBusinessIds: linkedSystemIds,
         linkedSystemsDisplay: linkedSystemIds.join('; '),

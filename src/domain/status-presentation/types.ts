@@ -8,6 +8,7 @@ export type StatusPresentationKind =
   | 'milestone'
   | 'task'
   | 'warranty'
+  | 'maintenance'
   | 'recordChange'
   | 'progress'
 

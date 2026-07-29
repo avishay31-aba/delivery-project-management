@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, OperationalStatusIcon } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, OperationalStatusIcon } from '@/components/ui'
 import { displayWarrantyStatus } from '@/domain/warranty-collection'
 import type { InfrastructureDashboardRow } from '@/domain/infrastructure-item'
 
@@ -58,8 +58,8 @@ export function createInfrastructureColumns(options: { includeActions?: boolean 
     { id: 'latestTenantWarrantyEndDate', label: 'Latest Tenant Warranty End', getValue: (row) => row.latestTenantWarrantyEndDate || '', semanticType: 'date', sortValue: (row) => row.latestTenantWarrantyEndDate || '' },
     { id: 'tidWarrantyMonthsLeft', label: 'TID Warranty Months Left', getValue: (row) => row.tidWarrantyMonthsLeft, sortValue: (row) => row.tidWarrantyMonthsLeft ?? '', promoteAsBusinessIdentifier: false },
     { id: 'tidWarrantyDaysLeft', label: 'TID Warranty Days Left', getValue: (row) => row.tidWarrantyDaysLeft, sortValue: (row) => row.tidWarrantyDaysLeft ?? '', promoteAsBusinessIdentifier: false },
-    { id: 'lastUpdatedDate', label: 'Last Updated', getValue: (row) => row.lastUpdatedDate ?? '', semanticType: 'date' },
-    { id: 'maintenanceStatus', label: 'Maintenance Status', getValue: (row) => row.maintenanceStatus },
+    { id: 'lastMaintenanceDate', label: 'Last Maintenance Date', getValue: (row) => row.lastMaintenanceDate ?? '', semanticType: 'date' },
+    { id: 'maintenanceStatus', label: 'Maintenance Status', getValue: (row) => row.maintenanceStatus, render: (row) => createElement(MaintenanceStatusPresentation, { status: row.maintenanceStatus }) },
     { id: 'initialWarrantyStartDate', label: 'Initial Warranty Date', getValue: (row) => row.initialWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyStartDate', label: 'Current Warranty Start Date', getValue: (row) => row.currentWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyEndDate', label: 'Current Warranty End Date', getValue: (row) => row.currentWarrantyEndDate ?? '', semanticType: 'date' },

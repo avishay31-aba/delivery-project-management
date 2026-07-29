@@ -5,26 +5,34 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { RichTextContent, RichTextEditor, StatusBadge, TableSection } from '@/components/ui'
-import type { InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus } from '@/data/seed.types'
+import { BusinessIdLink, MaintenanceStatusPresentation, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import type { InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
+  ADD_NEW_REFERENCE_OPTION,
   commitInfrastructureMaintenanceTask,
   createInfrastructureMaintenanceTask,
   infrastructureMaintenanceAlert,
+  infrastructureMaintenanceTaskTypes,
+  infrastructureReferenceDataLabel,
   INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS,
 } from '@/domain/infrastructure-item'
 import { hasMeaningfulRichText } from '@/domain/rich-text'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { handleDateInputPaste } from '@/utils/date-input'
 
 interface InfrastructureMaintenanceGridProps {
   tasks: InfrastructureMaintenanceTask[]
   onChange: (tasks: InfrastructureMaintenanceTask[]) => void
+  referenceData: ReferenceDataRecord[]
+  onAddTaskType: (label: string) => { ok: boolean; message: string; record?: ReferenceDataRecord }
   readOnly?: boolean
 }
 
 function normalizedTask(record: InfrastructureMaintenanceTask) {
   return {
+    taskTypeRefId: record.taskTypeRefId,
     task: record.task,
+    startDate: record.startDate ?? null,
     dueDate: record.dueDate ?? null,
     taskStatus: record.taskStatus,
   }
@@ -33,12 +41,13 @@ function normalizedTask(record: InfrastructureMaintenanceTask) {
 function alertBadge(task: InfrastructureMaintenanceTask) {
   const alert = infrastructureMaintenanceAlert(task)
   if (!alert) return null
-  return <StatusBadge label={alert} variant={alert === 'Overdue' ? 'error' : 'warning'} />
+  return <MaintenanceStatusPresentation status={alert} />
 }
 
-export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = false }: InfrastructureMaintenanceGridProps) {
+export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, onAddTaskType, readOnly = false }: InfrastructureMaintenanceGridProps) {
   const editor = useEditableChildObjectEditor<InfrastructureMaintenanceTask>()
   const permissions = editableChildObjectPermissions({ readOnly })
+  const taskTypeOptions = infrastructureMaintenanceTaskTypes(referenceData)
   const committedTaskIds = tasks.map((task) => task.id).join('|')
   const renderedTasks = [
     ...tasks,
@@ -69,10 +78,29 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = fals
 
   function validateTask(draft: InfrastructureMaintenanceTask): string[] {
     const errors: string[] = []
-    if (!hasMeaningfulRichText(draft.task)) errors.push('Task is required.')
+    if (!hasMeaningfulRichText(draft.task)) errors.push('Description is required.')
+    if (draft.startDate && Number.isNaN(new Date(`${draft.startDate}T00:00:00`).valueOf())) errors.push('Start Date is invalid.')
     if (draft.dueDate && Number.isNaN(new Date(`${draft.dueDate}T00:00:00`).valueOf())) errors.push('Due Date is invalid.')
     if (!INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(draft.taskStatus)) errors.push('Task Status is invalid.')
     return errors
+  }
+
+  function changeTaskType(taskId: string, value: string) {
+    if (value !== ADD_NEW_REFERENCE_OPTION) {
+      editor.updateDraft(taskId, { taskTypeRefId: value })
+      return
+    }
+    const label = window.prompt('Add Infrastructure Maintenance Task Type')
+    if (!label) {
+      editor.updateDraft(taskId, { taskTypeRefId: '' })
+      return
+    }
+    const result = onAddTaskType(label)
+    if (result.ok && result.record) {
+      editor.updateDraft(taskId, { taskTypeRefId: result.record.id })
+      return
+    }
+    window.alert(result.message)
   }
 
   function saveTask(id: string) {
@@ -80,7 +108,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = fals
       validate: validateTask,
       commit: commitTask,
       normalize: normalizedTask,
-      isMeaningfulNewDraft: (draft) => hasMeaningfulRichText(draft.task) || Boolean(draft.dueDate) || draft.taskStatus !== 'Open',
+      isMeaningfulNewDraft: (draft) => hasMeaningfulRichText(draft.task) || Boolean(draft.taskTypeRefId || draft.startDate || draft.dueDate) || draft.taskStatus !== 'Open',
       successMessage: 'Maintenance Task saved.',
     })
   }
@@ -108,7 +136,10 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = fals
           <thead className="bg-sf-surface-alt text-left text-xs uppercase tracking-wide text-sf-text-muted">
             <tr>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Actions</th>
-              <th className="min-w-[24rem] border border-sf-border px-2 py-2">Task</th>
+              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task ID</th>
+              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Type</th>
+              <th className="min-w-[24rem] border border-sf-border px-2 py-2">Description</th>
+              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Start Date</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Due Date</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Status</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Alert</th>
@@ -117,7 +148,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = fals
           <tbody>
             {renderedTasks.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-sf-border px-3 py-4 text-center text-sf-text-muted">No Maintenance Tasks yet.</td>
+                <td colSpan={8} className="border border-sf-border px-3 py-4 text-center text-sf-text-muted">No Maintenance Tasks yet.</td>
               </tr>
             ) : renderedTasks.map((task) => {
               const draft = editor.draftFor(task.id)
@@ -154,11 +185,26 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, readOnly = fals
                     </div>
                     {errors.length > 0 ? <div className="mt-2 space-y-1 text-xs text-red-700">{errors.map((error) => <div key={error}>{error}</div>)}</div> : null}
                   </td>
+                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
+                    <BusinessIdLink objectType="INFRASTRUCTURE_MAINTENANCE_TASK" businessId={row.taskId}>{row.taskId}</BusinessIdLink>
+                  </td>
+                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
+                    {isEditing ? (
+                      <select className="h-8 w-56 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.taskTypeRefId} onChange={(event) => changeTaskType(task.id, event.target.value)}>
+                        <option value=""></option>
+                        {taskTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                        <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
+                      </select>
+                    ) : infrastructureReferenceDataLabel(referenceData, row.taskTypeRefId) || '-'}
+                  </td>
                   <td className="border border-sf-border px-2 py-2">
                     {isEditing ? <RichTextEditor value={row.task} onChange={(value) => editor.updateDraft(task.id, { task: value })} minHeightClassName="min-h-24" /> : <RichTextContent value={row.task} />}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    {isEditing ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.dueDate ?? ''} onChange={(event) => editor.updateDraft(task.id, { dueDate: event.target.value || null })} /> : row.dueDate || '-'}
+                    {isEditing ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { startDate: value }))} onChange={(event) => editor.updateDraft(task.id, { startDate: event.target.value || null })} /> : row.startDate || '-'}
+                  </td>
+                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
+                    {isEditing ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.dueDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { dueDate: value }))} onChange={(event) => editor.updateDraft(task.id, { dueDate: event.target.value || null })} /> : row.dueDate || '-'}
                   </td>
                   <td className="whitespace-nowrap border border-sf-border px-2 py-2">
                     {isEditing ? (

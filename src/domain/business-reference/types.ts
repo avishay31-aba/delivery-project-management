@@ -26,6 +26,7 @@ export type BusinessObjectType =
   | 'MILESTONE'
   | 'TASK'
   | 'INFRASTRUCTURE_ITEM'
+  | 'INFRASTRUCTURE_MAINTENANCE_TASK'
 
 export interface BusinessObjectReference {
   objectType: BusinessObjectType

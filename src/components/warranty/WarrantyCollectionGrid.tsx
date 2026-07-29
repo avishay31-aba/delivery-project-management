@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { Edit2, Save, X } from 'lucide-react'
 import { EditableChildObjectActionButton, editableChildObjectPermissions, useEditableChildObjectEditor } from '@/components/child-objects'
 import { RichTextContent, RichTextEditor, TableSection, WarrantyStatusPresentation } from '@/components/ui'
 import type { TenantWarranty } from '@/data/seed.types'
@@ -41,28 +41,22 @@ export function WarrantyCollectionGrid({
   const editor = useEditableChildObjectEditor<TenantWarranty>()
   const permissions = editableChildObjectPermissions({ readOnly })
   const committedIds = warranties.map((warranty) => warranty.id).join('|')
-  const renderedWarranties = [
-    ...warranties,
-    ...editor.newDrafts.filter((draft) => !warranties.some((warranty) => warranty.id === draft.id)),
-  ]
+  const defaultWarranty = useMemo(
+    () => normalizeInfrastructureWarrantyCollection([{ ...createInfrastructureWarranty([]), noWarranty: 'YES' }])[0],
+    [committedIds],
+  )
+  const renderedWarranties = [warranties[0] ?? editor.newDrafts[0] ?? defaultWarranty]
 
   useEffect(() => {
     editor.reset()
   }, [committedIds])
-
-  function addWarranty() {
-    editor.beginAdd(createInfrastructureWarranty(warranties))
-  }
 
   function updateDraft(id: string, patch: Partial<TenantWarranty>) {
     editor.updateDraft(id, patch)
   }
 
   function commitWarranty(draft: TenantWarranty) {
-    const next = warranties.some((warranty) => warranty.id === draft.id)
-      ? warranties.map((warranty) => (warranty.id === draft.id ? draft : warranty))
-      : [...warranties, draft]
-    onChange(normalizeInfrastructureWarrantyCollection(next))
+    onChange(normalizeInfrastructureWarrantyCollection([draft]))
   }
 
   function saveWarranty(id: string) {
@@ -89,23 +83,8 @@ export function WarrantyCollectionGrid({
     editor.cancel(id)
   }
 
-  function deleteWarranty(id: string) {
-    editor.commitDelete(id, {
-      confirmMessage: 'Delete this Warranty record?\n\nThis change will be saved immediately and cannot be undone.',
-      commit: () => onChange(normalizeInfrastructureWarrantyCollection(warranties.filter((warranty) => warranty.id !== id))),
-      successMessage: 'Warranty deleted.',
-    })
-  }
-
-  const actions = permissions.canAdd ? (
-    <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
-      <Plus className="h-4 w-4" aria-hidden="true" />
-      Add warranty
-    </button>
-  ) : null
-
   return (
-    <TableSection title="Warranty" actions={actions} className="space-y-2">
+    <TableSection title="Warranty" className="space-y-2">
       {editor.notification ? (
         <div
           className={[
@@ -158,10 +137,6 @@ export function WarrantyCollectionGrid({
                             <EditableChildObjectActionButton onClick={() => editor.beginEdit(warranty)}>
                               <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
                               Edit
-                            </EditableChildObjectActionButton>
-                            <EditableChildObjectActionButton variant="danger" onClick={() => deleteWarranty(warranty.id)}>
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              Delete
                             </EditableChildObjectActionButton>
                           </>
                         )}
