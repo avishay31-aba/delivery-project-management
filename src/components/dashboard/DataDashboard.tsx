@@ -67,6 +67,7 @@ export interface DashboardColumn<T> {
   semanticType?: DateTimeSemanticType
   sortValue?: (row: T) => string | number | null
   hideInFullDashboard?: boolean
+  promoteAsBusinessIdentifier?: boolean
 }
 
 export interface DashboardColorLegendItem {
@@ -148,13 +149,14 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   tenants: ['tid', 'sid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'systemVersion', 'systemUrl', 'accountId'],
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
-  infrastructure: ['infrastructureId'],
+  infrastructure: ['infrastructureId', 'identifier', 'linkedSidTid'],
 }
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
   return classNames.filter(Boolean).join(' ')
 }
 
 function isBusinessIdentifierColumn<T>(column: DashboardColumn<T>, dashboardScope: DashboardViewScope): boolean {
+  if (column.promoteAsBusinessIdentifier === false) return false
   if ((BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE[dashboardScope] ?? []).includes(column.id)) return true
   if (BUSINESS_IDENTIFIER_COLUMN_PRIORITY.includes(column.id)) return true
   return /\b(ID|PID|SID|MID|TID|CID|OID)\b/i.test(column.label)

@@ -16,9 +16,10 @@ export function InfrastructureListPage() {
   const systems = useAppStore((state) => state.systems)
   const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
+  const tenants = useAppStore((state) => state.tenants)
   const rows = useMemo(
-    () => infrastructureDashboardRows(infrastructureItems, referenceData, allSystemRecords(systems, productionSystemInventory, reusedInternalSystems)),
-    [infrastructureItems, productionSystemInventory, referenceData, reusedInternalSystems, systems],
+    () => infrastructureDashboardRows(infrastructureItems, referenceData, allSystemRecords(systems, productionSystemInventory, reusedInternalSystems), tenants),
+    [infrastructureItems, productionSystemInventory, referenceData, reusedInternalSystems, systems, tenants],
   )
   const columns = useMemo(() => createInfrastructureColumns(), [])
 

@@ -9,6 +9,7 @@ import type {
   InfrastructureWarrantyContact,
   InfrastructureWarrantyStatus,
   TenantWarranty,
+  Tenant,
   ReferenceDataRecord,
   System,
   ProductionSystemInventoryItem,
@@ -17,6 +18,7 @@ import type {
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
 import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
+import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
 export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_TYPE'
@@ -120,12 +122,13 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   productsDisplay: string
   linkedSystemBusinessIds: string[]
   linkedSystemsDisplay: string
+  linkedSidTidDisplay: string
   warrantyStatus: InfrastructureWarrantyStatus
   itemWarrantyDaysLeft: number | null
-  latestWarrantyTid: string
-  latestWarrantyEndDate: string
-  tidMonthsLeft: number | null
-  tidDaysLeft: number | null
+  latestExpiringTenantId: string
+  latestTenantWarrantyEndDate: string
+  tidWarrantyMonthsLeft: number | null
+  tidWarrantyDaysLeft: number | null
   warrantyContactDisplay: string
 }
 
@@ -819,15 +822,97 @@ export function linkedSystemProducts(
     .sort((first, second) => first.localeCompare(second, undefined, { sensitivity: 'base' }))
 }
 
+function linkedSidTidDisplay(
+  item: InfrastructureItem,
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[],
+): string {
+  const linkedSystems = item.linkedSystemIds
+    .map((id) => systems.find((system) => system.id === id))
+    .filter((system): system is System | ProductionSystemInventoryItem | ReusedInternalSystem => Boolean(system))
+    .sort((first, second) => systemBusinessId(first).localeCompare(systemBusinessId(second), undefined, { numeric: true, sensitivity: 'base' }))
+
+  if (linkedSystems.length === 0) return '-'
+
+  return linkedSystems
+    .map((system) => {
+      const tids = Array.from(new Set(
+        tenants
+          .filter((tenant) => tenantIsActivelyHostedBySystem(tenant, system.id))
+          .map((tenant) => tenant.tid)
+          .filter(Boolean),
+      ))
+        .sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))
+      return `${systemBusinessId(system)}-${tids.join(',')}`
+    })
+    .join('; ')
+}
+
+function daysLeftUntil(endDate: string, today = new Date()): number {
+  const end = dateTimestamp(endDate)
+  if (end === null) return 0
+  return Math.max(0, Math.ceil((end - todayTimestamp(today)) / 86_400_000))
+}
+
+function completeCalendarMonthsLeftUntil(endDate: string, today = new Date()): number {
+  const end = dateTimestamp(endDate)
+  if (end === null || end < todayTimestamp(today)) return 0
+  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const target = new Date(`${endDate}T00:00:00`)
+  let months = (target.getFullYear() - current.getFullYear()) * 12 + target.getMonth() - current.getMonth()
+  if (target.getDate() < current.getDate()) months -= 1
+  return Math.max(0, months)
+}
+
+function latestTenantWarrantyForInfrastructureItem(
+  item: InfrastructureItem,
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[],
+): Pick<InfrastructureDashboardRow, 'latestExpiringTenantId' | 'latestTenantWarrantyEndDate' | 'tidWarrantyMonthsLeft' | 'tidWarrantyDaysLeft'> {
+  const linkedSystemIdSet = new Set(item.linkedSystemIds.filter((systemId) => systems.some((system) => system.id === systemId)))
+  const candidates = tenants
+    .filter((tenant) => Array.from(linkedSystemIdSet).some((systemId) => tenantIsActivelyHostedBySystem(tenant, systemId)))
+    .flatMap((tenant) => {
+      const latestEndDate = (tenant.warranties ?? [])
+        .map((warranty) => warranty.endDate)
+        .filter((endDate): endDate is string => dateTimestamp(endDate) !== null)
+        .sort((first, second) => (dateTimestamp(second) ?? 0) - (dateTimestamp(first) ?? 0))[0]
+      return latestEndDate ? [{ tid: tenant.tid, endDate: latestEndDate }] : []
+    })
+    .sort((first, second) =>
+      (dateTimestamp(second.endDate) ?? 0) - (dateTimestamp(first.endDate) ?? 0) ||
+      first.tid.localeCompare(second.tid, undefined, { numeric: true, sensitivity: 'base' }),
+    )
+
+  const selected = candidates[0]
+  if (!selected) {
+    return {
+      latestExpiringTenantId: '',
+      latestTenantWarrantyEndDate: '',
+      tidWarrantyMonthsLeft: null,
+      tidWarrantyDaysLeft: null,
+    }
+  }
+
+  return {
+    latestExpiringTenantId: selected.tid,
+    latestTenantWarrantyEndDate: selected.endDate,
+    tidWarrantyMonthsLeft: completeCalendarMonthsLeftUntil(selected.endDate),
+    tidWarrantyDaysLeft: daysLeftUntil(selected.endDate),
+  }
+}
+
 export function infrastructureDashboardRows(
   items: InfrastructureItem[],
   referenceData: ReferenceDataRecord[],
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
   return items
     .map((item) => {
       const linkedSystemIds = linkedSystemBusinessIds(item, systems)
       const currentWarranty = currentInfrastructureWarranty(item)
+      const tenantWarranty = latestTenantWarrantyForInfrastructureItem(item, systems, tenants)
       return {
         ...item,
         categoryLabel: infrastructureReferenceDataLabel(referenceData, item.categoryRefId),
@@ -839,12 +924,10 @@ export function infrastructureDashboardRows(
         productsDisplay: linkedSystemProducts(item, systems).join('; '),
         linkedSystemBusinessIds: linkedSystemIds,
         linkedSystemsDisplay: linkedSystemIds.join('; '),
+        linkedSidTidDisplay: linkedSidTidDisplay(item, systems, tenants),
         warrantyStatus: infrastructureWarrantyStatusFromCollection(item),
         itemWarrantyDaysLeft: infrastructureDaysBeforeExpirationFromCollection(item),
-        latestWarrantyTid: '',
-        latestWarrantyEndDate: currentWarranty?.endDate ?? '',
-        tidMonthsLeft: null,
-        tidDaysLeft: null,
+        ...tenantWarranty,
         warrantyContactDisplay: infrastructureWarrantyContactDisplay(item.warrantyContact),
         initialWarrantyStartDate: item.initialWarrantyStartDate ?? currentWarranty?.startDate ?? null,
         currentWarrantyStartDate: currentWarranty?.startDate ?? item.currentWarrantyStartDate,
@@ -860,19 +943,22 @@ export function infrastructureItemsForSystem(
   systemId: string,
   referenceData: ReferenceDataRecord[],
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
-  return infrastructureDashboardRows(items.filter((item) => item.linkedSystemIds.includes(systemId)), referenceData, systems)
+  return infrastructureDashboardRows(items.filter((item) => item.linkedSystemIds.includes(systemId)), referenceData, systems, tenants)
 }
 
 export function eligibleInfrastructureItemsForSystemLink(
   items: InfrastructureItem[],
   referenceData: ReferenceDataRecord[],
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
   return infrastructureDashboardRows(
     items.filter((item) => item.operationalStatus !== 'Obsolete'),
     referenceData,
     systems,
+    tenants,
   )
 }
 
