@@ -32,6 +32,7 @@ export function InfrastructureListPage() {
         rows={rows}
         columns={columns}
         initialSorting={[{ id: 'infrastructureId', desc: false }]}
+        freezeThroughColumnId="identifier"
         toolbar={
           <button
             type="button"

@@ -805,19 +805,25 @@ export function linkedSystemBusinessIds(
   item: InfrastructureItem,
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
 ): string[] {
-  return item.linkedSystemIds
-    .map((id) => systems.find((system) => system.id === id))
-    .filter((system): system is System | ProductionSystemInventoryItem | ReusedInternalSystem => Boolean(system))
+  return linkedSystemsForInfrastructureItem(item, systems)
     .map(systemBusinessId)
     .sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+function linkedSystemsForInfrastructureItem(
+  item: InfrastructureItem,
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+): Array<System | ProductionSystemInventoryItem | ReusedInternalSystem> {
+  const linkedIds = new Set(item.linkedSystemIds.map((id) => id.trim()).filter(Boolean))
+  return systems.filter((system) => linkedIds.has(system.id) || linkedIds.has(systemBusinessId(system)))
 }
 
 export function linkedSystemProducts(
   item: InfrastructureItem,
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
 ): string[] {
-  return Array.from(new Set(item.linkedSystemIds
-    .map((id) => systems.find((system) => system.id === id)?.productType?.trim())
+  return Array.from(new Set(linkedSystemsForInfrastructureItem(item, systems)
+    .map((system) => system.productType?.trim())
     .filter((value): value is string => Boolean(value))))
     .sort((first, second) => first.localeCompare(second, undefined, { sensitivity: 'base' }))
 }
@@ -827,9 +833,7 @@ function linkedSidTidDisplay(
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
   tenants: Tenant[],
 ): string {
-  const linkedSystems = item.linkedSystemIds
-    .map((id) => systems.find((system) => system.id === id))
-    .filter((system): system is System | ProductionSystemInventoryItem | ReusedInternalSystem => Boolean(system))
+  const linkedSystems = linkedSystemsForInfrastructureItem(item, systems)
     .sort((first, second) => systemBusinessId(first).localeCompare(systemBusinessId(second), undefined, { numeric: true, sensitivity: 'base' }))
 
   if (linkedSystems.length === 0) return '-'
@@ -869,7 +873,7 @@ function latestTenantWarrantyForInfrastructureItem(
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
   tenants: Tenant[],
 ): Pick<InfrastructureDashboardRow, 'latestExpiringTenantId' | 'latestTenantWarrantyEndDate' | 'tidWarrantyMonthsLeft' | 'tidWarrantyDaysLeft'> {
-  const linkedSystemIdSet = new Set(item.linkedSystemIds.filter((systemId) => systems.some((system) => system.id === systemId)))
+  const linkedSystemIdSet = new Set(linkedSystemsForInfrastructureItem(item, systems).map((system) => system.id))
   const candidates = tenants
     .filter((tenant) => Array.from(linkedSystemIdSet).some((systemId) => tenantIsActivelyHostedBySystem(tenant, systemId)))
     .flatMap((tenant) => {

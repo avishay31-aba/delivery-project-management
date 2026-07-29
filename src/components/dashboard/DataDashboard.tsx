@@ -92,6 +92,7 @@ interface DataDashboardProps<T extends { id: string }> {
   enableRecordActions?: boolean
   initialSorting?: SortingState
   colorLegend?: DashboardColorLegendItem[]
+  freezeThroughColumnId?: string
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -913,6 +914,7 @@ export function DataDashboard<T extends { id: string }>({
   enableRecordActions = true,
   initialSorting = [],
   colorLegend = [],
+  freezeThroughColumnId,
 }: DataDashboardProps<T>) {
   const regionalDateFormat = useDateTimePresentationPreference()
   const initialSortingKey = JSON.stringify(initialSorting)
@@ -961,7 +963,7 @@ export function DataDashboard<T extends { id: string }>({
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
-  const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([0, 0, 0])
+  const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([])
   const [isFreezeEnabled, setIsFreezeEnabled] = useState(false)
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set())
   const isApplyingDashboardUndoRef = useRef(false)
@@ -1157,10 +1159,18 @@ export function DataDashboard<T extends { id: string }>({
     getGroupedRowModel: getGroupedRowModel(),
   })
 
+  const frozenColumnCount = useMemo(() => {
+    if (!isFreezeEnabled) return 0
+    const visibleColumns = table.getVisibleLeafColumns()
+    if (!freezeThroughColumnId) return Math.min(3, visibleColumns.length)
+    const boundaryIndex = visibleColumns.findIndex((column) => column.id === freezeThroughColumnId)
+    return boundaryIndex >= 0 ? boundaryIndex + 1 : Math.min(3, visibleColumns.length)
+  }, [freezeThroughColumnId, isFreezeEnabled, table])
+
   useLayoutEffect(() => {
-    if (!isFreezeEnabled) {
+    if (!isFreezeEnabled || frozenColumnCount === 0) {
       setFrozenColumnOffsets((currentOffsets) =>
-        currentOffsets.every((offset) => offset === 0) ? currentOffsets : [0, 0, 0],
+        currentOffsets.length === 0 ? currentOffsets : [],
       )
       return
     }
@@ -1169,14 +1179,17 @@ export function DataDashboard<T extends { id: string }>({
     if (!container) return
 
     const measureFrozenColumns = () => {
-      const headers = Array.from(container.querySelectorAll('thead th')).slice(0, 3) as HTMLElement[]
+      const headers = Array.from(container.querySelectorAll('thead th')).slice(0, frozenColumnCount) as HTMLElement[]
       const offsets = headers.reduce<number[]>((nextOffsets, _header, index) => {
         nextOffsets[index] = index === 0 ? 0 : (nextOffsets[index - 1] ?? 0) + (headers[index - 1]?.offsetWidth ?? 0)
         return nextOffsets
       }, [])
-      const nextOffsets = [offsets[0] ?? 0, offsets[1] ?? 0, offsets[2] ?? 0]
+      const nextOffsets = Array.from({ length: frozenColumnCount }, (_value, index) => offsets[index] ?? 0)
       setFrozenColumnOffsets((currentOffsets) =>
-        currentOffsets.every((offset, index) => offset === nextOffsets[index]) ? currentOffsets : nextOffsets,
+        currentOffsets.length === nextOffsets.length &&
+        currentOffsets.every((offset, index) => offset === nextOffsets[index])
+          ? currentOffsets
+          : nextOffsets,
       )
     }
 
@@ -1186,11 +1199,11 @@ export function DataDashboard<T extends { id: string }>({
     const observer = new ResizeObserver(measureFrozenColumns)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [columnOrder, columnVisibility, rows.length, isFreezeEnabled])
+  }, [columnOrder, columnVisibility, frozenColumnCount, rows.length, isFreezeEnabled])
 
   function columnPositionStyle(index: number, columnId: string): CSSProperties | undefined {
     if (columnId === ACTION_COLUMN_ID) return { insetInlineStart: 0 }
-    return isFreezeEnabled && index < 3 ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
+    return isFreezeEnabled && index < frozenColumnCount ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
   }
 
   function frozenColumnClassName(index: number, isHeader = false, columnId = ''): string {
@@ -1200,8 +1213,8 @@ export function DataDashboard<T extends { id: string }>({
         isHeader ? 'z-40 bg-sf-surface-alt' : 'z-30 bg-inherit',
       )
     }
-    if (!isFreezeEnabled || index >= 3) return ''
-    const isLastFrozenColumn = index === 2
+    if (!isFreezeEnabled || index >= frozenColumnCount) return ''
+    const isLastFrozenColumn = index === frozenColumnCount - 1
     return joinClassNames(
       'sticky',
       isLastFrozenColumn
