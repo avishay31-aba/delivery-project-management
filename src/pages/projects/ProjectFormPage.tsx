@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader } from '@/components/record'
-import { BusinessObjectLink, FormField, MetadataHeaderField, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
@@ -61,7 +61,6 @@ import { opportunityReference, systemReference } from '@/domain/business-referen
 import {
   alertPresentationForDeadline,
   errorMessageClassName,
-  operationalStatusPresentation,
   projectStatusPresentation,
   successMessageClassName,
   taskStatusPresentation,
@@ -179,13 +178,9 @@ function ProjectStatusBadge({ status, large = false }: { status: string; large?:
 }
 
 function OperationalStatusBadge({ status }: { status: string }) {
-  const presentation = operationalStatusPresentation(status)
-  const Icon = presentation.icon
-
   return (
     <span className="inline-flex items-center gap-1.5 font-semibold">
-      <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
-      <span>{presentation.label}</span>
+      <OperationalStatusIcon status={status} showLabel className="h-5 w-5 stroke-[3]" />
     </span>
   )
 }

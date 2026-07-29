@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { PageHeader } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, OperationalStatusIcon, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { Tenant } from '@/data/seed.types'
 import {
@@ -32,7 +32,6 @@ import {
   badgeVariantForProjectHealthStatus,
   badgeVariantForProjectStatus,
   badgeVariantForRequirementCoverageStatus,
-  operationalStatusPresentation,
 } from '@/domain/status-presentation'
 import {
   warrantyDashboardRows,
@@ -109,14 +108,7 @@ function readOnlyTable(headers: string[], rows: ReactNode[][], emptyText: string
 }
 
 function operationalStatus(value: string | null | undefined) {
-  const presentation = operationalStatusPresentation(value)
-  const Icon = presentation.icon
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <Icon className={`h-4 w-4 shrink-0 ${presentation.iconClassName}`} aria-hidden />
-      {presentation.label}
-    </span>
-  )
+  return <OperationalStatusIcon status={value} showLabel wrapperClassName="gap-1.5 whitespace-nowrap" />
 }
 
 function alertList(alerts: string[]) {

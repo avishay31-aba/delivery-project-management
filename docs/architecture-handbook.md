@@ -405,6 +405,20 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Dashboard action columns are UI controls only. They are not business data, object fields, report columns, or saved-view business columns.
 - Saved dashboard views may preserve user display preferences, but action controls must not become editable business facts or domain-owned fields.
 
+### Business ID Link Standard
+
+- Every displayed Business Object ID must render through the shared Business ID link presenter whenever that object has a supported route.
+- The standard presenter owns route-aware fallback behavior. Pages, dashboards, forms, tables, dialogs, tooltips, activity references, and history views must not create local anchor tags or duplicate routing logic for Business Object IDs.
+- Empty IDs display the shared empty value. IDs without a supported route may render as read-only text through the shared fallback.
+- Export and persistence paths keep plain ID text only; presentation components must not enter domain/read-model values.
+
+### Operational Status Presentation Standard
+
+- Every field or column representing `Operational Status` must use the shared icon-and-text operational status presentation where text display is required.
+- Operational Status presentation must include the status text and the approved colored indicator. Color may reinforce status but must not be the only signal.
+- The shared presenter receives the stored or derived Operational Status value exactly as owned by the Business Object. It must not infer Operational Status from Warranty Status, Maintenance Status, linked-object state, dates, allocation state, or other fields.
+- Sorting, filtering, export, persistence, and read models operate on the raw Operational Status value, not on rendered icons.
+
 ### Date And Time Presentation Standard
 
 - Business data storage keeps canonical date and timestamp values. Transactional timestamps should remain ISO-compatible values where already used.

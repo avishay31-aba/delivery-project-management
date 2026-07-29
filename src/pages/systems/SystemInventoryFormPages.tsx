@@ -72,7 +72,6 @@ import {
   activeProjectTenantLinks,
 } from '@/domain/allocation-context'
 import { infrastructureItemReference, projectReference, tenantReference } from '@/domain/business-reference'
-import { operationalStatusPresentation } from '@/domain/status-presentation'
 import {
   hostingContextPatchForFieldChange,
   sanitizeHostingContext,
@@ -310,13 +309,9 @@ function derivedValue(
 }
 
 function OperationalStatusBadge({ value }: { value: string }) {
-  const presentation = operationalStatusPresentation(value)
-  const Icon = presentation.icon
-
   return (
     <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
-      {presentation.label}
+      <OperationalStatusIcon status={value} showLabel className="h-5 w-5 stroke-[3]" />
     </span>
   )
 }

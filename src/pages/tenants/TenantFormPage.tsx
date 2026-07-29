@@ -106,7 +106,6 @@ import {
 import { systemReference } from '@/domain/business-reference'
 import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
-import { operationalStatusPresentation } from '@/domain/status-presentation'
 import { WARRANTY_FIELD_LABELS } from '@/domain/warranty-collection'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
@@ -852,14 +851,14 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderOperationalStatusOption(value: string) {
-    const presentation = operationalStatusPresentation(value)
-    const Icon = presentation.icon
-
     return (
-      <span className="inline-flex min-w-0 items-center gap-1.5">
-        <Icon className={['h-5 w-5 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
-        <span className="truncate">{presentation.label}</span>
-      </span>
+      <OperationalStatusIcon
+        status={value}
+        showLabel
+        className="h-5 w-5 stroke-[3]"
+        wrapperClassName="min-w-0 gap-1.5"
+        labelClassName="truncate"
+      />
     )
   }
 
