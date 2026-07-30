@@ -23,6 +23,7 @@ import {
   MetadataHeaderField,
   OperationalStatusIcon,
   PlaceholderCard,
+  RequiredFieldMarker,
   RichTextContent,
   RichTextEditor,
   SaveButtonLabel,
@@ -80,7 +81,10 @@ import {
   predecessorReference,
   splitWarrantyPredecessors,
   successorRefsForWarranty,
+  WARRANTY_DATE_ORDER_MESSAGE,
+  WARRANTY_END_DATE_REQUIRED_MESSAGE,
   isSelfWarrantyPredecessorSelection,
+  WARRANTY_START_DATE_REQUIRED_MESSAGE,
   validateWarrantyEditDraft,
   warrantyHeaderStatusReadModel,
   warrantyManageabilityMessage,
@@ -690,7 +694,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     warrantyEditor.save(id, {
       validate: validateWarrantyEditDraft,
       normalize: normalizedWarrantySaveScope,
-      isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
       commit: (committedDraft) => {
         const currentWarranties = persistedTenant.warranties ?? []
         const currentComputedWarranties = computedWarrantiesForTenant(persistedTenant, currentWarranties)
@@ -744,7 +747,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function cancelWarranty(id: string) {
     const shouldConfirmDiscard = warrantyEditor.isNew(id) && warrantyEditor.hasChanges(id, {
-      isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
+      isMeaningfulNewDraft: (record) => Boolean(record.relatedProjectId || record.startDate || record.endDate || record.initialWarrantyDate || record.remark),
     })
     if (shouldConfirmDiscard) {
       warrantyEditor.commitDelete(id, {
@@ -1404,7 +1407,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             <thead className="bg-sf-surface-alt text-left">
               <tr>
                 {['Actions', WARRANTY_FIELD_LABELS.id, WARRANTY_FIELD_LABELS.type, WARRANTY_FIELD_LABELS.subType, 'First', 'Predecessors', 'Successors', 'Account ID / End User ID', WARRANTY_FIELD_LABELS.relatedProjectId, 'Opportunity ID', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', WARRANTY_FIELD_LABELS.status, 'Alerts', 'Remark'].map((header) => (
-                  <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">{header}</th>
+                  <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold">
+                    {header}
+                    {header === 'Start Date' || header === 'End Date' ? <RequiredFieldMarker /> : null}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -1415,11 +1421,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 const isDeletingWarranty = warrantyEditor.isDeleting(warranty.id)
                 const warrantyErrors = warrantyEditor.errorsFor(warranty.id)
                 const relatedProjectHasError = warrantyErrors.some((error) => error.toLowerCase().includes('project'))
-                const canSaveWarranty = warrantyEditor.canSave(warranty.id, {
-                  validate: validateWarrantyEditDraft,
-                  normalize: normalizedWarrantySaveScope,
-                  isMeaningfulNewDraft: (record) => validateWarrantyEditDraft(record).length === 0,
-                })
+                const startDateError = warrantyErrors.find((error) => error === WARRANTY_START_DATE_REQUIRED_MESSAGE || error === WARRANTY_DATE_ORDER_MESSAGE)
+                const endDateError = warrantyErrors.find((error) => error === WARRANTY_END_DATE_REQUIRED_MESSAGE)
+                const canAttemptWarrantySave = !isSavingWarranty && warrantyEditor.isEditing(warranty.id)
                 return (
                 <tr key={warranty.id}>
                   <td className="border border-sf-border px-1.5 py-1">
@@ -1429,7 +1433,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                           <>
                             <EditableChildObjectActionButton
                               variant="primary"
-                              disabled={isSavingWarranty || !canSaveWarranty}
+                              disabled={!canAttemptWarrantySave}
                               onClick={() => saveWarranty(warranty.id)}
                             >
                               <Save className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1515,26 +1519,32 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">
                     {isEditingWarranty ? (
-                      <input
-                        className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
-                        type="date"
-                        value={warranty.startDate ?? ''}
-                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'startDate', nextValue))}
-                        onChange={(event) => updateWarrantyDraft(warranty.id, 'startDate', event.target.value || null)}
-                      />
+                      <>
+                        <input
+                          className={['h-8 rounded border px-2 py-1 text-sm', startDateError ? 'border-red-500' : 'border-sf-border'].join(' ')}
+                          type="date"
+                          value={warranty.startDate ?? ''}
+                          onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'startDate', nextValue))}
+                          onChange={(event) => updateWarrantyDraft(warranty.id, 'startDate', event.target.value || null)}
+                        />
+                        {startDateError ? <div className="mt-1 text-xs text-red-700">{startDateError}</div> : null}
+                      </>
                     ) : (
                       <DateTimeValue value={warranty.startDate} semanticType="date" />
                     )}
                   </td>
                   <td className="border border-sf-border px-1.5 py-1">
                     {isEditingWarranty ? (
-                      <input
-                        className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
-                        type="date"
-                        value={warranty.endDate ?? ''}
-                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'endDate', nextValue))}
-                        onChange={(event) => updateWarrantyDraft(warranty.id, 'endDate', event.target.value || null)}
-                      />
+                      <>
+                        <input
+                          className={['h-8 rounded border px-2 py-1 text-sm', endDateError ? 'border-red-500' : 'border-sf-border'].join(' ')}
+                          type="date"
+                          value={warranty.endDate ?? ''}
+                          onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(warranty.id, 'endDate', nextValue))}
+                          onChange={(event) => updateWarrantyDraft(warranty.id, 'endDate', event.target.value || null)}
+                        />
+                        {endDateError ? <div className="mt-1 text-xs text-red-700">{endDateError}</div> : null}
+                      </>
                     ) : (
                       <DateTimeValue value={warranty.endDate} semanticType="date" />
                     )}
@@ -1577,6 +1587,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
     const predecessorValues = splitWarrantyPredecessors(advancedWarrantyDraft.predecessor)
     const hasSuccessors = successorRefsForWarranty(warranty, dialogWarranties, tenantDraft.tid).length > 0
+    const advancedWarrantyErrors = warrantyEditor.errorsFor(warranty.id)
+    const advancedStartDateError = advancedWarrantyErrors.find((error) => error === WARRANTY_START_DATE_REQUIRED_MESSAGE || error === WARRANTY_DATE_ORDER_MESSAGE)
+    const advancedEndDateError = advancedWarrantyErrors.find((error) => error === WARRANTY_END_DATE_REQUIRED_MESSAGE)
 
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" role="presentation">
@@ -1630,24 +1643,26 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
               />
             </label>
             <label className="space-y-1">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date</span>
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">Start Date<RequiredFieldMarker /></span>
               <input
-                className="h-9 w-full rounded border border-sf-border px-2 py-1"
+                className={['h-9 w-full rounded border px-2 py-1', advancedStartDateError ? 'border-red-500' : 'border-sf-border'].join(' ')}
                 type="date"
                 value={advancedWarrantyDraft.startDate ?? ''}
                 onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(advancedWarrantyId, 'startDate', nextValue))}
                 onChange={(event) => updateWarrantyDraft(advancedWarrantyId, 'startDate', event.target.value || null)}
               />
+              {advancedStartDateError ? <div className="mt-1 text-xs text-red-700">{advancedStartDateError}</div> : null}
             </label>
             <label className="space-y-1">
-              <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date</span>
+              <span className="block text-xs font-semibold uppercase text-sf-text-muted">End Date<RequiredFieldMarker /></span>
               <input
-                className="h-9 w-full rounded border border-sf-border px-2 py-1"
+                className={['h-9 w-full rounded border px-2 py-1', advancedEndDateError ? 'border-red-500' : 'border-sf-border'].join(' ')}
                 type="date"
                 value={advancedWarrantyDraft.endDate ?? ''}
                 onPaste={(event) => handleDateInputPaste(event, (nextValue) => updateWarrantyDraft(advancedWarrantyId, 'endDate', nextValue))}
                 onChange={(event) => updateWarrantyDraft(advancedWarrantyId, 'endDate', event.target.value || null)}
               />
+              {advancedEndDateError ? <div className="mt-1 text-xs text-red-700">{advancedEndDateError}</div> : null}
             </label>
             <div className="space-y-2 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Predecessors</span>

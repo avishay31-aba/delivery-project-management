@@ -160,12 +160,12 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
     if (!draft || savingIdsRef.current.includes(id)) return false
 
     const isNew = newDraftIdsRef.current.includes(id)
-    if (!hasChanges(id, { normalize, isMeaningfulNewDraft })) return false
     const validationErrors = validate?.(draft, isNew) ?? []
     if (validationErrors.length > 0) {
       setErrorsById((current) => ({ ...current, [id]: validationErrors }))
       return false
     }
+    if (!hasChanges(id, { normalize, isMeaningfulNewDraft })) return false
 
     savingIdsRef.current = Array.from(new Set([...savingIdsRef.current, id]))
     setSavingIds(savingIdsRef.current)
