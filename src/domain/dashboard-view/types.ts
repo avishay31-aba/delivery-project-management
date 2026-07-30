@@ -11,6 +11,8 @@ export type DashboardViewScope =
   | 'requirementCoverage'
   | 'activityLog'
   | 'infrastructure'
+  | 'infrastructurePlannedMaintenance'
+  | 'infrastructureCurrentMaintenance'
 
 export interface DashboardViewColumnFilter {
   id: string

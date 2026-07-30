@@ -1,4 +1,5 @@
 import type {
+  Account,
   InfrastructureItem,
   InfrastructureMaintenanceTask,
   InfrastructureMaintenanceTaskStatus,
@@ -133,9 +134,31 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   itemWarrantyDaysLeft: number | null
   latestExpiringTenantId: string
   latestTenantWarrantyEndDate: string
+  latestExpiringTenantAccountName: string
   tidWarrantyMonthsLeft: number | null
   tidWarrantyDaysLeft: number | null
   warrantyContactDisplay: string
+}
+
+export interface InfrastructureMaintenanceDashboardRow {
+  id: string
+  createdAt: string
+  updatedAt: string
+  taskId: string
+  taskType: string
+  description: string
+  taskStatus: InfrastructureMaintenanceTaskStatus
+  infrastructureItemId: string
+  infrastructureItemName: string
+  infrastructureType: string
+  region: string
+  customer: string
+  account: string
+  tenant: string
+  startDate: string
+  dueDate: string
+  alert: InfrastructureMaintenanceAlert
+  daysRunning: number | null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -194,6 +217,12 @@ function todayTimestamp(today = new Date()): number {
 
 function businessDate(today = new Date()): string {
   return today.toISOString().slice(0, 10)
+}
+
+function dateOnlyDaysBetween(startDate: string | null | undefined, endDate: Date): number | null {
+  const start = dateTimestamp(startDate)
+  if (start === null) return null
+  return Math.max(0, Math.floor((todayTimestamp(endDate) - start) / 86_400_000) + 1)
 }
 
 export function normalizeInfrastructureIdentifier(value: string): string {
@@ -1024,7 +1053,7 @@ function latestTenantWarrantyForInfrastructureItem(
   item: InfrastructureItem,
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
   tenants: Tenant[],
-): Pick<InfrastructureDashboardRow, 'latestExpiringTenantId' | 'latestTenantWarrantyEndDate' | 'tidWarrantyMonthsLeft' | 'tidWarrantyDaysLeft'> {
+): Pick<InfrastructureDashboardRow, 'latestExpiringTenantId' | 'latestTenantWarrantyEndDate' | 'latestExpiringTenantAccountName' | 'tidWarrantyMonthsLeft' | 'tidWarrantyDaysLeft'> {
   const linkedSystemIdSet = new Set(linkedSystemsForInfrastructureItem(item, systems).map((system) => system.id))
   const candidates = tenants
     .filter((tenant) => Array.from(linkedSystemIdSet).some((systemId) => tenantIsActivelyHostedBySystem(tenant, systemId)))
@@ -1033,7 +1062,7 @@ function latestTenantWarrantyForInfrastructureItem(
         .map((warranty) => warranty.endDate)
         .filter((endDate): endDate is string => dateTimestamp(endDate) !== null)
         .sort((first, second) => (dateTimestamp(second) ?? 0) - (dateTimestamp(first) ?? 0))[0]
-      return latestEndDate ? [{ tid: tenant.tid, endDate: latestEndDate }] : []
+      return latestEndDate ? [{ tid: tenant.tid, accountName: tenant.accountName, endDate: latestEndDate }] : []
     })
     .sort((first, second) =>
       (dateTimestamp(second.endDate) ?? 0) - (dateTimestamp(first.endDate) ?? 0) ||
@@ -1045,6 +1074,7 @@ function latestTenantWarrantyForInfrastructureItem(
     return {
       latestExpiringTenantId: '',
       latestTenantWarrantyEndDate: '',
+      latestExpiringTenantAccountName: '',
       tidWarrantyMonthsLeft: null,
       tidWarrantyDaysLeft: null,
     }
@@ -1053,9 +1083,94 @@ function latestTenantWarrantyForInfrastructureItem(
   return {
     latestExpiringTenantId: selected.tid,
     latestTenantWarrantyEndDate: selected.endDate,
+    latestExpiringTenantAccountName: selected.accountName,
     tidWarrantyMonthsLeft: completeCalendarMonthsLeftUntil(selected.endDate),
     tidWarrantyDaysLeft: daysLeftUntil(selected.endDate),
   }
+}
+
+function linkedTenantsForInfrastructureItem(
+  item: InfrastructureItem,
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[],
+): Tenant[] {
+  const linkedSystemIdSet = new Set(linkedSystemsForInfrastructureItem(item, systems).map((system) => system.id))
+  return tenants
+    .filter((tenant) => Array.from(linkedSystemIdSet).some((systemId) => tenantIsActivelyHostedBySystem(tenant, systemId)))
+    .sort((first, second) => first.tid.localeCompare(second.tid, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+function uniqueJoined(values: string[]): string {
+  return Array.from(new Set(values.map((value) => text(value).trim()).filter(Boolean)))
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))
+    .join('; ')
+}
+
+export function infrastructureMaintenanceDashboardRows(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
+  tenants: Tenant[] = [],
+  accounts: Account[] = [],
+  today = new Date(),
+): InfrastructureMaintenanceDashboardRow[] {
+  return items.flatMap((item) => {
+    const linkedSystems = linkedSystemsForInfrastructureItem(item, systems)
+    const linkedTenants = linkedTenantsForInfrastructureItem(item, systems, tenants)
+    const accountNameById = new Map(accounts.map((account) => [account.id, account.accountName]))
+    const accountCodeById = new Map(accounts.map((account) => [account.id, account.accountCode]))
+    const tenantDisplay = uniqueJoined(linkedTenants.map((tenant) => tenant.tid))
+    const customerDisplay = uniqueJoined(linkedTenants.map((tenant) => accountNameById.get(tenant.accountId) || tenant.accountName))
+    const accountDisplay = uniqueJoined(linkedTenants.map((tenant) => accountCodeById.get(tenant.accountId) || tenant.accountId))
+    const regionDisplay = uniqueJoined(linkedSystems.map((system) => {
+      if ('region' in system && system.region) return system.region
+      if ('usedInRegion' in system && system.usedInRegion) return system.usedInRegion
+      return system.cognitoRegion ?? ''
+    }))
+
+    return (item.maintenanceTasks ?? []).map((task) => ({
+      id: `${item.id}-${task.id}`,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      taskId: task.taskId,
+      taskType: infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
+      description: task.task,
+      taskStatus: task.taskStatus,
+      infrastructureItemId: item.infrastructureId,
+      infrastructureItemName: item.identifier,
+      infrastructureType: infrastructureReferenceDataLabel(referenceData, item.typeRefId),
+      region: regionDisplay,
+      customer: customerDisplay,
+      account: accountDisplay,
+      tenant: tenantDisplay,
+      startDate: task.startDate ?? '',
+      dueDate: task.dueDate ?? '',
+      alert: infrastructureMaintenanceAlert(task, today),
+      daysRunning: dateOnlyDaysBetween(task.startDate, today),
+    }))
+  })
+}
+
+export function plannedInfrastructureMaintenanceDashboardRows(rows: InfrastructureMaintenanceDashboardRow[], today = new Date()): InfrastructureMaintenanceDashboardRow[] {
+  const now = todayTimestamp(today)
+  return rows
+    .filter((row) => row.taskStatus === 'Open' && row.alert === 'Pending' && row.startDate && (dateTimestamp(row.startDate) ?? 0) > now)
+    .sort((first, second) =>
+      first.startDate.localeCompare(second.startDate) ||
+      first.dueDate.localeCompare(second.dueDate) ||
+      first.infrastructureItemId.localeCompare(second.infrastructureItemId, undefined, { numeric: true, sensitivity: 'base' }),
+    )
+}
+
+export function currentInfrastructureMaintenanceDashboardRows(rows: InfrastructureMaintenanceDashboardRow[], today = new Date()): InfrastructureMaintenanceDashboardRow[] {
+  const now = todayTimestamp(today)
+  return rows
+    .filter((row) => row.taskStatus === 'Open' && row.startDate && (dateTimestamp(row.startDate) ?? Number.MAX_SAFE_INTEGER) <= now)
+    .sort((first, second) =>
+      first.startDate.localeCompare(second.startDate) ||
+      first.dueDate.localeCompare(second.dueDate) ||
+      first.infrastructureItemId.localeCompare(second.infrastructureItemId, undefined, { numeric: true, sensitivity: 'base' }),
+    )
 }
 
 export function infrastructureDashboardRows(

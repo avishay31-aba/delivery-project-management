@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -155,6 +155,8 @@ export function InfrastructureFormPage() {
   const location = useLocation()
   const isNew = infrastructureId === 'new'
   const routeState = location.state as { returnTo?: string; mode?: string } | null
+  const requestedSection = new URLSearchParams(location.search).get('section')
+  const maintenanceSectionRef = useRef<HTMLElement | null>(null)
   const isViewMode = !isNew && routeMode(location) !== 'edit'
   const returnTo = routeState?.returnTo ?? '/infrastructure'
 
@@ -217,6 +219,13 @@ export function InfrastructureFormPage() {
     clone: cloneInfrastructureItem,
     isEqual: valuesEqual,
   })
+
+  useEffect(() => {
+    if (requestedSection !== 'maintenance') return
+    window.setTimeout(() => {
+      maintenanceSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    }, 0)
+  }, [requestedSection])
 
   if (!isNew && !savedItem) {
     return <PlaceholderCard title="Infrastructure Item not found" description={`No Infrastructure Item exists for "${infrastructureId}".`} />
@@ -780,7 +789,7 @@ export function InfrastructureFormPage() {
         {messages.length > 0 ? <div className={formMessageClassName(messages)}>{messages.map((message) => <div key={message}>{message}</div>)}</div> : null}
         {renderHeader()}
         {renderTabs()}
-        <section className="sf-card space-y-3 p-3">
+        <section ref={maintenanceSectionRef} className="sf-card space-y-3 p-3">
           <InfrastructureMaintenanceGrid
             tasks={draft.maintenanceTasks ?? []}
             onChange={(maintenanceTasks) => commitChildPatch({ maintenanceTasks })}

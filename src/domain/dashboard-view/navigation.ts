@@ -50,6 +50,11 @@ export function dashboardRecordRoutePath(scope: DashboardViewScope, row: unknown
       return routeForActivityObject(record.primaryObject)
     case 'infrastructure':
       return routePathForBusinessReference('INFRASTRUCTURE_ITEM', text(record.infrastructureId) || text(record.id))
+    case 'infrastructurePlannedMaintenance':
+    case 'infrastructureCurrentMaintenance': {
+      const routePath = routePathForBusinessReference('INFRASTRUCTURE_ITEM', text(record.infrastructureItemId) || text(record.infrastructureId) || text(record.id))
+      return routePath ? `${routePath}?section=maintenance` : null
+    }
     default:
       return null
   }
