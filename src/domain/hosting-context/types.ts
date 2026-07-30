@@ -18,6 +18,7 @@ export interface HostingContext extends HostingIntent {
   performanceTier?: PerformanceTier
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
 }
 
@@ -32,6 +33,7 @@ export interface HostingSnapshot {
   performanceTier: PerformanceTier
   vpnEnabled: YesNo
   vpnType: string
+  externalInterface: boolean
   ipRestrictionEnabled: YesNo
   platform: CloudPlatform
   csp: CloudServiceProvider

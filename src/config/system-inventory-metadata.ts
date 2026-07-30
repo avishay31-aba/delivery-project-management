@@ -84,8 +84,8 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
     { key: 'timeGroup', label: 'Time Group', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'timeGroupAlert', label: 'Time Group Alert', editable: false, source: '2. Header', line: 3, inputType: 'readonly' },
     { key: 'currentSid', label: 'Current SID', editable: false, source: 'POC/Training/Demo pool', line: 4, inputType: 'readonly' },
-    { key: 'occupationStartDate', label: 'Occupation Start Date', editable: false, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
-    { key: 'occupationEndDate', label: 'Occupation End Date', editable: false, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
+    { key: 'occupationStartDate', label: 'Occupation Start Date', editable: true, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
+    { key: 'occupationEndDate', label: 'Occupation End Date', editable: true, source: 'POC/Training/Demo pool', line: 5, inputType: 'date' },
   ],
   tabs: [...SYSTEM_INVENTORY_TABS, { id: 'owner', label: 'Owner' }],
 }

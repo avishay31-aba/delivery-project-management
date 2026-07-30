@@ -44,6 +44,7 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
     configurationHistory: Array.isArray(record.configurationHistory) ? record.configurationHistory : [],
+    ...('externalInterface' in record || 'vpnEnabled' in record ? { externalInterface: Boolean(record.externalInterface) } : {}),
     ...('currentProjectIds' in record ? {
       purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory),
       status: reusedInternalStatusForPurpose(record.purpose),
@@ -191,11 +192,16 @@ export function occupyReusedInternalSystem(
   activeAllocations: ProjectSystemLink[] = [],
   projects: Project[] = [],
 ): ReusedInternalSystem {
+  const currentProjectIds = Array.from(new Set([...system.currentProjectIds, projectId]))
+  const shouldStartPocOccupation = system.purpose !== SYSTEM_PURPOSE_POC || !system.currentProjectIds.includes(projectId)
+  const baseSystem = shouldStartPocOccupation
+    ? appendReusedInternalPurposeHistory(system, SYSTEM_PURPOSE_POC, updatedAt, context)
+    : system
   const occupiedSystem: ReusedInternalSystem = {
-    ...appendReusedInternalPurposeHistory(system, 'POC', updatedAt, context),
+    ...baseSystem,
     purpose: SYSTEM_PURPOSE_POC,
     status: REUSED_INTERNAL_STATUS_OCCUPIED,
-    currentProjectIds: Array.from(new Set([...system.currentProjectIds, projectId])),
+    currentProjectIds,
     updatedAt,
   }
   return applyReusedSystemOccupationWindow(occupiedSystem, activeAllocations, projects, updatedAt)
@@ -216,7 +222,8 @@ export function releaseReusedInternalSystem(
     purpose: currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose,
     status: reusedInternalStatusForPurpose(currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose),
     currentProjectIds,
-    occupationEndDate: currentProjectIds.length === 0 ? updatedAt : system.occupationEndDate ?? null,
+    occupationStartDate: currentProjectIds.length === 0 ? null : system.occupationStartDate ?? null,
+    occupationEndDate: currentProjectIds.length === 0 ? null : system.occupationEndDate ?? null,
     updatedAt,
   }
 }
@@ -335,7 +342,7 @@ export function systemFromReusedInternalAllocation(
     linkedProjectIds: [projectId],
     tenantIds,
     systemClass: SYSTEM_CLASS_POC_DEMO_TRAINING,
-    purpose: reusedSystem.purpose,
+    purpose: SYSTEM_PURPOSE_POC,
     availability: SYSTEM_AVAILABILITY_OCCUPIED,
     logo: reusedSystem.logo,
     url: reusedSystem.url,

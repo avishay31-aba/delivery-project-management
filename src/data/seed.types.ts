@@ -224,6 +224,7 @@ export interface OpportunityRequirementBase {
   performanceTier?: 'STANDARD' | 'POWERED' | ''
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
   productType: string
   mapCenter: string
@@ -345,6 +346,7 @@ export interface System {
   performanceTier?: 'STANDARD' | 'POWERED' | ''
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
   mapCenter?: string
   region?: string
@@ -400,6 +402,7 @@ export interface Tenant {
   performanceTier?: 'STANDARD' | 'POWERED' | ''
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
   mapCenter?: string
   licenses?: number | null
@@ -475,6 +478,7 @@ export interface TenantHostingSnapshot {
   performanceTier: 'STANDARD' | 'POWERED' | ''
   vpnEnabled: YesNo
   vpnType: string
+  externalInterface: boolean
   ipRestrictionEnabled: YesNo
   platform: string
   csp: string
@@ -769,6 +773,7 @@ export interface ProductionSystemInventoryItem {
   performanceTier?: 'STANDARD' | 'POWERED' | ''
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
   region?: string
   country?: string
@@ -832,6 +837,7 @@ export interface ReusedInternalSystem {
   performanceTier?: 'STANDARD' | 'POWERED' | ''
   vpnEnabled?: YesNo
   vpnType?: string
+  externalInterface?: boolean
   ipRestrictionEnabled?: YesNo
   usedInRegion?: string
   timeGroup: string

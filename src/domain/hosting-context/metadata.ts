@@ -103,5 +103,6 @@ export const DEFAULT_HOSTING_CONTEXT = {
   performanceTier: 'STANDARD' as const,
   vpnEnabled: 'NO' as const,
   vpnType: '',
+  externalInterface: false,
   ipRestrictionEnabled: 'NO' as const,
 }

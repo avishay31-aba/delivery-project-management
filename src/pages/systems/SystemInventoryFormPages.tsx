@@ -79,10 +79,14 @@ import {
 } from '@/domain/hosting-context'
 import {
   hostedTenantsForSystem,
+  ACTIVE_POC_PURPOSE_LOCK_MESSAGE,
   currentProjectPidsForSystem,
+  hasActiveOpenPocPurposeLock,
+  isOccupationDateRequiredForPurpose,
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
   reusedInternalPurposeHistory,
+  shouldConfirmEarlyNonPocPurposeChange,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
   systemApplicationConfigurationSummary,
@@ -90,6 +94,7 @@ import {
   systemTimeGroup,
   systemTimeGroupAlert,
   tenantCountForSystem,
+  validateReusedInternalPurposeChange,
   validateReusedInternalMachineId,
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
@@ -146,6 +151,7 @@ const ACCESS_DETAIL_FIELDS = [
   { key: 'url', label: 'URL', inputType: 'text' },
   { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
   { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
+  { key: 'externalInterface', label: 'External Interface', inputType: 'boolean' },
   { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
 ]
 const PRODUCT_LOGO_COLORS: Record<string, string> = {
@@ -536,6 +542,7 @@ export function InventoryForm<T extends InventoryRecord>({
     if (!invalidFields.has(key) || messages.length === 0) return undefined
     if (key === 'machineId') return messages.find((message) => message === 'MID is required.' || message === 'MID must be unique.')
     if (key === 'url') return messages.find((message) => message === 'URL is required.' || message.startsWith('URL must '))
+    if (key === 'purpose') return messages.find((message) => message === ACTIVE_POC_PURPOSE_LOCK_MESSAGE)
     return messages.find((message) => message === `${label} is required.`)
   }
 
@@ -551,6 +558,9 @@ export function InventoryForm<T extends InventoryRecord>({
       'CSP is required.',
       'Cloud Region is required.',
       'VPN Type is required.',
+      'Occupation Start Date is required.',
+      'Occupation End Date is required.',
+      ACTIVE_POC_PURPOSE_LOCK_MESSAGE,
     ].includes(message) || message.startsWith('URL must ')
   }
 
@@ -590,6 +600,15 @@ export function InventoryForm<T extends InventoryRecord>({
 
     if (metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
       validateReusedInternalMachineId(activeDraft, records).forEach((message) => {
+        if (message.field) invalidFields.add(message.field)
+        nextMessages.push(message.message)
+      })
+      validateReusedInternalPurposeChange(
+        activeRecord as ReusedInternalSystem,
+        activeDraft as ReusedInternalSystem,
+        projects,
+        projectSystems,
+      ).forEach((message) => {
         if (message.field) invalidFields.add(message.field)
         nextMessages.push(message.message)
       })
@@ -634,6 +653,20 @@ export function InventoryForm<T extends InventoryRecord>({
     return window.confirm(warnings.join('\n\n'))
   }
 
+  function confirmPurposeChangeIfRequired(record: T): boolean {
+    if (metadata.source !== SYSTEM_SOURCE_REUSED_INTERNAL) return true
+    const previous = activeRecord as ReusedInternalSystem
+    const next = record as ReusedInternalSystem
+    if (!shouldConfirmEarlyNonPocPurposeChange(previous, next)) return true
+    const accepted = window.confirm(
+      `This system is occupied until ${previous.occupationEndDate}. Changing its purpose before the occupation period ends may affect the current allocation. Do you want to continue?`,
+    )
+    if (accepted) return true
+    setDraft((current) => current ? ({ ...current, purpose: previous.purpose } as T) : current)
+    setMessages(['Purpose change cancelled. Other draft changes were preserved.'])
+    return false
+  }
+
   validate()
   const lines = new Map<number, SystemInventoryHeaderField[]>()
   metadata.headerFields.forEach((field) => {
@@ -651,6 +684,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
     const nextDraft = sanitizedDraftForSave()
     if (!confirmRegionWarnings(nextDraft)) return
+    if (!confirmPurposeChangeIfRequired(nextDraft)) return
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
@@ -692,6 +726,10 @@ export function InventoryForm<T extends InventoryRecord>({
       navigationBlocker.reset?.()
       return
     }
+    if (!confirmPurposeChangeIfRequired(nextDraft)) {
+      navigationBlocker.reset?.()
+      return
+    }
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
@@ -726,13 +764,22 @@ export function InventoryForm<T extends InventoryRecord>({
         link.allocationStatus !== 'DEALLOCATED' &&
         (link.systemId === activeRecord.id || ('machineId' in activeRecord && link.sourceMachineId === activeRecord.machineId)),
     )
-    const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation)
+    const hasPocPurposeLock =
+      metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL &&
+      field.key === 'purpose' &&
+      hasActiveOpenPocPurposeLock(activeRecord as ReusedInternalSystem, projects, projectSystems)
+    const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
     const sourceRecord = businessEditable ? activeDraft : activeRecord
     const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const error = validationMessageForField(field.label, field.key)
-    const isRequired = field.key === 'cognitoRegion' ? requiresCloudPlatform(hostingType) : field.required
+    const isRequired =
+      field.key === 'cognitoRegion'
+        ? requiresCloudPlatform(hostingType)
+        : (field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
+          ? isOccupationDateRequiredForPurpose(textValue(readRecordValue(activeDraft, 'purpose')))
+          : field.required
     const width =
       field.key === 'url'
         ? 'w-96'
@@ -879,7 +926,8 @@ export function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderAccessDetailField(field: { key: string; label: string; inputType?: string }) {
-    const value = textValue(readRecordValue(activeDraft, field.key))
+    const rawValue = readRecordValue(activeDraft, field.key)
+    const value = field.inputType === 'boolean' ? Boolean(rawValue) : textValue(rawValue)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const vpnEnabled = textValue(readRecordValue(activeDraft, 'vpnEnabled'))
@@ -891,9 +939,10 @@ export function InventoryForm<T extends InventoryRecord>({
       : validationMessageForField(field.label, field.key)
 
     if (field.inputType === 'text') {
+      const textInputValue = textValue(value)
       return (
         <FormField key={field.key} label={field.label} controlWidthClassName="w-96" required={isRequired} error={error}>
-          <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+          <input className={fieldClassName(isChanged, isInvalid)} value={textInputValue} onChange={(event) => updateField(field.key, event.target.value)} />
         </FormField>
       )
     }
@@ -919,9 +968,31 @@ export function InventoryForm<T extends InventoryRecord>({
       )
     }
 
+    if (field.inputType === 'boolean') {
+      return (
+        <FormField key={field.key} label={field.label} controlWidthClassName="w-48" required={false} error={error}>
+          <div className={[fieldClassName(isChanged), 'flex items-center gap-3'].join(' ')}>
+            {[true, false].map((option) => (
+              <label key={String(option)} className="inline-flex items-center gap-1 text-sm">
+                <input
+                  type="radio"
+                  name={`${activeRecord.id}-${field.key}`}
+                  value={String(option)}
+                  checked={value === option}
+                  onChange={() => updateField(field.key, option)}
+                />
+                <span>{option ? 'Yes' : 'No'}</span>
+              </label>
+            ))}
+          </div>
+        </FormField>
+      )
+    }
+
+    const selectValue = textValue(value)
     return (
       <FormField key={field.key} label={field.label} controlWidthClassName="w-56" required={isRequired} error={error}>
-        <select className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => handlePicklistChange(field.key, event.target.value)}>
+        <select className={fieldClassName(isChanged, isInvalid)} value={selectValue} onChange={(event) => handlePicklistChange(field.key, event.target.value)}>
           <option value="" />
           {optionsWithCustom(field.key, VPN_TYPE_OPTIONS).map((option) => (
             <option key={option} value={option}>{option}</option>

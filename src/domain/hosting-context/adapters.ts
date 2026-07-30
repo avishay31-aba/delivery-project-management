@@ -31,13 +31,14 @@ export function hostingContextFromSource(source: Partial<HostingContext>): Hosti
     performanceTier: source.performanceTier,
     vpnEnabled: source.vpnEnabled,
     vpnType: source.vpnType,
+    externalInterface: source.externalInterface ?? false,
     ipRestrictionEnabled: source.ipRestrictionEnabled,
   }
 }
 
 export function tenantHostingPatchFromSystem(system: Partial<HostingContext>): Pick<
   Tenant,
-  'hostingType' | 'cloudPlatform' | 'csp' | 'cloudRegion' | 'performanceTier' | 'vpnEnabled' | 'vpnType' | 'ipRestrictionEnabled'
+  'hostingType' | 'cloudPlatform' | 'csp' | 'cloudRegion' | 'performanceTier' | 'vpnEnabled' | 'vpnType' | 'externalInterface' | 'ipRestrictionEnabled'
 > {
   return {
     hostingType: system.hostingType,
@@ -47,6 +48,7 @@ export function tenantHostingPatchFromSystem(system: Partial<HostingContext>): P
     performanceTier: system.performanceTier,
     vpnEnabled: system.vpnEnabled,
     vpnType: system.vpnType,
+    externalInterface: system.externalInterface ?? false,
     ipRestrictionEnabled: system.ipRestrictionEnabled,
   }
 }
@@ -72,6 +74,7 @@ export function hostingSnapshotFromSystem(
     performanceTier: system?.performanceTier ?? tenant.performanceTier ?? '',
     vpnEnabled: system?.vpnEnabled ?? tenant.vpnEnabled ?? '',
     vpnType: system?.vpnType ?? tenant.vpnType ?? '',
+    externalInterface: system?.externalInterface ?? tenant.externalInterface ?? false,
     ipRestrictionEnabled: system?.ipRestrictionEnabled ?? tenant.ipRestrictionEnabled ?? '',
     platform,
     csp: system?.csp ?? tenant.csp ?? '',

@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, ClipboardCheck, FolderKanban, HardDrive, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -72,12 +72,6 @@ export const consoleNavigation: NavConsoleGroup[] = [
         path: '/renewals',
         icon: RefreshCcw,
         description: 'Renewal readiness queue',
-      },
-      {
-        label: 'Requirement Coverage',
-        path: '/requirement-coverage',
-        icon: ClipboardCheck,
-        description: 'Requirement delivery traceability',
       },
     ],
   },
