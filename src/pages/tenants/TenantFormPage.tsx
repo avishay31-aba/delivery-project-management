@@ -2,7 +2,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, Edit2, Plus, Save, Settings2, Trash2, X } from 'lucide-react'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
@@ -1761,7 +1761,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+    <WorkspaceFrame>
       {navigationBlocker.state === 'blocked' ? (
         <UnsavedChangesDialog
           onSave={() => saveTenant(true, () => navigationBlocker.proceed?.())}
@@ -1779,7 +1779,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         subtitle={`${formType === 'POC' ? 'Tenant form-POC' : 'Tenant form-Customer'} foundation`}
         actions={renderActionButtons()}
       />
-      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
+      <WorkspaceScrollContent className="space-y-4" viewMode={isViewMode}>
       {messages.length > 0 ? (
         <div className={formMessageClassName(messages)}>
           {messages.map((message) => <div key={message}>{message}</div>)}
@@ -1812,7 +1812,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       {formType === 'POC' ? null : renderWarranties()}
       {renderRemarks()}
       {renderConfigurationHistory()}
-      </div>
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

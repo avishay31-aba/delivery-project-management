@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createReusedInternalSystemColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
@@ -26,11 +26,12 @@ export function ReusedInternalSystemsInventoryPage() {
   )
 
   return (
-    <div>
+    <WorkspaceFrame>
       <PageHeader
         title="Reused Internal Systems Inventory"
         subtitle="Reusable POC / Demo / Training / Support machines. Source = Reused Internal Systems."
       />
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Reused Internal Systems Inventory"
         dashboardScope="reusedInternalSystems"
@@ -66,6 +67,7 @@ export function ReusedInternalSystemsInventoryPage() {
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

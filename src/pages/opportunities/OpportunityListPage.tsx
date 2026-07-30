@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { opportunityReference } from '@/domain/business-reference'
@@ -24,9 +24,10 @@ export function OpportunityListPage() {
   )
 
   return (
-    <div>
+    <WorkspaceFrame>
       <PageHeader title="Opportunities" subtitle="Salesforce opportunity intake and tenant requirements" />
 
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Opportunity dashboard"
         dashboardScope="opportunities"
@@ -62,6 +63,7 @@ export function OpportunityListPage() {
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

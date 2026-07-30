@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, OperationalStatusIcon, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { Tenant } from '@/data/seed.types'
@@ -381,7 +381,7 @@ export function Customer360Page() {
   }
 
   return (
-    <div className="space-y-4">
+    <WorkspaceFrame>
       <PageHeader
         title={customerDisplayName(account)}
         subtitle="Customer Workspace"
@@ -396,6 +396,7 @@ export function Customer360Page() {
         }
       />
 
+      <WorkspaceScrollContent className="space-y-4">
       <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         {readOnlyNode('Account ID', <BusinessObjectLink reference={customerReference}>{account.accountCode}</BusinessObjectLink>)}
         {readOnlyValue('Customer Name', customerDisplayName(account))}
@@ -441,6 +442,7 @@ export function Customer360Page() {
           {renderTabContent()}
         </div>
       </section>
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

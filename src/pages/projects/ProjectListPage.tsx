@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createProjectListColumns } from '@/config/project-columns'
 import { PROJECT_DASHBOARD_COLOR_LEGEND, projectListRowClassName } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
@@ -28,9 +28,10 @@ const projectListColumns = useMemo(
 const activeProjects = useMemo(() => projects.filter((project) => !project.archivedAt), [projects])
 
 return (
-<div>
+<WorkspaceFrame>
 <PageHeader title="Projects" subtitle="Delivery specialist desktop" />
 
+<WorkspaceScrollContent>
   <DataDashboard
     title="Project list"
     dashboardScope="projects"
@@ -67,6 +68,7 @@ return (
       if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
     }}
   />
-</div>
+</WorkspaceScrollContent>
+</WorkspaceFrame>
 )
 }

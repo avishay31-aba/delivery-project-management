@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
@@ -20,11 +20,12 @@ export function ProductionSystemInventoryPage() {
   const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
 
   return (
-    <div>
+    <WorkspaceFrame>
       <PageHeader
         title="Production System Inventory"
         subtitle="Available production systems only. Source = Production, Purpose = Delivery."
       />
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Production System Inventory"
         dashboardScope="productionSystemInventory"
@@ -59,6 +60,7 @@ export function ProductionSystemInventoryPage() {
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

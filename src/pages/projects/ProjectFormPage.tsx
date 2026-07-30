@@ -17,7 +17,7 @@ import type {
   System,
   Tenant,
 } from '@/data/seed.types'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
@@ -1966,7 +1966,7 @@ export function ProjectFormPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+    <WorkspaceFrame>
       {navigationBlocker.state === 'blocked' ? (
         <UnsavedChangesDialog
           onSave={() => saveProject(true, () => navigationBlocker.proceed?.())}
@@ -1988,7 +1988,7 @@ export function ProjectFormPage() {
         actions={renderActionButtons()}
       />
 
-      <div className={['sf-form-content-scroll min-h-0 flex-1 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
+      <WorkspaceScrollContent viewMode={isViewMode}>
       {saveMessages.length > 0 ? (
         <div className={`mb-3 ${formMessageClassName(saveMessages)}`}>
           {saveMessages.map((message) => (
@@ -2042,10 +2042,10 @@ export function ProjectFormPage() {
                   : renderDocumentsTab()}
         </div>
       </div>
-      </div>
+      </WorkspaceScrollContent>
       {renderAddMilestoneDialog()}
       {renderMilestoneDialog()}
       {renderAllocationDialog()}
-    </div>
+    </WorkspaceFrame>
   )
 }

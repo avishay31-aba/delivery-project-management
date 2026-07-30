@@ -1755,7 +1755,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col space-y-4 overflow-hidden">
+    <div className="flex min-h-full min-w-0 flex-col space-y-4">
       {pendingViewId ? (
         <UnsavedChangesDialog
           onSave={saveChangesAndApplyPendingView}
@@ -1838,7 +1838,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
         {toolbar}
       </div>
 
-      <div className="sf-card flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden p-3">
+      <div className="sf-card flex min-h-[24rem] flex-1 flex-col space-y-3 overflow-hidden p-3">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-sf-text-muted">View</span>
@@ -1978,7 +1978,7 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
 
         <div
           ref={tableContainerRef}
-          className="min-h-0 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border"
+          className="min-h-48 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border"
           style={{ scrollbarGutter: 'stable' }}
         >
           <table className="min-w-full divide-y divide-sf-border text-sm">

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createRequirementCoverageColumns } from '@/config/requirement-coverage-columns'
 import {
   requirementCoverageRows,
@@ -52,9 +52,10 @@ export function RequirementCoverageDashboardPage() {
   const columns = useMemo(() => createRequirementCoverageColumns(), [])
 
   return (
-    <div className="space-y-4">
+    <WorkspaceFrame>
       <PageHeader title="Requirement Coverage" subtitle="End-to-end requirement delivery traceability" />
 
+      <WorkspaceScrollContent className="space-y-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
         {KPI_LABELS.map((item) => (
           <div key={item.key} className="rounded border border-sf-border bg-white p-3">
@@ -83,6 +84,7 @@ export function RequirementCoverageDashboardPage() {
           if (routePath) navigate(routePath, { state: { mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

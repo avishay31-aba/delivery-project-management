@@ -45,7 +45,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="flex h-screen min-h-0 overflow-hidden">
       {pendingNavigation ? (
         <UnsavedChangesDialog
           onSave={saveUnsavedDashboardChanges ? saveChangesAndNavigate : undefined}
@@ -54,9 +54,9 @@ export function AppShell() {
         />
       ) : null}
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col" data-regional-date-format={regionalDateFormat}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-regional-date-format={regionalDateFormat}>
         <TopHeader title={headerTitle} />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden p-6">
           <Outlet />
         </main>
       </div>

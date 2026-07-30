@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
@@ -2010,7 +2010,7 @@ export function InventoryForm<T extends InventoryRecord>({
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+    <WorkspaceFrame>
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
@@ -2022,7 +2022,7 @@ export function InventoryForm<T extends InventoryRecord>({
         actions={renderActionButtons()}
       />
 
-      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
+      <WorkspaceScrollContent className="space-y-4" viewMode={isViewMode}>
       {summaryMessages.length > 0 ? (
         <div className={formMessageClassName(summaryMessages)}>
           {summaryMessages.map((message) => (
@@ -2092,7 +2092,7 @@ export function InventoryForm<T extends InventoryRecord>({
       {renderPurposeHistorySection()}
       {renderRemarksSection()}
       {renderConfigurationHistorySection()}
-      </div>
+      </WorkspaceScrollContent>
 
       {navigationBlocker.state === 'blocked' ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
@@ -2117,7 +2117,7 @@ export function InventoryForm<T extends InventoryRecord>({
       ) : null}
       {renderAddTenantDialog()}
       {renderMoveTenantDialog()}
-    </div>
+    </WorkspaceFrame>
   )
 }
 

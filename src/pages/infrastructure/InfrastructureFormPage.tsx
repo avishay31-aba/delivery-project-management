@@ -4,7 +4,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { InfrastructureMaintenanceGrid } from '@/components/maintenance/InfrastructureMaintenanceGrid'
 import { RemarksGrid } from '@/components/remarks'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { SystemDeliveryTable } from '@/components/systems'
 import { WarrantyCollectionGrid } from '@/components/warranty/WarrantyCollectionGrid'
 import {
@@ -756,7 +756,7 @@ export function InfrastructureFormPage() {
   )
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+    <WorkspaceFrame>
       <PageHeader
         title={title}
         subtitle="Infrastructure Item"
@@ -776,7 +776,7 @@ export function InfrastructureFormPage() {
         }
       />
 
-      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
+      <WorkspaceScrollContent className="space-y-4" viewMode={isViewMode}>
         {messages.length > 0 ? <div className={formMessageClassName(messages)}>{messages.map((message) => <div key={message}>{message}</div>)}</div> : null}
         {renderHeader()}
         {renderTabs()}
@@ -804,7 +804,7 @@ export function InfrastructureFormPage() {
             readOnly={isViewMode}
           />
         </section>
-      </div>
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

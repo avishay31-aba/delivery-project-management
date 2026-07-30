@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createCustomerColumns } from '@/config/customer-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { accountReference } from '@/domain/business-reference'
@@ -16,9 +16,10 @@ export function CustomerListPage() {
   const columns = createCustomerColumns(salesManagers, systems, tenants, warrantyRecords)
 
   return (
-    <div>
+    <WorkspaceFrame>
       <PageHeader title="Customers" subtitle="Customer/account database for Opportunities, Systems, and Tenants" />
 
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Customer list"
         dashboardScope="customers"
@@ -39,6 +40,7 @@ export function CustomerListPage() {
           updateAccount(row.id, { [column.editKey]: value } as never)
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

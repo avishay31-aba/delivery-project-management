@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createRenewalColumns } from '@/config/renewal-columns'
 import type { Tenant } from '@/data/seed.types'
 import {
@@ -69,9 +69,10 @@ export function RenewalWorkQueuePage() {
   const columns = useMemo(() => createRenewalColumns(), [])
 
   return (
-    <div className="space-y-4">
+    <WorkspaceFrame>
       <PageHeader title="Renewal Work Queue" subtitle="Read-only renewal readiness and warranty risk queue" />
 
+      <WorkspaceScrollContent className="space-y-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {KPI_LABELS.map((item) => (
           <div key={item.key} className="rounded border border-sf-border bg-white p-3">
@@ -96,6 +97,7 @@ export function RenewalWorkQueuePage() {
           if (routePath) navigate(routePath, { state: { mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createAllocatedSystemColumns } from '@/config/system-inventory-columns'
 import { ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND, allocatedSystemDashboardRows, systemDashboardRowClassName } from '@/domain/system-inventory'
 import { systemReference } from '@/domain/business-reference'
@@ -19,9 +19,10 @@ export function SystemListPage() {
   const systemListColumns = createAllocatedSystemColumns(projects, tenants)
 
   return (
-    <div>
+    <WorkspaceFrame>
       <PageHeader title="Allocated Systems" subtitle="Allocated systems only. Production rows show SID; reused internal rows show SID plus MID." />
 
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Allocated Systems"
         dashboardScope="systems"
@@ -44,6 +45,7 @@ export function SystemListPage() {
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

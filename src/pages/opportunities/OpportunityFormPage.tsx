@@ -36,7 +36,7 @@ import type {
   Tenant,
   WarrantyRecord,
 } from '@/data/seed.types'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import {
   BusinessIdLink,
   BusinessObjectLink,
@@ -1946,7 +1946,7 @@ export function OpportunityFormPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] min-h-0 flex-col">
+    <WorkspaceFrame>
       {navigationBlocker.state === 'blocked' ? (
         <UnsavedChangesDialog
           onSave={() => saveChanges({ stayOnPage: true, onSaved: () => navigationBlocker.proceed?.() })}
@@ -2042,7 +2042,7 @@ export function OpportunityFormPage() {
         </div>
       </div>
 
-      <div className={['sf-form-content-scroll min-h-0 flex-1 space-y-4 pb-2 pr-1', isViewMode ? 'sf-view-mode' : ''].filter(Boolean).join(' ')}>
+      <WorkspaceScrollContent className="space-y-4" viewMode={isViewMode}>
       {hasAttemptedSave && validationMessages.length > 0 ? (
         <div className={validationErrors.length > 0 ? formMessageClassName(validationErrors.map((message) => message.message)) : 'rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'}>
           <p className="font-semibold">Opportunity validation</p>
@@ -2361,7 +2361,7 @@ export function OpportunityFormPage() {
         )}
         </div>
       </section>
-      </div>
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

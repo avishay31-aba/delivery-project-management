@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createTenantColumns } from '@/config/tenant-columns'
 import { tenantReference } from '@/domain/business-reference'
 import { TENANT_DASHBOARD_COLOR_LEGEND, tenantDashboardRowClassName } from '@/domain/tenant-operations'
@@ -19,9 +19,10 @@ const createTenant = useAppStore((s) => s.createTenant)
 const tenantListColumns = createTenantColumns(systems, projects, projectTenants)
 
 return (
-<div>
+<WorkspaceFrame>
 <PageHeader title="Tenants" subtitle="Tenant list with warranty columns" />
 
+<WorkspaceScrollContent>
   <DataDashboard
     title="Tenant list"
     dashboardScope="tenants"
@@ -57,6 +58,7 @@ return (
       if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
     }}
   />
-</div>
+</WorkspaceScrollContent>
+</WorkspaceFrame>
 )
 }

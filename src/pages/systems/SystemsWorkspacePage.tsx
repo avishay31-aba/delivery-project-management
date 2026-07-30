@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import { WorkspaceFrame } from '@/components/record'
 import { ProductionSystemInventoryPage } from './ProductionSystemInventoryPage'
 import { ReusedInternalSystemsInventoryPage } from './ReusedInternalSystemsInventoryPage'
 import { SystemListPage } from './SystemListPage'
@@ -20,8 +21,8 @@ export function SystemsWorkspacePage() {
   const activeView = activeSystemsWorkspaceView(pathname)
 
   return (
-    <div className="space-y-4">
-      <div className="sticky top-0 z-10 border-b border-sf-border bg-sf-surface">
+    <WorkspaceFrame className="gap-4">
+      <div className="shrink-0 border-b border-sf-border bg-sf-surface">
         <nav className="flex flex-wrap gap-2" aria-label="Systems Workspace views">
           {SYSTEMS_WORKSPACE_TABS.map((tab) => (
             <NavLink
@@ -43,9 +44,11 @@ export function SystemsWorkspacePage() {
         </nav>
       </div>
 
-      {activeView === 'production' ? <ProductionSystemInventoryPage /> : null}
-      {activeView === 'reused' ? <ReusedInternalSystemsInventoryPage /> : null}
-      {activeView === 'allocated' ? <SystemListPage /> : null}
-    </div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        {activeView === 'production' ? <ProductionSystemInventoryPage /> : null}
+        {activeView === 'reused' ? <ReusedInternalSystemsInventoryPage /> : null}
+        {activeView === 'allocated' ? <SystemListPage /> : null}
+      </div>
+    </WorkspaceFrame>
   )
 }

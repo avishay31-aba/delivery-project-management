@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createInfrastructureColumns } from '@/config/infrastructure-columns'
 import { allSystemRecords, infrastructureDashboardRows } from '@/domain/infrastructure-item'
 import { infrastructureItemReference } from '@/domain/business-reference'
@@ -24,8 +24,9 @@ export function InfrastructureListPage() {
   const columns = useMemo(() => createInfrastructureColumns(), [])
 
   return (
-    <div className="space-y-4">
+    <WorkspaceFrame>
       <PageHeader title="Infrastructure Dashboard" subtitle="Global Infrastructure Items supporting Systems" />
+      <WorkspaceScrollContent>
       <DataDashboard
         title="Infrastructure Items"
         dashboardScope="infrastructure"
@@ -53,6 +54,7 @@ export function InfrastructureListPage() {
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
       />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { ActivityTimeline } from '@/components/activity'
-import { PageHeader } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { activityLogDashboardSummary } from '@/domain/activity-log'
 import { useAppStore } from '@/store/useAppStore'
 
@@ -18,9 +18,10 @@ export function ActivityLogDashboardPage() {
   const summary = useMemo(() => activityLogDashboardSummary(activityEvents), [activityEvents])
 
   return (
-    <div className="space-y-4">
+    <WorkspaceFrame>
       <PageHeader title="Activity / Audit Log" subtitle="Read-only operational activity across customers, projects, systems, tenants, and allocations" />
 
+      <WorkspaceScrollContent className="space-y-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9">
         {kpiCard('Total Events', summary.totalEvents)}
         {kpiCard('Today', summary.today)}
@@ -34,6 +35,7 @@ export function ActivityLogDashboardPage() {
       </section>
 
       <ActivityTimeline events={activityEvents} emptyText="No activity has been recorded across the ERP." />
-    </div>
+      </WorkspaceScrollContent>
+    </WorkspaceFrame>
   )
 }
