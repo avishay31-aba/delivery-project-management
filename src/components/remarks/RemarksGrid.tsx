@@ -139,7 +139,6 @@ export function RemarksGrid({
       validate: validateRemark,
       commit: commitRemark,
       normalize: normalizedRemark,
-      isMeaningfulNewDraft: (draft) => hasMeaningfulRichText(draft.content),
       successMessage: 'Remark saved.',
     })
   }
@@ -176,6 +175,7 @@ export function RemarksGrid({
               {['Actions', 'Remark ID', 'Created', 'Author', 'Type', 'Content', 'Due Date', 'DL Alert'].map((label) => (
                 <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                   {label}
+                  {label === 'Content' ? <span className="ml-0.5 text-red-600" aria-hidden="true">*</span> : null}
                 </th>
               ))}
             </tr>
@@ -188,11 +188,10 @@ export function RemarksGrid({
               const errors = editor.errorsFor(remark.id)
               const isSaving = editor.isSaving(remark.id)
               const isDeleting = editor.isDeleting(remark.id)
-              const canSave = editor.canSave(remark.id, {
-                validate: validateRemark,
-                normalize: normalizedRemark,
-                isMeaningfulNewDraft: (draftRecord) => hasMeaningfulRichText(draftRecord.content),
-              })
+              const canAttemptSave = Boolean(draft) && !isSaving && (
+                editor.isNew(remark.id) ||
+                editor.hasChanges(remark.id, { normalize: normalizedRemark })
+              )
               return (
                 <tr key={remark.id} className="hover:bg-sf-surface-alt">
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
@@ -202,7 +201,7 @@ export function RemarksGrid({
                           <>
                             <EditableChildObjectActionButton
                               variant="primary"
-                              disabled={isSaving || !canSave}
+                              disabled={!canAttemptSave}
                               onClick={() => saveRemark(remark.id)}
                             >
                               <Save className="h-3.5 w-3.5" aria-hidden="true" />
