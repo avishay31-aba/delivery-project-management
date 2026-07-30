@@ -151,9 +151,9 @@ const ACCESS_DETAIL_FIELDS = [
   { key: 'url', label: 'URL', inputType: 'text' },
   { key: 'ipRestrictionEnabled', label: 'IP Restriction', inputType: 'yesNo' },
   { key: 'vpnEnabled', label: 'VPN', inputType: 'yesNo' },
-  { key: 'externalInterface', label: 'External Interface', inputType: 'boolean' },
   { key: 'vpnType', label: 'VPN Type', inputType: 'picklist' },
 ]
+const EXTERNAL_INTERFACE_FIELD = { key: 'externalInterface', label: 'External Interface', inputType: 'boolean' }
 const PRODUCT_LOGO_COLORS: Record<string, string> = {
   Tangles: 'text-blue-600',
   'Tangles Light': 'text-cyan-600',
@@ -1583,6 +1583,7 @@ export function InventoryForm<T extends InventoryRecord>({
               <h3 className="text-lg font-semibold text-sf-text">Access Details</h3>
               <div className="flex flex-wrap items-start gap-3">
                 {ACCESS_DETAIL_FIELDS.map(renderAccessDetailField)}
+                {renderAccessDetailField(EXTERNAL_INTERFACE_FIELD)}
               </div>
             </section>
             <section className="space-y-2">

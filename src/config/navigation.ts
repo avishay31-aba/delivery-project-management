@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, RefreshCcw, Server, ShieldCheck, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, Server, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -60,18 +60,6 @@ export const consoleNavigation: NavConsoleGroup[] = [
         path: '/tenants',
         icon: Users,
         description: 'Tenant list',
-      },
-      {
-        label: 'Warranty Workspace',
-        path: '/warranties',
-        icon: ShieldCheck,
-        description: 'Warranty work queue',
-      },
-      {
-        label: 'Renewal Work Queue',
-        path: '/renewals',
-        icon: RefreshCcw,
-        description: 'Renewal readiness queue',
       },
     ],
   },
