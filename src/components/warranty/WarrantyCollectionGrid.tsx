@@ -9,9 +9,13 @@ import {
 } from '@/domain/infrastructure-item'
 import {
   validateWarrantyDateDraft,
+  WARRANTY_FIELD_LABELS,
+  WARRANTY_OBJECT_CONTEXT_SCHEMAS,
   WARRANTY_DATE_ORDER_MESSAGE,
   WARRANTY_END_DATE_REQUIRED_MESSAGE,
   WARRANTY_START_DATE_REQUIRED_MESSAGE,
+  warrantyContextHasField,
+  warrantyContextRequiresField,
 } from '@/domain/warranty-collection'
 import { hasMeaningfulRichText } from '@/domain/rich-text'
 import { handleDateInputPaste } from '@/utils/date-input'
@@ -44,6 +48,20 @@ export function WarrantyCollectionGrid({
 }: WarrantyCollectionGridProps) {
   const editor = useEditableChildObjectEditor<TenantWarranty>()
   const permissions = editableChildObjectPermissions({ readOnly })
+  const warrantySchema = WARRANTY_OBJECT_CONTEXT_SCHEMAS.infrastructure
+  const headers = [
+    'Actions',
+    'Warranty ID',
+    ...(warrantyContextHasField(warrantySchema, 'initialWarrantyDate') ? [WARRANTY_FIELD_LABELS.initialWarrantyDate] : []),
+    WARRANTY_FIELD_LABELS.startDate,
+    WARRANTY_FIELD_LABELS.endDate,
+    'Duration',
+    'Days Before Expiration',
+    'Warranty Status',
+    'Alerts',
+    'Remarks',
+    'No Warranty',
+  ]
   const committedIds = warranties.map((warranty) => warranty.id).join('|')
   const defaultWarranty = useMemo(
     () => normalizeInfrastructureWarrantyCollection([{ ...createInfrastructureWarranty([]), noWarranty: 'YES' }])[0],
@@ -104,10 +122,11 @@ export function WarrantyCollectionGrid({
         <table className="w-max min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {['Actions', 'Warranty ID', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
+              {headers.map((header) => (
                 <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                   {header}
-                  {header === 'Start Date' || header === 'End Date' ? <RequiredFieldMarker /> : null}
+                  {header === WARRANTY_FIELD_LABELS.startDate && warrantyContextRequiresField(warrantySchema, 'startDate') ? <RequiredFieldMarker /> : null}
+                  {header === WARRANTY_FIELD_LABELS.endDate && warrantyContextRequiresField(warrantySchema, 'endDate') ? <RequiredFieldMarker /> : null}
                 </th>
               ))}
             </tr>
