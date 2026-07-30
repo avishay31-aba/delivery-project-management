@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, MaintenanceStatusPresentation, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
 import type { InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
@@ -136,7 +136,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
             <tr>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Actions</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task ID</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Type</th>
+              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Type<RequiredFieldMarker /></th>
               <th className="min-w-[24rem] border border-sf-border px-2 py-2">Description</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Start Date</th>
               <th className="whitespace-nowrap border border-sf-border px-2 py-2">Due Date</th>

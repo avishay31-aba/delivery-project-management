@@ -13,6 +13,10 @@ interface FormFieldProps {
   renderAs?: 'label' | 'div'
 }
 
+export function RequiredFieldMarker() {
+  return <span className="ml-0.5 text-red-600" aria-label="required">*</span>
+}
+
 export function FormField({
   label,
   children,
@@ -33,7 +37,7 @@ export function FormField({
     <Wrapper className={`inline-grid w-max items-start gap-1 align-top text-sm ${className}`}>
       <span className="max-w-none whitespace-nowrap font-medium text-sf-text-muted">
         {label}
-        {required ? <span className="ml-0.5 text-red-600" aria-label="required">*</span> : null}
+        {required ? <RequiredFieldMarker /> : null}
       </span>
       <span className={`${controlWidthClassName} block`} data-invalid={Boolean(error) || undefined}>
         {children}

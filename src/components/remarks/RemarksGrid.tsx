@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
 import {
   createRemarkRecord,
   remarkDeadlineAlertLabel,
@@ -175,7 +175,7 @@ export function RemarksGrid({
               {['Actions', 'Remark ID', 'Created', 'Author', 'Type', 'Content', 'Due Date', 'DL Alert'].map((label) => (
                 <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                   {label}
-                  {label === 'Content' ? <span className="ml-0.5 text-red-600" aria-hidden="true">*</span> : null}
+                  {label === 'Content' ? <RequiredFieldMarker /> : null}
                 </th>
               ))}
             </tr>
