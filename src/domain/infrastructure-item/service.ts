@@ -47,7 +47,7 @@ export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; t
   { category: 'Hardware', types: ['Server', 'Storage Server', 'Firewall', 'Laptop'] },
   { category: 'Software', types: [] },
   { category: 'Cloud', types: ['Compute/Host', 'VPN'] },
-  { category: 'Network', types: ['Domain'] },
+  { category: 'Network', types: ['Domain', 'SSL'] },
 ]
 
 const APPROVED_INFRASTRUCTURE_CATEGORY_LABELS = new Set(
@@ -92,7 +92,9 @@ export const INFRASTRUCTURE_PROPERTY_SCOPES = {
   firewallFirmwareVersion: 'firewall.firmwareVersion',
   domainProvider: 'domain.provider',
   domainType: 'domain.domainType',
-  sslType: 'domain.sslType',
+  sslProvider: 'ssl.provider',
+  sslType: 'ssl.type',
+  sslVersion: 'ssl.version',
   laptopManufacturer: 'laptop.manufacturer',
 } as const
 
@@ -254,6 +256,43 @@ export function infrastructureBillingMethods(referenceData: ReferenceDataRecord[
   return referenceData
     .filter((record) => record.referenceType === INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE && record.active)
     .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
+}
+
+export function infrastructureItemTypeLabel(item: InfrastructureItem, referenceData: ReferenceDataRecord[]): string {
+  return infrastructureReferenceDataLabel(referenceData, item.typeRefId)
+}
+
+export function isInfrastructureItemType(item: InfrastructureItem, referenceData: ReferenceDataRecord[], typeLabel: string): boolean {
+  return normalizeReferenceLabel(infrastructureItemTypeLabel(item, referenceData)) === normalizeReferenceLabel(typeLabel)
+}
+
+export function infrastructureDomainName(item: InfrastructureItem): string {
+  return text(item.properties?.domainName).trim()
+}
+
+export function infrastructureDomainLinkLabel(item: InfrastructureItem): string {
+  const businessId = text(item.infrastructureId).trim()
+  const domainName = infrastructureDomainName(item)
+  if (businessId && domainName) return `${businessId}-${domainName}`
+  return businessId || domainName || '-'
+}
+
+export function linkedDomainItemsForSsl(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  currentSslItemId: string,
+  currentLinkedDomainId = '',
+): InfrastructureItem[] {
+  const linkedByOtherSsl = new Set(
+    items
+      .filter((item) => item.id !== currentSslItemId && isInfrastructureItemType(item, referenceData, 'SSL'))
+      .map((item) => text(item.properties?.linkedDomainInfrastructureItemId))
+      .filter(Boolean),
+  )
+  return items
+    .filter((item) => isInfrastructureItemType(item, referenceData, 'Domain'))
+    .filter((item) => item.id === currentLinkedDomainId || !linkedByOtherSsl.has(item.id))
+    .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 export function infrastructureWarrantyTypes(referenceData: ReferenceDataRecord[]): ReferenceDataRecord[] {
@@ -601,8 +640,11 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     domainProviderRefId: text(raw.domainProviderRefId),
     domainTypeRefId: text(raw.domainTypeRefId),
     domainName: text(raw.domainName),
+    sslProviderRefId: text(raw.sslProviderRefId),
     sslTypeRefId: text(raw.sslTypeRefId),
+    sslVersionRefId: text(raw.sslVersionRefId),
     sslVersion: text(raw.sslVersion),
+    linkedDomainInfrastructureItemId: text(raw.linkedDomainInfrastructureItemId),
     vpnTypeRefId: text(raw.vpnTypeRefId),
     vpnLicenseCount: numberOrNull(raw.vpnLicenseCount),
   }
@@ -1106,6 +1148,20 @@ export function validateInfrastructureItemDraft(
   const typeLabel = infrastructureReferenceDataLabel(referenceData, draft.typeRefId)
   if ((typeLabel === 'Server' || typeLabel === 'Storage Server') && (draft.properties?.memoryQuantity ?? 0) < 0) messages.push('Memory Quantity cannot be negative.')
   if ((typeLabel === 'Server' || typeLabel === 'Storage Server') && (draft.properties?.cpuQuantity ?? 0) < 0) messages.push('CPU Quantity cannot be negative.')
+  if (isInfrastructureItemType(draft, referenceData, 'SSL') && draft.properties?.linkedDomainInfrastructureItemId) {
+    const linkedDomainId = draft.properties.linkedDomainInfrastructureItemId
+    const linkedDomain = items.find((item) => item.id === linkedDomainId)
+    if (!linkedDomain || !isInfrastructureItemType(linkedDomain, referenceData, 'Domain')) {
+      messages.push('Linked Domain must be a Network Domain Infrastructure Item.')
+    }
+    if (items.some((item) =>
+      item.id !== draft.id &&
+      isInfrastructureItemType(item, referenceData, 'SSL') &&
+      item.properties?.linkedDomainInfrastructureItemId === linkedDomainId
+    )) {
+      messages.push('This Domain is already linked to another SSL Infrastructure Item.')
+    }
+  }
   ;(draft.properties?.disks ?? []).forEach((disk, index) => {
     if ((disk.quantity ?? 0) <= 0) messages.push(`Disk ${index + 1} Quantity must be greater than zero.`)
   })

@@ -40,12 +40,14 @@ import {
   infrastructureMaintenanceStatusesFromTasks,
   infrastructureManufacturerPropertyScope,
   infrastructureManufacturersForType,
+  infrastructureDomainLinkLabel,
   infrastructureOwners,
   infrastructurePropertyValues,
   infrastructureReferenceDataLabel,
   infrastructureTypesForCategory,
   infrastructureWarrantyAlert,
   infrastructureWarrantyStatusFromCollection,
+  linkedDomainItemsForSsl,
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
@@ -225,6 +227,7 @@ export function InfrastructureFormPage() {
   if (messages.includes('Type is required.') || messages.includes('Type must belong to the selected Category.')) invalidFields.add('typeRefId')
   if (messages.includes('Identifier is required.') || messages.includes('Identifier must be unique.')) invalidFields.add('identifier')
   if (messages.includes('Owner is required.') || messages.includes('Owner is invalid.')) invalidFields.add('owner')
+  if (messages.some((message) => message.includes('Linked Domain') || message.includes('This Domain'))) invalidFields.add('linkedDomainInfrastructureItemId')
 
   function updateDraft(patch: Partial<InfrastructureItem>) {
     if (isViewMode) return
@@ -634,9 +637,34 @@ export function InfrastructureFormPage() {
           {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
           {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
         </div>
+      </div>
+    )
+  }
+
+  function renderSslProperties() {
+    const domainOptions = linkedDomainItemsForSsl(infrastructureItems, referenceData, draft.id, draft.properties?.linkedDomainInfrastructureItemId)
+    return (
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start gap-3">
+          {propertySelect('SSL Provider', 'sslProviderRefId', INFRASTRUCTURE_PROPERTY_SCOPES.sslProvider)}
           {propertySelect('SSL Type', 'sslTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.sslType)}
-          {renderTextInput('SSL Version', draft.properties?.sslVersion, (value) => updateProperties({ sslVersion: value }))}
+          {propertySelect('SSL Version', 'sslVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.sslVersion)}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          <FormField label="Linked Domain" controlWidthClassName={WIDE_FIELD_WIDTH}>
+            <select
+              className={[
+                'h-9 w-full rounded border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted',
+                invalidFields.has('linkedDomainInfrastructureItemId') ? 'border-red-500' : 'border-sf-border',
+              ].join(' ')}
+              value={draft.properties?.linkedDomainInfrastructureItemId ?? ''}
+              disabled={isViewMode}
+              onChange={(event) => updateProperties({ linkedDomainInfrastructureItemId: event.target.value })}
+            >
+              <option value=""></option>
+              {domainOptions.map((item) => <option key={item.id} value={item.id}>{infrastructureDomainLinkLabel(item)}</option>)}
+            </select>
+          </FormField>
         </div>
       </div>
     )
@@ -667,6 +695,7 @@ export function InfrastructureFormPage() {
     if (selectedTypeLabel === 'Server' || selectedTypeLabel === 'Storage Server') return renderServerProperties()
     if (selectedTypeLabel === 'Firewall') return renderFirewallProperties()
     if (selectedTypeLabel === 'Domain') return renderDomainProperties()
+    if (selectedTypeLabel === 'SSL') return renderSslProperties()
     if (selectedTypeLabel === 'Laptop') return renderLaptopProperties()
     if (selectedTypeLabel === 'Compute/Host') return renderVmGroups(false)
     if (selectedTypeLabel === 'VPN') return renderVpnProperties()

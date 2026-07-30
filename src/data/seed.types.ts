@@ -666,8 +666,11 @@ export interface InfrastructureItemProperties {
   domainTypeRefId?: string
   domainProviderRefId?: string
   domainName?: string
+  sslProviderRefId?: string
   sslTypeRefId?: string
+  sslVersionRefId?: string
   sslVersion?: string
+  linkedDomainInfrastructureItemId?: string
   vpnTypeRefId?: string
   vpnLicenseCount?: number | null
 }

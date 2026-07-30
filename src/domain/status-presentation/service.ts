@@ -82,7 +82,7 @@ const RECORD_CHANGE_PRESENTATIONS: Record<string, StatusPresentation> = {
 }
 
 const WARRANTY_PRESENTATIONS: Record<WarrantyStatus, StatusPresentation> = {
-  NOT_SET: { ...DEFAULT_PRESENTATION, key: 'NOT_SET', kind: 'warranty', label: WARRANTY_STATUS_LABELS.NOT_SET, icon: CircleHelp, iconClassName: 'text-sf-success', badgeClassName: 'bg-green-100 text-sf-success', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.NOT_SET}` },
+  NOT_SET: { ...DEFAULT_PRESENTATION, key: 'NOT_SET', kind: 'warranty', label: WARRANTY_STATUS_LABELS.NOT_SET, icon: CircleHelp, iconClassName: 'text-yellow-700', badgeClassName: 'bg-yellow-100 text-yellow-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.NOT_SET}` },
   PLANNED: { ...DEFAULT_PRESENTATION, key: 'PLANNED', kind: 'warranty', label: WARRANTY_STATUS_LABELS.PLANNED, icon: Calendar, iconClassName: 'text-sf-brand-light', badgeClassName: 'bg-blue-50 text-blue-700', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.PLANNED}` },
   VALID: { ...DEFAULT_PRESENTATION, key: 'VALID', kind: 'warranty', label: WARRANTY_STATUS_LABELS.VALID, icon: Check, iconClassName: 'text-sf-brand', badgeClassName: 'bg-blue-100 text-blue-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.VALID}` },
   PENDING: { ...DEFAULT_PRESENTATION, key: 'PENDING', kind: 'warranty', label: WARRANTY_STATUS_LABELS.PENDING, icon: AlertTriangle, iconClassName: 'text-sf-warning', badgeClassName: 'bg-orange-100 text-orange-800', tooltip: `Warranty status: ${WARRANTY_STATUS_LABELS.PENDING}` },
