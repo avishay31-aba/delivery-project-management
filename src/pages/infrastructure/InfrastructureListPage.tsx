@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
+import { WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
   allSystemRecords,
@@ -48,22 +48,29 @@ export function InfrastructureListPage() {
   const currentMaintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns({ includeDaysRunning: true }), [])
 
   return (
-    <WorkspaceFrame>
-      <PageHeader title="Infrastructure Dashboard" subtitle="Global Infrastructure Items supporting Systems" />
-      <WorkspaceScrollContent>
-        <section className="space-y-3">
-          <div className="flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
-            {INFRASTRUCTURE_DASHBOARD_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={['border-b-2 px-4 py-2 text-sm font-semibold', activeTab === tab.id ? 'border-sf-brand bg-white text-sf-text' : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text'].join(' ')}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <WorkspaceFrame className="gap-4">
+      <div className="shrink-0 border-b border-sf-border bg-sf-surface">
+        <nav className="flex flex-wrap gap-2" aria-label="Infrastructure Workspace views">
+          {INFRASTRUCTURE_DASHBOARD_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={[
+                'rounded-t border border-b-0 px-3 py-2 text-sm font-medium',
+                activeTab === tab.id
+                  ? 'border-sf-border bg-white text-sf-text'
+                  : 'border-transparent text-sf-text-muted hover:border-sf-border hover:bg-white',
+              ].join(' ')}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <WorkspaceScrollContent>
           {activeTab === 'allItems' ? (
             <DataDashboard
               title="All Items"
@@ -121,8 +128,8 @@ export function InfrastructureListPage() {
               freezeThroughColumnId="infrastructureItemId"
             />
           ) : null}
-        </section>
-      </WorkspaceScrollContent>
+        </WorkspaceScrollContent>
+      </div>
     </WorkspaceFrame>
   )
 }
