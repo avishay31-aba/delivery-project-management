@@ -37,7 +37,7 @@ import {
   infrastructureCategories,
   infrastructureDashboardRows,
   infrastructureLastMaintenanceDate,
-  infrastructureMaintenanceStatusFromTasks,
+  infrastructureMaintenanceStatusesFromTasks,
   infrastructureManufacturerPropertyScope,
   infrastructureManufacturersForType,
   infrastructureOwners,
@@ -55,7 +55,7 @@ import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
-import { isRouteViewMode } from '@/utils/route-mode'
+import { routeMode } from '@/utils/route-mode'
 import { useAppStore } from '@/store/useAppStore'
 
 type InfrastructureTab = 'properties' | 'linkedSystems' | 'documents' | 'activity'
@@ -153,7 +153,7 @@ export function InfrastructureFormPage() {
   const location = useLocation()
   const isNew = infrastructureId === 'new'
   const routeState = location.state as { returnTo?: string; mode?: string } | null
-  const isViewMode = !isNew && (isRouteViewMode(location) || routeState?.mode !== 'edit')
+  const isViewMode = !isNew && routeMode(location) !== 'edit'
   const returnTo = routeState?.returnTo ?? '/infrastructure'
 
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
@@ -470,7 +470,7 @@ export function InfrastructureFormPage() {
           </FormField>
           <FormField label="Maintenance Status" controlWidthClassName={STANDARD_FIELD_WIDTH}>
             <div className="flex h-9 items-center px-2 text-sm text-sf-text">
-              <MaintenanceStatusPresentation status={infrastructureMaintenanceStatusFromTasks(draft)} />
+              <MaintenanceStatusPresentation status={infrastructureMaintenanceStatusesFromTasks(draft)} />
             </div>
           </FormField>
         </div>

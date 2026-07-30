@@ -31,7 +31,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessIdListLinks, BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
+import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -1574,7 +1574,7 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.manufacturerLabel}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.ownerLabel}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.operationalStatus}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.maintenanceStatus}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><MaintenanceStatusPresentation status={row.maintenanceStatuses} /></td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.productsDisplay || '-'}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
                         <BusinessIdListLinks objectType="SYSTEM" businessIds={row.linkedSystemBusinessIds} />

@@ -229,6 +229,13 @@ function infrastructureMaintenanceTaskIds(items: InfrastructureItem[], excludeIt
     .filter(Boolean)
 }
 
+function infrastructureWarrantyIds(items: InfrastructureItem[], excludeItemId?: string): string[] {
+  return items
+    .filter((item) => item.id !== excludeItemId)
+    .flatMap((item) => (item.warranties ?? []).map((warranty) => warranty.warrantyId))
+    .filter(Boolean)
+}
+
 function versionUpdateRef(record: VersionUpdateRecord): ActivityObjectRefInput {
   return {
     objectType: 'VERSION_UPDATE',
@@ -1425,8 +1432,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set((draft.linkedSystemIds ?? []).filter(Boolean))),
       maintenanceTasks: normalizeInfrastructureMaintenanceTasks(draft.maintenanceTasks ?? [], now, infrastructureMaintenanceTaskIds(state.infrastructureItems)),
-      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
-    }, infrastructureMaintenanceTaskIds(state.infrastructureItems))
+      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? [], infrastructureWarrantyIds(state.infrastructureItems)),
+    }, infrastructureMaintenanceTaskIds(state.infrastructureItems), infrastructureWarrantyIds(state.infrastructureItems))
     const messages = validateInfrastructureItemDraft(normalizedDraft, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     const nextIdentity = normalizedDraft.infrastructureId
@@ -1437,7 +1444,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       infrastructureId: nextIdentity.id,
       createdAt: now,
       updatedAt: now,
-    }, infrastructureMaintenanceTaskIds(state.infrastructureItems))
+    }, infrastructureMaintenanceTaskIds(state.infrastructureItems), infrastructureWarrantyIds(state.infrastructureItems))
     set((current) => ({
       idCounters: nextIdentity.counters,
       infrastructureItems: [...current.infrastructureItems, record],
@@ -1472,10 +1479,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       lastUpdatedDate: now,
       linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
       maintenanceTasks: normalizeInfrastructureMaintenanceTasks(draft.maintenanceTasks ?? [], now, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id)),
-      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? []),
+      warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? [], infrastructureWarrantyIds(state.infrastructureItems, existing.id)),
       createdAt: existing.createdAt,
       updatedAt: now,
-    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id))
+    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id), infrastructureWarrantyIds(state.infrastructureItems, existing.id))
     const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     set((current) => {

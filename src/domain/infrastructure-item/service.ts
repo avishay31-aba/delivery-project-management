@@ -18,7 +18,7 @@ import type {
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
 import { reserveBusinessId } from '@/domain/business-identity'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
-import { daysBeforeExpiration, daysBetween, nextWarrantyId, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
+import { daysBeforeExpiration, daysBetween, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
@@ -126,6 +126,7 @@ export interface InfrastructureDashboardRow extends InfrastructureItem {
   linkedSystemsDisplay: string
   linkedSidTidDisplay: string
   lastMaintenanceDate: string | null
+  maintenanceStatuses: Array<Exclude<InfrastructureMaintenanceAlert, ''>>
   warrantyStatus: InfrastructureWarrantyStatus
   itemWarrantyDaysLeft: number | null
   latestExpiringTenantId: string
@@ -503,6 +504,17 @@ export function infrastructureMaintenanceAlert(task: Pick<InfrastructureMaintena
   return 'Planned'
 }
 
+export const INFRASTRUCTURE_MAINTENANCE_ALERT_SEVERITY: Array<Exclude<InfrastructureMaintenanceAlert, ''>> = ['Delayed', 'Overdue', 'Pending', 'Planned']
+
+export function infrastructureMaintenanceStatusesFromTasks(item: Pick<InfrastructureItem, 'maintenanceTasks'>, today = new Date()): Array<Exclude<InfrastructureMaintenanceAlert, ''>> {
+  const alerts = new Set<Exclude<InfrastructureMaintenanceAlert, ''>>(
+    (item.maintenanceTasks ?? [])
+      .map((task) => infrastructureMaintenanceAlert(task, today))
+      .filter((alert): alert is Exclude<InfrastructureMaintenanceAlert, ''> => Boolean(alert)),
+  )
+  return INFRASTRUCTURE_MAINTENANCE_ALERT_SEVERITY.filter((status) => alerts.has(status))
+}
+
 export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem, 'maintenanceTasks'>): string | null {
   const latestActivity = (item.maintenanceTasks ?? [])
     .map((task) => text(task.updatedAt) || text(task.completionDate) || text(task.dueDate) || text(task.startDate))
@@ -512,13 +524,7 @@ export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem,
 }
 
 export function infrastructureMaintenanceStatusFromTasks(item: Pick<InfrastructureItem, 'maintenanceTasks'>): InfrastructureMaintenanceStatus {
-  const severity: Exclude<InfrastructureMaintenanceAlert, ''>[] = ['Delayed', 'Overdue', 'Pending', 'Planned']
-  const alerts = new Set<Exclude<InfrastructureMaintenanceAlert, ''>>(
-    (item.maintenanceTasks ?? [])
-      .map((task) => infrastructureMaintenanceAlert(task))
-      .filter((alert): alert is Exclude<InfrastructureMaintenanceAlert, ''> => Boolean(alert)),
-  )
-  return severity.find((status) => alerts.has(status)) ?? 'None'
+  return infrastructureMaintenanceStatusesFromTasks(item)[0] ?? 'None'
 }
 
 function normalizeVmProperties(value: unknown): InfrastructureItemProperties['vms'] {
@@ -602,11 +608,17 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
   }
 }
 
-function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty[] {
+function normalizeInfrastructureWarranties(
+  item: Partial<InfrastructureItem> & Record<string, unknown>,
+  existingWarrantyIds: Array<string | null | undefined> = [],
+): TenantWarranty[] {
   if (Array.isArray(item.warranties)) {
     return item.warranties.length > 0
-      ? item.warranties.map((warranty, index) => normalizeInfrastructureWarrantyRecord(warranty as Partial<TenantWarranty>, index, item))
-      : [defaultInfrastructureWarranty(item)]
+      ? normalizeInfrastructureWarrantyCollection(
+          item.warranties.map((warranty, index) => normalizeInfrastructureWarrantyRecord(warranty as Partial<TenantWarranty>, index, item)),
+          existingWarrantyIds,
+        )
+      : [defaultInfrastructureWarranty(item, existingWarrantyIds)]
   }
 
   const hasLegacyWarranty =
@@ -616,7 +628,7 @@ function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & R
     Boolean(text(item.currentWarrantyEndDate)) ||
     item.manualWarrantyStatus === 'NO_WARRANTY'
 
-  if (!hasLegacyWarranty) return [defaultInfrastructureWarranty(item)]
+  if (!hasLegacyWarranty) return [defaultInfrastructureWarranty(item, existingWarrantyIds)]
 
   return [normalizeInfrastructureWarrantyRecord({
     id: `infrastructure-warranty-${crypto.randomUUID()}`,
@@ -629,18 +641,26 @@ function normalizeInfrastructureWarranties(item: Partial<InfrastructureItem> & R
   }, 0, item)]
 }
 
-function defaultInfrastructureWarranty(item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty {
+function defaultInfrastructureWarranty(
+  item: Partial<InfrastructureItem> & Record<string, unknown>,
+  existingWarrantyIds: Array<string | null | undefined> = [],
+): TenantWarranty {
   return normalizeInfrastructureWarrantyRecord({
     id: `infrastructure-warranty-${normalizeInfrastructureBusinessId(item.infrastructureId) || text(item.id) || 'default'}`,
-    warrantyId: 'W000001',
+    warrantyId: '',
     noWarranty: 'YES',
-  }, 0, item)
+  }, 0, item, existingWarrantyIds)
 }
 
-function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>, index: number, item: Partial<InfrastructureItem> & Record<string, unknown>): TenantWarranty {
+function normalizeInfrastructureWarrantyRecord(
+  warranty: Partial<TenantWarranty>,
+  index: number,
+  item: Partial<InfrastructureItem> & Record<string, unknown>,
+  existingWarrantyIds: Array<string | null | undefined> = [],
+): TenantWarranty {
   const normalized: TenantWarranty = {
     id: text(warranty.id) || `infrastructure-warranty-${crypto.randomUUID()}`,
-    warrantyId: text(warranty.warrantyId) || `W${String(index + 1).padStart(6, '0')}`,
+    warrantyId: text(warranty.warrantyId) || reserveBusinessId('warranty', existingWarrantyIds, index),
     firstWarranty: index === 0,
     predecessor: '',
     successor: '',
@@ -660,13 +680,13 @@ function normalizeInfrastructureWarrantyRecord(warranty: Partial<TenantWarranty>
     alerts: '',
     remark: text(warranty.remark),
   }
-  return normalizeInfrastructureWarrantyCollection([normalized])[0]
+  return normalizeInfrastructureWarrantyCollection([normalized], existingWarrantyIds)[0]
 }
 
 export function createInfrastructureWarranty(warranties: TenantWarranty[]): TenantWarranty {
   return {
     id: `infrastructure-warranty-${crypto.randomUUID()}`,
-    warrantyId: nextWarrantyId(warranties),
+    warrantyId: reserveBusinessId('warranty', warranties.map((warranty) => warranty.warrantyId)),
     firstWarranty: warranties.length === 0,
     predecessor: '',
     successor: '',
@@ -688,8 +708,21 @@ export function createInfrastructureWarranty(warranties: TenantWarranty[]): Tena
   }
 }
 
-export function normalizeInfrastructureWarrantyCollection(warranties: TenantWarranty[]): TenantWarranty[] {
-  const readModel = warrantyCollectionReadModel(warranties, '')
+export function normalizeInfrastructureWarrantyCollection(
+  warranties: TenantWarranty[],
+  existingWarrantyIds: Array<string | null | undefined> = [],
+): TenantWarranty[] {
+  const usedWarrantyIds = new Set(existingWarrantyIds.map(text).filter(Boolean))
+  const normalizedWarranties = warranties.map((warranty, index) => {
+    const currentWarrantyId = text(warranty.warrantyId)
+    const isDuplicate = currentWarrantyId && usedWarrantyIds.has(currentWarrantyId)
+    const warrantyId = currentWarrantyId && !isDuplicate
+      ? currentWarrantyId
+      : reserveBusinessId('warranty', Array.from(usedWarrantyIds), index)
+    usedWarrantyIds.add(warrantyId)
+    return { ...warranty, warrantyId }
+  })
+  const readModel = warrantyCollectionReadModel(normalizedWarranties, '')
   return readModel.map((row, index) => ({
     ...row.warranty,
     firstWarranty: index === 0,
@@ -750,6 +783,7 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
 export function normalizeInfrastructureItem(
   item: Partial<InfrastructureItem> & Record<string, unknown>,
   existingMaintenanceTaskIds: Array<string | null | undefined> = [],
+  existingWarrantyIds: Array<string | null | undefined> = [],
 ): InfrastructureItem {
   const now = new Date().toISOString()
   const identifier = text(item.identifier).trim()
@@ -759,7 +793,7 @@ export function normalizeInfrastructureItem(
     ...(typeof item.warrantyContact === 'object' && item.warrantyContact ? item.warrantyContact as InfrastructureWarrantyContact : {}),
   }
   const properties = normalizeInfrastructureProperties(item)
-  const warranties = normalizeInfrastructureWarranties(item)
+  const warranties = normalizeInfrastructureWarranties(item, existingWarrantyIds)
   const maintenanceTasks = normalizeInfrastructureMaintenanceTasks(item.maintenanceTasks, now, existingMaintenanceTaskIds)
   const currentWarranty = normalizeInfrastructureWarrantyCollection(warranties).find((warranty) => warranty.warrantyStatus !== 'RENEWED') ?? warranties[warranties.length - 1]
   return {
@@ -787,7 +821,7 @@ export function normalizeInfrastructureItem(
     locationAddress: text(item.locationAddress) || warrantyContact.address || legacyPhysicalAddress,
     properties,
     maintenanceTasks,
-    warranties: normalizeInfrastructureWarrantyCollection(warranties),
+    warranties: normalizeInfrastructureWarrantyCollection(warranties, existingWarrantyIds),
     remarks: Array.isArray(item.remarks) ? item.remarks : [],
     documents: Array.isArray(item.documents) ? item.documents : [],
     createdAt: text(item.createdAt) || now,
@@ -815,9 +849,11 @@ export function normalizeInfrastructureItemsForReferenceData(
       .map((record) => record.id),
   )
   const usedMaintenanceTaskIds: string[] = []
+  const usedWarrantyIds: string[] = []
   return items.map((item) => {
-    const normalized = normalizeInfrastructureItem(item, usedMaintenanceTaskIds)
+    const normalized = normalizeInfrastructureItem(item, usedMaintenanceTaskIds, usedWarrantyIds)
     usedMaintenanceTaskIds.push(...(normalized.maintenanceTasks ?? []).map((task) => task.taskId))
+    usedWarrantyIds.push(...(normalized.warranties ?? []).map((warranty) => warranty.warrantyId))
     return vpnType && legacyOpenVpnTypeIds.has(normalized.typeRefId)
       ? { ...normalized, typeRefId: vpnType.id, updatedAt: normalized.updatedAt }
       : normalized
@@ -1000,6 +1036,7 @@ export function infrastructureDashboardRows(
         billingMethodLabel: infrastructureReferenceDataLabel(referenceData, item.billingMethodRefId),
         lastMaintenanceDate: infrastructureLastMaintenanceDate(item),
         maintenanceStatus: infrastructureMaintenanceStatusFromTasks(item),
+        maintenanceStatuses: infrastructureMaintenanceStatusesFromTasks(item),
         productsDisplay: linkedSystemProducts(item, systems).join('; '),
         linkedSystemBusinessIds: linkedSystemIds,
         linkedSystemsDisplay: linkedSystemIds.join('; '),

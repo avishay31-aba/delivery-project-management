@@ -108,6 +108,10 @@ function allTenantWarranties(state: Partial<AppDataState>) {
   return (state.tenants ?? []).flatMap((tenant) => tenant.warranties ?? [])
 }
 
+function allInfrastructureWarranties(state: Partial<AppDataState>) {
+  return (state.infrastructureItems ?? []).flatMap((item) => item.warranties ?? [])
+}
+
 export function deriveIdCountersFromRecords(
   state: Pick<AppDataState, 'projects' | 'systems' | 'tenants'> &
     Partial<Pick<AppDataState, 'accounts' | 'opportunities' | 'productionSystemInventory' | 'reusedInternalSystems' | 'warrantyRecords' | 'activityEvents' | 'referenceData' | 'versionUpdates' | 'infrastructureItems'>>,
@@ -128,6 +132,7 @@ export function deriveIdCountersFromRecords(
     warranty: maxCounter([
       ...(state.warrantyRecords ?? []).map((warranty) => warranty.warrantyRecordId),
       ...allTenantWarranties(state).map((warranty) => warranty.warrantyId),
+      ...allInfrastructureWarranties(state).map((warranty) => warranty.warrantyId),
     ], 'warranty'),
     remark: maxCounter(allRemarks(state).map((remark) => remark.remarkId), 'remark'),
     activity: maxCounter((state.activityEvents ?? []).map((event) => event.id), 'activity'),

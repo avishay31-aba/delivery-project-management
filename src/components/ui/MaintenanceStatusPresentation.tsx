@@ -2,18 +2,23 @@ import { cn } from '@/utils/cn'
 import { maintenanceStatusPresentation } from '@/domain/status-presentation'
 
 interface MaintenanceStatusPresentationProps {
-  status: string | null | undefined
+  status: string | string[] | null | undefined
   label?: string
   tooltip?: string
   className?: string
 }
 
-export function MaintenanceStatusPresentation({
+function SingleMaintenanceStatusPresentation({
   status,
   label,
   tooltip,
   className,
-}: MaintenanceStatusPresentationProps) {
+}: {
+  status: string | null | undefined
+  label?: string
+  tooltip?: string
+  className?: string
+}) {
   const presentation = maintenanceStatusPresentation(status)
   const Icon = presentation.icon
   const displayLabel = label ?? presentation.label
@@ -33,4 +38,24 @@ export function MaintenanceStatusPresentation({
       <span>{displayLabel}</span>
     </span>
   )
+}
+
+export function MaintenanceStatusPresentation({
+  status,
+  label,
+  tooltip,
+  className,
+}: MaintenanceStatusPresentationProps) {
+  if (Array.isArray(status)) {
+    const statuses = status.length > 0 ? status : ['None']
+    return (
+      <span className={cn('inline-flex flex-wrap items-center gap-1', className)}>
+        {statuses.map((item) => (
+          <SingleMaintenanceStatusPresentation key={item} status={item} />
+        ))}
+      </span>
+    )
+  }
+
+  return <SingleMaintenanceStatusPresentation status={status} label={label} tooltip={tooltip} className={className} />
 }

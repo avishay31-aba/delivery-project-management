@@ -100,7 +100,7 @@ export function WarrantyCollectionGrid({
         <table className="w-max min-w-full border-collapse text-sm leading-tight">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {['Actions', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
+              {['Actions', 'Warranty ID', 'Initial Warranty', 'Start Date', 'End Date', 'Duration', 'Days Before Expiration', 'Warranty Status', 'Alerts', 'Remarks', 'No Warranty'].map((header) => (
                 <th key={header} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{header}</th>
               ))}
             </tr>
@@ -143,6 +143,7 @@ export function WarrantyCollectionGrid({
                       </div>
                     )}
                   </td>
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top font-semibold text-sf-text">{row.warrantyId || '-'}</td>
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
                     {isEditing ? <input className="h-8 rounded border border-sf-border px-2 py-1 text-sm" type="date" value={row.initialWarrantyDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => updateDraft(warranty.id, { initialWarrantyDate: value }))} onChange={(event) => updateDraft(warranty.id, { initialWarrantyDate: event.target.value || null })} /> : <DateTimeValue value={row.initialWarrantyDate} semanticType="date" />}
                   </td>
@@ -177,7 +178,7 @@ export function WarrantyCollectionGrid({
               )
             })}
             {renderedWarranties.length === 0 ? (
-              <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={10}>No warranty records yet.</td></tr>
+              <tr><td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={11}>No warranty records yet.</td></tr>
             ) : null}
           </tbody>
         </table>
