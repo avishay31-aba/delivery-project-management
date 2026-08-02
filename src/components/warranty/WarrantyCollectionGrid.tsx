@@ -38,6 +38,7 @@ function normalizedWarranty(record: TenantWarranty) {
 }
 
 function validateWarranty(record: TenantWarranty): string[] {
+  if (record.noWarranty === 'YES') return []
   return validateWarrantyDateDraft(record)
 }
 
@@ -64,7 +65,7 @@ export function WarrantyCollectionGrid({
   ]
   const committedIds = warranties.map((warranty) => warranty.id).join('|')
   const defaultWarranty = useMemo(
-    () => normalizeInfrastructureWarrantyCollection([{ ...createInfrastructureWarranty([]), noWarranty: 'YES' }])[0],
+    () => normalizeInfrastructureWarrantyCollection([createInfrastructureWarranty([])])[0],
     [committedIds],
   )
   const renderedWarranties = [warranties[0] ?? editor.newDrafts[0] ?? defaultWarranty]

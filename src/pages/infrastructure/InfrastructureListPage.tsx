@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
   allSystemRecords,
@@ -20,6 +20,21 @@ const INFRASTRUCTURE_DASHBOARD_TABS: Array<{ id: InfrastructureDashboardTab; lab
   { id: 'plannedMaintenance', label: 'Planned Maintenance Tasks' },
   { id: 'currentMaintenance', label: 'Current Maintenance Tasks' },
 ]
+
+const INFRASTRUCTURE_DASHBOARD_TAB_DETAILS: Record<InfrastructureDashboardTab, { title: string; description: string }> = {
+  allItems: {
+    title: 'All Items',
+    description: 'All Infrastructure Items supporting Systems.',
+  },
+  plannedMaintenance: {
+    title: 'Planned Maintenance Tasks',
+    description: 'Open Infrastructure maintenance tasks scheduled to start in the future.',
+  },
+  currentMaintenance: {
+    title: 'Current Maintenance Tasks',
+    description: 'Open Infrastructure maintenance tasks whose scheduled start date has been reached.',
+  },
+}
 
 export function InfrastructureListPage() {
   const navigate = useNavigate()
@@ -46,6 +61,7 @@ export function InfrastructureListPage() {
   const columns = useMemo(() => createInfrastructureColumns(), [])
   const plannedMaintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns(), [])
   const currentMaintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns({ includeDaysRunning: true }), [])
+  const activeTabDetails = INFRASTRUCTURE_DASHBOARD_TAB_DETAILS[activeTab]
 
   return (
     <WorkspaceFrame className="gap-4">
@@ -58,6 +74,7 @@ export function InfrastructureListPage() {
 
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <WorkspaceScrollContent>
+          <PageHeader title={activeTabDetails.title} subtitle={activeTabDetails.description} />
           {activeTab === 'allItems' ? (
             <DataDashboard
               title="All Items"

@@ -1496,7 +1496,7 @@ export function InventoryForm<T extends InventoryRecord>({
                   <table className="min-w-full border-collapse text-sm leading-tight">
                     <thead className="bg-sf-surface-alt text-left">
                       <tr>
-                        {['Select', 'ID', 'Identifier', 'Category', 'Item Type', 'Linked System(s)', 'Warranty Status'].map((label) => (
+                        {['Select', 'ID', 'Identifier', 'Category', 'Item Type', 'Manufacturer', 'Model', 'Linked System(s)', 'Warranty Status'].map((label) => (
                           <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">{label}</th>
                         ))}
                       </tr>
@@ -1521,6 +1521,8 @@ export function InventoryForm<T extends InventoryRecord>({
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.identifier || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.categoryLabel || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.typeLabel || '-'}</td>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.manufacturerLabel || '-'}</td>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.model || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.linkedSystemBusinessIds.join(', ') || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{displayWarrantyStatus(item.warrantyStatus)}</td>
                           </tr>
@@ -1528,7 +1530,7 @@ export function InventoryForm<T extends InventoryRecord>({
                       })}
                       {visibleInfrastructureCandidates.length === 0 ? (
                         <tr>
-                          <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={7}>
+                          <td className="border border-sf-border px-1.5 py-4 text-center text-sm text-sf-text-muted" colSpan={9}>
                             No Infrastructure Items match the current filters.
                           </td>
                         </tr>
