@@ -46,7 +46,7 @@ export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContac
 
 export const INFRASTRUCTURE_REFERENCE_DATA_DEFAULTS: Array<{ category: string; types: string[] }> = [
   { category: 'Hardware', types: ['Server', 'Storage Server', 'Firewall', 'Laptop'] },
-  { category: 'Software', types: [] },
+  { category: 'Software', types: ['ESXi'] },
   { category: 'Cloud', types: ['Compute/Host', 'VPN'] },
   { category: 'Network', types: ['Domain', 'SSL'] },
 ]
@@ -75,6 +75,7 @@ const INFRASTRUCTURE_WARRANTY_TYPE_DEFAULTS = ['Standard', 'Extended', 'No Warra
 export const INFRASTRUCTURE_PROPERTY_SCOPES = {
   serverRackUnit: 'server.rackUnit',
   serverEsxiVersion: 'server.esxiVersion',
+  esxiVersion: 'esxi.version',
   serverMemoryType: 'server.memoryType',
   serverMemorySize: 'server.memorySize',
   serverCpuType: 'server.cpuType',
@@ -306,21 +307,74 @@ export function infrastructureDomainLinkLabel(item: InfrastructureItem): string 
   return businessId || domainName || '-'
 }
 
+export function infrastructureItemRelationshipLabel(item: InfrastructureItem): string {
+  const businessId = text(item.infrastructureId).trim()
+  const identifier = text(item.identifier).trim()
+  if (businessId && identifier) return `${businessId}-${identifier}`
+  return businessId || identifier || '-'
+}
+
+export function esxiInfrastructureItems(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  currentLinkedEsxiId = '',
+): InfrastructureItem[] {
+  return items
+    .filter((item) => isInfrastructureItemType(item, referenceData, 'ESXi'))
+    .filter((item) => item.operationalStatus !== 'Obsolete' || item.id === currentLinkedEsxiId)
+    .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+export function linkedServersForEsxi(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  esxiItemId: string,
+): InfrastructureItem[] {
+  if (!esxiItemId) return []
+  return items
+    .filter((item) => isInfrastructureItemType(item, referenceData, 'Server'))
+    .filter((item) => text(item.properties?.linkedEsxiInfrastructureItemId) === esxiItemId)
+    .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+export function linkedServersDisplayForEsxi(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  esxiItemId: string,
+): string {
+  const linkedServers = linkedServersForEsxi(items, referenceData, esxiItemId)
+  return linkedServers.length > 0 ? linkedServers.map(infrastructureItemRelationshipLabel).join(' ; ') : '-'
+}
+
+export function linkedSslsForDomain(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  domainItemId: string,
+): InfrastructureItem[] {
+  if (!domainItemId) return []
+  return items
+    .filter((item) => isInfrastructureItemType(item, referenceData, 'SSL'))
+    .filter((item) => text(item.properties?.linkedDomainInfrastructureItemId) === domainItemId)
+    .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
+}
+
+export function linkedSslsDisplayForDomain(
+  items: InfrastructureItem[],
+  referenceData: ReferenceDataRecord[],
+  domainItemId: string,
+): string {
+  const linkedSsls = linkedSslsForDomain(items, referenceData, domainItemId)
+  return linkedSsls.length > 0 ? linkedSsls.map(infrastructureItemRelationshipLabel).join(' ; ') : '-'
+}
+
 export function linkedDomainItemsForSsl(
   items: InfrastructureItem[],
   referenceData: ReferenceDataRecord[],
-  currentSslItemId: string,
-  currentLinkedDomainId = '',
+  _currentSslItemId: string,
+  _currentLinkedDomainId = '',
 ): InfrastructureItem[] {
-  const linkedByOtherSsl = new Set(
-    items
-      .filter((item) => item.id !== currentSslItemId && isInfrastructureItemType(item, referenceData, 'SSL'))
-      .map((item) => text(item.properties?.linkedDomainInfrastructureItemId))
-      .filter(Boolean),
-  )
   return items
     .filter((item) => isInfrastructureItemType(item, referenceData, 'Domain'))
-    .filter((item) => item.id === currentLinkedDomainId || !linkedByOtherSsl.has(item.id))
     .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
@@ -650,6 +704,7 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     firmwareLastUpdatedDate: text(raw.firmwareLastUpdatedDate) || null,
     esxiVersionRefId: text(raw.esxiVersionRefId),
     esxiLastUpdatedDate: text(raw.esxiLastUpdatedDate) || null,
+    linkedEsxiInfrastructureItemId: text(raw.linkedEsxiInfrastructureItemId),
     memoryTypeRefId: text(raw.memoryTypeRefId),
     memorySizeRefId: text(raw.memorySizeRefId),
     memoryQuantity: numberOrNull(raw.memoryQuantity),
@@ -719,7 +774,7 @@ function defaultInfrastructureWarranty(
   return normalizeInfrastructureWarrantyRecord({
     id: `infrastructure-warranty-${normalizeInfrastructureBusinessId(item.infrastructureId) || text(item.id) || 'default'}`,
     warrantyId: '',
-    noWarranty: 'YES',
+    noWarranty: 'NO',
   }, 0, item, existingWarrantyIds)
 }
 
@@ -1269,12 +1324,12 @@ export function validateInfrastructureItemDraft(
     if (!linkedDomain || !isInfrastructureItemType(linkedDomain, referenceData, 'Domain')) {
       messages.push('Linked Domain must be a Network Domain Infrastructure Item.')
     }
-    if (items.some((item) =>
-      item.id !== draft.id &&
-      isInfrastructureItemType(item, referenceData, 'SSL') &&
-      item.properties?.linkedDomainInfrastructureItemId === linkedDomainId
-    )) {
-      messages.push('This Domain is already linked to another SSL Infrastructure Item.')
+  }
+  if (isInfrastructureItemType(draft, referenceData, 'Server') && draft.properties?.linkedEsxiInfrastructureItemId) {
+    const linkedEsxiId = draft.properties.linkedEsxiInfrastructureItemId
+    const linkedEsxi = items.find((item) => item.id === linkedEsxiId)
+    if (!linkedEsxi || !isInfrastructureItemType(linkedEsxi, referenceData, 'ESXi')) {
+      messages.push('Linked ESXi must be a Software ESXi Infrastructure Item.')
     }
   }
   ;(draft.properties?.disks ?? []).forEach((disk, index) => {

@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from 'react-router-dom'
-import { WorkspaceFrame } from '@/components/record'
+import { useLocation } from 'react-router-dom'
+import { WorkspaceFrame, WorkspaceTabs } from '@/components/record'
 import { ProductionSystemInventoryPage } from './ProductionSystemInventoryPage'
 import { ReusedInternalSystemsInventoryPage } from './ReusedInternalSystemsInventoryPage'
 import { SystemListPage } from './SystemListPage'
@@ -22,27 +22,7 @@ export function SystemsWorkspacePage() {
 
   return (
     <WorkspaceFrame className="gap-4">
-      <div className="shrink-0 border-b border-sf-border bg-sf-surface">
-        <nav className="flex flex-wrap gap-2" aria-label="Systems Workspace views">
-          {SYSTEMS_WORKSPACE_TABS.map((tab) => (
-            <NavLink
-              key={tab.path}
-              to={tab.path}
-              end={tab.path === '/systems'}
-              className={({ isActive }) =>
-                [
-                  'rounded-t border border-b-0 px-3 py-2 text-sm font-medium',
-                  isActive
-                    ? 'border-sf-border bg-white text-sf-text'
-                    : 'border-transparent text-sf-text-muted hover:border-sf-border hover:bg-white',
-                ].join(' ')
-              }
-            >
-              {tab.label}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
+      <WorkspaceTabs tabs={SYSTEMS_WORKSPACE_TABS} ariaLabel="Systems Workspace views" />
 
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {activeView === 'production' ? <ProductionSystemInventoryPage /> : null}

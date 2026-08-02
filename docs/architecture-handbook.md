@@ -357,6 +357,20 @@ Therefore:
 
 This composition does not transfer Business Object ownership.
 
+### Workspace UI Standard
+
+Every ERP Workspace must reuse the shared Workspace template. The visual hierarchy, typography, spacing, tab positioning, and overall layout must be identical across all workspaces.
+
+The approved hierarchy is:
+
+```text
+Workspace Title
+Workspace Tabs
+Workspace Content
+```
+
+Business Objects may differ in content only. A Workspace must not introduce workspace-specific UI patterns, duplicated tab styling, or an additional page title between the Workspace title and Workspace tabs unless explicitly approved in the Architecture Handbook.
+
 ### Business Object Mutation Ownership Principle
 
 Every business mutation must be initiated only by the Business Object that owns the business responsibility. Referencing or displaying another Business Object does not grant ownership of that object's lifecycle.

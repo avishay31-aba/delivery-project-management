@@ -33,9 +33,11 @@ import {
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
   allSystemRecords,
   createInfrastructureDraft,
+  esxiInfrastructureItems,
   infrastructureBillingMethods,
   infrastructureCategories,
   infrastructureDashboardRows,
+  infrastructureItemRelationshipLabel,
   infrastructureLastMaintenanceDate,
   infrastructureMaintenanceStatusesFromTasks,
   infrastructureManufacturerPropertyScope,
@@ -48,6 +50,8 @@ import {
   infrastructureWarrantyAlert,
   infrastructureWarrantyStatusFromCollection,
   linkedDomainItemsForSsl,
+  linkedServersDisplayForEsxi,
+  linkedSslsDisplayForDomain,
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
@@ -107,8 +111,6 @@ function hasServerDependentProperties(properties: InfrastructureItemProperties |
     properties.modelText ||
     properties.firmwareVersionRefId ||
     properties.firmwareLastUpdatedDate ||
-    properties.esxiVersionRefId ||
-    properties.esxiLastUpdatedDate ||
     properties.memoryTypeRefId ||
     properties.memorySizeRefId ||
     properties.memoryQuantity ||
@@ -137,8 +139,6 @@ function clearServerDependentProperties(properties: InfrastructureItemProperties
     modelText: '',
     firmwareVersionRefId: '',
     firmwareLastUpdatedDate: null,
-    esxiVersionRefId: '',
-    esxiLastUpdatedDate: null,
     memoryTypeRefId: '',
     memorySizeRefId: '',
     memoryQuantity: null,
@@ -237,6 +237,7 @@ export function InfrastructureFormPage() {
   if (messages.includes('Identifier is required.') || messages.includes('Identifier must be unique.')) invalidFields.add('identifier')
   if (messages.includes('Owner is required.') || messages.includes('Owner is invalid.')) invalidFields.add('owner')
   if (messages.some((message) => message.includes('Linked Domain') || message.includes('This Domain'))) invalidFields.add('linkedDomainInfrastructureItemId')
+  if (messages.some((message) => message.includes('Linked ESXi'))) invalidFields.add('linkedEsxiInfrastructureItemId')
 
   function updateDraft(patch: Partial<InfrastructureItem>) {
     if (isViewMode) return
@@ -381,6 +382,14 @@ export function InfrastructureFormPage() {
     )
   }
 
+  function renderReadonlyValue(label: string, value: string) {
+    return (
+      <FormField label={label} controlWidthClassName={WIDE_FIELD_WIDTH}>
+        <div className="flex min-h-9 items-center px-2 py-1 text-sm text-sf-text">{value || '-'}</div>
+      </FormField>
+    )
+  }
+
   function renderSelect(
     label: string,
     value: string,
@@ -494,6 +503,7 @@ export function InfrastructureFormPage() {
     const hasManufacturer = Boolean(draft.properties?.manufacturerRefId)
     const modelScope = infrastructureManufacturerPropertyScope(referenceData, draft.properties?.manufacturerRefId, 'model')
     const firmwareScope = infrastructureManufacturerPropertyScope(referenceData, draft.properties?.manufacturerRefId, 'firmwareVersion')
+    const esxiOptions = esxiInfrastructureItems(infrastructureItems, referenceData, draft.properties?.linkedEsxiInfrastructureItemId)
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-start gap-3">
@@ -510,12 +520,36 @@ export function InfrastructureFormPage() {
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('Firmware Version', 'firmwareVersionRefId', firmwareScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderDateInput('Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
-          {propertySelect('ESXi Version', 'esxiVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverEsxiVersion, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderDateInput('Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
+          {renderDateInput('Firmware Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          <FormField label="Linked ESXi" controlWidthClassName={WIDE_FIELD_WIDTH}>
+            <select
+              className={[
+                'h-9 w-full rounded border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted',
+                invalidFields.has('linkedEsxiInfrastructureItemId') ? 'border-red-500' : 'border-sf-border',
+              ].join(' ')}
+              value={draft.properties?.linkedEsxiInfrastructureItemId ?? ''}
+              disabled={isViewMode}
+              onChange={(event) => updateProperties({ linkedEsxiInfrastructureItemId: event.target.value })}
+            >
+              <option value=""></option>
+              {esxiOptions.map((item) => <option key={item.id} value={item.id}>{infrastructureItemRelationshipLabel(item).replace('-', ' - ')}</option>)}
+            </select>
+          </FormField>
         </div>
         {renderDiskGroups(!hasManufacturer)}
         {renderVmGroups(!hasManufacturer)}
+      </div>
+    )
+  }
+
+  function renderEsxiProperties() {
+    return (
+      <div className="flex flex-wrap items-start gap-3">
+        {propertySelect('Version', 'esxiVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.esxiVersion)}
+        {renderDateInput('Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }))}
+        {renderReadonlyValue('Linked Servers', linkedServersDisplayForEsxi(infrastructureItems, referenceData, draft.id))}
       </div>
     )
   }
@@ -645,6 +679,7 @@ export function InfrastructureFormPage() {
           {propertySelect('Domain Provider', 'domainProviderRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainProvider)}
           {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
           {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
+          {renderReadonlyValue('Linked SSLs', linkedSslsDisplayForDomain(infrastructureItems, referenceData, draft.id))}
         </div>
       </div>
     )
@@ -705,6 +740,7 @@ export function InfrastructureFormPage() {
     if (selectedTypeLabel === 'Firewall') return renderFirewallProperties()
     if (selectedTypeLabel === 'Domain') return renderDomainProperties()
     if (selectedTypeLabel === 'SSL') return renderSslProperties()
+    if (selectedTypeLabel === 'ESXi') return renderEsxiProperties()
     if (selectedTypeLabel === 'Laptop') return renderLaptopProperties()
     if (selectedTypeLabel === 'Compute/Host') return renderVmGroups(false)
     if (selectedTypeLabel === 'VPN') return renderVpnProperties()

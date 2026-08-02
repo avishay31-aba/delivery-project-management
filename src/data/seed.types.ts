@@ -657,6 +657,7 @@ export interface InfrastructureItemProperties {
   firmwareLastUpdatedDate?: string | null
   esxiVersionRefId?: string
   esxiLastUpdatedDate?: string | null
+  linkedEsxiInfrastructureItemId?: string
   memoryTypeRefId?: string
   memorySizeRefId?: string
   memoryQuantity?: number | null
