@@ -21,6 +21,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { OwnerGrid } from '@/components/owners'
 import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import { RemarksGrid } from '@/components/remarks'
 import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
 import {
@@ -31,7 +32,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
+import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -312,61 +313,6 @@ function derivedValue(
     return systemTimeGroupAlert(record, tenants, readRecordValue(record, key))
   }
   return textValue(readRecordValue(record, key))
-}
-
-function OperationalStatusBadge({ value }: { value: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm font-semibold text-sf-text">
-      <OperationalStatusIcon status={value} showLabel className="h-5 w-5 stroke-[3]" />
-    </span>
-  )
-}
-
-function OperationalStatusSelect({
-  value,
-  options,
-  isChanged,
-  isInvalid,
-  onChange,
-}: {
-  value: string
-  options: string[]
-  isChanged: boolean
-  isInvalid: boolean
-  onChange: (value: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        className={[fieldClassName(isChanged, isInvalid), 'flex items-center justify-between gap-2 text-left'].join(' ')}
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-      >
-        <OperationalStatusBadge value={value} />
-        <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
-      </button>
-      {open ? (
-        <div className="absolute left-0 top-full z-20 mt-1 w-full rounded border border-sf-border bg-white py-1 shadow-lg">
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="flex w-full items-center px-2 py-1 text-left hover:bg-sf-surface-alt"
-              onClick={() => {
-                onChange(option)
-                setOpen(false)
-              }}
-            >
-              <OperationalStatusBadge value={option} />
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
 }
 
 export function InventoryForm<T extends InventoryRecord>({
@@ -826,11 +772,10 @@ export function InventoryForm<T extends InventoryRecord>({
       if (field.key === 'operationalStatus') {
         return (
           <FormField key={field.key} label={field.label} controlWidthClassName={width} required={field.required}>
-            <OperationalStatusSelect
+            <SharedOperationalStatusSelect
               value={value}
               options={field.options ?? []}
-              isChanged={isChanged}
-              isInvalid={isInvalid}
+              className={fieldClassName(isChanged, isInvalid)}
               onChange={(nextValue) => updateField(field.key, nextValue)}
             />
           </FormField>
@@ -2069,7 +2014,9 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectName}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.accountName}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.product}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectStatus}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        {row.projectStatus ? <ProjectStatusIcon status={row.projectStatus} /> : '-'}
+                      </td>
                     </tr>
                   )
                 })}

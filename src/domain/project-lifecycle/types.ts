@@ -145,6 +145,13 @@ export interface ProjectDeliveryDashboardReadModel {
   owner: string
 }
 
+export type ProjectAlertKey = 'deliveryOverdue' | 'pocOverdue' | 'noDeliveryDate' | 'noEndDate'
+
+export interface ProjectAlertReadModel {
+  key: ProjectAlertKey
+  label: string
+}
+
 export type {
   Account,
   ChangeRequestRequirement,

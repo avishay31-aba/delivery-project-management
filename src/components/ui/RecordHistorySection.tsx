@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
-export type RecordHistoryPageSize = 20 | 50 | 100 | 'all'
+export type RecordHistoryPageSize = 10 | 20 | 25 | 50 | 100 | 'all'
 export type RecordHistorySortDirection = 'asc' | 'desc'
 
 export interface RecordHistoryColumn<TRecord> {
@@ -22,6 +22,10 @@ interface RecordHistorySectionProps<TRecord> {
   enableSearch?: boolean
   searchLabel?: string
   searchPlaceholder?: string
+  dateFilterLabel?: string
+  fromDateLabel?: string
+  toDateLabel?: string
+  getDateValue?: (record: TRecord) => string | null | undefined
   recordsPerPageLabel?: string
   pageSizeOptions?: RecordHistoryPageSize[]
   initialPageSize?: RecordHistoryPageSize
@@ -32,7 +36,7 @@ interface RecordHistorySectionProps<TRecord> {
   tableClassName?: string
 }
 
-const DEFAULT_PAGE_SIZE_OPTIONS: RecordHistoryPageSize[] = [20, 50, 100, 'all']
+const DEFAULT_PAGE_SIZE_OPTIONS: RecordHistoryPageSize[] = [10, 25, 50, 100, 'all']
 
 function pageSizeLabel(pageSize: RecordHistoryPageSize): string {
   return pageSize === 'all' ? 'All' : String(pageSize)
@@ -53,13 +57,17 @@ export function RecordHistorySection<TRecord>({
   getRowKey,
   getSearchText,
   emptyText,
-  filteredEmptyText = 'No records match the current filters.',
+  filteredEmptyText = 'No matching records.',
   enableSearch = true,
   searchLabel = 'Search / Filter',
   searchPlaceholder = 'Search / Filter',
+  dateFilterLabel = 'Date',
+  fromDateLabel = 'From Date',
+  toDateLabel = 'To Date',
+  getDateValue,
   recordsPerPageLabel = 'Records per page',
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
-  initialPageSize = 20,
+  initialPageSize = 10,
   controls,
   actions,
   message,
@@ -70,6 +78,8 @@ export function RecordHistorySection<TRecord>({
   const [pageSize, setPageSize] = useState<RecordHistoryPageSize>(initialPageSize)
   const [pageNumber, setPageNumber] = useState(1)
   const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(null)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   function resetToFirstPage() {
     setPageNumber(1)
@@ -81,9 +91,20 @@ export function RecordHistorySection<TRecord>({
 
   const sortedAndFilteredRecords = useMemo(() => {
     const searchText = enableSearch ? normalized(search) : ''
-    const filtered = searchText
-      ? records.filter((record) => normalized(getSearchText(record)).includes(searchText))
+    const dateFiltered = getDateValue
+      ? records.filter((record) => {
+          if (!fromDate && !toDate) return true
+          const value = getDateValue(record)
+          if (!value) return false
+          const date = String(value).slice(0, 10)
+          if (fromDate && date < fromDate) return false
+          if (toDate && date > toDate) return false
+          return true
+        })
       : records
+    const filtered = searchText
+      ? dateFiltered.filter((record) => normalized(getSearchText(record)).includes(searchText))
+      : dateFiltered
 
     if (!sort) return filtered
     const column = columns.find((candidate) => candidate.key === sort.key)
@@ -93,7 +114,7 @@ export function RecordHistorySection<TRecord>({
       const result = compareValues(column.sortValue?.(first), column.sortValue?.(second))
       return sort.direction === 'asc' ? result : -result
     })
-  }, [columns, enableSearch, getSearchText, records, search, sort])
+  }, [columns, enableSearch, fromDate, getDateValue, getSearchText, records, search, sort, toDate])
 
   const totalMatchingRecords = sortedAndFilteredRecords.length
   const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
@@ -161,6 +182,47 @@ export function RecordHistorySection<TRecord>({
                 }}
               />
             </label>
+          ) : null}
+          {getDateValue ? (
+            <>
+              <label className="block text-sm font-medium text-sf-text">
+                <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{fromDateLabel}</span>
+                <input
+                  aria-label={`${dateFilterLabel} ${fromDateLabel}`}
+                  className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => {
+                    setFromDate(event.target.value)
+                    resetToFirstPage()
+                  }}
+                />
+              </label>
+              <label className="block text-sm font-medium text-sf-text">
+                <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{toDateLabel}</span>
+                <input
+                  aria-label={`${dateFilterLabel} ${toDateLabel}`}
+                  className="h-8 rounded border border-sf-border px-2 py-1 text-sm"
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => {
+                    setToDate(event.target.value)
+                    resetToFirstPage()
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt"
+                onClick={() => {
+                  setFromDate('')
+                  setToDate('')
+                  resetToFirstPage()
+                }}
+              >
+                Clear / All Dates
+              </button>
+            </>
           ) : null}
           {controls}
         </div>

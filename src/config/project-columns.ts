@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { AlertStatusIcon, BusinessObjectLink, ProgressBar, StatusBadge } from '@/components/ui'
+import { BusinessObjectLink, ProgressBar, StatusBadge } from '@/components/ui'
+import { ProjectAlertPresentation } from '@/components/projects/ProjectAlertPresentation'
 import type {
   Account,
   Opportunity,
@@ -126,12 +127,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       render: (project) => {
         const row = projectRow(project)
         if (row.projectAlerts.length === 0) return ''
-        return createElement(
-          'span',
-          { className: 'inline-flex items-center gap-1.5' },
-          createElement(AlertStatusIcon, { variant: row.projectAlertSeverity, label: row.projectAlerts.join('; ') }),
-          row.projectAlerts.join('; '),
-        )
+        return createElement(ProjectAlertPresentation, { alerts: row.projectAlerts })
       },
     },
     {

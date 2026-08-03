@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, MaintenanceStatusPresentation, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, type RecordHistoryColumn } from '@/components/ui'
 import type { InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
@@ -123,109 +123,161 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     </button>
   ) : null
 
+  const columns: Array<RecordHistoryColumn<InfrastructureMaintenanceTask>> = [
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (task) => {
+        const draft = editor.draftFor(task.id)
+        const isEditing = editor.isEditing(task.id)
+        const errors = editor.errorsFor(task.id)
+        return (
+          <>
+            <div className="flex flex-wrap gap-1">
+              {isEditing ? (
+                <>
+                  <EditableChildObjectActionButton variant="primary" disabled={editor.isSaving(task.id)} onClick={() => saveTask(task.id)}>
+                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Save
+                  </EditableChildObjectActionButton>
+                  <EditableChildObjectActionButton onClick={() => editor.cancel(task.id)}>
+                    <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
+                  </EditableChildObjectActionButton>
+                </>
+              ) : (
+                <>
+                  {permissions.canEdit ? (
+                    <EditableChildObjectActionButton onClick={() => editor.beginEdit(task)}>
+                      <Edit2 className="h-3.5 w-3.5" aria-hidden="true" /> Edit
+                    </EditableChildObjectActionButton>
+                  ) : null}
+                  {permissions.canDelete ? (
+                    <EditableChildObjectActionButton variant="danger" disabled={editor.isDeleting(task.id)} onClick={() => deleteTask(task.id)}>
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
+                    </EditableChildObjectActionButton>
+                  ) : null}
+                </>
+              )}
+            </div>
+            {draft && errors.length > 0 ? <div className="mt-2 space-y-1 text-xs text-red-700">{errors.map((error) => <div key={error}>{error}</div>)}</div> : null}
+          </>
+        )
+      },
+    },
+    {
+      key: 'taskId',
+      label: 'Task ID',
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        return <BusinessIdLink objectType="INFRASTRUCTURE_MAINTENANCE_TASK" businessId={row.taskId}>{row.taskId}</BusinessIdLink>
+      },
+      sortValue: (task) => task.taskId,
+    },
+    {
+      key: 'taskType',
+      label: <>Task Type<RequiredFieldMarker /></>,
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        const isEditing = editor.isEditing(task.id)
+        const errors = editor.errorsFor(task.id)
+        return isEditing ? (
+          <select
+            className={[
+              'h-8 w-56 rounded border px-2 py-1 pr-8 text-sm',
+              errors.some((error) => error.includes('Task Type')) ? 'border-red-500' : 'border-sf-border',
+            ].join(' ')}
+            value={row.taskTypeRefId}
+            onChange={(event) => changeTaskType(task.id, event.target.value)}
+          >
+            <option value=""></option>
+            {taskTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
+          </select>
+        ) : infrastructureReferenceDataLabel(referenceData, row.taskTypeRefId) || '-'
+      },
+      sortValue: (task) => infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      className: 'min-w-[24rem] border border-sf-border px-2 py-2 align-top text-sf-text',
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        return editor.isEditing(task.id)
+          ? <RichTextEditor value={row.task} onChange={(value) => editor.updateDraft(task.id, { task: value })} minHeightClassName="min-h-24" />
+          : <RichTextContent value={row.task} />
+      },
+      sortValue: (task) => task.task,
+    },
+    {
+      key: 'startDate',
+      label: 'Start Date',
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        return editor.isEditing(task.id)
+          ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { startDate: value }))} onChange={(event) => editor.updateDraft(task.id, { startDate: event.target.value || null })} />
+          : row.startDate || '-'
+      },
+      sortValue: (task) => task.startDate ?? '',
+    },
+    {
+      key: 'dueDate',
+      label: 'Due Date',
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        return editor.isEditing(task.id)
+          ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.dueDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { dueDate: value }))} onChange={(event) => editor.updateDraft(task.id, { dueDate: event.target.value || null })} />
+          : row.dueDate || '-'
+      },
+      sortValue: (task) => task.dueDate ?? '',
+    },
+    {
+      key: 'taskStatus',
+      label: 'Task Status',
+      render: (task) => {
+        const row = editor.draftFor(task.id) ?? task
+        return editor.isEditing(task.id) ? (
+          <select className="h-8 w-32 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.taskStatus} onChange={(event) => editor.updateDraft(task.id, { taskStatus: event.target.value as InfrastructureMaintenanceTaskStatus })}>
+            {INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        ) : row.taskStatus
+      },
+      sortValue: (task) => task.taskStatus,
+    },
+    {
+      key: 'alert',
+      label: 'Alert',
+      render: (task) => alertBadge(editor.draftFor(task.id) ?? task) ?? '-',
+      sortValue: (task) => infrastructureMaintenanceAlert(task) ?? '',
+    },
+  ]
+
   return (
-    <TableSection title="Maintenance" actions={actions}>
+    <TableSection title="Maintenance">
       {editor.notification ? (
         <div className={editor.notification.tone === 'error' ? 'rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700' : 'rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700'}>
           {editor.notification.message}
         </div>
       ) : null}
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-sm">
-          <thead className="bg-sf-surface-alt text-left text-xs uppercase tracking-wide text-sf-text-muted">
-            <tr>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Actions</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task ID</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Type<RequiredFieldMarker /></th>
-              <th className="min-w-[24rem] border border-sf-border px-2 py-2">Description</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Start Date</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Due Date</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Task Status</th>
-              <th className="whitespace-nowrap border border-sf-border px-2 py-2">Alert</th>
-            </tr>
-          </thead>
-          <tbody>
-            {renderedTasks.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="border border-sf-border px-3 py-4 text-center text-sf-text-muted">No Maintenance Tasks yet.</td>
-              </tr>
-            ) : renderedTasks.map((task) => {
-              const draft = editor.draftFor(task.id)
-              const row = draft ?? task
-              const isEditing = editor.isEditing(task.id)
-              const errors = editor.errorsFor(task.id)
-              return (
-                <tr key={task.id} className="align-top">
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {isEditing ? (
-                        <>
-                          <EditableChildObjectActionButton variant="primary" disabled={editor.isSaving(task.id)} onClick={() => saveTask(task.id)}>
-                            <Save className="h-3.5 w-3.5" aria-hidden="true" /> Save
-                          </EditableChildObjectActionButton>
-                          <EditableChildObjectActionButton onClick={() => editor.cancel(task.id)}>
-                            <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
-                          </EditableChildObjectActionButton>
-                        </>
-                      ) : (
-                        <>
-                          {permissions.canEdit ? (
-                            <EditableChildObjectActionButton onClick={() => editor.beginEdit(task)}>
-                              <Edit2 className="h-3.5 w-3.5" aria-hidden="true" /> Edit
-                            </EditableChildObjectActionButton>
-                          ) : null}
-                          {permissions.canDelete ? (
-                            <EditableChildObjectActionButton variant="danger" disabled={editor.isDeleting(task.id)} onClick={() => deleteTask(task.id)}>
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Delete
-                            </EditableChildObjectActionButton>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-                    {errors.length > 0 ? <div className="mt-2 space-y-1 text-xs text-red-700">{errors.map((error) => <div key={error}>{error}</div>)}</div> : null}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    <BusinessIdLink objectType="INFRASTRUCTURE_MAINTENANCE_TASK" businessId={row.taskId}>{row.taskId}</BusinessIdLink>
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    {isEditing ? (
-                      <select
-                        className={[
-                          'h-8 w-56 rounded border px-2 py-1 pr-8 text-sm',
-                          errors.some((error) => error.includes('Task Type')) ? 'border-red-500' : 'border-sf-border',
-                        ].join(' ')}
-                        value={row.taskTypeRefId}
-                        onChange={(event) => changeTaskType(task.id, event.target.value)}
-                      >
-                        <option value=""></option>
-                        {taskTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                        <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
-                      </select>
-                    ) : infrastructureReferenceDataLabel(referenceData, row.taskTypeRefId) || '-'}
-                  </td>
-                  <td className="border border-sf-border px-2 py-2">
-                    {isEditing ? <RichTextEditor value={row.task} onChange={(value) => editor.updateDraft(task.id, { task: value })} minHeightClassName="min-h-24" /> : <RichTextContent value={row.task} />}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    {isEditing ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { startDate: value }))} onChange={(event) => editor.updateDraft(task.id, { startDate: event.target.value || null })} /> : row.startDate || '-'}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    {isEditing ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.dueDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { dueDate: value }))} onChange={(event) => editor.updateDraft(task.id, { dueDate: event.target.value || null })} /> : row.dueDate || '-'}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">
-                    {isEditing ? (
-                      <select className="h-8 w-32 rounded border border-sf-border px-2 py-1 pr-8 text-sm" value={row.taskStatus} onChange={(event) => editor.updateDraft(task.id, { taskStatus: event.target.value as InfrastructureMaintenanceTaskStatus })}>
-                        {INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                    ) : row.taskStatus}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-2 py-2">{alertBadge(row) ?? '-'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <RecordHistorySection
+        records={renderedTasks}
+        columns={columns}
+        getRowKey={(task) => task.id}
+        getSearchText={(task) => [
+          task.taskId,
+          infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
+          task.task,
+          task.taskStatus,
+          infrastructureMaintenanceAlert(task) ?? '',
+        ].join(' ')}
+        getDateValue={(task) => task.startDate}
+        dateFilterLabel="Maintenance Start Date"
+        emptyText="No records available."
+        filteredEmptyText="No matching records."
+        searchLabel="Search / Filter"
+        searchPlaceholder="Search Maintenance"
+        recordsPerPageLabel="Records per page"
+        actions={actions}
+      />
     </TableSection>
   )
 }

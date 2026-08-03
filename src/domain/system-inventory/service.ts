@@ -400,19 +400,22 @@ export function reusedInternalPurposeHistory(
   if (!machineId) return []
 
   if ('purposeHistory' in record && Array.isArray(record.purposeHistory) && record.purposeHistory.length > 0) {
-    return record.purposeHistory.map((history) => ({
-      id: history.id,
-      recordId: history.recordId,
-      startDate: history.startDate,
-      endDate: history.endDate ?? '',
-      purposeType: history.purposeType,
-      pid: history.pid ?? '',
-      sid: history.sid ?? '',
-      projectName: history.projectName ?? '',
-      accountName: history.accountName ?? '',
-      product: history.product ?? '',
-      projectStatus: history.projectStatus ?? '',
-    }))
+    return record.purposeHistory.map((history) => {
+      const project = projects.find((candidate) => candidate.pid === history.pid || candidate.id === history.pid)
+      return {
+        id: history.id,
+        recordId: history.recordId,
+        startDate: history.startDate,
+        endDate: history.endDate ?? '',
+        purposeType: history.purposeType,
+        pid: history.pid ?? '',
+        sid: history.sid ?? '',
+        projectName: history.projectName ?? '',
+        accountName: history.accountName ?? '',
+        product: history.product ?? '',
+        projectStatus: project?.progressStatus ?? history.projectStatus ?? '',
+      }
+    })
   }
 
   const rows: ReusedInternalPurposeHistoryRow[] = projectSystems

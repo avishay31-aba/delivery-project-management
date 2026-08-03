@@ -433,6 +433,31 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - The shared presenter receives the stored or derived Operational Status value exactly as owned by the Business Object. It must not infer Operational Status from Warranty Status, Maintenance Status, linked-object state, dates, allocation state, or other fields.
 - Sorting, filtering, export, persistence, and read models operate on the raw Operational Status value, not on rendered icons.
 
+### Related Object Read Model Standard
+
+- Current attributes of a related Business Object must be resolved from the authoritative related-object store or shared read model.
+- Relationship/history records may store the related Business Object identity and event-time facts, but they must not become a stale source of truth for current related-object attributes unless explicitly modeled as a separate historical snapshot column.
+- Pages and tables render the shared read model result only; they must not duplicate current-status synchronization logic.
+
+### Project Alert Standard
+
+- Project alerts use one shared Project-domain derivation and one shared critical-alert presentation.
+- The shared Project alert derivation owns Delivery Overdue, POC Overdue, No Delivery Date, No End Date, their date/status rules, and their stable display order.
+- Forms, dashboards, exports and future Project references consume raw alert labels from the shared read model and render alerts through the shared presentation component.
+
+### Pick List Interaction Standard
+
+- Every custom ERP pick list must close when the user selects an option, clicks outside the control/menu, presses Escape, or tabs focus away.
+- The shared pick-list controller owns open/close behavior, cleanup, and keyboard/outside-click handling. Business pages must not patch individual pick lists locally.
+- Closing a pick list without selecting an option preserves the existing value and must not create a draft change or trigger a Save action.
+
+### Pageable Child Collection Standard
+
+- Child collections that support pagination, search, date filtering, or record-count controls must use a shared pageable/filterable collection shell.
+- The default Records per page value is 10, with the approved shared options 10, 25, 50, 100, and All.
+- The processing order is: all records, date filtering, text search, selected sort, then pagination.
+- Empty collections display the standard no-records message. Collections with records but no filter matches display the standard no-matching-records message.
+
 ### Date And Time Presentation Standard
 
 - Business data storage keeps canonical date and timestamp values. Transactional timestamps should remain ISO-compatible values where already used.

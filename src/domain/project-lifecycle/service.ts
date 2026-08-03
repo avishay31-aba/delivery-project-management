@@ -17,6 +17,7 @@ import type {
   ChangeRequestRequirement,
   Opportunity,
   Project,
+  ProjectAlertReadModel,
   ProjectDeliveryDashboardContext,
   ProjectDeliveryDashboardReadModel,
   ProjectDeliveryDateStatus,
@@ -185,6 +186,26 @@ function isPastDate(value: string | null | undefined, today = new Date()): boole
   return date.getTime() < dateOnly(today).getTime()
 }
 
+export function deriveProjectAlerts(project: Project, today = new Date()): ProjectAlertReadModel[] {
+  const isOpen = project.progressStatus === 'OPEN'
+  const isPoc = project.mainType === 'POC'
+  const alerts: Array<ProjectAlertReadModel | null> = [
+    project.deliveryDate && isOpen && isPastDate(project.deliveryDate, today)
+      ? { key: 'deliveryOverdue', label: 'Delivery Overdue' }
+      : null,
+    isPoc && project.pocEndDate && isOpen && isPastDate(project.pocEndDate, today)
+      ? { key: 'pocOverdue', label: 'POC Overdue' }
+      : null,
+    !project.deliveryDate ? { key: 'noDeliveryDate', label: 'No Delivery Date' } : null,
+    isPoc && !project.pocEndDate ? { key: 'noEndDate', label: 'No End Date' } : null,
+  ]
+  return alerts.filter((alert): alert is ProjectAlertReadModel => Boolean(alert))
+}
+
+export function projectAlertLabels(project: Project, today = new Date()): string[] {
+  return deriveProjectAlerts(project, today).map((alert) => alert.label)
+}
+
 export function projectLifecycleIdentity(project: Project): Project {
   return project
 }
@@ -244,11 +265,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
   const configuration = projectConfigurationSummary(context, opportunity)
   const health = projectHealthReadModel(context)
   const location = projectLocationContext(context.project, opportunity, account)
-  const completed = context.project.progressStatus === 'DONE'
-  const projectAlerts = [
-    ...health.healthAlerts,
-    !completed && isPastDate(context.project.pocStartDate ?? opportunity?.pocStartDate) ? 'POC start date overdue' : null,
-  ].filter((alert): alert is string => Boolean(alert))
+  const projectAlerts = projectAlertLabels(context.project)
 
   return {
     projectId: context.project.id,
@@ -272,7 +289,7 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     licenses: configuration.licenses,
     users: configuration.users,
     projectAlerts,
-    projectAlertSeverity: projectAlerts.some((alert) => alert.toLowerCase().includes('overdue')) ? 'danger' : projectDashboardAlertSeverity(health.healthStatus),
+    projectAlertSeverity: projectAlerts.length > 0 ? 'danger' : projectDashboardAlertSeverity(health.healthStatus),
     deadlineRiskLabel: health.deadlineRiskLabel,
     deadlineRiskSeverity: projectDashboardDeadlineRiskSeverity(health.deadlineRiskStatus),
     nextDeadline: health.nextDeadline,
@@ -513,7 +530,7 @@ export function projectHeaderFieldValue(
     case 'currentMilestone':
       return deriveProjectProgress(project).currentMilestone
     case 'projectAlerts':
-      return context.linkedOpportunity?.projectAlerts?.join(', ') ?? ''
+      return projectAlertLabels(project).join(', ')
     case 'reportToDirect':
     case 'reportToLevel2':
       return ''

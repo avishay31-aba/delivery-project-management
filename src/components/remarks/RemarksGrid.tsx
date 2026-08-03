@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, type RecordHistoryColumn } from '@/components/ui'
 import {
   createRemarkRecord,
   remarkDeadlineAlertLabel,
@@ -154,8 +154,184 @@ export function RemarksGrid({
     </button>
   ) : null
 
+  const columns: Array<RecordHistoryColumn<RemarkRecord>> = [
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (remark) => {
+        const draft = editor.draftFor(remark.id)
+        const isEditing = permissions.canEdit && Boolean(draft)
+        const isSaving = editor.isSaving(remark.id)
+        const isDeleting = editor.isDeleting(remark.id)
+        const canAttemptSave = Boolean(draft) && !isSaving && (
+          editor.isNew(remark.id) ||
+          editor.hasChanges(remark.id, { normalize: normalizedRemark })
+        )
+
+        if (readOnly) return null
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {isEditing ? (
+              <>
+                <EditableChildObjectActionButton
+                  variant="primary"
+                  disabled={!canAttemptSave}
+                  onClick={() => saveRemark(remark.id)}
+                >
+                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                  {isSaving ? 'Saving...' : 'Save'}
+                </EditableChildObjectActionButton>
+                <EditableChildObjectActionButton
+                  disabled={isSaving || isDeleting}
+                  onClick={() => cancelRemark(remark.id)}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  Cancel
+                </EditableChildObjectActionButton>
+              </>
+            ) : (
+              <>
+                {permissions.canEdit ? (
+                  <EditableChildObjectActionButton onClick={() => editor.beginEdit(remark)}>
+                    <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Edit
+                  </EditableChildObjectActionButton>
+                ) : null}
+                {permissions.canDelete ? (
+                  <EditableChildObjectActionButton
+                    variant="danger"
+                    disabled={isDeleting}
+                    onClick={() => deleteRemark(remark.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </EditableChildObjectActionButton>
+                ) : null}
+              </>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'remarkId',
+      label: 'Remark ID',
+      render: (remark) => (editor.draftFor(remark.id) ?? remark).remarkId,
+      sortValue: (remark) => remark.remarkId,
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      render: (remark) => <DateTimeValue value={(editor.draftFor(remark.id) ?? remark).createdAt} semanticType="datetime" />,
+      sortValue: (remark) => remark.createdAt,
+    },
+    {
+      key: 'author',
+      label: 'Author',
+      render: (remark) => (editor.draftFor(remark.id) ?? remark).author,
+      sortValue: (remark) => remark.author,
+    },
+    {
+      key: 'type',
+      label: 'Type',
+      render: (remark) => {
+        const rowRemark = editor.draftFor(remark.id) ?? remark
+        const isEditing = permissions.canEdit && Boolean(editor.draftFor(remark.id))
+        const errors = editor.errorsFor(remark.id)
+
+        return isEditing ? (
+          <select
+            className={[
+              'h-8 w-56 rounded border px-2 py-1 text-sm',
+              errors.some((error) => error.includes('Type')) ? 'border-red-500' : 'border-sf-border',
+            ].join(' ')}
+            value={rowRemark.type}
+            onChange={(event) => handleTypeChange(remark.id, event.target.value)}
+          >
+            {typeOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        ) : rowRemark.type
+      },
+      sortValue: (remark) => remark.type,
+    },
+    {
+      key: 'content',
+      label: <>Content<RequiredFieldMarker /></>,
+      className: 'min-w-80 max-w-[36rem] border border-sf-border px-1.5 py-1 align-top text-sf-text',
+      render: (remark) => {
+        const rowRemark = editor.draftFor(remark.id) ?? remark
+        const isEditing = permissions.canEdit && Boolean(editor.draftFor(remark.id))
+        const errors = editor.errorsFor(remark.id)
+
+        return (
+          <>
+            {isEditing ? (
+              <div className={errors.some((error) => error.includes('Content')) ? 'rounded border border-red-500' : undefined}>
+                <RichTextEditor
+                  value={rowRemark.content}
+                  onChange={(value) => editor.updateDraft(remark.id, { content: value })}
+                  minHeightClassName="min-h-16"
+                  toolbarMode="focus"
+                />
+              </div>
+            ) : (
+              <RichTextContent value={rowRemark.content} />
+            )}
+            {isEditing && errors.length > 0 ? (
+              <div className="mt-1 space-y-0.5 text-xs text-red-700">
+                {errors.map((error) => <div key={error}>{error}</div>)}
+              </div>
+            ) : null}
+          </>
+        )
+      },
+      sortValue: (remark) => remark.content,
+    },
+    {
+      key: 'dueDate',
+      label: 'Due Date',
+      render: (remark) => {
+        const rowRemark = editor.draftFor(remark.id) ?? remark
+        const isEditing = permissions.canEdit && Boolean(editor.draftFor(remark.id))
+
+        return isEditing ? (
+          <input
+            className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
+            type="date"
+            value={rowRemark.dueDate ?? ''}
+            onPaste={(event) => handleDateInputPaste(event, (nextValue) => editor.updateDraft(remark.id, { dueDate: nextValue }))}
+            onChange={(event) => editor.updateDraft(remark.id, { dueDate: event.target.value || null })}
+          />
+        ) : (
+          <DateTimeValue value={rowRemark.dueDate} semanticType="date" />
+        )
+      },
+      sortValue: (remark) => remark.dueDate ?? '',
+    },
+    {
+      key: 'deadlineAlert',
+      label: 'DL Alert',
+      render: (remark) => renderDeadlineAlert((editor.draftFor(remark.id) ?? remark).dueDate) ?? '-',
+      sortValue: (remark) => remarkDeadlineAlertLabel(remarkDeadlineAlertStatus(remark.dueDate)),
+    },
+  ]
+
+  function remarkSearchText(remark: RemarkRecord): string {
+    return [
+      remark.remarkId,
+      remark.type,
+      remark.content,
+      remark.author,
+      remark.updatedBy ?? '',
+      remarkDeadlineAlertLabel(remarkDeadlineAlertStatus(remark.dueDate)),
+    ].join(' ')
+  }
+
   return (
-    <TableSection title="Remarks" actions={actions} className="space-y-2">
+    <TableSection title="Remarks" className="space-y-2">
       {editor.notification ? (
         <div
           className={[
@@ -168,149 +344,21 @@ export function RemarksGrid({
         </div>
       ) : null}
 
-      <div className="sf-scroll-x rounded border border-sf-border bg-white">
-        <table className="w-max min-w-full border-collapse text-sm leading-tight">
-          <thead className="bg-sf-surface-alt text-left">
-            <tr>
-              {['Actions', 'Remark ID', 'Created', 'Author', 'Type', 'Content', 'Due Date', 'DL Alert'].map((label) => (
-                <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                  {label}
-                  {label === 'Content' ? <RequiredFieldMarker /> : null}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {renderedRemarks.map((remark) => {
-              const draft = editor.draftFor(remark.id)
-              const rowRemark = draft ?? remark
-              const isEditing = permissions.canEdit && Boolean(draft)
-              const errors = editor.errorsFor(remark.id)
-              const isSaving = editor.isSaving(remark.id)
-              const isDeleting = editor.isDeleting(remark.id)
-              const canAttemptSave = Boolean(draft) && !isSaving && (
-                editor.isNew(remark.id) ||
-                editor.hasChanges(remark.id, { normalize: normalizedRemark })
-              )
-              return (
-                <tr key={remark.id} className="hover:bg-sf-surface-alt">
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
-                    {readOnly ? null : (
-                      <div className="flex flex-wrap gap-1">
-                        {isEditing ? (
-                          <>
-                            <EditableChildObjectActionButton
-                              variant="primary"
-                              disabled={!canAttemptSave}
-                              onClick={() => saveRemark(remark.id)}
-                            >
-                              <Save className="h-3.5 w-3.5" aria-hidden="true" />
-                              {isSaving ? 'Saving...' : 'Save'}
-                            </EditableChildObjectActionButton>
-                            <EditableChildObjectActionButton
-                              disabled={isSaving || isDeleting}
-                              onClick={() => cancelRemark(remark.id)}
-                            >
-                              <X className="h-3.5 w-3.5" aria-hidden="true" />
-                              Cancel
-                            </EditableChildObjectActionButton>
-                          </>
-                        ) : (
-                          <>
-                            {permissions.canEdit ? (
-                              <EditableChildObjectActionButton
-                                onClick={() => editor.beginEdit(remark)}
-                              >
-                                <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                                Edit
-                              </EditableChildObjectActionButton>
-                            ) : null}
-                            {permissions.canDelete ? (
-                            <EditableChildObjectActionButton
-                              variant="danger"
-                              disabled={isDeleting}
-                              onClick={() => deleteRemark(remark.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              {isDeleting ? 'Deleting...' : 'Delete'}
-                            </EditableChildObjectActionButton>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{rowRemark.remarkId}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    <DateTimeValue value={rowRemark.createdAt} semanticType="datetime" />
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{rowRemark.author}</td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {isEditing ? (
-                      <select
-                        className={[
-                          'h-8 w-56 rounded border px-2 py-1 text-sm',
-                          errors.some((error) => error.includes('Type')) ? 'border-red-500' : 'border-sf-border',
-                        ].join(' ')}
-                        value={rowRemark.type}
-                        onChange={(event) => handleTypeChange(remark.id, event.target.value)}
-                      >
-                        {typeOptions.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      rowRemark.type
-                    )}
-                  </td>
-                  <td className="min-w-80 max-w-[36rem] border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {isEditing ? (
-                      <div className={errors.some((error) => error.includes('Content')) ? 'rounded border border-red-500' : undefined}>
-                        <RichTextEditor
-                          value={rowRemark.content}
-                          onChange={(value) => editor.updateDraft(remark.id, { content: value })}
-                          minHeightClassName="min-h-16"
-                          toolbarMode="focus"
-                        />
-                      </div>
-                    ) : (
-                      <RichTextContent value={rowRemark.content} />
-                    )}
-                    {isEditing && errors.length > 0 ? (
-                      <div className="mt-1 space-y-0.5 text-xs text-red-700">
-                        {errors.map((error) => <div key={error}>{error}</div>)}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {isEditing ? (
-                      <input
-                        className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm"
-                        type="date"
-                        value={rowRemark.dueDate ?? ''}
-                        onPaste={(event) => handleDateInputPaste(event, (nextValue) => editor.updateDraft(remark.id, { dueDate: nextValue }))}
-                        onChange={(event) => editor.updateDraft(remark.id, { dueDate: event.target.value || null })}
-                      />
-                    ) : (
-                      <DateTimeValue value={rowRemark.dueDate} semanticType="date" />
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                    {renderDeadlineAlert(rowRemark.dueDate)}
-                  </td>
-                </tr>
-              )
-            })}
-            {renderedRemarks.length === 0 ? (
-              <tr>
-                <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={8}>
-                  No remarks yet.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <RecordHistorySection
+        records={renderedRemarks}
+        columns={columns}
+        getRowKey={(remark) => remark.id}
+        getSearchText={remarkSearchText}
+        getDateValue={(remark) => remark.createdAt}
+        dateFilterLabel="Remark Created Date"
+        emptyText="No records available."
+        filteredEmptyText="No matching records."
+        searchLabel="Search / Filter"
+        searchPlaceholder="Search Remarks"
+        recordsPerPageLabel="Records per page"
+        actions={actions}
+        resetPageSignal={committedRemarkIds}
+      />
     </TableSection>
   )
 }

@@ -71,15 +71,16 @@ export function openPocProjectsForReusedInternalSystem(
   projects: Project[],
   projectSystems: ProjectSystemLink[],
 ): Project[] {
+  const currentProjectIds = Array.isArray(system.currentProjectIds) ? system.currentProjectIds : []
   const activeProjectIds = new Set(
     projectSystems
       .filter((link) =>
         link.allocationStatus !== 'DEALLOCATED' &&
-        (link.sourceMachineId === system.machineId || system.currentProjectIds.includes(link.projectId)),
+        (link.sourceMachineId === system.machineId || currentProjectIds.includes(link.projectId)),
       )
       .map((link) => link.projectId),
   )
-  system.currentProjectIds.forEach((projectId) => activeProjectIds.add(projectId))
+  currentProjectIds.forEach((projectId) => activeProjectIds.add(projectId))
   return projects.filter((project) => activeProjectIds.has(project.id) && project.mainType === 'POC' && project.progressStatus === 'OPEN')
 }
 

@@ -27,6 +27,7 @@ import {
   applicationConfigurationComparisonCellClassName,
 } from '@/components/application-configuration/ApplicationConfigurationComparisonCell'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { ProjectAlertPresentation } from '@/components/projects/ProjectAlertPresentation'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
@@ -77,6 +78,7 @@ import {
   projectRequirementRows,
   projectRequirementTitle,
   projectHeaderFieldValue,
+  projectAlertLabels,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
   projectStatusLabel,
@@ -661,6 +663,7 @@ export function ProjectFormPage() {
     const isManualProjectWithoutOpportunity = !linkedOpportunity && !projectDraft.opportunityId
     const isProjectTypeField = field.key === 'mainType' || field.key === 'subType'
     const isEditable = field.editable || (isManualProjectWithoutOpportunity && !isProjectTypeField)
+    const projectAlerts = field.key === 'projectAlerts' ? projectAlertLabels(projectDraft) : []
     const label = (
       <>
         {field.label}
@@ -704,7 +707,13 @@ export function ProjectFormPage() {
           controlWidthClassName="w-44"
           businessEditable={false}
           editor={null}
-          readOnlyValue={field.key === 'progressStatus' ? <ProjectStatusBadge status={projectDraft.progressStatus} /> : value || '-'}
+          readOnlyValue={
+            field.key === 'progressStatus'
+              ? <ProjectStatusBadge status={projectDraft.progressStatus} />
+              : field.key === 'projectAlerts'
+                ? (projectAlerts.length > 0 ? <ProjectAlertPresentation alerts={projectAlerts} /> : '-')
+                : value || '-'
+          }
         />
       )
     }
