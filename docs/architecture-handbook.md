@@ -138,6 +138,12 @@ Product Readiness Review findings should be classified as one of:
 - Performance Improvement
 - Product Recommendation
 
+## ERP UI/UX Consistency
+
+New functionality must first reuse existing shared application patterns.
+
+Equivalent business meanings must use identical shared components, icons, labels, colors, typography, spacing and interaction patterns. External product concepts may guide behavior, but they must not introduce a separate visual language into the ERP. Any new local UI pattern requires explicit approval and Architecture Handbook documentation.
+
 ## Scope-Based Save Boundary
 
 Every explicit Save action is the commit boundary for the Business Object or save scope it owns. Child-object Save actions commit independently and do not require a subsequent parent-form Save.

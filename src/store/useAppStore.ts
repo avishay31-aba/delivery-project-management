@@ -348,10 +348,20 @@ function appendInfrastructureMaintenanceActivityEvents(
           after: { taskId: task.taskId, completionDate: task.completionDate },
         })
       }
+      if (task.recurrence.frequency !== 'none' && task.recurrenceDefinitionTaskId === task.id) {
+        nextEvents = appendActivityEvent(nextEvents, now, {
+          category: 'TASK',
+          eventType: 'infrastructureItem.maintenanceRecurrenceSeriesCreated',
+          severity: 'INFO',
+          summary: `Maintenance recurrence series created for ${task.taskId}.`,
+          primaryObject: infrastructureRef(next),
+          after: task.recurrence as unknown as Record<string, unknown>,
+        })
+      }
       return
     }
 
-    if (!valuesEqual(before.task, task.task) || before.dueDate !== task.dueDate) {
+    if (!valuesEqual(before.task, task.task) || before.dueDate !== task.dueDate || before.startDate !== task.startDate || before.location !== task.location || !valuesEqual(before.recurrence, task.recurrence)) {
       nextEvents = appendActivityEvent(nextEvents, now, {
         category: 'TASK',
         eventType: 'infrastructureItem.maintenanceTaskEdited',
@@ -360,6 +370,17 @@ function appendInfrastructureMaintenanceActivityEvents(
         primaryObject: infrastructureRef(next),
         before: before as unknown as Record<string, unknown>,
         after: task as unknown as Record<string, unknown>,
+      })
+    }
+    if (!valuesEqual(before.recurrence, task.recurrence)) {
+      nextEvents = appendActivityEvent(nextEvents, now, {
+        category: 'TASK',
+        eventType: 'infrastructureItem.maintenanceRecurrencePatternChanged',
+        severity: 'INFO',
+        summary: `Maintenance recurrence pattern changed for ${task.taskId}.`,
+        primaryObject: infrastructureRef(next),
+        before: before.recurrence as unknown as Record<string, unknown>,
+        after: task.recurrence as unknown as Record<string, unknown>,
       })
     }
     if (before.dueDate !== task.dueDate) {
@@ -393,7 +414,7 @@ function appendInfrastructureMaintenanceActivityEvents(
           after: { taskId: task.taskId, completionDate: task.completionDate },
         })
       }
-      if (task.taskStatus === 'Open') {
+      if (before.taskStatus === 'Done' && task.taskStatus !== 'Done') {
         nextEvents = appendActivityEvent(nextEvents, now, {
           category: 'TASK',
           eventType: 'infrastructureItem.maintenanceTaskReopened',

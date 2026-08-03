@@ -1,6 +1,7 @@
 import type {
   Account,
   InfrastructureItem,
+  InfrastructureMaintenanceRecurrence,
   InfrastructureMaintenanceTask,
   InfrastructureMaintenanceTaskStatus,
   InfrastructureItemProperties,
@@ -35,7 +36,7 @@ export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
 export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['None', 'Planned', 'Pending', 'Overdue', 'Delayed', 'Not Set Yet', 'Current', 'Expired', 'No Warranty', 'Obsolete']
-export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'Done']
+export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'In Progress', 'Done']
 
 export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContact = {
   name: '',
@@ -149,6 +150,8 @@ export interface InfrastructureMaintenanceDashboardRow {
   taskType: string
   description: string
   taskStatus: InfrastructureMaintenanceTaskStatus
+  location: string
+  recurrenceSummary: string
   infrastructureItemId: string
   infrastructureItemName: string
   infrastructureType: string
@@ -537,6 +540,55 @@ export function ensureInfrastructureReferenceData(referenceData: ReferenceDataRe
   return next
 }
 
+export function normalizeMaintenanceRecurrence(
+  value: unknown,
+  fallbackSeriesId: string | null = null,
+  fallbackStartDate: string | null = null,
+): InfrastructureMaintenanceRecurrence {
+  const raw = isRecord(value) ? value : {}
+  const frequency = ['daily', 'weekly', 'monthly', 'yearly'].includes(text(raw.frequency))
+    ? text(raw.frequency) as InfrastructureMaintenanceRecurrence['frequency']
+    : 'none'
+  const interval = Math.max(1, numberOrNull(raw.interval) ?? 1)
+  const endType = ['after', 'by'].includes(text(raw.endType))
+    ? text(raw.endType) as InfrastructureMaintenanceRecurrence['endType']
+    : 'none'
+  const weeklyWeekdays = Array.isArray(raw.weeklyWeekdays)
+    ? raw.weeklyWeekdays.map((day) => text(day)).filter((day): day is NonNullable<InfrastructureMaintenanceRecurrence['weeklyWeekdays']>[number] =>
+        ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(day),
+      )
+    : []
+
+  return {
+    frequency,
+    seriesId: frequency === 'none' ? null : text(raw.seriesId) || fallbackSeriesId || `infrastructure-maintenance-series-${crypto.randomUUID()}`,
+    interval,
+    startDate: text(raw.startDate) || fallbackStartDate || null,
+    endType,
+    endAfterOccurrences: numberOrNull(raw.endAfterOccurrences),
+    endByDate: text(raw.endByDate) || null,
+    dailyMode: text(raw.dailyMode) === 'weekday' ? 'weekday' : 'interval',
+    weeklyWeekdays,
+    monthlyMode: text(raw.monthlyMode) === 'relative' ? 'relative' : 'day',
+    monthlyDay: numberOrNull(raw.monthlyDay),
+    monthlyOrdinal: ['first', 'second', 'third', 'fourth', 'last'].includes(text(raw.monthlyOrdinal)) ? text(raw.monthlyOrdinal) as InfrastructureMaintenanceRecurrence['monthlyOrdinal'] : 'first',
+    monthlyRelativeDay: normalizeRelativeDay(raw.monthlyRelativeDay),
+    yearlyMode: text(raw.yearlyMode) === 'relative' ? 'relative' : 'date',
+    yearlyMonth: numberOrNull(raw.yearlyMonth),
+    yearlyDay: numberOrNull(raw.yearlyDay),
+    yearlyOrdinal: ['first', 'second', 'third', 'fourth', 'last'].includes(text(raw.yearlyOrdinal)) ? text(raw.yearlyOrdinal) as InfrastructureMaintenanceRecurrence['yearlyOrdinal'] : 'first',
+    yearlyRelativeDay: normalizeRelativeDay(raw.yearlyRelativeDay),
+    generatedThroughDate: text(raw.generatedThroughDate) || null,
+  }
+}
+
+function normalizeRelativeDay(value: unknown): InfrastructureMaintenanceRecurrence['monthlyRelativeDay'] {
+  const normalized = text(value)
+  return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'day', 'weekday', 'weekend-day'].includes(normalized)
+    ? normalized as InfrastructureMaintenanceRecurrence['monthlyRelativeDay']
+    : 'monday'
+}
+
 function normalizeMaintenanceTask(
   record: Partial<InfrastructureMaintenanceTask> & Record<string, unknown>,
   index: number,
@@ -546,6 +598,7 @@ function normalizeMaintenanceTask(
   const status = INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(record.taskStatus as InfrastructureMaintenanceTaskStatus)
     ? record.taskStatus as InfrastructureMaintenanceTaskStatus
     : 'Open'
+  const recurrence = normalizeMaintenanceRecurrence(record.recurrence, text(record.recurrenceSeriesId) || null, text(record.startDate) || null)
   return {
     id: text(record.id) || `infrastructure-maintenance-${crypto.randomUUID()}`,
     taskId: normalizeInfrastructureMaintenanceTaskId(record.taskId, existingTaskIds, index),
@@ -553,8 +606,13 @@ function normalizeMaintenanceTask(
     task: text(record.task),
     startDate: text(record.startDate) || null,
     dueDate: text(record.dueDate) || null,
+    location: text(record.location),
     taskStatus: status,
     completionDate: status === 'Done' ? text(record.completionDate) || businessDate(new Date(now)) : null,
+    recurrence,
+    recurrenceSeriesId: recurrence.seriesId,
+    recurrenceOccurrenceDate: text(record.recurrenceOccurrenceDate) || null,
+    recurrenceDefinitionTaskId: text(record.recurrenceDefinitionTaskId) || null,
     createdAt: text(record.createdAt) || now,
     createdBy: text(record.createdBy) || 'System',
     updatedAt: text(record.updatedAt) || now,
@@ -583,6 +641,7 @@ export function createInfrastructureMaintenanceTask(tasks: InfrastructureMainten
     task: '',
     startDate: null,
     dueDate: null,
+    location: '',
     taskStatus: 'Open',
     completionDate: null,
     createdAt: now,
@@ -590,6 +649,124 @@ export function createInfrastructureMaintenanceTask(tasks: InfrastructureMainten
     updatedAt: now,
     updatedBy: 'Demo User',
   }, tasks.length, now, tasks.map((task) => task.taskId))
+}
+
+function parseDateOnly(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const date = new Date(`${value}T00:00:00`)
+  return Number.isNaN(date.valueOf()) ? null : date
+}
+
+function dateOnly(value: Date): string {
+  return businessDate(value)
+}
+
+function addDays(value: Date, days: number): Date {
+  const next = new Date(value)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function addMonthsClamped(value: Date, months: number): Date {
+  const next = new Date(value)
+  const day = next.getDate()
+  next.setDate(1)
+  next.setMonth(next.getMonth() + months)
+  const maxDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+  next.setDate(Math.min(day, maxDay))
+  return next
+}
+
+function addYearsClamped(value: Date, years: number): Date {
+  return addMonthsClamped(value, years * 12)
+}
+
+export function infrastructureMaintenanceTaskIsActive(task: Pick<InfrastructureMaintenanceTask, 'taskStatus'>): boolean {
+  return task.taskStatus !== 'Done'
+}
+
+export function recurrenceSummary(recurrence: InfrastructureMaintenanceRecurrence | null | undefined): string {
+  if (!recurrence || recurrence.frequency === 'none') return 'Does not repeat'
+  const every = recurrence.interval > 1 ? `Every ${recurrence.interval} ` : 'Every '
+  const end = recurrence.endType === 'after' && recurrence.endAfterOccurrences
+    ? `, ${recurrence.endAfterOccurrences} occurrences`
+    : recurrence.endType === 'by' && recurrence.endByDate
+      ? `, until ${recurrence.endByDate}`
+      : ', no end date'
+  if (recurrence.frequency === 'daily') return recurrence.dailyMode === 'weekday' ? `Every weekday${end}` : `${every}${recurrence.interval > 1 ? 'days' : 'day'}${end}`
+  if (recurrence.frequency === 'weekly') return `${every}${recurrence.interval > 1 ? 'weeks' : 'week'}${recurrence.weeklyWeekdays?.length ? ` on ${recurrence.weeklyWeekdays.join(', ')}` : ''}${end}`
+  if (recurrence.frequency === 'monthly') return recurrence.monthlyMode === 'relative'
+    ? `${every}${recurrence.interval > 1 ? 'months' : 'month'} on the ${recurrence.monthlyOrdinal} ${recurrence.monthlyRelativeDay}${end}`
+    : `${every}${recurrence.interval > 1 ? 'months' : 'month'} on day ${recurrence.monthlyDay ?? ''}${end}`
+  return recurrence.yearlyMode === 'relative'
+    ? `Every year on the ${recurrence.yearlyOrdinal} ${recurrence.yearlyRelativeDay} of month ${recurrence.yearlyMonth ?? ''}${end}`
+    : `Every year on ${recurrence.yearlyMonth ?? ''}/${recurrence.yearlyDay ?? ''}${end}`
+}
+
+function nextSimpleOccurrenceDate(current: Date, recurrence: InfrastructureMaintenanceRecurrence): Date {
+  if (recurrence.frequency === 'daily') {
+    if (recurrence.dailyMode === 'weekday') {
+      let next = addDays(current, 1)
+      while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1)
+      return next
+    }
+    return addDays(current, recurrence.interval)
+  }
+  if (recurrence.frequency === 'weekly') return addDays(current, recurrence.interval * 7)
+  if (recurrence.frequency === 'monthly') return addMonthsClamped(current, recurrence.interval)
+  if (recurrence.frequency === 'yearly') return addYearsClamped(current, recurrence.interval)
+  return current
+}
+
+export function generateInfrastructureMaintenanceOccurrences(
+  draft: InfrastructureMaintenanceTask,
+  existingTasks: InfrastructureMaintenanceTask[],
+  now = new Date().toISOString(),
+): InfrastructureMaintenanceTask[] {
+  const recurrence = normalizeMaintenanceRecurrence(draft.recurrence, draft.recurrenceSeriesId, draft.startDate)
+  if (recurrence.frequency === 'none') return [draft]
+  const start = parseDateOnly(recurrence.startDate ?? draft.startDate)
+  if (!start) return [draft]
+  const due = parseDateOnly(draft.dueDate) ?? start
+  const durationDays = Math.max(0, Math.round((due.getTime() - (parseDateOnly(draft.startDate) ?? start).getTime()) / 86_400_000))
+  const horizon = addMonthsClamped(new Date(), 12)
+  const endByDate = recurrence.endType === 'by' ? parseDateOnly(recurrence.endByDate) : null
+  const maxDate = endByDate && endByDate < horizon ? endByDate : horizon
+  const maxOccurrences = recurrence.endType === 'after'
+    ? Math.max(1, recurrence.endAfterOccurrences ?? 1)
+    : 370
+  const seriesId = recurrence.seriesId ?? `infrastructure-maintenance-series-${crypto.randomUUID()}`
+  const existingKeys = new Set(existingTasks.map((task) => `${task.recurrenceSeriesId ?? ''}:${task.recurrenceOccurrenceDate ?? ''}`))
+  const generated: InfrastructureMaintenanceTask[] = []
+  let occurrenceDate = start
+  let occurrenceCount = 0
+  const usedIds = existingTasks.map((task) => task.taskId)
+
+  while (occurrenceCount < maxOccurrences && occurrenceDate <= maxDate) {
+    const occurrenceDateText = dateOnly(occurrenceDate)
+    const key = `${seriesId}:${occurrenceDateText}`
+    if (!existingKeys.has(key) || occurrenceDateText === draft.recurrenceOccurrenceDate || draft.recurrenceOccurrenceDate == null) {
+      const taskId = occurrenceCount === 0 ? draft.taskId : reserveBusinessId('infrastructureMaintenanceTask', [...usedIds, ...generated.map((task) => task.taskId)])
+      generated.push(normalizeMaintenanceTask({
+        ...draft,
+        id: occurrenceCount === 0 ? draft.id : `infrastructure-maintenance-${crypto.randomUUID()}`,
+        taskId,
+        startDate: occurrenceDateText,
+        dueDate: dateOnly(addDays(occurrenceDate, durationDays)),
+        taskStatus: occurrenceCount === 0 ? draft.taskStatus : 'Open',
+        completionDate: occurrenceCount === 0 ? draft.completionDate : null,
+        recurrence: { ...recurrence, seriesId, generatedThroughDate: dateOnly(maxDate) },
+        recurrenceSeriesId: seriesId,
+        recurrenceOccurrenceDate: occurrenceDateText,
+        recurrenceDefinitionTaskId: draft.id,
+        createdAt: occurrenceCount === 0 ? draft.createdAt : now,
+        updatedAt: now,
+      }, occurrenceCount, now, [...usedIds, ...generated.map((task) => task.taskId)]))
+    }
+    occurrenceCount += 1
+    occurrenceDate = nextSimpleOccurrenceDate(occurrenceDate, recurrence)
+  }
+  return generated.length > 0 ? generated : [draft]
 }
 
 export function commitInfrastructureMaintenanceTask(
@@ -639,10 +816,11 @@ export function infrastructureMaintenanceStatusesFromTasks(item: Pick<Infrastruc
 
 export function infrastructureLastMaintenanceDate(item: Pick<InfrastructureItem, 'maintenanceTasks'>): string | null {
   const latestActivity = (item.maintenanceTasks ?? [])
-    .map((task) => text(task.updatedAt) || text(task.completionDate) || text(task.dueDate) || text(task.startDate))
+    .filter((task) => task.taskStatus === 'Done')
+    .map((task) => text(task.completionDate))
     .filter(Boolean)
     .sort((first, second) => second.localeCompare(first))[0]
-  return latestActivity ? businessDate(new Date(latestActivity)) : null
+  return latestActivity || null
 }
 
 export function infrastructureMaintenanceStatusFromTasks(item: Pick<InfrastructureItem, 'maintenanceTasks'>): InfrastructureMaintenanceStatus {
@@ -1191,6 +1369,8 @@ export function infrastructureMaintenanceDashboardRows(
       taskType: infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
       description: task.task,
       taskStatus: task.taskStatus,
+      location: task.location,
+      recurrenceSummary: recurrenceSummary(task.recurrence),
       infrastructureItemId: item.infrastructureId,
       infrastructureItemName: item.identifier,
       infrastructureType: infrastructureReferenceDataLabel(referenceData, item.typeRefId),
@@ -1209,7 +1389,7 @@ export function infrastructureMaintenanceDashboardRows(
 export function plannedInfrastructureMaintenanceDashboardRows(rows: InfrastructureMaintenanceDashboardRow[], today = new Date()): InfrastructureMaintenanceDashboardRow[] {
   const now = todayTimestamp(today)
   return rows
-    .filter((row) => row.taskStatus === 'Open' && row.alert === 'Pending' && row.startDate && (dateTimestamp(row.startDate) ?? 0) > now)
+    .filter((row) => row.taskStatus !== 'Done' && row.startDate && (dateTimestamp(row.startDate) ?? 0) > now)
     .sort((first, second) =>
       first.startDate.localeCompare(second.startDate) ||
       first.dueDate.localeCompare(second.dueDate) ||
@@ -1220,7 +1400,7 @@ export function plannedInfrastructureMaintenanceDashboardRows(rows: Infrastructu
 export function currentInfrastructureMaintenanceDashboardRows(rows: InfrastructureMaintenanceDashboardRow[], today = new Date()): InfrastructureMaintenanceDashboardRow[] {
   const now = todayTimestamp(today)
   return rows
-    .filter((row) => row.taskStatus === 'Open' && row.startDate && (dateTimestamp(row.startDate) ?? Number.MAX_SAFE_INTEGER) <= now)
+    .filter((row) => row.taskStatus !== 'Done' && row.startDate && (dateTimestamp(row.startDate) ?? Number.MAX_SAFE_INTEGER) <= now)
     .sort((first, second) =>
       first.startDate.localeCompare(second.startDate) ||
       first.dueDate.localeCompare(second.dueDate) ||

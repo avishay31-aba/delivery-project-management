@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   Check,
   CheckCircle2,
+  Clock3,
   CircleCheck,
   CircleHelp,
   CircleX,
@@ -121,7 +122,20 @@ export function projectStatusPresentation(status: string | null | undefined): St
 
 export function taskStatusPresentation(status: string | null | undefined): StatusPresentation {
   const key = String(status ?? '').trim().toLocaleLowerCase()
-  return key === 'done' ? { ...PROJECT_PRESENTATIONS.done, kind: 'task', tooltip: 'Task status: Done' } : { ...PROJECT_PRESENTATIONS.open, kind: 'task', tooltip: 'Task status: Open' }
+  if (key === 'done') return { ...PROJECT_PRESENTATIONS.done, kind: 'task', tooltip: 'Task status: Done' }
+  if (key === 'in progress') {
+    return {
+      ...DEFAULT_PRESENTATION,
+      key: 'in-progress',
+      kind: 'task',
+      label: 'In Progress',
+      icon: Clock3,
+      iconClassName: 'text-orange-500',
+      badgeClassName: 'text-orange-800',
+      tooltip: 'Task status: In Progress',
+    }
+  }
+  return { ...PROJECT_PRESENTATIONS.open, kind: 'task', tooltip: 'Task status: Open' }
 }
 
 export function milestoneStatusPresentation(status: string | null | undefined): StatusPresentation {

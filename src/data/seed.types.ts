@@ -631,7 +631,37 @@ export interface InfrastructureTokenProperty {
   licenseEndDate: string | null
 }
 
-export type InfrastructureMaintenanceTaskStatus = 'Open' | 'Done'
+export type InfrastructureMaintenanceTaskStatus = 'Open' | 'In Progress' | 'Done'
+
+export type InfrastructureMaintenanceRecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+export type InfrastructureMaintenanceRecurrenceEndType = 'none' | 'after' | 'by'
+export type InfrastructureMaintenanceMonthlyMode = 'day' | 'relative'
+export type InfrastructureMaintenanceYearlyMode = 'date' | 'relative'
+export type InfrastructureMaintenanceOrdinal = 'first' | 'second' | 'third' | 'fourth' | 'last'
+export type InfrastructureMaintenanceWeekday = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'
+export type InfrastructureMaintenanceRelativeDay = InfrastructureMaintenanceWeekday | 'day' | 'weekday' | 'weekend-day'
+
+export interface InfrastructureMaintenanceRecurrence {
+  frequency: InfrastructureMaintenanceRecurrenceFrequency
+  seriesId: string | null
+  interval: number
+  startDate: string | null
+  endType: InfrastructureMaintenanceRecurrenceEndType
+  endAfterOccurrences: number | null
+  endByDate: string | null
+  dailyMode?: 'interval' | 'weekday'
+  weeklyWeekdays?: InfrastructureMaintenanceWeekday[]
+  monthlyMode?: InfrastructureMaintenanceMonthlyMode
+  monthlyDay?: number | null
+  monthlyOrdinal?: InfrastructureMaintenanceOrdinal
+  monthlyRelativeDay?: InfrastructureMaintenanceRelativeDay
+  yearlyMode?: InfrastructureMaintenanceYearlyMode
+  yearlyMonth?: number | null
+  yearlyDay?: number | null
+  yearlyOrdinal?: InfrastructureMaintenanceOrdinal
+  yearlyRelativeDay?: InfrastructureMaintenanceRelativeDay
+  generatedThroughDate?: string | null
+}
 
 export interface InfrastructureMaintenanceTask {
   id: string
@@ -640,8 +670,13 @@ export interface InfrastructureMaintenanceTask {
   task: string
   startDate: string | null
   dueDate: string | null
+  location: string
   taskStatus: InfrastructureMaintenanceTaskStatus
   completionDate: string | null
+  recurrence: InfrastructureMaintenanceRecurrence
+  recurrenceSeriesId: string | null
+  recurrenceOccurrenceDate: string | null
+  recurrenceDefinitionTaskId: string | null
   createdAt: string
   createdBy: string
   updatedAt: string

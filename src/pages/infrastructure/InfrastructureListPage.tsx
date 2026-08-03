@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
+import { InfrastructureMaintenanceCalendar } from '@/components/maintenance/InfrastructureMaintenanceCalendar'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
@@ -41,6 +42,7 @@ export function InfrastructureListPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const [activeTab, setActiveTab] = useState<InfrastructureDashboardTab>('allItems')
+  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const accounts = useAppStore((state) => state.accounts)
   const referenceData = useAppStore((state) => state.referenceData)
@@ -116,6 +118,32 @@ export function InfrastructureListPage() {
                 { id: 'infrastructureItemId', desc: false },
               ]}
               freezeThroughColumnId="infrastructureItemId"
+              contentModeControls={
+                <div className="inline-flex rounded border border-sf-border bg-white p-0.5 text-sm">
+                  <button
+                    type="button"
+                    className={plannedViewMode === 'list' ? 'rounded bg-sf-brand px-3 py-1 text-white' : 'rounded px-3 py-1 text-sf-text hover:bg-sf-surface-alt'}
+                    onClick={() => setPlannedViewMode('list')}
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    className={plannedViewMode === 'calendar' ? 'rounded bg-sf-brand px-3 py-1 text-white' : 'rounded px-3 py-1 text-sf-text hover:bg-sf-surface-alt'}
+                    onClick={() => setPlannedViewMode('calendar')}
+                  >
+                    Calendar
+                  </button>
+                </div>
+              }
+              renderAlternateContent={plannedViewMode === 'calendar'
+                ? (filteredRows) => (
+                    <InfrastructureMaintenanceCalendar
+                      rows={filteredRows}
+                      onOpenTask={(row) => navigate(`/infrastructure/${row.infrastructureItemId}`, { state: { returnTo, mode: 'view', focusSection: 'maintenance' } })}
+                    />
+                  )
+                : undefined}
             />
           ) : null}
           {activeTab === 'currentMaintenance' ? (

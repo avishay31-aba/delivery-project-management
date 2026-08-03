@@ -93,6 +93,8 @@ interface DataDashboardProps<T extends { id: string }> {
   initialSorting?: SortingState
   colorLegend?: DashboardColorLegendItem[]
   freezeThroughColumnId?: string
+  contentModeControls?: ReactNode
+  renderAlternateContent?: (rows: T[]) => ReactNode
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -917,6 +919,8 @@ export function DataDashboard<T extends { id: string }>({
   initialSorting = [],
   colorLegend = [],
   freezeThroughColumnId,
+  contentModeControls,
+  renderAlternateContent,
 }: DataDashboardProps<T>) {
   const regionalDateFormat = useDateTimePresentationPreference()
   const initialSortingKey = JSON.stringify(initialSorting)
@@ -1588,6 +1592,7 @@ const hiddenFilteredColumns = table
 const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   String(column.columnDef.header),
 )
+const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => row.original), [table, rows, sorting, columnFilters, globalFilter])
 
   function clearAllFiltersAndSearch() {
     recordDashboardUndoSnapshot()
@@ -1955,6 +1960,8 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
             Export CSV
           </button>
 
+          {contentModeControls}
+
           {replaceColumns.length > 0 ? (
             <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(true)}>
               Search & Replace
@@ -1978,12 +1985,17 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
           </div>
         ) : null}  
 
-        <div
-          ref={tableContainerRef}
-          className="min-h-48 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border"
-          style={{ scrollbarGutter: 'stable' }}
-        >
-          <table className="min-w-full divide-y divide-sf-border text-sm">
+        {renderAlternateContent ? (
+          <div className="min-h-48 flex-1 overflow-auto border-b border-sf-border">
+            {renderAlternateContent(alternateRows)}
+          </div>
+        ) : (
+          <div
+            ref={tableContainerRef}
+            className="min-h-48 flex-1 overflow-x-scroll overflow-y-auto border-b border-sf-border"
+            style={{ scrollbarGutter: 'stable' }}
+          >
+            <table className="min-w-full divide-y divide-sf-border text-sm">
             <thead className="bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -2109,8 +2121,9 @@ const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
                 </tr>
               </tfoot>
             ) : null}
-          </table>
-        </div>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
