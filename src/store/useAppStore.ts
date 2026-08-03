@@ -59,6 +59,7 @@ import {
   createReusedInternalInventorySystem,
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
+  hasActiveOpenPocPurposeLock,
   normalizeSystemInventoryRecord,
   occupyReusedInternalSystem,
   applyReusedSystemOccupationWindow,
@@ -583,6 +584,23 @@ function recalculateReusedSystemOccupationWindows(
       now,
     ),
   )
+}
+
+function sanitizeReusedInternalSystemUserPatch(
+  system: AppDataState['reusedInternalSystems'][number],
+  patch: Partial<AppDataState['reusedInternalSystems'][number]>,
+  projects: AppDataState['projects'],
+  projectSystems: AppDataState['projectSystems'],
+): Partial<AppDataState['reusedInternalSystems'][number]> {
+  const { purposeHistory: _purposeHistory, ...safePatch } = patch
+  if (!hasActiveOpenPocPurposeLock(system, projects, projectSystems)) return safePatch
+  const {
+    purpose: _purpose,
+    occupationStartDate: _occupationStartDate,
+    occupationEndDate: _occupationEndDate,
+    ...unmanagedPatch
+  } = safePatch
+  return unmanagedPatch
 }
 
 function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['projects'][number]) {
@@ -1241,7 +1259,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           collection === 'reused'
             ? state.reusedInternalSystems.map((system) => {
                 if (system.id !== id) return system
-                const { purposeHistory: _purposeHistory, ...safePatch } = reusedPatch
+                const safePatch = sanitizeReusedInternalSystemUserPatch(system, reusedPatch, state.projects, state.projectSystems)
                 const blockedPurposeChange = validateReusedInternalPurposeChange(
                   system,
                   { ...system, ...safePatch },
@@ -2270,7 +2288,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const reusedInternalSystems = state.reusedInternalSystems.map((system) => {
         if (system.id !== id) return system
         previousSystem = system
-        const { purposeHistory: _purposeHistory, ...safePatch } = patch
+        const safePatch = sanitizeReusedInternalSystemUserPatch(system, patch, state.projects, state.projectSystems)
         const blockedPurposeChange = validateReusedInternalPurposeChange(
           system,
           { ...system, ...safePatch },
@@ -2282,8 +2300,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           nextCommittedSystem = system
           return system
         }
-        const nextSystem = patch.purpose && patch.purpose !== system.purpose
-          ? updateReusedInternalPurpose(system, patch.purpose, now)
+        const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
+          ? updateReusedInternalPurpose(system, safePatch.purpose, now)
           : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
         nextCommittedSystem = normalizeSystemInventoryRecord({ ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now })
         return nextCommittedSystem

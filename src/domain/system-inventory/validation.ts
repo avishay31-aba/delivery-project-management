@@ -64,7 +64,7 @@ export function isOccupationDateRequiredForPurpose(purpose: string | undefined):
 }
 
 export const ACTIVE_POC_PURPOSE_LOCK_MESSAGE =
-  'System purpose cannot be changed while it is allocated to an open POC project. Complete all linked POC projects before changing the purpose.'
+  'This System is currently allocated to one or more active POC Projects. Its Purpose and Occupation dates are managed automatically until all linked POC Projects are completed.'
 
 export function openPocProjectsForReusedInternalSystem(
   system: ReusedInternalSystem,

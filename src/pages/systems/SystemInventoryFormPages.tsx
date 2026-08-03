@@ -659,7 +659,7 @@ export function InventoryForm<T extends InventoryRecord>({
     const next = record as ReusedInternalSystem
     if (!shouldConfirmEarlyNonPocPurposeChange(previous, next)) return true
     const accepted = window.confirm(
-      `This system is occupied until ${previous.occupationEndDate}. Changing its purpose before the occupation period ends may affect the current allocation. Do you want to continue?`,
+      `The occupation period for this System ends on ${previous.occupationEndDate}.\n\nChanging the Purpose before the occupation period ends may affect its current usage.\n\nDo you want to continue?`,
     )
     if (accepted) return true
     setDraft((current) => current ? ({ ...current, purpose: previous.purpose } as T) : current)
@@ -674,6 +674,9 @@ export function InventoryForm<T extends InventoryRecord>({
   })
   const headerLines = Array.from(lines.entries()).sort(([first], [second]) => first - second)
   const summaryMessages = messages.filter((message) => !isFieldLevelValidationMessage(message))
+  const activePocPurposeLock = metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
+    ? hasActiveOpenPocPurposeLock(activeRecord as ReusedInternalSystem, projects, projectSystems)
+    : false
   function save(stayOnPage: boolean) {
     if (isViewMode) return
     const nextMessages = validate()
@@ -765,9 +768,8 @@ export function InventoryForm<T extends InventoryRecord>({
         (link.systemId === activeRecord.id || ('machineId' in activeRecord && link.sourceMachineId === activeRecord.machineId)),
     )
     const hasPocPurposeLock =
-      metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL &&
-      field.key === 'purpose' &&
-      hasActiveOpenPocPurposeLock(activeRecord as ReusedInternalSystem, projects, projectSystems)
+      activePocPurposeLock &&
+      (field.key === 'purpose' || field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
     const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
     const sourceRecord = businessEditable ? activeDraft : activeRecord
     const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
@@ -2102,6 +2104,12 @@ export function InventoryForm<T extends InventoryRecord>({
           {summaryMessages.map((message) => (
             <div key={message}>{message}</div>
           ))}
+        </div>
+      ) : null}
+
+      {activePocPurposeLock ? (
+        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          {ACTIVE_POC_PURPOSE_LOCK_MESSAGE}
         </div>
       ) : null}
 
