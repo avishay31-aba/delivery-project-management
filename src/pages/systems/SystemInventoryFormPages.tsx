@@ -769,7 +769,7 @@ export function InventoryForm<T extends InventoryRecord>({
     )
     const hasPocPurposeLock =
       activePocPurposeLock &&
-      (field.key === 'purpose' || field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
+      (field.key === 'purpose' || field.key === 'status' || field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
     const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
     const sourceRecord = businessEditable ? activeDraft : activeRecord
     const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)

@@ -596,6 +596,7 @@ function sanitizeReusedInternalSystemUserPatch(
   if (!hasActiveOpenPocPurposeLock(system, projects, projectSystems)) return safePatch
   const {
     purpose: _purpose,
+    status: _status,
     occupationStartDate: _occupationStartDate,
     occupationEndDate: _occupationEndDate,
     ...unmanagedPatch
