@@ -5,7 +5,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
 import type { InfrastructureMaintenanceRecurrence, InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
@@ -47,6 +47,17 @@ function alertBadge(task: InfrastructureMaintenanceTask) {
   return <MaintenanceStatusPresentation status={alert} />
 }
 
+const WEEKDAYS: Array<NonNullable<InfrastructureMaintenanceRecurrence['weeklyWeekdays']>[number]> = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+const WEEKDAY_LABELS: Record<NonNullable<InfrastructureMaintenanceRecurrence['weeklyWeekdays']>[number], string> = {
+  sunday: 'Sunday',
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+  saturday: 'Saturday',
+}
+
 function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanceTaskStatus; onChange: (value: InfrastructureMaintenanceTaskStatus) => void }) {
   const [open, setOpen] = useState(false)
   return (
@@ -80,6 +91,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
   const editor = useEditableChildObjectEditor<InfrastructureMaintenanceTask>()
   const [advancedTaskId, setAdvancedTaskId] = useState<string | null>(null)
   const [advancedDraft, setAdvancedDraft] = useState<InfrastructureMaintenanceTask | null>(null)
+  const [advancedErrors, setAdvancedErrors] = useState<string[]>([])
   const permissions = editableChildObjectPermissions({ readOnly })
   const taskTypeOptions = infrastructureMaintenanceTaskTypes(referenceData)
   const committedTaskIds = tasks.map((task) => task.id).join('|')
@@ -99,10 +111,22 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
   function commitTask(draft: InfrastructureMaintenanceTask, isNew: boolean) {
     const previous = tasks.find((task) => task.id === draft.id)
     const committedTask = commitInfrastructureMaintenanceTask(draft, previous, new Date().toISOString(), CURRENT_USER_DISPLAY_NAME)
-    const generatedTasks = isNew && committedTask.recurrence.frequency !== 'none'
-      ? generateInfrastructureMaintenanceOccurrences(committedTask, tasks, new Date().toISOString())
+    const generationBaseTasks = tasks.filter((task) => task.id !== draft.id)
+    const generatedTasks = committedTask.recurrence.frequency !== 'none'
+      ? generateInfrastructureMaintenanceOccurrences(committedTask, generationBaseTasks, new Date().toISOString())
       : [committedTask]
-    onChange(isNew ? [...tasks, ...generatedTasks] : tasks.map((task) => (task.id === draft.id ? committedTask : task)))
+    if (isNew) {
+      onChange([...tasks, ...generatedTasks])
+      return
+    }
+    const updatedTasks = tasks.map((task) => (task.id === draft.id ? generatedTasks[0] ?? committedTask : task))
+    const generatedNewTasks = generatedTasks.slice(1).filter((generatedTask) =>
+      !updatedTasks.some((task) =>
+        task.recurrenceSeriesId === generatedTask.recurrenceSeriesId &&
+        task.recurrenceOccurrenceDate === generatedTask.recurrenceOccurrenceDate,
+      ),
+    )
+    onChange([...updatedTasks, ...generatedNewTasks])
   }
 
   function deleteTask(id: string) {
@@ -120,10 +144,11 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     if (draft.dueDate && Number.isNaN(new Date(`${draft.dueDate}T00:00:00`).valueOf())) errors.push('Due Date is invalid.')
     if (!INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(draft.taskStatus)) errors.push('Task Status is invalid.')
     if (draft.recurrence.frequency !== 'none') {
-      if (!draft.recurrence.startDate) errors.push('Recurrence Start is required.')
+      const recurrenceStartDate = draft.recurrence.startDate ?? draft.startDate
+      if (!recurrenceStartDate) errors.push('Recurrence Start is required.')
       if (draft.recurrence.frequency === 'weekly' && (draft.recurrence.weeklyWeekdays ?? []).length === 0) errors.push('Select at least one recurrence weekday.')
       if (draft.recurrence.endType === 'after' && (!draft.recurrence.endAfterOccurrences || draft.recurrence.endAfterOccurrences <= 0)) errors.push('End After occurrences must be greater than 0.')
-      if (draft.recurrence.endType === 'by' && (!draft.recurrence.endByDate || (draft.recurrence.startDate && draft.recurrence.endByDate < draft.recurrence.startDate))) errors.push('End By date must be on or after Recurrence Start.')
+      if (draft.recurrence.endType === 'by' && (!draft.recurrence.endByDate || (recurrenceStartDate && draft.recurrence.endByDate < recurrenceStartDate))) errors.push('End By date must be on or after Recurrence Start.')
     }
     return errors
   }
@@ -165,17 +190,25 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
 
   function updateAdvancedDraft(patch: Partial<InfrastructureMaintenanceTask>) {
     setAdvancedDraft((current) => current ? { ...current, ...patch } : current)
+    setAdvancedErrors([])
   }
 
   function updateAdvancedRecurrence(patch: Partial<InfrastructureMaintenanceRecurrence>) {
     setAdvancedDraft((current) => current ? { ...current, recurrence: { ...current.recurrence, ...patch } } : current)
+    setAdvancedErrors([])
   }
 
   function confirmAdvancedEdit() {
     if (!advancedDraft || !advancedTaskId) return
+    const errors = validateTask(advancedDraft)
+    if (errors.length > 0) {
+      setAdvancedErrors(errors)
+      return
+    }
     editor.replaceDraft(advancedDraft)
     setAdvancedTaskId(null)
     setAdvancedDraft(null)
+    setAdvancedErrors([])
   }
 
   const actions = permissions.canAdd ? (
@@ -347,10 +380,15 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                 <h3 className="text-lg font-semibold text-sf-text">Advanced Edit Maintenance Task</h3>
                 <p className="text-xs text-sf-text-muted">Advanced changes stay in the editable row draft until row Save is clicked.</p>
               </div>
-              <button type="button" className="rounded border border-sf-border px-2 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => setAdvancedDraft(null)}>Close</button>
+              <button type="button" className="rounded border border-sf-border px-2 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => { setAdvancedDraft(null); setAdvancedErrors([]) }}>Close</button>
             </div>
 
             <div className="space-y-5">
+              {advancedErrors.length > 0 ? (
+                <div className={formMessageClassName(advancedErrors)}>
+                  {advancedErrors.map((error) => <div key={error}>{error}</div>)}
+                </div>
+              ) : null}
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Task Details</h4>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -421,12 +459,33 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                         </label>
                       ) : null}
                       {advancedDraft.recurrence.frequency === 'weekly' ? (
-                        <label className="block text-sm md:col-span-2">
-                          <span className="mb-1 block font-medium text-sf-text">Weekdays</span>
-                          <select multiple className="h-28 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.weeklyWeekdays ?? []} onChange={(event) => updateAdvancedRecurrence({ weeklyWeekdays: Array.from(event.target.selectedOptions).map((option) => option.value as NonNullable<InfrastructureMaintenanceRecurrence['weeklyWeekdays']>[number]) })}>
-                            {['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map((day) => <option key={day} value={day}>{day}</option>)}
-                          </select>
-                        </label>
+                        <div className="block text-sm md:col-span-3">
+                          <span className="mb-1 block font-medium text-sf-text">Recur every {advancedDraft.recurrence.interval} week(s) on:<RequiredFieldMarker /></span>
+                          <div className={['grid grid-cols-2 gap-2 rounded border border-sf-border p-2 md:grid-cols-4', validationControlClassName(advancedErrors.includes('Select at least one recurrence weekday.'))].filter(Boolean).join(' ')}>
+                            {WEEKDAYS.map((day) => {
+                              const selected = advancedDraft.recurrence.weeklyWeekdays ?? []
+                              return (
+                                <label key={day} className="inline-flex items-center gap-2 text-sm text-sf-text">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-sf-border text-sf-brand"
+                                    checked={selected.includes(day)}
+                                    onChange={() => {
+                                      const nextSelected = selected.includes(day)
+                                        ? selected.filter((selectedDay) => selectedDay !== day)
+                                        : [...selected, day]
+                                      updateAdvancedRecurrence({ weeklyWeekdays: nextSelected })
+                                    }}
+                                  />
+                                  <span>{WEEKDAY_LABELS[day]}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                          {advancedErrors.includes('Select at least one recurrence weekday.') ? (
+                            <p className="mt-1 text-xs text-red-700">Select at least one weekday.</p>
+                          ) : null}
+                        </div>
                       ) : null}
                       {advancedDraft.recurrence.frequency === 'monthly' ? (
                         <>
@@ -494,7 +553,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <EditableChildObjectActionButton onClick={() => setAdvancedDraft(null)}>
+              <EditableChildObjectActionButton onClick={() => { setAdvancedDraft(null); setAdvancedErrors([]) }}>
                 <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
               </EditableChildObjectActionButton>
               <EditableChildObjectActionButton variant="primary" onClick={confirmAdvancedEdit}>

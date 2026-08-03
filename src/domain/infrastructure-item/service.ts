@@ -718,6 +718,39 @@ function nextSimpleOccurrenceDate(current: Date, recurrence: InfrastructureMaint
   return current
 }
 
+const WEEKDAY_INDEX_BY_RECURRENCE_DAY: Record<NonNullable<InfrastructureMaintenanceRecurrence['weeklyWeekdays']>[number], number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+}
+
+function recurrenceWeekIndex(start: Date, date: Date): number {
+  const startDay = new Date(start)
+  startDay.setHours(0, 0, 0, 0)
+  const currentDay = new Date(date)
+  currentDay.setHours(0, 0, 0, 0)
+  return Math.floor((currentDay.getTime() - startDay.getTime()) / (7 * 86_400_000))
+}
+
+function weeklyOccurrenceDates(start: Date, maxDate: Date, recurrence: InfrastructureMaintenanceRecurrence, maxOccurrences: number): Date[] {
+  const selectedWeekdays = new Set((recurrence.weeklyWeekdays ?? []).map((day) => WEEKDAY_INDEX_BY_RECURRENCE_DAY[day]))
+  if (selectedWeekdays.size === 0) return []
+  const dates: Date[] = []
+  let cursor = new Date(start)
+  while (cursor <= maxDate && dates.length < maxOccurrences) {
+    const weekIndex = recurrenceWeekIndex(start, cursor)
+    if (weekIndex >= 0 && weekIndex % recurrence.interval === 0 && selectedWeekdays.has(cursor.getDay())) {
+      dates.push(new Date(cursor))
+    }
+    cursor = addDays(cursor, 1)
+  }
+  return dates
+}
+
 export function generateInfrastructureMaintenanceOccurrences(
   draft: InfrastructureMaintenanceTask,
   existingTasks: InfrastructureMaintenanceTask[],
@@ -738,11 +771,20 @@ export function generateInfrastructureMaintenanceOccurrences(
   const seriesId = recurrence.seriesId ?? `infrastructure-maintenance-series-${crypto.randomUUID()}`
   const existingKeys = new Set(existingTasks.map((task) => `${task.recurrenceSeriesId ?? ''}:${task.recurrenceOccurrenceDate ?? ''}`))
   const generated: InfrastructureMaintenanceTask[] = []
-  let occurrenceDate = start
-  let occurrenceCount = 0
   const usedIds = existingTasks.map((task) => task.taskId)
+  const occurrenceDates = recurrence.frequency === 'weekly'
+    ? weeklyOccurrenceDates(start, maxDate, recurrence, maxOccurrences)
+    : (() => {
+        const dates: Date[] = []
+        let occurrenceDate = start
+        while (dates.length < maxOccurrences && occurrenceDate <= maxDate) {
+          dates.push(new Date(occurrenceDate))
+          occurrenceDate = nextSimpleOccurrenceDate(occurrenceDate, recurrence)
+        }
+        return dates
+      })()
 
-  while (occurrenceCount < maxOccurrences && occurrenceDate <= maxDate) {
+  occurrenceDates.forEach((occurrenceDate, occurrenceCount) => {
     const occurrenceDateText = dateOnly(occurrenceDate)
     const key = `${seriesId}:${occurrenceDateText}`
     if (!existingKeys.has(key) || occurrenceDateText === draft.recurrenceOccurrenceDate || draft.recurrenceOccurrenceDate == null) {
@@ -763,9 +805,7 @@ export function generateInfrastructureMaintenanceOccurrences(
         updatedAt: now,
       }, occurrenceCount, now, [...usedIds, ...generated.map((task) => task.taskId)]))
     }
-    occurrenceCount += 1
-    occurrenceDate = nextSimpleOccurrenceDate(occurrenceDate, recurrence)
-  }
+  })
   return generated.length > 0 ? generated : [draft]
 }
 
