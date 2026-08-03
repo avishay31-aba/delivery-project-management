@@ -1,7 +1,8 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessObjectLink, ProgressBar, StatusBadge } from '@/components/ui'
+import { BusinessObjectLink, ProgressBar } from '@/components/ui'
 import { ProjectAlertPresentation } from '@/components/projects/ProjectAlertPresentation'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import type {
   Account,
   Opportunity,
@@ -17,7 +18,6 @@ import {
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
-import { badgeVariantForProjectStatus } from '@/domain/status-presentation'
 
 interface ProjectDashboardColumnContext {
   opportunities: Opportunity[]
@@ -88,7 +88,7 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       getValue: (project) => projectRow(project).statusLabel,
       render: (project) => {
         const row = projectRow(project)
-        return createElement(StatusBadge, { label: row.statusLabel, variant: badgeVariantForProjectStatus(row.status) })
+        return createElement(ProjectStatusIcon, { status: row.status })
       },
     },
     {

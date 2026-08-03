@@ -28,6 +28,7 @@ import {
 } from '@/components/application-configuration/ApplicationConfigurationComparisonCell'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { ProjectAlertPresentation } from '@/components/projects/ProjectAlertPresentation'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
@@ -62,7 +63,6 @@ import { opportunityReference, systemReference } from '@/domain/business-referen
 import {
   alertPresentationForDeadline,
   errorMessageClassName,
-  projectStatusPresentation,
   successMessageClassName,
   taskStatusPresentation,
 } from '@/domain/status-presentation'
@@ -81,7 +81,6 @@ import {
   projectAlertLabels,
   projectPatchFromOpportunitySelection,
   projectSavePatch,
-  projectStatusLabel,
   projectTimeZoneValidationFieldKeys,
   systemProductMismatchForProject,
   validateProjectSave,
@@ -162,21 +161,6 @@ function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): str
 function allocationStatusClassName(result: AllocationActionResult | null): string {
   if (!result) return ''
   return result.ok ? successMessageClassName() : errorMessageClassName()
-}
-
-function ProjectStatusBadge({ status, large = false }: { status: string; large?: boolean }) {
-  const presentation = projectStatusPresentation(status)
-  const Icon = presentation.icon
-  if (large) {
-    return <Icon className={['h-8 w-8 stroke-[3.5]', presentation.iconClassName].join(' ')} aria-label={presentation.tooltip} />
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sf-text">
-      <Icon className={['h-4 w-4 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
-      <span>{projectStatusLabel(status)}</span>
-    </span>
-  )
 }
 
 function OperationalStatusBadge({ status }: { status: string }) {
@@ -709,7 +693,7 @@ export function ProjectFormPage() {
           editor={null}
           readOnlyValue={
             field.key === 'progressStatus'
-              ? <ProjectStatusBadge status={projectDraft.progressStatus} />
+              ? <ProjectStatusIcon status={projectDraft.progressStatus} />
               : field.key === 'projectAlerts'
                 ? (projectAlerts.length > 0 ? <ProjectAlertPresentation alerts={projectAlerts} /> : '-')
                 : value || '-'
@@ -1256,7 +1240,7 @@ export function ProjectFormPage() {
                         <DateTimeValue value={milestone.deadline} semanticType="date" />
                       </td>
                       <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">{renderDeadlineAlert(milestone.deadline, status)}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusBadge status={status} /></td>
+                      <td className="whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text"><ProjectStatusIcon status={status} /></td>
                       <td className="w-24 whitespace-nowrap border border-sf-border px-1 py-1 text-sf-text">
                         <ProgressBar value={progress} className="min-w-20" />
                       </td>
@@ -1989,7 +1973,7 @@ export function ProjectFormPage() {
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2">
-            <ProjectStatusBadge status={projectDraft.progressStatus} large />
+            <ProjectStatusIcon status={projectDraft.progressStatus} large />
             <span>{`Project ${projectDraft.pid}`}</span>
           </span>
         }

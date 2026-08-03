@@ -54,6 +54,7 @@ import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialo
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
@@ -99,7 +100,6 @@ import { tenantFormType, tenantRequirementIdDisplay } from '@/domain/tenant-oper
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
-import { badgeVariantForProjectStatus } from '@/domain/status-presentation'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
@@ -2319,10 +2319,7 @@ export function OpportunityFormPage() {
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.mainType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">{project.subType}</td>
                           <td className="border border-sf-border px-2 py-1 text-sm">
-                            <StatusBadge
-                              label={project.progressStatus === 'DONE' ? 'Done' : 'Open'}
-                              variant={badgeVariantForProjectStatus(project.progressStatus)}
-                            />
+                            <ProjectStatusIcon status={project.progressStatus} />
                           </td>
                           <td className="border border-sf-border px-2 py-1 text-sm"><DateTimeValue value={project.createdAt} semanticType="datetime" /></td>
                           <td className="border border-sf-border px-2 py-1 text-sm"><DateTimeValue value={project.updatedAt} semanticType="datetime" /></td>

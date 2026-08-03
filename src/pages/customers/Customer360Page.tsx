@@ -5,6 +5,7 @@ import { ActivityTimeline } from '@/components/activity'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, OperationalStatusIcon, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import type { Tenant } from '@/data/seed.types'
 import {
   customerAccount360ReadModel,
@@ -30,7 +31,6 @@ import {
   alertVariantForProjectHealthStatus,
   alertVariantForRequirementCoverageStatus,
   badgeVariantForProjectHealthStatus,
-  badgeVariantForProjectStatus,
   badgeVariantForRequirementCoverageStatus,
 } from '@/domain/status-presentation'
 import {
@@ -249,7 +249,7 @@ export function Customer360Page() {
             project.opportunityName,
             project.mainType,
             project.subType,
-            <StatusBadge label={project.progressStatus === 'DONE' ? 'Done' : 'Open'} variant={badgeVariantForProjectStatus(project.progressStatus)} />,
+            <ProjectStatusIcon status={project.progressStatus} />,
             health ? (
               <span className="inline-flex items-center gap-1.5">
                 <AlertStatusIcon variant={alertVariantForProjectHealthStatus(health.healthStatus)} label={health.healthLabel} />

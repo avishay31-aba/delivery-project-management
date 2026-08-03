@@ -1,5 +1,6 @@
 import { projectStatusLabel } from '@/domain/project-lifecycle'
 import { projectStatusPresentation } from '@/domain/status-presentation'
+import { cn } from '@/utils/cn'
 
 interface ProjectStatusIconProps {
   status: string | null | undefined
@@ -15,7 +16,13 @@ export function ProjectStatusIcon({ status, showLabel = true, large = false }: P
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-sf-text" title={presentation.tooltip}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
+        presentation.badgeClassName,
+      )}
+      title={presentation.tooltip}
+    >
       <Icon className={['h-4 w-4 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
       {showLabel ? <span>{projectStatusLabel(String(status ?? ''))}</span> : null}
     </span>
