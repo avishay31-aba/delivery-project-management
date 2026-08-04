@@ -526,8 +526,49 @@ The ERP should be treated as a commercial product.
 
 Product engineering should look beyond the requested feature, but implementation must remain limited to the requested scope. Everything else should be reported separately as recommendations.
 
-The Version 1.0 objective is to finish a commercially releasable Delivery ERP.
+## Milestone Boundary
 
-The Version 1.0 objective is not to build the future configurable ERP platform.
+### Version 1.2
 
-Version 2.0 may introduce configurable ERP platform capabilities after Version 1.0 is complete.
+Version 1.2 is the final frontend-only implementation milestone.
+
+Status: Development Complete / Pending Publication.
+
+Version 1.2 consolidates the approved business workflows, workspace structure, shared UI/UX standards, browser-local persistence, dashboards, Activity and Configuration History, Infrastructure capability, Warranty and Remarks frameworks, shared Business ID links, shared status presentation, shared validation behavior, POC allocation, and reused-system lifecycle behavior.
+
+Version 1.2 remains suitable for product validation, QA, demonstrations, and release handoff. It is not the final production security or deployment architecture.
+
+Version 1.2 intentionally retains these architectural boundaries:
+
+- Frontend-only React/Vite application.
+- Browser-local persistence.
+- No secure multi-user authentication.
+- No server-side authorization.
+- No production backend database.
+- No self-upgrade agent.
+
+Do not add frontend-only login, local password storage, browser-stored password hashes, fake roles, fake permissions, or incomplete Application Upgrade actions to Version 1.2.
+
+### Version 2.0
+
+Version 2.0 is the active next development phase.
+
+Version 2.0 transforms Delivery ERP from a frontend-only product implementation into a secure multi-user production platform.
+
+Version 2.0 scope includes:
+
+- Backend/API foundation.
+- Database persistence.
+- Internal authentication.
+- Roles and privileges.
+- Server-side authorization.
+- Secure sessions.
+- Audit/security events.
+- Administration Console.
+- Metadata Settings.
+- Application Upgrade and Update Agent.
+- Migration from browser-local data.
+- Multi-user and concurrency support.
+- Deployment hardening.
+
+Version 2.0 security-sensitive capabilities must be implemented behind a trusted backend boundary, not as browser-only prototypes.

@@ -9,6 +9,15 @@ export interface BuildInformation {
 
 const UNKNOWN_COMMIT = 'Unknown'
 
+function releaseLabelFromPackageVersion(version: string): string {
+  if (version === 'Unknown') return version
+
+  const match = version.match(/^(\d+)\.(\d+)(?:\.0)?$/)
+  if (!match) return version.startsWith('v') ? version : `v${version}`
+
+  return `v${match[1]}.${match[2]}`
+}
+
 function resolveBuildInformation(): BuildInformation {
   const metadata = typeof __DELIVERY_ERP_BUILD_INFO__ === 'undefined'
     ? {
@@ -22,6 +31,7 @@ function resolveBuildInformation(): BuildInformation {
 
   return {
     ...metadata,
+    version: releaseLabelFromPackageVersion(metadata.version),
     shortGitCommit: metadata.gitCommit === UNKNOWN_COMMIT ? UNKNOWN_COMMIT : metadata.gitCommit.slice(0, 7),
   }
 }
