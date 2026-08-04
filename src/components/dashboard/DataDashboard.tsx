@@ -1762,7 +1762,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
   }
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col space-y-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col space-y-4">
       {pendingViewId ? (
         <UnsavedChangesDialog
           onSave={saveChangesAndApplyPendingView}
@@ -1846,7 +1846,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
         {toolbar}
       </div>
 
-      <div className="sf-card flex min-h-[24rem] flex-1 flex-col space-y-3 overflow-hidden p-3">
+      <div className="sf-card flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden p-3">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-sf-text-muted">View</span>
@@ -1985,7 +1985,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
         ) : null}  
 
         {renderAlternateContent ? (
-          <div className="min-h-48 flex-1 overflow-auto border-b border-sf-border">
+          <div className="min-h-0 flex-1 overflow-auto border-b border-sf-border" style={{ scrollbarGutter: 'stable' }}>
             {renderAlternateContent(alternateRows)}
           </div>
         ) : (

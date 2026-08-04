@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { CalendarDays, Table2 } from 'lucide-react'
 import { DataDashboard } from '@/components/dashboard'
 import { InfrastructureMaintenanceCalendar } from '@/components/maintenance/InfrastructureMaintenanceCalendar'
-import { PageHeader, WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record'
+import { PageHeader, WorkspaceFrame, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
   allSystemRecords,
@@ -79,9 +79,11 @@ export function InfrastructureListPage() {
         onSelect={(id) => setActiveTab(id as InfrastructureDashboardTab)}
       />
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <WorkspaceScrollContent>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0">
           <PageHeader title={activeTabDetails.title} subtitle={activeTabDetails.description} />
+        </div>
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {activeTab === 'allItems' ? (
             <DataDashboard
               title="All Items"
@@ -152,7 +154,7 @@ export function InfrastructureListPage() {
                 : undefined}
             />
           ) : null}
-        </WorkspaceScrollContent>
+        </div>
       </div>
     </WorkspaceFrame>
   )

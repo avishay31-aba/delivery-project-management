@@ -179,7 +179,7 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
     )
   }
 
-  function renderDayCell(day: Date, isCurrentMonth = true, maxEvents = 3) {
+  function renderDayCell(day: Date, isCurrentMonth = true) {
     const dayRows = rowsForDay(rows, day)
     return (
       <div key={dateKey(day)} className={['min-h-0 min-w-0 border-b border-r border-sf-border p-1.5', isCurrentMonth ? 'bg-white' : 'bg-sf-surface-alt/50'].join(' ')}>
@@ -187,8 +187,7 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
           <DayNumber day={day} todayKey={todayKey} />
         </div>
         <div className="space-y-1">
-          {dayRows.slice(0, maxEvents).map((row) => <EventButton key={`${row.id}-${dateKey(day)}`} row={row} onOpenTask={onOpenTask} compact={maxEvents <= 2} />)}
-          {dayRows.length > maxEvents ? <div className="text-xs text-sf-text-muted">+{dayRows.length - maxEvents} more</div> : null}
+          {dayRows.map((row) => <EventButton key={`${row.id}-${dateKey(day)}`} row={row} onOpenTask={onOpenTask} compact />)}
         </div>
       </div>
     )
@@ -200,8 +199,8 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
         <div className="grid grid-cols-7 border-b border-sf-border bg-sf-surface-alt text-xs font-semibold uppercase text-sf-text-muted">
           {weekDays.map((day) => <div key={dateKey(day)} className="px-2 py-1">{day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>)}
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-7">
-          {weekDays.map((day) => renderDayCell(day, true, 6))}
+        <div className="grid min-h-[28rem] grid-cols-7">
+          {weekDays.map((day) => renderDayCell(day))}
         </div>
       </>
     )
@@ -214,8 +213,8 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
         <div className="grid grid-cols-7 border-b border-sf-border bg-sf-surface-alt text-xs font-semibold uppercase text-sf-text-muted">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day} className="px-2 py-1">{day}</div>)}
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${rowCount}, minmax(0, 1fr))` }}>
-          {visibleMonthDays.map((day) => renderDayCell(day, day.getMonth() === visibleDate.getMonth(), rowCount > 5 ? 2 : 3))}
+        <div className="grid grid-cols-7" style={{ gridTemplateRows: `repeat(${rowCount}, minmax(7.5rem, auto))` }}>
+          {visibleMonthDays.map((day) => renderDayCell(day, day.getMonth() === visibleDate.getMonth()))}
         </div>
       </>
     )
@@ -223,7 +222,7 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
 
   function renderYear() {
     return (
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3 md:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-3 xl:grid-cols-4">
         {Array.from({ length: 12 }, (_value, monthIndex) => {
           const monthDate = new Date(visibleDate.getFullYear(), monthIndex, 1)
           const miniDays = monthDays(monthDate)
@@ -263,8 +262,8 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
   }
 
   return (
-    <div className="flex h-full min-h-[32rem] flex-col bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sf-border px-3 py-2">
+    <div className="flex min-h-full flex-col bg-white">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-sf-border bg-white px-3 py-2">
         <div className="text-sm font-semibold text-sf-text">{periodLabel(visibleDate, mode)}</div>
         <div className="flex flex-wrap items-center gap-2">
           {renderModeToggle()}
