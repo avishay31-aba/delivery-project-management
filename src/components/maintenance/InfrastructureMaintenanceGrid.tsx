@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Edit2, Maximize2, Plus, Save, Trash2, X } from 'lucide-react'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
   EditableChildObjectActionButton,
   editableChildObjectPermissions,
@@ -340,7 +341,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
         const row = editor.draftFor(task.id) ?? task
         return editor.isEditing(task.id)
           ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.startDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { startDate: value }))} onChange={(event) => editor.updateDraft(task.id, { startDate: event.target.value || null })} />
-          : row.startDate || '-'
+          : <DateTimeValue value={row.startDate} semanticType="date" fallback="-" />
       },
       sortValue: (task) => task.startDate ?? '',
     },
@@ -351,7 +352,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
         const row = editor.draftFor(task.id) ?? task
         return editor.isEditing(task.id)
           ? <input type="date" className="h-8 rounded border border-sf-border px-2 py-1 text-sm" value={row.dueDate ?? ''} onPaste={(event) => handleDateInputPaste(event, (value) => editor.updateDraft(task.id, { dueDate: value }))} onChange={(event) => editor.updateDraft(task.id, { dueDate: event.target.value || null })} />
-          : row.dueDate || '-'
+          : <DateTimeValue value={row.dueDate} semanticType="date" fallback="-" />
       },
       sortValue: (task) => task.dueDate ?? '',
     },

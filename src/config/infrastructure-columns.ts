@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, MaintenanceStatusPresentation, OperationalStatusIcon, TaskStatusPresentation } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, OperationalStatusIcon, TaskStatusPresentation, WarrantyStatusPresentation } from '@/components/ui'
 import { displayWarrantyStatus } from '@/domain/warranty-collection'
 import type { InfrastructureDashboardRow, InfrastructureMaintenanceDashboardRow } from '@/domain/infrastructure-item'
 
@@ -70,7 +70,7 @@ export function createInfrastructureColumns(options: { includeActions?: boolean 
     { id: 'currentWarrantyStartDate', label: 'Current Warranty Start Date', getValue: (row) => row.currentWarrantyStartDate ?? '', semanticType: 'date' },
     { id: 'currentWarrantyEndDate', label: 'Current Warranty End Date', getValue: (row) => row.currentWarrantyEndDate ?? '', semanticType: 'date' },
     { id: 'itemWarrantyDaysLeft', label: 'Warranty Days Left', getValue: (row) => row.itemWarrantyDaysLeft },
-    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => displayWarrantyStatus(row.warrantyStatus) },
+    { id: 'warrantyStatus', label: 'Warranty Status', getValue: (row) => displayWarrantyStatus(row.warrantyStatus), render: (row) => createElement(WarrantyStatusPresentation, { status: row.warrantyStatus }) },
     { id: 'billingMethod', label: 'Billing Method', getValue: (row) => row.billingMethodLabel },
     { id: 'locationAddress', label: 'Location Address', getValue: (row) => row.locationAddress },
     { id: 'contactPersonName', label: 'Contact Person Name', getValue: (row) => row.warrantyContact.name },

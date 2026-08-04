@@ -32,7 +32,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, SaveButtonLabel, TableSection, formMessageClassName } from '@/components/ui'
+import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -108,7 +108,6 @@ import {
   infrastructureItemsForSystem,
   infrastructureWarrantyAlert,
 } from '@/domain/infrastructure-item'
-import { displayWarrantyStatus } from '@/domain/warranty-collection'
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
 import {
@@ -1471,7 +1470,7 @@ export function InventoryForm<T extends InventoryRecord>({
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.manufacturerLabel || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.model || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.linkedSystemBusinessIds.join(', ') || '-'}</td>
-                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{displayWarrantyStatus(item.warrantyStatus)}</td>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><WarrantyStatusPresentation status={item.warrantyStatus} /></td>
                           </tr>
                         )
                       })}
@@ -1604,7 +1603,12 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyStartDate} semanticType="date" /></td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><DateTimeValue value={row.currentWarrantyEndDate} semanticType="date" /></td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.itemWarrantyDaysLeft ?? '-'}</td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{displayWarrantyStatus(row.warrantyStatus)}{infrastructureWarrantyAlert(row) ? ` - ${infrastructureWarrantyAlert(row)}` : ''}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        <span className="inline-flex items-center gap-1">
+                          <WarrantyStatusPresentation status={row.warrantyStatus} />
+                          {infrastructureWarrantyAlert(row) ? <span>{infrastructureWarrantyAlert(row)}</span> : null}
+                        </span>
+                      </td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.warrantyContactDisplay}</td>
                       <td className="max-w-80 whitespace-pre-wrap border border-sf-border px-1.5 py-1 text-sf-text">{row.locationAddress}</td>
                     </tr>
