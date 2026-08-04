@@ -1,25 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { CalendarDays, Table2 } from 'lucide-react'
 import { DataDashboard } from '@/components/dashboard'
 import { InfrastructureMaintenanceCalendar } from '@/components/maintenance/InfrastructureMaintenanceCalendar'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
   allSystemRecords,
-  currentInfrastructureMaintenanceDashboardRows,
   infrastructureDashboardRows,
   infrastructureMaintenanceDashboardRows,
-  plannedInfrastructureMaintenanceDashboardRows,
 } from '@/domain/infrastructure-item'
 import { infrastructureItemReference } from '@/domain/business-reference'
 import { useAppStore } from '@/store/useAppStore'
 
-type InfrastructureDashboardTab = 'allItems' | 'plannedMaintenance' | 'currentMaintenance'
+type InfrastructureDashboardTab = 'allItems' | 'maintenance'
 
 const INFRASTRUCTURE_DASHBOARD_TABS: Array<{ id: InfrastructureDashboardTab; label: string }> = [
   { id: 'allItems', label: 'All Items' },
-  { id: 'plannedMaintenance', label: 'Planned Maintenance Tasks' },
-  { id: 'currentMaintenance', label: 'Current Maintenance Tasks' },
+  { id: 'maintenance', label: 'Maintenance Tasks' },
 ]
 
 const INFRASTRUCTURE_DASHBOARD_TAB_DETAILS: Record<InfrastructureDashboardTab, { title: string; description: string }> = {
@@ -27,14 +25,16 @@ const INFRASTRUCTURE_DASHBOARD_TAB_DETAILS: Record<InfrastructureDashboardTab, {
     title: 'All Items',
     description: 'All Infrastructure Items supporting Systems.',
   },
-  plannedMaintenance: {
-    title: 'Planned Maintenance Tasks',
-    description: 'Open Infrastructure maintenance tasks scheduled to start in the future.',
+  maintenance: {
+    title: 'Maintenance Tasks',
+    description: 'Infrastructure maintenance tasks across statuses.',
   },
-  currentMaintenance: {
-    title: 'Current Maintenance Tasks',
-    description: 'Open Infrastructure maintenance tasks whose scheduled start date has been reached.',
-  },
+}
+
+function maintenanceRowClassName(row: { taskStatus: string }): string {
+  if (row.taskStatus === 'Done') return 'bg-blue-50 hover:bg-blue-100'
+  if (row.taskStatus === 'In Progress') return 'bg-orange-50 hover:bg-orange-100'
+  return 'bg-emerald-50 hover:bg-emerald-100'
 }
 
 export function InfrastructureListPage() {
@@ -42,7 +42,7 @@ export function InfrastructureListPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const [activeTab, setActiveTab] = useState<InfrastructureDashboardTab>('allItems')
-  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
+  const [maintenanceViewMode, setMaintenanceViewMode] = useState<'table' | 'calendar'>('table')
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const accounts = useAppStore((state) => state.accounts)
   const referenceData = useAppStore((state) => state.referenceData)
@@ -58,11 +58,16 @@ export function InfrastructureListPage() {
     () => infrastructureMaintenanceDashboardRows(infrastructureItems, referenceData, allSystemRecords(systems, productionSystemInventory, reusedInternalSystems), tenants, accounts),
     [accounts, infrastructureItems, productionSystemInventory, referenceData, reusedInternalSystems, systems, tenants],
   )
-  const plannedMaintenanceRows = useMemo(() => plannedInfrastructureMaintenanceDashboardRows(maintenanceRows), [maintenanceRows])
-  const currentMaintenanceRows = useMemo(() => currentInfrastructureMaintenanceDashboardRows(maintenanceRows), [maintenanceRows])
+  const sortedMaintenanceRows = useMemo(
+    () => [...maintenanceRows].sort((first, second) =>
+      second.startDate.localeCompare(first.startDate) ||
+      second.dueDate.localeCompare(first.dueDate) ||
+      second.taskId.localeCompare(first.taskId, undefined, { numeric: true, sensitivity: 'base' }),
+    ),
+    [maintenanceRows],
+  )
   const columns = useMemo(() => createInfrastructureColumns(), [])
-  const plannedMaintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns(), [])
-  const currentMaintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns({ includeDaysRunning: true }), [])
+  const maintenanceColumns = useMemo(() => createInfrastructureMaintenanceTaskColumns(), [])
   const activeTabDetails = INFRASTRUCTURE_DASHBOARD_TAB_DETAILS[activeTab]
 
   return (
@@ -106,37 +111,38 @@ export function InfrastructureListPage() {
               }}
             />
           ) : null}
-          {activeTab === 'plannedMaintenance' ? (
+          {activeTab === 'maintenance' ? (
             <DataDashboard
-              title="Planned Maintenance Tasks"
+              title="Maintenance Tasks"
               dashboardScope="infrastructurePlannedMaintenance"
-              rows={plannedMaintenanceRows}
-              columns={plannedMaintenanceColumns}
-              initialSorting={[
-                { id: 'startDate', desc: false },
-                { id: 'dueDate', desc: false },
-                { id: 'infrastructureItemId', desc: false },
-              ]}
+              rows={sortedMaintenanceRows}
+              columns={maintenanceColumns}
+              initialSorting={[{ id: 'startDate', desc: true }]}
               freezeThroughColumnId="infrastructureItemId"
+              getRowClassName={maintenanceRowClassName}
               contentModeControls={
-                <div className="inline-flex rounded border border-sf-border bg-white p-0.5 text-sm">
+                <div className="inline-flex items-center gap-1">
                   <button
                     type="button"
-                    className={plannedViewMode === 'list' ? 'rounded bg-sf-brand px-3 py-1 text-white' : 'rounded px-3 py-1 text-sf-text hover:bg-sf-surface-alt'}
-                    onClick={() => setPlannedViewMode('list')}
+                    className={maintenanceViewMode === 'table' ? 'rounded border border-sf-brand bg-sf-brand px-2 py-1 text-white' : 'rounded border border-sf-border bg-white px-2 py-1 text-sf-text hover:bg-sf-surface-alt'}
+                    aria-label="Table view"
+                    title="Table view"
+                    onClick={() => setMaintenanceViewMode('table')}
                   >
-                    List
+                    <Table2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     type="button"
-                    className={plannedViewMode === 'calendar' ? 'rounded bg-sf-brand px-3 py-1 text-white' : 'rounded px-3 py-1 text-sf-text hover:bg-sf-surface-alt'}
-                    onClick={() => setPlannedViewMode('calendar')}
+                    className={maintenanceViewMode === 'calendar' ? 'rounded border border-sf-brand bg-sf-brand px-2 py-1 text-white' : 'rounded border border-sf-border bg-white px-2 py-1 text-sf-text hover:bg-sf-surface-alt'}
+                    aria-label="Calendar view"
+                    title="Calendar view"
+                    onClick={() => setMaintenanceViewMode('calendar')}
                   >
-                    Calendar
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               }
-              renderAlternateContent={plannedViewMode === 'calendar'
+              renderAlternateContent={maintenanceViewMode === 'calendar'
                 ? (filteredRows) => (
                     <InfrastructureMaintenanceCalendar
                       rows={filteredRows}
@@ -144,20 +150,6 @@ export function InfrastructureListPage() {
                     />
                   )
                 : undefined}
-            />
-          ) : null}
-          {activeTab === 'currentMaintenance' ? (
-            <DataDashboard
-              title="Current Maintenance Tasks"
-              dashboardScope="infrastructureCurrentMaintenance"
-              rows={currentMaintenanceRows}
-              columns={currentMaintenanceColumns}
-              initialSorting={[
-                { id: 'startDate', desc: false },
-                { id: 'dueDate', desc: false },
-                { id: 'infrastructureItemId', desc: false },
-              ]}
-              freezeThroughColumnId="infrastructureItemId"
             />
           ) : null}
         </WorkspaceScrollContent>

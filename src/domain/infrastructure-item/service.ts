@@ -31,6 +31,7 @@ export const INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE = 'INFRASTRUCTURE_BILL
 export const INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_WARRANTY_TYPE'
 export const INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE = 'INFRASTRUCTURE_PROPERTY_VALUE'
 export const INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_MAINTENANCE_TASK_TYPE'
+export const INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE_REFERENCE_TYPE = 'INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE'
 export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
@@ -150,7 +151,7 @@ export interface InfrastructureMaintenanceDashboardRow {
   taskType: string
   description: string
   taskStatus: InfrastructureMaintenanceTaskStatus
-  location: string
+  assignedResource: string
   recurrenceSummary: string
   infrastructureItemId: string
   infrastructureItemName: string
@@ -172,6 +173,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function numberOrNull(value: unknown): number | null {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function boundedBusinessNumber(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.min(max, Math.max(min, numberOrNull(value) ?? fallback))
+}
+
+function nullableBoundedBusinessNumber(value: unknown, min: number, max: number): number | null {
+  const parsed = numberOrNull(value)
+  return parsed === null ? null : Math.min(max, Math.max(min, parsed))
 }
 
 function text(value: unknown): string {
@@ -393,6 +403,12 @@ export function infrastructureMaintenanceTaskTypes(referenceData: ReferenceDataR
     .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
 }
 
+export function infrastructureMaintenanceAssignedResources(referenceData: ReferenceDataRecord[]): ReferenceDataRecord[] {
+  return referenceData
+    .filter((record) => record.referenceType === INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE_REFERENCE_TYPE && record.active)
+    .sort((first, second) => first.label.localeCompare(second.label, undefined, { sensitivity: 'base' }))
+}
+
 export function infrastructurePropertyValues(referenceData: ReferenceDataRecord[], scope: string): ReferenceDataRecord[] {
   return referenceData
     .filter((record) =>
@@ -549,7 +565,7 @@ export function normalizeMaintenanceRecurrence(
   const frequency = ['daily', 'weekly', 'monthly', 'yearly'].includes(text(raw.frequency))
     ? text(raw.frequency) as InfrastructureMaintenanceRecurrence['frequency']
     : 'none'
-  const interval = Math.max(1, numberOrNull(raw.interval) ?? 1)
+  const interval = boundedBusinessNumber(raw.interval, 1, 99, 1)
   const endType = ['after', 'by'].includes(text(raw.endType))
     ? text(raw.endType) as InfrastructureMaintenanceRecurrence['endType']
     : 'none'
@@ -565,17 +581,17 @@ export function normalizeMaintenanceRecurrence(
     interval,
     startDate: text(raw.startDate) || fallbackStartDate || null,
     endType,
-    endAfterOccurrences: numberOrNull(raw.endAfterOccurrences),
+    endAfterOccurrences: nullableBoundedBusinessNumber(raw.endAfterOccurrences, 1, 99),
     endByDate: text(raw.endByDate) || null,
     dailyMode: text(raw.dailyMode) === 'weekday' ? 'weekday' : 'interval',
     weeklyWeekdays,
     monthlyMode: text(raw.monthlyMode) === 'relative' ? 'relative' : 'day',
-    monthlyDay: numberOrNull(raw.monthlyDay),
+    monthlyDay: nullableBoundedBusinessNumber(raw.monthlyDay, 1, 31),
     monthlyOrdinal: ['first', 'second', 'third', 'fourth', 'last'].includes(text(raw.monthlyOrdinal)) ? text(raw.monthlyOrdinal) as InfrastructureMaintenanceRecurrence['monthlyOrdinal'] : 'first',
     monthlyRelativeDay: normalizeRelativeDay(raw.monthlyRelativeDay),
     yearlyMode: text(raw.yearlyMode) === 'relative' ? 'relative' : 'date',
-    yearlyMonth: numberOrNull(raw.yearlyMonth),
-    yearlyDay: numberOrNull(raw.yearlyDay),
+    yearlyMonth: nullableBoundedBusinessNumber(raw.yearlyMonth, 1, 12),
+    yearlyDay: nullableBoundedBusinessNumber(raw.yearlyDay, 1, 31),
     yearlyOrdinal: ['first', 'second', 'third', 'fourth', 'last'].includes(text(raw.yearlyOrdinal)) ? text(raw.yearlyOrdinal) as InfrastructureMaintenanceRecurrence['yearlyOrdinal'] : 'first',
     yearlyRelativeDay: normalizeRelativeDay(raw.yearlyRelativeDay),
     generatedThroughDate: text(raw.generatedThroughDate) || null,
@@ -606,7 +622,7 @@ function normalizeMaintenanceTask(
     task: text(record.task),
     startDate: text(record.startDate) || null,
     dueDate: text(record.dueDate) || null,
-    location: text(record.location),
+    assignedResourceRefId: text(record.assignedResourceRefId),
     taskStatus: status,
     completionDate: status === 'Done' ? text(record.completionDate) || businessDate(new Date(now)) : null,
     recurrence,
@@ -641,7 +657,7 @@ export function createInfrastructureMaintenanceTask(tasks: InfrastructureMainten
     task: '',
     startDate: null,
     dueDate: null,
-    location: '',
+    assignedResourceRefId: '',
     taskStatus: 'Open',
     completionDate: null,
     createdAt: now,
@@ -1409,7 +1425,7 @@ export function infrastructureMaintenanceDashboardRows(
       taskType: infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
       description: task.task,
       taskStatus: task.taskStatus,
-      location: task.location,
+      assignedResource: infrastructureReferenceDataLabel(referenceData, task.assignedResourceRefId),
       recurrenceSummary: recurrenceSummary(task.recurrence),
       infrastructureItemId: item.infrastructureId,
       infrastructureItemName: item.identifier,

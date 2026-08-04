@@ -33,6 +33,12 @@ function eventTouchesDay(row: InfrastructureMaintenanceDashboardRow, day: Date):
   return current >= dateKey(start) && current <= dateKey(due)
 }
 
+function eventClassName(status: string): string {
+  if (status === 'Done') return 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100'
+  if (status === 'In Progress') return 'border-orange-200 bg-orange-50 hover:border-orange-300 hover:bg-orange-100'
+  return 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:bg-emerald-100'
+}
+
 export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: InfrastructureMaintenanceCalendarProps) {
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date()
@@ -87,7 +93,7 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
                   <button
                     key={`${row.id}-${dateKey(day)}`}
                     type="button"
-                    className="block w-full rounded border border-orange-200 bg-orange-50 px-1.5 py-1 text-left text-xs text-sf-text hover:border-orange-300 hover:bg-orange-100"
+                    className={['block w-full rounded border px-1.5 py-1 text-left text-xs text-sf-text', eventClassName(row.taskStatus)].join(' ')}
                     title={[
                       `Task ID: ${row.taskId}`,
                       `Task Type: ${row.taskType || '-'}`,
@@ -95,7 +101,7 @@ export function InfrastructureMaintenanceCalendar({ rows, onOpenTask }: Infrastr
                       `Infrastructure Item ID: ${row.infrastructureItemId}`,
                       `Start Date: ${row.startDate || '-'}`,
                       `Due Date: ${row.dueDate || '-'}`,
-                      `Location: ${row.location || '-'}`,
+                      `Assigned Resource: ${row.assignedResource || '-'}`,
                       `Task Status: ${row.taskStatus}`,
                       `Alert: ${row.alert || '-'}`,
                     ].join('\n')}

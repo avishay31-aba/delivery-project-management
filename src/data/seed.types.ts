@@ -579,6 +579,7 @@ export type ReferenceDataType =
   | 'INFRASTRUCTURE_WARRANTY_TYPE'
   | 'INFRASTRUCTURE_PROPERTY_VALUE'
   | 'INFRASTRUCTURE_MAINTENANCE_TASK_TYPE'
+  | 'INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE'
 
 export interface ReferenceDataRecord {
   id: string
@@ -670,7 +671,7 @@ export interface InfrastructureMaintenanceTask {
   task: string
   startDate: string | null
   dueDate: string | null
-  location: string
+  assignedResourceRefId: string
   taskStatus: InfrastructureMaintenanceTaskStatus
   completionDate: string | null
   recurrence: InfrastructureMaintenanceRecurrence

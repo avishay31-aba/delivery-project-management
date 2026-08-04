@@ -1842,6 +1842,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
           {table.getFilteredRowModel().rows.length === 1 ? '' : 's'}
         </p>
         <DashboardColorLegend items={visibleColorLegend} />
+        {contentModeControls ? <div className="flex items-center gap-1">{contentModeControls}</div> : null}
         {toolbar}
       </div>
 
@@ -1959,8 +1960,6 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
           <button type="button" onClick={exportCsv} className="rounded border border-sf-border px-3 py-1">
             Export CSV
           </button>
-
-          {contentModeControls}
 
           {replaceColumns.length > 0 ? (
             <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(true)}>

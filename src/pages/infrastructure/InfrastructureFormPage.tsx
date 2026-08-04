@@ -25,6 +25,7 @@ import {
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
   INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
+  INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE_REFERENCE_TYPE,
   INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS,
   INFRASTRUCTURE_OWNER_REFERENCE_TYPE,
@@ -831,6 +832,7 @@ export function InfrastructureFormPage() {
             onChange={(maintenanceTasks) => commitChildPatch({ maintenanceTasks })}
             referenceData={referenceData}
             onAddTaskType={(label) => createReferenceDataRecord(INFRASTRUCTURE_MAINTENANCE_TASK_TYPE_REFERENCE_TYPE, label)}
+            onAddAssignedResource={(label) => createReferenceDataRecord(INFRASTRUCTURE_MAINTENANCE_ASSIGNED_RESOURCE_REFERENCE_TYPE, label)}
             readOnly={isViewMode}
           />
         </section>

@@ -5,13 +5,14 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, BusinessNumericInput, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
 import type { InfrastructureMaintenanceRecurrence, InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
   commitInfrastructureMaintenanceTask,
   createInfrastructureMaintenanceTask,
   generateInfrastructureMaintenanceOccurrences,
+  infrastructureMaintenanceAssignedResources,
   infrastructureMaintenanceAlert,
   infrastructureMaintenanceTaskTypes,
   infrastructureReferenceDataLabel,
@@ -26,6 +27,7 @@ interface InfrastructureMaintenanceGridProps {
   onChange: (tasks: InfrastructureMaintenanceTask[]) => void
   referenceData: ReferenceDataRecord[]
   onAddTaskType: (label: string) => { ok: boolean; message: string; record?: ReferenceDataRecord }
+  onAddAssignedResource: (label: string) => { ok: boolean; message: string; record?: ReferenceDataRecord }
   readOnly?: boolean
 }
 
@@ -35,7 +37,7 @@ function normalizedTask(record: InfrastructureMaintenanceTask) {
     task: record.task,
     startDate: record.startDate ?? null,
     dueDate: record.dueDate ?? null,
-    location: record.location,
+    assignedResourceRefId: record.assignedResourceRefId,
     taskStatus: record.taskStatus,
     recurrence: record.recurrence,
   }
@@ -87,13 +89,14 @@ function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanc
   )
 }
 
-export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, onAddTaskType, readOnly = false }: InfrastructureMaintenanceGridProps) {
+export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, onAddTaskType, onAddAssignedResource, readOnly = false }: InfrastructureMaintenanceGridProps) {
   const editor = useEditableChildObjectEditor<InfrastructureMaintenanceTask>()
   const [advancedTaskId, setAdvancedTaskId] = useState<string | null>(null)
   const [advancedDraft, setAdvancedDraft] = useState<InfrastructureMaintenanceTask | null>(null)
   const [advancedErrors, setAdvancedErrors] = useState<string[]>([])
   const permissions = editableChildObjectPermissions({ readOnly })
   const taskTypeOptions = infrastructureMaintenanceTaskTypes(referenceData)
+  const assignedResourceOptions = infrastructureMaintenanceAssignedResources(referenceData)
   const committedTaskIds = tasks.map((task) => task.id).join('|')
   const renderedTasks = [
     ...tasks,
@@ -166,6 +169,24 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     const result = onAddTaskType(label)
     if (result.ok && result.record) {
       editor.updateDraft(taskId, { taskTypeRefId: result.record.id })
+      return
+    }
+    window.alert(result.message)
+  }
+
+  function changeAssignedResource(taskId: string, value: string) {
+    if (value !== ADD_NEW_REFERENCE_OPTION) {
+      editor.updateDraft(taskId, { assignedResourceRefId: value })
+      return
+    }
+    const label = window.prompt('Add Infrastructure Maintenance Assigned Resource')
+    if (!label) {
+      editor.updateDraft(taskId, { assignedResourceRefId: '' })
+      return
+    }
+    const result = onAddAssignedResource(label)
+    if (result.ok && result.record) {
+      editor.updateDraft(taskId, { assignedResourceRefId: result.record.id })
       return
     }
     window.alert(result.message)
@@ -335,15 +356,23 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       sortValue: (task) => task.dueDate ?? '',
     },
     {
-      key: 'location',
-      label: 'Location',
+      key: 'assignedResource',
+      label: 'Assigned Resource',
       render: (task) => {
         const row = editor.draftFor(task.id) ?? task
-        return editor.isEditing(task.id)
-          ? <input className="h-8 w-56 rounded border border-sf-border px-2 py-1 text-sm" value={row.location} onChange={(event) => editor.updateDraft(task.id, { location: event.target.value })} />
-          : row.location || '-'
+        return editor.isEditing(task.id) ? (
+          <select
+            className="h-8 w-56 rounded border border-sf-border px-2 py-1 pr-8 text-sm"
+            value={row.assignedResourceRefId}
+            onChange={(event) => changeAssignedResource(task.id, event.target.value)}
+          >
+            <option value=""></option>
+            {assignedResourceOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
+          </select>
+        ) : infrastructureReferenceDataLabel(referenceData, row.assignedResourceRefId) || '-'
       },
-      sortValue: (task) => task.location,
+      sortValue: (task) => infrastructureReferenceDataLabel(referenceData, task.assignedResourceRefId),
     },
     {
       key: 'taskStatus',
@@ -416,8 +445,22 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                     <input type="date" className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.dueDate ?? ''} onChange={(event) => updateAdvancedDraft({ dueDate: event.target.value || null })} />
                   </label>
                   <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-sf-text">Location</span>
-                    <input className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.location} onChange={(event) => updateAdvancedDraft({ location: event.target.value })} />
+                    <span className="mb-1 block font-medium text-sf-text">Assigned Resource</span>
+                    <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8" value={advancedDraft.assignedResourceRefId} onChange={(event) => {
+                      if (event.target.value === ADD_NEW_REFERENCE_OPTION) {
+                        const label = window.prompt('Add Infrastructure Maintenance Assigned Resource')
+                        if (!label) return
+                        const result = onAddAssignedResource(label)
+                        if (result.ok && result.record) updateAdvancedDraft({ assignedResourceRefId: result.record.id })
+                        else window.alert(result.message)
+                        return
+                      }
+                      updateAdvancedDraft({ assignedResourceRefId: event.target.value })
+                    }}>
+                      <option value=""></option>
+                      {assignedResourceOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                      <option value={ADD_NEW_REFERENCE_OPTION}>Add New...</option>
+                    </select>
                   </label>
                   <label className="block text-sm md:col-span-3">
                     <span className="mb-1 block font-medium text-sf-text">Description</span>
@@ -447,7 +490,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                     <>
                       <label className="block text-sm">
                         <span className="mb-1 block font-medium text-sf-text">Every</span>
-                        <input type="number" min={1} className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.interval} onChange={(event) => updateAdvancedRecurrence({ interval: Math.max(1, Number(event.target.value) || 1) })} />
+                        <BusinessNumericInput value={advancedDraft.recurrence.interval} onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })} />
                       </label>
                       {advancedDraft.recurrence.frequency === 'daily' ? (
                         <label className="block text-sm">
@@ -498,7 +541,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                           </label>
                           <label className="block text-sm">
                             <span className="mb-1 block font-medium text-sf-text">Day</span>
-                            <input type="number" min={1} max={31} className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.monthlyDay ?? ''} onChange={(event) => updateAdvancedRecurrence({ monthlyDay: Number(event.target.value) || null })} />
+                            <BusinessNumericInput value={advancedDraft.recurrence.monthlyDay} max={31} onChange={(monthlyDay) => updateAdvancedRecurrence({ monthlyDay })} />
                           </label>
                         </>
                       ) : null}
@@ -506,11 +549,11 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                         <>
                           <label className="block text-sm">
                             <span className="mb-1 block font-medium text-sf-text">Month</span>
-                            <input type="number" min={1} max={12} className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.yearlyMonth ?? ''} onChange={(event) => updateAdvancedRecurrence({ yearlyMonth: Number(event.target.value) || null })} />
+                            <BusinessNumericInput value={advancedDraft.recurrence.yearlyMonth} max={12} onChange={(yearlyMonth) => updateAdvancedRecurrence({ yearlyMonth })} />
                           </label>
                           <label className="block text-sm">
                             <span className="mb-1 block font-medium text-sf-text">Day</span>
-                            <input type="number" min={1} max={31} className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.yearlyDay ?? ''} onChange={(event) => updateAdvancedRecurrence({ yearlyDay: Number(event.target.value) || null })} />
+                            <BusinessNumericInput value={advancedDraft.recurrence.yearlyDay} max={31} onChange={(yearlyDay) => updateAdvancedRecurrence({ yearlyDay })} />
                           </label>
                         </>
                       ) : null}
@@ -538,7 +581,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                     {advancedDraft.recurrence.endType === 'after' ? (
                       <label className="block text-sm">
                         <span className="mb-1 block font-medium text-sf-text">Occurrences</span>
-                        <input type="number" min={1} className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.endAfterOccurrences ?? ''} onChange={(event) => updateAdvancedRecurrence({ endAfterOccurrences: Number(event.target.value) || null })} />
+                        <BusinessNumericInput value={advancedDraft.recurrence.endAfterOccurrences} onChange={(endAfterOccurrences) => updateAdvancedRecurrence({ endAfterOccurrences })} />
                       </label>
                     ) : null}
                     {advancedDraft.recurrence.endType === 'by' ? (
@@ -576,7 +619,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
           task.taskId,
           infrastructureReferenceDataLabel(referenceData, task.taskTypeRefId),
           task.task,
-          task.location,
+          infrastructureReferenceDataLabel(referenceData, task.assignedResourceRefId),
           task.taskStatus,
           recurrenceSummary(task.recurrence),
           infrastructureMaintenanceAlert(task) ?? '',

@@ -109,7 +109,7 @@ export function createInfrastructureMaintenanceTaskColumns(options: { includeDay
     { id: 'tenant', label: 'Tenant', getValue: (row) => row.tenant },
     { id: 'startDate', label: 'Start Date', getValue: (row) => row.startDate, semanticType: 'date', sortValue: (row) => row.startDate },
     { id: 'dueDate', label: 'Due Date', getValue: (row) => row.dueDate, semanticType: 'date', sortValue: (row) => row.dueDate },
-    { id: 'location', label: 'Location', getValue: (row) => row.location },
+    { id: 'assignedResource', label: 'Assigned Resource', getValue: (row) => row.assignedResource },
     { id: 'taskStatus', label: 'Task Status', getValue: (row) => row.taskStatus, render: (row) => createElement(TaskStatusPresentation, { status: row.taskStatus }) },
     {
       id: 'alert',

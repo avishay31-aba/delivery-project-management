@@ -361,7 +361,7 @@ function appendInfrastructureMaintenanceActivityEvents(
       return
     }
 
-    if (!valuesEqual(before.task, task.task) || before.dueDate !== task.dueDate || before.startDate !== task.startDate || before.location !== task.location || !valuesEqual(before.recurrence, task.recurrence)) {
+    if (!valuesEqual(before.task, task.task) || before.dueDate !== task.dueDate || before.startDate !== task.startDate || before.assignedResourceRefId !== task.assignedResourceRefId || !valuesEqual(before.recurrence, task.recurrence)) {
       nextEvents = appendActivityEvent(nextEvents, now, {
         category: 'TASK',
         eventType: 'infrastructureItem.maintenanceTaskEdited',
