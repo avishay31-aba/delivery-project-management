@@ -8,7 +8,7 @@ import type {
   System,
 } from '@/data/seed.types'
 import type { AllocationMode } from './types'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, SYSTEM_PURPOSE_POC } from '@/domain/system-inventory'
+import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE } from '@/domain/system-inventory'
 
 export function activeProjectSystemLinks(links: ProjectSystemLink[]): ProjectSystemLink[] {
   return links.filter((link) => link.allocationStatus !== 'DEALLOCATED')
@@ -39,7 +39,10 @@ export function availableProductionCandidates(
 export function availableReusedInternalCandidates(
   reusedSystems: ReusedInternalSystem[],
 ): ReusedInternalSystem[] {
-  return reusedSystems.filter((system) => system.purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE || system.purpose === SYSTEM_PURPOSE_POC)
+  return reusedSystems.filter((system) =>
+    system.status === REUSED_INTERNAL_STATUS_AVAILABLE &&
+    system.purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE,
+  )
 }
 
 export function availableExistingSystemCandidates(

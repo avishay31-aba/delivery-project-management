@@ -1,7 +1,7 @@
 import type { ProjectSystemLink } from '@/data/seed.types'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, SYSTEM_PURPOSE_POC } from '@/domain/system-inventory'
+import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE } from '@/domain/system-inventory'
 import { activeProjectSystemLinks } from './service'
 import type { AllocationActionResult, AllocationValidationContext, AllocationValidationInput } from './types'
 
@@ -90,7 +90,8 @@ export function validateReusedInternalAllocation(
   if (!project) return failed('Project not found.')
   if (project.mainType !== 'POC') return failed('Delivery and Renewal projects cannot allocate Reused Internal Systems.')
   if (!reusedSystem) return failed('Reused internal system not found.')
-  if (reusedSystem.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE && reusedSystem.purpose !== SYSTEM_PURPOSE_POC) return failed(`Reused internal system is occupied for ${reusedSystem.purpose}.`)
+  if (reusedSystem.status !== REUSED_INTERNAL_STATUS_AVAILABLE) return failed('Reused internal system is not available for allocation.')
+  if (reusedSystem.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE) return failed(`Reused internal system is occupied for ${reusedSystem.purpose}.`)
   const projectRegion = projectBusinessRegionForAllocation(project, context)
   if (!projectRegion) return unmappedProjectRegionMessage()
   const activeLinks = activeProjectSystemLinks(context.projectSystems).filter((link) =>
