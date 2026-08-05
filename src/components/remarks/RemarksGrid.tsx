@@ -356,6 +356,8 @@ export function RemarksGrid({
         searchLabel="Search / Filter"
         searchPlaceholder="Search Remarks"
         recordsPerPageLabel="Records per page"
+        logicalTableType="remarks"
+        logicalTableLabel="Remarks"
         actions={actions}
         resetPageSignal={committedRemarkIds}
       />

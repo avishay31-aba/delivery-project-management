@@ -14,6 +14,7 @@ import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemsWithDerivedTimeGroups } from '@/domain/time-groups'
+import { normalizeUserPresentationPreferences } from '@/domain/user-preferences'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
@@ -61,6 +62,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     referenceData,
     timeGroupLookups,
+    userPresentationPreferences: normalizeUserPresentationPreferences(Array.isArray(state.userPresentationPreferences) ? state.userPresentationPreferences : []),
     versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
     infrastructureItems: normalizeInfrastructureItemsForReferenceData(Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : [], referenceData),
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),

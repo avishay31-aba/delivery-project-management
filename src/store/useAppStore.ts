@@ -9,11 +9,12 @@ import type {
   ReferenceDataType,
   InfrastructureItem,
   TimeGroupLookupRecord,
+  UserPresentationPreference,
   VersionUpdateAttachmentRecord,
   VersionUpdateRecord,
 } from '@/data/seed.types'
 import { incrementCounter } from '@/data/id-generator'
-import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
+import { CURRENT_USER_DISPLAY_NAME, CURRENT_USER_ID } from '@/config/current-user'
 import { generateBusinessIdFromCounter, idCountersWithBusinessId, reserveBusinessId } from '@/domain/business-identity'
 import {
   createActivityEvent,
@@ -83,6 +84,7 @@ import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFiel
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
+import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
 import {
   normalizeReferenceLabel,
   referenceDataLabel,
@@ -1002,6 +1004,8 @@ interface AppStore extends AppDataState {
   updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
   setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
   updateTimeGroupLookup: (id: string, patch: Partial<TimeGroupLookupRecord>) => AllocationActionResult
+  setRecordsPerPagePreference: (context: string, value: string | number) => AllocationActionResult & { preference?: UserPresentationPreference }
+  resetRecordsPerPagePreference: (context: string) => AllocationActionResult
   createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
@@ -1087,6 +1091,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       warrantyRecords: state.warrantyRecords,
       referenceData: state.referenceData,
       timeGroupLookups: state.timeGroupLookups,
+      userPresentationPreferences: state.userPresentationPreferences,
       versionUpdates: state.versionUpdates,
       infrastructureItems: state.infrastructureItems,
       activityEvents: state.activityEvents,
@@ -1531,6 +1536,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }))
     get().saveToStorage()
     return { ok: true, message: 'Time Group mapping updated.' }
+  },
+
+  setRecordsPerPagePreference: (context, value) => {
+    const normalized = normalizeRecordsPerPageValue(value)
+    if (!normalized) return { ok: false, message: 'Records per page value is not supported.' }
+    const now = new Date().toISOString()
+    const existing = get().userPresentationPreferences.find((preference) =>
+      preference.userId === CURRENT_USER_ID &&
+      preference.preferenceType === USER_PREFERENCE_TYPE_RECORDS_PER_PAGE &&
+      preference.context === context,
+    )
+    const preference: UserPresentationPreference = existing
+      ? { ...existing, value: String(normalized), updatedAt: now }
+      : {
+          id: `pref-${crypto.randomUUID()}`,
+          userId: CURRENT_USER_ID,
+          preferenceType: USER_PREFERENCE_TYPE_RECORDS_PER_PAGE,
+          context,
+          value: String(normalized),
+          createdAt: now,
+          updatedAt: now,
+        }
+    set((current) => ({
+      userPresentationPreferences: existing
+        ? current.userPresentationPreferences.map((candidate) => candidate.id === existing.id ? preference : candidate)
+        : [preference, ...current.userPresentationPreferences],
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Records per page default saved.', preference }
+  },
+
+  resetRecordsPerPagePreference: (context) => {
+    const existing = get().userPresentationPreferences.find((preference) =>
+      preference.userId === CURRENT_USER_ID &&
+      preference.preferenceType === USER_PREFERENCE_TYPE_RECORDS_PER_PAGE &&
+      preference.context === context,
+    )
+    if (!existing) return { ok: true, message: 'No personal default was set.' }
+    set((current) => ({
+      userPresentationPreferences: current.userPresentationPreferences.filter((preference) => preference.id !== existing.id),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Records per page default reset.' }
   },
 
   createInfrastructureItem: (draft) => {

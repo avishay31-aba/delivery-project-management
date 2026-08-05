@@ -1,6 +1,17 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { CURRENT_USER_ID } from '@/config/current-user'
+import {
+  RECORDS_PER_PAGE_OPTIONS,
+  SYSTEM_DEFAULT_RECORDS_PER_PAGE,
+  effectiveRecordsPerPage,
+  preferenceContextLabel,
+  recordsPerPageLabel as sharedPageSizeLabel,
+  recordsPerPagePreference,
+  type RecordsPerPageValue,
+} from '@/domain/user-preferences'
+import { useAppStore } from '@/store/useAppStore'
 
-export type RecordHistoryPageSize = 10 | 20 | 25 | 50 | 100 | 'all'
+export type RecordHistoryPageSize = RecordsPerPageValue
 export type RecordHistorySortDirection = 'asc' | 'desc'
 
 export interface RecordHistoryColumn<TRecord> {
@@ -29,6 +40,8 @@ interface RecordHistorySectionProps<TRecord> {
   recordsPerPageLabel?: string
   pageSizeOptions?: RecordHistoryPageSize[]
   initialPageSize?: RecordHistoryPageSize
+  logicalTableType?: string
+  logicalTableLabel?: string
   controls?: ReactNode
   actions?: ReactNode
   message?: ReactNode
@@ -36,10 +49,10 @@ interface RecordHistorySectionProps<TRecord> {
   tableClassName?: string
 }
 
-const DEFAULT_PAGE_SIZE_OPTIONS: RecordHistoryPageSize[] = [10, 25, 50, 100, 'all']
+const DEFAULT_PAGE_SIZE_OPTIONS: RecordHistoryPageSize[] = RECORDS_PER_PAGE_OPTIONS
 
 function pageSizeLabel(pageSize: RecordHistoryPageSize): string {
-  return pageSize === 'all' ? 'All' : String(pageSize)
+  return sharedPageSizeLabel(pageSize)
 }
 
 function normalized(value: unknown): string {
@@ -68,18 +81,31 @@ export function RecordHistorySection<TRecord>({
   recordsPerPageLabel = 'Records per page',
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   initialPageSize = 10,
+  logicalTableType,
+  logicalTableLabel,
   controls,
   actions,
   message,
   resetPageSignal,
   tableClassName = 'w-max min-w-full border-collapse text-sm leading-tight',
 }: RecordHistorySectionProps<TRecord>) {
+  const userPresentationPreferences = useAppStore((state) => state.userPresentationPreferences)
+  const setRecordsPerPagePreference = useAppStore((state) => state.setRecordsPerPagePreference)
+  const resetRecordsPerPagePreference = useAppStore((state) => state.resetRecordsPerPagePreference)
+  const tableLabel = logicalTableLabel ?? (logicalTableType ? preferenceContextLabel(logicalTableType) : 'this table')
+  const effectiveInitialPageSize = logicalTableType
+    ? effectiveRecordsPerPage(userPresentationPreferences, CURRENT_USER_ID, logicalTableType, initialPageSize ?? SYSTEM_DEFAULT_RECORDS_PER_PAGE)
+    : initialPageSize
+  const savedUserDefault = logicalTableType
+    ? recordsPerPagePreference(userPresentationPreferences, CURRENT_USER_ID, logicalTableType)
+    : null
   const [search, setSearch] = useState('')
-  const [pageSize, setPageSize] = useState<RecordHistoryPageSize>(initialPageSize)
+  const [pageSize, setPageSize] = useState<RecordHistoryPageSize>(effectiveInitialPageSize)
   const [pageNumber, setPageNumber] = useState(1)
   const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(null)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [preferenceMessage, setPreferenceMessage] = useState('')
 
   function resetToFirstPage() {
     setPageNumber(1)
@@ -88,6 +114,23 @@ export function RecordHistorySection<TRecord>({
   useEffect(() => {
     resetToFirstPage()
   }, [resetPageSignal])
+
+  useEffect(() => {
+    setPageSize(effectiveInitialPageSize)
+    resetToFirstPage()
+  }, [effectiveInitialPageSize])
+
+  function setCurrentPageSizeAsDefault() {
+    if (!logicalTableType) return
+    const result = setRecordsPerPagePreference(logicalTableType, pageSize)
+    setPreferenceMessage(result.ok ? `${pageSizeLabel(pageSize)} records per page was set as your default for ${tableLabel}.` : result.message)
+  }
+
+  function resetPersonalDefault() {
+    if (!logicalTableType) return
+    const result = resetRecordsPerPagePreference(logicalTableType)
+    setPreferenceMessage(result.ok ? `Your personal default for ${tableLabel} was reset.` : result.message)
+  }
 
   const sortedAndFilteredRecords = useMemo(() => {
     const searchText = enableSearch ? normalized(search) : ''
@@ -168,6 +211,27 @@ export function RecordHistorySection<TRecord>({
               ))}
             </select>
           </label>
+          {logicalTableType ? (
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
+                onClick={setCurrentPageSizeAsDefault}
+              >
+                Set as Default
+              </button>
+              <button
+                type="button"
+                className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt"
+                onClick={resetPersonalDefault}
+              >
+                Reset to Default
+              </button>
+              {savedUserDefault === pageSize ? (
+                <span className="pb-1 text-xs font-semibold text-sf-success">Saved default</span>
+              ) : null}
+            </div>
+          ) : null}
           {enableSearch ? (
             <label className="block text-sm font-medium text-sf-text">
               <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{searchLabel}</span>
@@ -230,6 +294,9 @@ export function RecordHistorySection<TRecord>({
       </div>
 
       {message}
+      {preferenceMessage ? (
+        <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{preferenceMessage}</div>
+      ) : null}
 
       <div className="sf-collection-navigation flex flex-wrap items-center justify-between gap-2 rounded border border-sf-border bg-white px-3 py-2 text-sm text-sf-text">
         <div>

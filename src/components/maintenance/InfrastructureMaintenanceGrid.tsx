@@ -659,6 +659,8 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
         searchLabel="Search / Filter"
         searchPlaceholder="Search Maintenance"
         recordsPerPageLabel="Records per page"
+        logicalTableType="infrastructure-maintenance"
+        logicalTableLabel="Maintenance Tasks"
         actions={actions}
       />
     </TableSection>

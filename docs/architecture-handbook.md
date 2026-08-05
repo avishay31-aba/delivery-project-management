@@ -460,9 +460,17 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 ### Pageable Child Collection Standard
 
 - Child collections that support pagination, search, date filtering, or record-count controls must use a shared pageable/filterable collection shell.
-- The default Records per page value is 10, with the approved shared options 10, 25, 50, 100, and All.
+- The default Records per page value is 10, with the approved shared options 10, 20, 25, 50, 100, and All.
 - The processing order is: all records, date filtering, text search, selected sort, then pagination.
 - Empty collections display the standard no-records message. Collections with records but no filter matches display the standard no-matching-records message.
+
+### User Presentation Preference Standard
+
+- User-selected presentation defaults, such as Records per page, belong to the user presentation preference layer and must not dirty or mutate Business Objects.
+- Preferences are scoped by the current user and a stable logical UI context such as a dashboard scope or shared table type. They must not be scoped by route, selected record, or object instance ID.
+- Resolution precedence is user-specific preference, then future admin/global default when introduced, then the system default.
+- In V1.2, preferences use the existing current-user abstraction and browser persistence. A future authenticated release should migrate the same logical preferences to backend User Preferences without changing table consumers.
+- Shared pageable tables and dashboards expose Set as Default and Reset to Default through the shared framework wherever Records per page is available.
 
 ### Date And Time Presentation Standard
 

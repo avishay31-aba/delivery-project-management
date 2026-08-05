@@ -197,6 +197,8 @@ export function TimeGroupSettingsPage() {
           ].join(' ')}
           emptyText="No Time Group mappings are available."
           initialPageSize={10}
+          logicalTableType="time-group-settings"
+          logicalTableLabel="Time Group Settings"
           message={message ? <div className={message.kind === 'error' ? formMessageClassName([message.text]) : 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'}>{message.text}</div> : null}
           resetPageSignal={editingId}
         />

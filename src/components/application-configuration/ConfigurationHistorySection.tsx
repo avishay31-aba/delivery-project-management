@@ -93,6 +93,8 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
       searchLabel="Search / Filter"
       searchPlaceholder="Search Configuration History"
       recordsPerPageLabel="Records per page"
+      logicalTableType="configuration-history"
+      logicalTableLabel="Configuration History"
     />
   )
 }

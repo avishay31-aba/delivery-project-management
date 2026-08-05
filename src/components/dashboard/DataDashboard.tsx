@@ -10,6 +10,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getGroupedRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type Column,
@@ -17,6 +18,7 @@ import {
   type ColumnFiltersState,
   type ColumnOrderState,
   type GroupingState,
+  type PaginationState,
   type Row,
   type SortingState,
   type VisibilityState,
@@ -51,6 +53,16 @@ import {
 } from '@/domain/date-time-presentation'
 import { dashboardRecordModeRoutePath } from '@/domain/dashboard-view'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { CURRENT_USER_ID } from '@/config/current-user'
+import {
+  RECORDS_PER_PAGE_OPTIONS,
+  effectiveRecordsPerPage,
+  preferenceContextLabel,
+  recordsPerPageLabel,
+  recordsPerPagePreference,
+  type RecordsPerPageValue,
+} from '@/domain/user-preferences'
+import { useAppStore } from '@/store/useAppStore'
 
 export interface DashboardColumn<T> {
   id: string
@@ -923,6 +935,13 @@ export function DataDashboard<T extends { id: string }>({
   renderAlternateContent,
 }: DataDashboardProps<T>) {
   const regionalDateFormat = useDateTimePresentationPreference()
+  const userPresentationPreferences = useAppStore((state) => state.userPresentationPreferences)
+  const setRecordsPerPagePreference = useAppStore((state) => state.setRecordsPerPagePreference)
+  const resetRecordsPerPagePreference = useAppStore((state) => state.resetRecordsPerPagePreference)
+  const pageSizePreferenceContext = `dashboard:${dashboardScope}`
+  const pageSizeTableLabel = preferenceContextLabel(pageSizePreferenceContext)
+  const savedUserPageSizeDefault = recordsPerPagePreference(userPresentationPreferences, CURRENT_USER_ID, pageSizePreferenceContext)
+  const effectivePageSizeDefault = effectiveRecordsPerPage(userPresentationPreferences, CURRENT_USER_ID, pageSizePreferenceContext)
   const initialSortingKey = JSON.stringify(initialSorting)
   const defaultSorting = useMemo(() => initialSorting, [initialSortingKey])
   const orderedColumns = useMemo(() => orderedDashboardColumns(columns, dashboardScope), [columns, dashboardScope])
@@ -954,6 +973,9 @@ export function DataDashboard<T extends { id: string }>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     Object.fromEntries(sourceColumnIds.map((columnId) => [columnId, true])),
   )
+  const [recordsPerPage, setRecordsPerPage] = useState<RecordsPerPageValue>(effectivePageSizeDefault)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSizePreferenceMessage, setPageSizePreferenceMessage] = useState('')
   const [dashboardUndoStack, setDashboardUndoStack] = useState<SavedDashboardViewState[]>([])
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null)
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null)
@@ -975,6 +997,8 @@ export function DataDashboard<T extends { id: string }>({
   const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
   const setSaveUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setSaveUnsavedDashboardChanges)
+  const numericPageSize = recordsPerPage === 'all' ? Math.max(rows.length, 1) : recordsPerPage
+  const pagination = useMemo<PaginationState>(() => ({ pageIndex, pageSize: numericPageSize }), [numericPageSize, pageIndex])
 
   const dashboardViewStateSnapshot = useCallback(
     () =>
@@ -1139,7 +1163,7 @@ export function DataDashboard<T extends { id: string }>({
   const table = useReactTable({
     data: rows,
     columns: tableColumns,
-    state: { globalFilter, sorting, grouping, columnFilters, columnOrder: internalColumnOrder, columnVisibility: internalColumnVisibility },
+    state: { globalFilter, sorting, grouping, columnFilters, columnOrder: internalColumnOrder, columnVisibility: internalColumnVisibility, pagination },
     onGlobalFilterChange: (updater) => updateDashboardState(setGlobalFilter, updater),
     onSortingChange: (updater) => updateDashboardState(setSorting, updater),
     onGroupingChange: (updater) => updateDashboardState(setGrouping, updater),
@@ -1163,7 +1187,31 @@ export function DataDashboard<T extends { id: string }>({
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onPaginationChange: (updater) => {
+      const next = typeof updater === 'function' ? updater(pagination) : updater
+      setPageIndex(next.pageIndex)
+    },
   })
+
+  useEffect(() => {
+    setRecordsPerPage(effectivePageSizeDefault)
+    setPageIndex(0)
+  }, [effectivePageSizeDefault])
+
+  useEffect(() => {
+    setPageIndex(0)
+  }, [globalFilter, columnFilters, sorting, grouping, recordsPerPage])
+
+  function setDashboardPageSizeDefault() {
+    const result = setRecordsPerPagePreference(pageSizePreferenceContext, recordsPerPage)
+    setPageSizePreferenceMessage(result.ok ? `${recordsPerPageLabel(recordsPerPage)} records per page was set as your default for ${pageSizeTableLabel}.` : result.message)
+  }
+
+  function resetDashboardPageSizeDefault() {
+    const result = resetRecordsPerPagePreference(pageSizePreferenceContext)
+    setPageSizePreferenceMessage(result.ok ? `Your personal default for ${pageSizeTableLabel} was reset.` : result.message)
+  }
 
   const frozenColumnCount = useMemo(() => {
     if (!isFreezeEnabled) return 0
@@ -1584,6 +1632,9 @@ export function DataDashboard<T extends { id: string }>({
 const activeColumnFilterCount = columnFilters.length
 const hasGlobalSearch = globalFilter.trim().length > 0
 const activeFilterAndSearchCount = activeColumnFilterCount + (hasGlobalSearch ? 1 : 0)
+const filteredRowCount = table.getFilteredRowModel().rows.length
+const pageCount = table.getPageCount()
+const currentPageNumber = Math.min(pageIndex + 1, Math.max(pageCount, 1))
 
 const hiddenFilteredColumns = table
   .getAllLeafColumns()
@@ -1961,6 +2012,34 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
             Export CSV
           </button>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-sf-text-muted">Records per page</span>
+              <select
+                className="rounded border border-sf-border px-2 py-1"
+                value={String(recordsPerPage)}
+                onChange={(event) => {
+                  const value = event.target.value === 'all' ? 'all' : Number(event.target.value) as RecordsPerPageValue
+                  setRecordsPerPage(value)
+                  setPageIndex(0)
+                }}
+              >
+                {RECORDS_PER_PAGE_OPTIONS.map((option) => (
+                  <option key={option} value={String(option)}>{recordsPerPageLabel(option)}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={setDashboardPageSizeDefault}>
+              Set as Default
+            </button>
+            <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={resetDashboardPageSizeDefault}>
+              Reset to Default
+            </button>
+            {savedUserPageSizeDefault === recordsPerPage ? (
+              <span className="text-xs font-semibold text-sf-success">Saved default</span>
+            ) : null}
+          </div>
+
           {replaceColumns.length > 0 ? (
             <button type="button" className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt" onClick={() => setIsReplaceDialogOpen(true)}>
               Search & Replace
@@ -1983,6 +2062,9 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
             </span>
           </div>
         ) : null}  
+        {pageSizePreferenceMessage ? (
+          <div className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{pageSizePreferenceMessage}</div>
+        ) : null}
 
         {renderAlternateContent ? (
           <div className="min-h-0 flex-1 overflow-auto border-b border-sf-border" style={{ scrollbarGutter: 'stable' }}>
@@ -2123,6 +2205,30 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
             </table>
           </div>
         )}
+        <div className="sf-collection-navigation flex shrink-0 flex-wrap items-center justify-between gap-2 rounded border border-sf-border bg-white px-3 py-2 text-sm text-sf-text">
+          <div>
+            Page {currentPageNumber} of {Math.max(pageCount, 1)}
+            <span className="ml-3 text-sf-text-muted">{filteredRowCount} matching record{filteredRowCount === 1 ? '' : 's'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!table.getCanPreviousPage()}
+              onClick={() => table.previousPage()}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="rounded border border-sf-border px-3 py-1 text-sm hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!table.getCanNextPage()}
+              onClick={() => table.nextPage()}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

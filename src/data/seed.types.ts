@@ -967,6 +967,16 @@ export interface TimeGroupLookupRecord {
   updatedAt?: string
 }
 
+export interface UserPresentationPreference {
+  id: string
+  userId: string
+  preferenceType: string
+  context: string
+  value: string
+  createdAt: string
+  updatedAt: string
+}
+
 /** Root shape persisted by the application storage adapter */
 export interface AppDataState {
   version: number
@@ -981,6 +991,7 @@ export interface AppDataState {
   warrantyRecords: WarrantyRecord[]
   referenceData: ReferenceDataRecord[]
   timeGroupLookups: TimeGroupLookupRecord[]
+  userPresentationPreferences: UserPresentationPreference[]
   versionUpdates: VersionUpdateRecord[]
   infrastructureItems: InfrastructureItem[]
   activityEvents: ActivityEvent[]

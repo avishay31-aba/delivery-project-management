@@ -213,6 +213,8 @@ export function ActivityTimeline({
         searchLabel="Search / Filter"
         searchPlaceholder="Search Activity Log"
         recordsPerPageLabel="Records per page"
+        logicalTableType="activity-log"
+        logicalTableLabel="Activity Log"
         resetPageSignal={`${fromDate}|${toDate}|${resetPageSignal}`}
         controls={(
           <>
