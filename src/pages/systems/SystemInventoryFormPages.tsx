@@ -1231,15 +1231,17 @@ export function InventoryForm<T extends InventoryRecord>({
         <section className="sf-card space-y-3 p-3" aria-labelledby="system-tenants-section-title">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 id="system-tenants-section-title" className="text-lg font-semibold text-sf-text">Tenants</h3>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
-              disabled={linkedProjectsForSystem().length === 0}
-              onClick={openAddTenantDialog}
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add Tenant
-            </button>
+            {!isViewMode ? (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+                disabled={linkedProjectsForSystem().length === 0}
+                onClick={openAddTenantDialog}
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add Tenant
+              </button>
+            ) : null}
           </div>
           {linkedProjectsForSystem().length === 0 ? (
             <div className="text-sm text-sf-text-muted">Link this system to a project before adding tenants.</div>
@@ -1249,7 +1251,7 @@ export function InventoryForm<T extends InventoryRecord>({
             tenants={hostedTenants}
             systems={allocatedSystems}
             emptyTextForSection={() => 'No hosted tenants in this section.'}
-            actions={(tenant) => renderHostedTenantActions(tenant)}
+            actions={isViewMode ? undefined : (tenant) => renderHostedTenantActions(tenant)}
           />
         </section>
         {renderApplicationConfigurationSummarySection()}

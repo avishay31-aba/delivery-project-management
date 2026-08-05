@@ -150,7 +150,7 @@ export function RecordHistorySection<TRecord>({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="sf-collection-navigation flex flex-wrap items-end gap-2">
           <label className="block text-sm font-medium text-sf-text">
             <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{recordsPerPageLabel}</span>
             <select
@@ -231,7 +231,7 @@ export function RecordHistorySection<TRecord>({
 
       {message}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-sf-border bg-white px-3 py-2 text-sm text-sf-text">
+      <div className="sf-collection-navigation flex flex-wrap items-center justify-between gap-2 rounded border border-sf-border bg-white px-3 py-2 text-sm text-sf-text">
         <div>
           Page {currentPage} of {totalPages}
           <span className="ml-3 text-sf-text-muted">{pageSummary}</span>
@@ -258,7 +258,7 @@ export function RecordHistorySection<TRecord>({
 
       <div className="sf-scroll-x rounded border border-sf-border bg-white">
         <table className={tableClassName}>
-          <thead className="bg-sf-surface-alt text-left">
+          <thead className="sf-collection-navigation bg-sf-surface-alt text-left">
             <tr>
               {columns.map((column) => (
                 <th key={column.key} className={column.headerClassName ?? 'whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text'}>

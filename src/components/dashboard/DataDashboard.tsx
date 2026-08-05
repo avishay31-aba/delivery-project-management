@@ -1835,7 +1835,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
           </div>
         </div>
       ) : null}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+      <div className="sf-collection-navigation flex shrink-0 flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-sf-text-muted">
           <span className="font-semibold text-sf-text">{title}</span>
           {' · '}Showing {table.getFilteredRowModel().rows.length} record
@@ -1847,7 +1847,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
       </div>
 
       <div className="sf-card flex min-h-0 flex-1 flex-col space-y-3 overflow-hidden p-3">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="sf-collection-navigation flex shrink-0 flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="font-medium text-sf-text-muted">View</span>
             <select
@@ -1995,7 +1995,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
             style={{ scrollbarGutter: 'stable' }}
           >
             <table className="min-w-full divide-y divide-sf-border text-sm">
-            <thead className="bg-sf-surface-alt text-left">
+            <thead className="sf-collection-navigation bg-sf-surface-alt text-left">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header, headerIndex) => {

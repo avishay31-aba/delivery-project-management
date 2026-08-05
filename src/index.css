@@ -179,6 +179,28 @@
     box-shadow: none;
   }
 
+  .sf-view-mode .sf-collection-navigation input:not([type='checkbox']):not([type='radio']),
+  .sf-view-mode .sf-collection-navigation select,
+  .sf-view-mode .sf-collection-navigation button {
+    pointer-events: auto;
+  }
+
+  .sf-view-mode .sf-collection-navigation input:not([type='checkbox']):not([type='radio']),
+  .sf-view-mode .sf-collection-navigation select {
+    border-color: #c9c9c9;
+    background-color: #ffffff;
+  }
+
+  .sf-view-mode .sf-collection-navigation button {
+    border-color: #c9c9c9;
+    background-color: #ffffff;
+  }
+
+  .sf-view-mode thead.sf-collection-navigation button {
+    border-color: transparent;
+    background-color: transparent;
+  }
+
   .fixed.inset-0:has([role='dialog']) {
     pointer-events: none;
     background: transparent !important;
