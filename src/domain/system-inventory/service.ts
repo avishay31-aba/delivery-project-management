@@ -6,7 +6,8 @@ import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
 } from '@/domain/application-configuration'
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
-import type { ConfigurationHistoryRecord, TenantConfiguration } from '@/data/seed.types'
+import type { ConfigurationHistoryRecord, TenantConfiguration, TimeGroupLookupRecord } from '@/data/seed.types'
+import { systemTimeGroupFromVeteranTenant } from '@/domain/time-groups'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
 import type { ReusedInternalSystemStatus } from './types'
 import {
@@ -320,14 +321,15 @@ export function linkedProjectDisplay(record: SystemInventoryRecord, projects: Pr
   return currentProjectPidsForSystem(record, projects, projectSystems).join('; ')
 }
 
-export function systemTimeGroup(record: SystemInventoryRecord, tenants: Tenant[]): string {
-  void tenants
-  return String(('timeGroup' in record ? record.timeGroup : '') ?? '')
+export function systemTimeGroup(record: SystemInventoryRecord, tenants: Tenant[], timeGroupLookups: TimeGroupLookupRecord[] = []): string {
+  if (!('sid' in record)) return ''
+  return systemTimeGroupFromVeteranTenant(record.id, tenants, timeGroupLookups).timeGroup
 }
 
-export function systemTimeGroupAlert(record: SystemInventoryRecord, tenants: Tenant[], fallback: unknown): string {
+export function systemTimeGroupAlert(record: SystemInventoryRecord, tenants: Tenant[], fallback: unknown, timeGroupLookups: TimeGroupLookupRecord[] = []): string {
   void record
   void tenants
+  void timeGroupLookups
   return String(fallback ?? '')
 }
 

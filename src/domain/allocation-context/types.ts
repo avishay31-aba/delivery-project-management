@@ -19,6 +19,7 @@ export interface AllocationActionResult {
   message: string
   allocationId?: string
   tenantId?: string
+  requiresTimeGroupOverride?: boolean
 }
 
 export interface AllocationValidationContext {

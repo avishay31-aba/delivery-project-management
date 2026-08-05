@@ -275,8 +275,8 @@ function deriveTenantCount(record: InventoryRecord, tenants: Tenant[]): number {
   return tenantCountForSystem(record, tenants)
 }
 
-function deriveTimeGroup(record: InventoryRecord, tenants: Tenant[]): string {
-  return systemTimeGroup(record, tenants)
+function deriveTimeGroup(record: InventoryRecord, tenants: Tenant[], timeGroupLookups: ReturnType<typeof useAppStore.getState>['timeGroupLookups']): string {
+  return systemTimeGroup(record, tenants, timeGroupLookups)
 }
 
 function deriveCurrentSid(record: InventoryRecord, systems: System[]): string {
@@ -298,6 +298,7 @@ function derivedValue(
   systems: System[] = [],
   versionUpdates: ReturnType<typeof useAppStore.getState>['versionUpdates'] = [],
   referenceData: ReturnType<typeof useAppStore.getState>['referenceData'] = [],
+  timeGroupLookups: ReturnType<typeof useAppStore.getState>['timeGroupLookups'] = [],
 ): string {
   if (key === 'currentSid') return deriveCurrentSid(record, systems)
   if (key === 'currentPid') return deriveCurrentPid(record, projects, projectSystems)
@@ -306,10 +307,10 @@ function derivedValue(
   if (key === 'linkedProjects') return deriveLinkedProjects(record, projects, projectSystems)
   if (key === 'tenantCount') return String(deriveTenantCount(record, tenants))
   if (key === 'usedInRegion') return textValue(readRecordValue(record, 'usedInRegion')) || textValue(readRecordValue(record, 'region')) || textValue(readRecordValue(record, 'timeGroup'))
-  if (key === 'timeGroup') return deriveTimeGroup(record, tenants)
+  if (key === 'timeGroup') return deriveTimeGroup(record, tenants, timeGroupLookups)
   if (key === 'availability' && 'source' in record && record.source === SYSTEM_SOURCE_PRODUCTION) return 'Available'
   if (key === 'timeGroupAlert') {
-    return systemTimeGroupAlert(record, tenants, readRecordValue(record, key))
+    return systemTimeGroupAlert(record, tenants, readRecordValue(record, key), timeGroupLookups)
   }
   return textValue(readRecordValue(record, key))
 }
@@ -339,6 +340,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const activityEvents = useAppStore((state) => state.activityEvents)
   const referenceData = useAppStore((state) => state.referenceData)
   const versionUpdates = useAppStore((state) => state.versionUpdates)
+  const timeGroupLookups = useAppStore((state) => state.timeGroupLookups)
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const allocatedSystems = useAppStore((state) => state.systems)
   const productionSystemInventory = useAppStore((state) => state.productionSystemInventory)
@@ -717,7 +719,7 @@ export function InventoryForm<T extends InventoryRecord>({
       (field.key === 'purpose' || field.key === 'status' || field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
     const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
     const sourceRecord = businessEditable ? activeDraft : activeRecord
-    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData)
+    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData, timeGroupLookups)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const error = validationMessageForField(field.label, field.key)
@@ -1040,6 +1042,21 @@ export function InventoryForm<T extends InventoryRecord>({
     const systemForTenant = allocatedSystemForTenantCreation() ?? activeRecord
     if (selectedRequirementId === 'INTERNAL') {
       const result = createInternalTenantForSystem(selectedProjectId, systemForTenant.id)
+      if (result.requiresTimeGroupOverride) {
+        if (!window.confirm(result.message)) {
+          setMessages(['Tenant was not added.'])
+          return
+        }
+        const confirmedResult = createInternalTenantForSystem(selectedProjectId, systemForTenant.id, { confirmedTimeGroupMismatch: true })
+        setMessages([confirmedResult.message])
+        if (confirmedResult.ok) {
+          if (confirmedResult.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, confirmedResult.tenantId as string])))
+          setAddTenantOpen(false)
+          setSelectedProjectId('')
+          setSelectedRequirementId('')
+        }
+        return
+      }
       setMessages([result.message])
       if (result.ok) {
         if (result.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, result.tenantId as string])))
@@ -1063,6 +1080,21 @@ export function InventoryForm<T extends InventoryRecord>({
 
     const systemId = systemForTenant.id
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
+    if (result.requiresTimeGroupOverride) {
+      if (!window.confirm(result.message)) {
+        setMessages(['Tenant was not added.'])
+        return
+      }
+      const confirmedResult = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId, { confirmedTimeGroupMismatch: true })
+      setMessages([confirmedResult.message])
+      if (confirmedResult.ok) {
+        if (confirmedResult.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, confirmedResult.tenantId as string])))
+        setAddTenantOpen(false)
+        setSelectedProjectId('')
+        setSelectedRequirementId('')
+      }
+      return
+    }
     setMessages([result.message])
     if (result.ok) {
       if (result.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, result.tenantId as string])))

@@ -1,6 +1,6 @@
 import type { AppDataState, System, Tenant, TimeGroupLookupRecord } from '@/data/seed.types'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
-import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
+import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
 
 export const TIME_GROUP_LOOKUP_SOURCE: TimeGroupLookupRecord[] = [
   {
@@ -136,19 +136,29 @@ export function normalizeTimeGroupLookups(records: TimeGroupLookupRecord[] | und
 
 export function validateTimeGroupLookupRows(records: TimeGroupLookupRecord[]): string[] {
   const messages: string[] = []
-  const activeZones = new Map<string, string>()
+  const activeZones = new Map<string, TimeGroupLookupRecord>()
+  const activeCountries = new Map<string, TimeGroupLookupRecord>()
+  const activeStates = new Map<string, TimeGroupLookupRecord>()
+
+  function assertUnique(owner: Map<string, TimeGroupLookupRecord>, value: string, record: TimeGroupLookupRecord, label: 'Time Zone' | 'Country' | 'State') {
+    if (!record.active) return
+    const previous = owner.get(value)
+    if (previous && previous.timeGroupId !== record.timeGroupId) {
+      messages.push(`${label} ${value} is already assigned to Time Group ${previous.timeGroup}.`)
+      return
+    }
+    owner.set(value, record)
+  }
+
   records.forEach((record) => {
     if (!record.timeGroup.trim()) messages.push(`Time Group is required for row ${record.timeGroupId}.`)
     if (record.timeZones.length === 0) messages.push(`Time Zone is required for row ${record.timeGroupId}.`)
     record.timeZones.forEach((timeZone) => {
       if (!TIME_ZONE_PATTERN.test(timeZone)) messages.push(`Time Zone ${timeZone} in row ${record.timeGroupId} is malformed.`)
-      if (!record.active) return
-      const previous = activeZones.get(timeZone)
-      if (previous && previous !== record.timeGroupId) {
-        messages.push(`Time Zone ${timeZone} is mapped to more than one active Time Group (${previous}, ${record.timeGroupId}).`)
-      }
-      activeZones.set(timeZone, record.timeGroupId)
+      assertUnique(activeZones, timeZone, record, 'Time Zone')
     })
+    record.countries.forEach((country) => assertUnique(activeCountries, country, record, 'Country'))
+    record.states.forEach((state) => assertUnique(activeStates, state, record, 'State'))
   })
   return messages
 }
@@ -181,28 +191,66 @@ export function normalizeTenantTimeGroup(tenant: Tenant, records: TimeGroupLooku
   }
 }
 
-export function projectTimeGroupForAllocation(
-  project: AppDataState['projects'][number],
-  state: Pick<AppDataState, 'opportunities' | 'accounts' | 'timeGroupLookups'>,
-): { timeZone: string; timeGroup: string; alert: string } {
-  const linkedOpportunity = state.opportunities.find((opportunity) => opportunity.id === project.opportunityId)
-  const account = state.accounts.find((candidate) => candidate.accountName === project.accountName)
-  const timeZone = projectHeaderFieldValue(project, 'timeZone', { linkedOpportunity, account })
-  const timeGroup = timeGroupForTimeZone(state.timeGroupLookups, timeZone)
-  return {
-    timeZone,
-    timeGroup,
-    alert: timeZone && !timeGroup ? `No active Time Group mapping exists for Time Zone ${timeZone}.` : '',
+function activeHostingDateForTenant(tenant: Tenant, systemId: string): string {
+  const activeHistory = (tenant.hostedSystemHistory ?? [])
+    .filter((entry) => entry.systemId === systemId && entry.endedAt == null)
+    .sort((first, second) => first.startedAt.localeCompare(second.startedAt))[0]
+  return activeHistory?.startedAt || tenant.createdAt || ''
+}
+
+export function mostVeteranActiveTenantForSystem(systemId: string, tenants: Tenant[]): Tenant | undefined {
+  return tenants
+    .filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId))
+    .sort((first, second) => {
+      const firstDate = activeHostingDateForTenant(first, systemId)
+      const secondDate = activeHostingDateForTenant(second, systemId)
+      if (firstDate !== secondDate) return firstDate.localeCompare(secondDate)
+      return first.tid.localeCompare(second.tid, undefined, { numeric: true, sensitivity: 'base' })
+    })[0]
+}
+
+export function systemTimeGroupFromVeteranTenant(
+  systemId: string,
+  tenants: Tenant[],
+  records: TimeGroupLookupRecord[],
+): { timeGroup: string; tenant?: Tenant; timeZone: string } {
+  const tenant = mostVeteranActiveTenantForSystem(systemId, tenants)
+  if (!tenant) return { timeGroup: '', tenant: undefined, timeZone: '' }
+  const derived = tenantTimeGroupFromLocation(tenant, records)
+  return { timeGroup: derived.timeGroup, tenant, timeZone: derived.timeZone }
+}
+
+export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: string, next: string, veteranTenant?: Tenant): string {
+  if (previous && next) {
+    return `System ${systemIdLabel} Time Group changed from ${previous} to ${next}. The value is now derived from Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
   }
+  if (previous && !next) {
+    return `System ${systemIdLabel} Time Group changed from ${previous} to empty because the System no longer has an active hosted Tenant.`
+  }
+  return `System ${systemIdLabel} Time Group was set to ${next}, based on Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
+}
+
+export function systemsWithDerivedTimeGroups<T extends System>(systems: T[], tenants: Tenant[], records: TimeGroupLookupRecord[]): T[] {
+  return systems.map((system) => {
+    const derived = systemTimeGroupFromVeteranTenant(system.id, tenants, records)
+    return derived.timeGroup === system.timeGroup
+      ? system
+      : { ...system, timeGroup: derived.timeGroup }
+  })
 }
 
 export function linkedSidsForTimeGroup(
   record: TimeGroupLookupRecord,
   systems: Array<System | AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number]>,
+  tenants: Tenant[] = [],
+  records: TimeGroupLookupRecord[] = [],
 ): string[] {
   return Array.from(new Set(
     systems
-      .filter((system) => system.timeGroup === record.timeGroup)
+      .filter((system) => {
+        if (!('sid' in system)) return false
+        return systemTimeGroupFromVeteranTenant(system.id, tenants, records).timeGroup === record.timeGroup
+      })
       .map((system) => ('sid' in system ? system.sid : 'machineId' in system ? system.machineId : ''))
       .filter((value): value is string => Boolean(value)),
   )).sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))

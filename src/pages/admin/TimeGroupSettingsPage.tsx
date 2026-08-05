@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Edit2, Save, X } from 'lucide-react'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
-import { BusinessIdListLinks, RecordHistorySection, SaveButtonLabel, formMessageClassName, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdListLinks, CheckboxMultiSelect, RecordHistorySection, SaveButtonLabel, formMessageClassName, type CheckboxMultiSelectOption, type RecordHistoryColumn } from '@/components/ui'
 import type { TimeGroupLookupRecord } from '@/data/seed.types'
-import { joinSemicolonValues, linkedSidsForTimeGroup, linkedTidsForTimeGroup } from '@/domain/time-groups'
+import { TIME_GROUP_LOOKUP_SOURCE, joinSemicolonValues, linkedSidsForTimeGroup, linkedTidsForTimeGroup } from '@/domain/time-groups'
 import { useAppStore } from '@/store/useAppStore'
 
 type TimeGroupRow = TimeGroupLookupRecord & {
@@ -11,25 +11,23 @@ type TimeGroupRow = TimeGroupLookupRecord & {
   linkedTids: string[]
 }
 
-function splitSemicolonInput(value: string): string[] {
-  return value.split(';').map((candidate) => candidate.trim()).filter(Boolean)
+function distinctValues(rows: TimeGroupLookupRecord[], key: 'timeZones' | 'countries' | 'states'): string[] {
+  return Array.from(new Set([...TIME_GROUP_LOOKUP_SOURCE, ...rows].flatMap((row) => row[key]).filter(Boolean)))
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
-function editableTextarea(
-  label: string,
-  value: string,
-  onChange: (value: string) => void,
-  required = false,
-) {
-  return (
-    <textarea
-      aria-label={label}
-      className="min-h-16 w-80 rounded border border-sf-border px-2 py-1 text-sm"
-      required={required}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  )
+function optionsForRecord(
+  rows: TimeGroupLookupRecord[],
+  record: TimeGroupLookupRecord,
+  key: 'timeZones' | 'countries' | 'states',
+): CheckboxMultiSelectOption[] {
+  const selected = new Set(record[key])
+  return distinctValues(rows, key)
+    .filter((value) => {
+      if (selected.has(value)) return true
+      return !rows.some((row) => row.active && row.id !== record.id && row[key].includes(value))
+    })
+    .map((value) => ({ value }))
 }
 
 export function TimeGroupSettingsPage() {
@@ -47,7 +45,7 @@ export function TimeGroupSettingsPage() {
     const allSystems = [...systems, ...productionSystems, ...reusedSystems]
     return lookups.map((lookup) => ({
       ...lookup,
-      linkedSids: linkedSidsForTimeGroup(lookup, allSystems),
+      linkedSids: linkedSidsForTimeGroup(lookup, allSystems, tenants, lookups),
       linkedTids: linkedTidsForTimeGroup(lookup, tenants, lookups),
     }))
   }, [lookups, productionSystems, reusedSystems, systems, tenants])
@@ -120,7 +118,15 @@ export function TimeGroupSettingsPage() {
       key: 'timeZones',
       label: 'Time Zones',
       render: (row) => editingId === row.id && draft
-        ? editableTextarea('Time Zones', joinSemicolonValues(draft.timeZones), (value) => updateDraft({ timeZones: splitSemicolonInput(value) }), true)
+        ? (
+          <CheckboxMultiSelect
+            id={`${row.id}:timeZones`}
+            label="Time Zones"
+            selected={draft.timeZones}
+            options={optionsForRecord(lookups, draft, 'timeZones')}
+            onChange={(timeZones) => updateDraft({ timeZones })}
+          />
+        )
         : joinSemicolonValues(row.timeZones),
       sortValue: (row) => joinSemicolonValues(row.timeZones),
     },
@@ -128,7 +134,15 @@ export function TimeGroupSettingsPage() {
       key: 'countries',
       label: 'Countries',
       render: (row) => editingId === row.id && draft
-        ? editableTextarea('Countries', joinSemicolonValues(draft.countries), (value) => updateDraft({ countries: splitSemicolonInput(value) }))
+        ? (
+          <CheckboxMultiSelect
+            id={`${row.id}:countries`}
+            label="Countries"
+            selected={draft.countries}
+            options={optionsForRecord(lookups, draft, 'countries')}
+            onChange={(countries) => updateDraft({ countries })}
+          />
+        )
         : joinSemicolonValues(row.countries),
       sortValue: (row) => joinSemicolonValues(row.countries),
       className: 'max-w-xl whitespace-normal border border-sf-border px-1.5 py-1 align-top text-sf-text',
@@ -137,7 +151,15 @@ export function TimeGroupSettingsPage() {
       key: 'states',
       label: 'States',
       render: (row) => editingId === row.id && draft
-        ? editableTextarea('States', joinSemicolonValues(draft.states), (value) => updateDraft({ states: splitSemicolonInput(value) }))
+        ? (
+          <CheckboxMultiSelect
+            id={`${row.id}:states`}
+            label="States"
+            selected={draft.states}
+            options={optionsForRecord(lookups, draft, 'states')}
+            onChange={(states) => updateDraft({ states })}
+          />
+        )
         : joinSemicolonValues(row.states),
       sortValue: (row) => joinSemicolonValues(row.states),
       className: 'max-w-xl whitespace-normal border border-sf-border px-1.5 py-1 align-top text-sf-text',

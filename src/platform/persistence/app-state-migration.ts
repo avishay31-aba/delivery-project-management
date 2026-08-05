@@ -13,7 +13,7 @@ import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } fro
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups } from '@/domain/time-groups'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemsWithDerivedTimeGroups } from '@/domain/time-groups'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
@@ -74,9 +74,11 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
   const reusedInternalSystems = normalizedState.reusedInternalSystems.map((system) =>
     applyReusedSystemOccupationWindow(system, activeSystemLinks, normalizedState.projects, system.updatedAt ?? new Date().toISOString()),
   )
+  const systems = systemsWithDerivedTimeGroups(normalizedState.systems, normalizedState.tenants, timeGroupLookups)
 
   return {
     ...normalizedState,
+    systems,
     reusedInternalSystems,
     idCounters: normalizeIdCounters(state.idCounters, normalizedState),
   }
