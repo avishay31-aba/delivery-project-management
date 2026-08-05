@@ -315,7 +315,7 @@ export function systemFromProductionInventoryAllocation(
     linkedProjectIds: [projectId],
     tenantIds,
     region: assignmentLocation.region || productionSystem.region || '',
-    timeGroup: assignmentLocation.region || assignmentLocation.timeGroup || productionSystem.timeGroup || '',
+    timeGroup: assignmentLocation.timeGroup || productionSystem.timeGroup || '',
     createdAt: productionSystem.createdAt,
     updatedAt,
   }
@@ -353,7 +353,7 @@ export function systemFromReusedInternalAllocation(
     region: assignmentLocation.region || assignmentLocation.timeGroup || reusedSystem.usedInRegion || '',
     country: '',
     state: '',
-    timeGroup: assignmentLocation.region || assignmentLocation.timeGroup || reusedSystem.timeGroup,
+    timeGroup: assignmentLocation.timeGroup || reusedSystem.timeGroup,
     timeGroupAlert: reusedSystem.timeGroupAlert,
     operationalStatus: reusedSystem.operationalStatus,
     remarks: [],

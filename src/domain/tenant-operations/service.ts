@@ -29,12 +29,15 @@ interface TenantMoveContext {
 }
 
 export type TenantOperationalMode =
-  | 'Operative'
-  | 'Service Blocked'
-  | 'Access Blocked'
+  | 'Active'
   | 'Deleted'
   | 'Cancelled'
   | 'Access Blocked - Password Reset'
+  | 'Access Blocked - System Level'
+  | 'Service Blocked - System Level'
+  | 'Deleted - System Level'
+  | 'Cancelled - System Level'
+  | 'Off - System Level'
 
 export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
   TENANT_OPERATIONAL_STATUS_DELETED,
@@ -42,7 +45,9 @@ export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
 ]
 
 export const TENANT_MANUAL_OPERATIONAL_MODES: TenantOperationalMode[] = [
+  'Active',
   'Access Blocked - Password Reset',
+  'Deleted',
 ]
 
 export function tenantFormType(tenant: Tenant): TenantFormType {
@@ -56,9 +61,12 @@ export function tenantFormTypeForSystem(system: System): TenantFormType {
 
 export function derivedTenantOperationalMode(system?: System): TenantOperationalMode {
   const status = system?.operationalStatus?.toLocaleLowerCase() ?? ''
-  if (status.includes('service blocked')) return 'Service Blocked'
-  if (status.includes('access blocked')) return 'Access Blocked'
-  return 'Operative'
+  if (status.includes('access blocked')) return 'Access Blocked - System Level'
+  if (status.includes('service blocked')) return 'Service Blocked - System Level'
+  if (status.includes('deleted')) return 'Deleted - System Level'
+  if (status.includes('cancelled') || status.includes('canceled')) return 'Cancelled - System Level'
+  if (status.includes('off')) return 'Off - System Level'
+  return 'Active'
 }
 
 export function isManualTenantOperationalMode(value: string | undefined | null): value is TenantOperationalMode {
@@ -66,12 +74,11 @@ export function isManualTenantOperationalMode(value: string | undefined | null):
 }
 
 export function effectiveTenantOperationalMode(tenant: Tenant, system?: System): TenantOperationalMode {
-  if (isTenantLifecycleInactive(tenant)) return tenant.operationalStatus as TenantOperationalMode
   const systemDerivedMode = derivedTenantOperationalMode(system)
-  if (systemDerivedMode !== 'Operative') return systemDerivedMode
-  return isManualTenantOperationalMode(tenant.operationalStatus)
-    ? tenant.operationalStatus
-    : systemDerivedMode
+  if (systemDerivedMode !== 'Active') return systemDerivedMode
+  const manual = tenant.lastManualOperationalStatus || tenant.operationalStatus
+  if (manual === 'Operative') return 'Active'
+  return isManualTenantOperationalMode(manual) ? manual : 'Active'
 }
 
 export function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {

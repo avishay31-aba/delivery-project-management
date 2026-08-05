@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Edit2, Maximize2, Plus, Save, Trash2, X } from 'lucide-react'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
@@ -63,8 +63,35 @@ const WEEKDAY_LABELS: Record<NonNullable<InfrastructureMaintenanceRecurrence['we
 
 function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanceTaskStatus; onChange: (value: InfrastructureMaintenanceTaskStatus) => void }) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLSpanElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (target instanceof Node && rootRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
   return (
-    <span className="relative inline-block w-40">
+    <span
+      ref={rootRef}
+      className="relative inline-block w-40"
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+        setOpen(false)
+      }}
+    >
       <button type="button" className="flex h-8 w-full items-center justify-between rounded border border-sf-border bg-white px-2 py-1 text-left text-sm" onClick={() => setOpen((current) => !current)}>
         <TaskStatusPresentation status={value} />
         <span className="text-sf-text-muted" aria-hidden="true">v</span>

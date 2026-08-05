@@ -36,6 +36,10 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
 
   return {
     ...tenant,
+    operationalStatus: tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active',
+    lastManualOperationalStatus: tenant.lastManualOperationalStatus === 'Operative'
+      ? 'Active'
+      : tenant.lastManualOperationalStatus || (tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active'),
     contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
     hostedSystemHistory: history,
     tenantFormType: tenant.tenantType === 'PENLINK_INTERNAL' ? 'INTERNAL' : tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
@@ -74,6 +78,7 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
     country: source.opportunity.country ?? source.account?.country ?? source.system.country ?? '',
     timeGroup: source.opportunity.timeGroup ?? source.account?.timeGroup ?? source.system.timeGroup,
     operationalStatus: 'Active',
+    lastManualOperationalStatus: 'Active',
     contractStatus: 'UNDER_CONTRACT',
     hostedSystemHistory: [{ systemId: source.system.id, startedAt: now, endedAt: null, reason: 'Created' }],
     productType: configuration.product,

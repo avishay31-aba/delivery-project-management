@@ -22,6 +22,7 @@ import {
   LinkedProjectsLinks,
   MetadataHeaderField,
   OperationalStatusIcon,
+  OperationalStatusSelect,
   PlaceholderCard,
   RequiredFieldMarker,
   RichTextContent,
@@ -90,7 +91,7 @@ import {
   validateWarrantyEditDraft,
   warrantyContextHasField,
   warrantyContextRequiresField,
-  warrantyHeaderStatusReadModel,
+  tenantWarrantyHeaderStatusReadModel,
   warrantyManageabilityMessage,
   warrantyRelatedProjectOptionLabel,
 } from '@/domain/warranty-collection'
@@ -99,7 +100,6 @@ import {
   derivedTenantOperationalMode,
   effectiveTenantOperationalMode,
   isManualTenantOperationalMode,
-  isTenantLifecycleInactive,
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
@@ -116,6 +116,7 @@ import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
+import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
 
 type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
 type ConfigKey = keyof TenantConfiguration
@@ -312,6 +313,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const projectTenants = useAppStore((state) => state.projectTenants)
   const opportunities = useAppStore((state) => state.opportunities)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const timeGroupLookups = useAppStore((state) => state.timeGroupLookups)
   const updateTenant = useAppStore((state) => state.updateTenant)
   const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
   const updateSystemMapCenter = useAppStore((state) => state.updateSystemMapCenter)
@@ -345,7 +347,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
-  const [operationalStatusOpen, setOperationalStatusOpen] = useState(false)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(tenantParentSaveScope(savedTenant), tenantParentSaveScope(draft)))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
@@ -448,7 +449,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
-  const committedWarrantyHeaderStatus = warrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
+  const committedWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
   const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
 
   useEffect(() => {
@@ -870,11 +871,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function updateTenantOperationalMode(value: string) {
     if (isViewMode) return
-    const nextOperationalStatus =
-      value === '__DERIVED__'
-        ? ''
-        : value
-    setDraft((current) => (current ? { ...current, operationalStatus: nextOperationalStatus } : current))
+    setDraft((current) => (current ? { ...current, operationalStatus: value, lastManualOperationalStatus: value } : current))
     setMessages([])
   }
 
@@ -893,49 +890,31 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function renderOperationalModeField() {
     const derivedMode = derivedTenantOperationalMode(activeSystem)
     const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
-    if (isTenantLifecycleInactive(tenantDraft)) {
-      return renderHeaderField('Operational Status', renderOperationalStatusOption(currentMode), 'w-72')
+    if (derivedMode !== 'Active') {
+      return (
+        <FormField label="Operational Status" controlWidthClassName="w-72">
+          <div className="flex h-8 items-center rounded border border-sf-border bg-sf-surface-alt px-2 text-sm">
+            {renderOperationalStatusOption(currentMode)}
+          </div>
+          <span className="block pt-1 text-xs text-sf-text-muted">Derived from linked System</span>
+        </FormField>
+      )
     }
-    const selectValue = isManualTenantOperationalMode(tenantDraft.operationalStatus) ? tenantDraft.operationalStatus : '__DERIVED__'
-    const selectedLabel = selectValue === '__DERIVED__' ? derivedMode : selectValue
-    const options = [
-      { value: '__DERIVED__', label: derivedMode },
-      ...TENANT_MANUAL_OPERATIONAL_MODES.map((mode) => ({ value: mode, label: mode })),
-    ]
+    const selectValue = isManualTenantOperationalMode(tenantDraft.lastManualOperationalStatus)
+      ? tenantDraft.lastManualOperationalStatus
+      : isManualTenantOperationalMode(tenantDraft.operationalStatus)
+        ? tenantDraft.operationalStatus
+        : 'Active'
 
     return (
       <FormField label="Operational Status" controlWidthClassName="w-72">
-        <div className="relative">
-          <button
-            type="button"
-            className="flex h-8 min-w-0 w-full items-center justify-between gap-2 rounded border border-sf-border bg-white px-2 py-1 text-left text-sm"
-            aria-expanded={operationalStatusOpen}
-            onClick={() => setOperationalStatusOpen((current) => !current)}
-          >
-            {renderOperationalStatusOption(selectedLabel)}
-            <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
-          </button>
-          {operationalStatusOpen ? (
-            <div className="absolute left-0 top-full z-20 mt-1 w-full rounded border border-sf-border bg-white py-1 text-sm shadow-lg">
-              {options.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-sf-surface-alt"
-                  onClick={() => {
-                    updateTenantOperationalMode(option.value)
-                    setOperationalStatusOpen(false)
-                  }}
-                >
-                  {renderOperationalStatusOption(option.label)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <span className="block pt-1 text-xs text-sf-text-muted">
-          {currentMode === derivedMode ? 'Derived from linked System' : 'Manual override'}
-        </span>
+        <OperationalStatusSelect
+          value={selectValue}
+          options={TENANT_MANUAL_OPERATIONAL_MODES}
+          disabled={isViewMode}
+          onChange={updateTenantOperationalMode}
+        />
+        <span className="block pt-1 text-xs text-sf-text-muted">Manual Tenant status</span>
       </FormField>
     )
   }
@@ -1044,7 +1023,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('Country', tenantDraft.country || opportunity?.country || activeSystem?.country || '')}
           {renderHeaderField('State', opportunity?.state ?? activeSystem?.state ?? '')}
           {renderHeaderField('Time Zone', tenantTimeZoneDisplayValue(tenantDraft, opportunity, activeSystem))}
-          {renderHeaderField('Time Group', tenantDraft.timeGroup || opportunity?.timeGroup || activeSystem?.timeGroup || '')}
+          {renderHeaderField('Time Group', tenantTimeGroupFromLocation({ ...tenantDraft, state: opportunity?.state ?? activeSystem?.state ?? '' }, timeGroupLookups).timeGroup || '')}
         </div>
       </section>
     )

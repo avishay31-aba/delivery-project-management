@@ -8,6 +8,7 @@ import type {
   ReferenceDataRecord,
   ReferenceDataType,
   InfrastructureItem,
+  TimeGroupLookupRecord,
   VersionUpdateAttachmentRecord,
   VersionUpdateRecord,
 } from '@/data/seed.types'
@@ -81,6 +82,7 @@ import {
 import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, projectTimeGroupForAllocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import {
   normalizeReferenceLabel,
   referenceDataLabel,
@@ -150,7 +152,7 @@ function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity 
     {
       ...opportunity,
       region,
-      timeGroup: region || normalizeBusinessRegion(opportunity.timeGroup),
+      timeGroup: opportunity.timeGroup || '',
     },
     opportunity.deliveryDate ?? opportunity.pocStartDate,
   )
@@ -161,7 +163,7 @@ function accountWithDerivedGeography(account: AppDataState['accounts'][number]):
   return applyGeographicTimeZone({
     ...account,
     region,
-    timeGroup: region || normalizeBusinessRegion(account.timeGroup),
+    timeGroup: account.timeGroup || '',
   })
 }
 
@@ -583,10 +585,12 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   const linkedOpportunity = state.opportunities.find((opportunity) => opportunity.id === project.opportunityId)
   const account = state.accounts.find((candidate) => candidate.accountName === project.accountName)
   const context = { linkedOpportunity, account }
+  const timeGroupResolution = projectTimeGroupForAllocation(project, state)
   return {
     region: projectBusinessRegionForAllocation(project, state),
     timeZone: projectHeaderFieldValue(project, 'timeZone', context),
-    timeGroup: projectBusinessRegionForAllocation(project, state),
+    timeGroup: timeGroupResolution.timeGroup,
+    timeGroupAlert: timeGroupResolution.alert,
   }
 }
 
@@ -783,7 +787,7 @@ function ensureProjectTenantHostingRelationships(
             ...system,
             linkedProjectIds: Array.from(new Set([...(system.linkedProjectIds ?? []), project.id])),
             tenantIds: Array.from(new Set([...(system.tenantIds ?? []), tenant.id])),
-            timeGroup: appendUniqueSemicolonValue(system.timeGroup, assignmentLocation.region || assignmentLocation.timeGroup),
+            timeGroup: appendUniqueSemicolonValue(system.timeGroup, assignmentLocation.timeGroup),
             updatedAt: now,
           }
         : system,
@@ -990,6 +994,7 @@ interface AppStore extends AppDataState {
   createReferenceDataRecord: (referenceType: ReferenceDataType, label: string, options?: { versionNumberId?: string | null }) => AllocationActionResult & { record?: ReferenceDataRecord }
   updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
   setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
+  updateTimeGroupLookup: (id: string, patch: Partial<TimeGroupLookupRecord>) => AllocationActionResult
   createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
@@ -1073,6 +1078,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenants: state.tenants,
       warrantyRecords: state.warrantyRecords,
       referenceData: state.referenceData,
+      timeGroupLookups: state.timeGroupLookups,
       versionUpdates: state.versionUpdates,
       infrastructureItems: state.infrastructureItems,
       activityEvents: state.activityEvents,
@@ -1479,6 +1485,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} ${active ? 'activated' : 'deactivated'}.` }
   },
 
+  updateTimeGroupLookup: (id, patch) => {
+    const state = get()
+    const existing = state.timeGroupLookups.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'Time Group mapping not found.' }
+    const now = new Date().toISOString()
+    const nextRecord: TimeGroupLookupRecord = {
+      ...existing,
+      ...patch,
+      timeGroupId: existing.timeGroupId,
+      timeGroup: String(patch.timeGroup ?? existing.timeGroup).trim(),
+      timeZones: Array.isArray(patch.timeZones) ? patch.timeZones.map((value) => value.trim()).filter(Boolean) : existing.timeZones,
+      countries: Array.isArray(patch.countries) ? patch.countries.map((value) => value.trim()).filter(Boolean) : existing.countries,
+      states: Array.isArray(patch.states) ? patch.states.map((value) => value.trim()).filter(Boolean) : existing.states,
+      active: patch.active ?? existing.active,
+      updatedAt: now,
+    }
+    const nextRows = normalizeTimeGroupLookups(state.timeGroupLookups.map((record) => record.id === id ? nextRecord : record))
+    const messages = validateTimeGroupLookupRows(nextRows)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    set((current) => ({
+      timeGroupLookups: nextRows,
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: 'timeGroup.mappingUpdated',
+        severity: 'INFO',
+        summary: `Time Group mapping ${nextRecord.timeGroupId} updated.`,
+        primaryObject: {
+          objectType: 'CONFIGURATION',
+          id: nextRecord.id,
+          businessId: nextRecord.timeGroupId,
+          displayLabel: nextRecord.timeGroup,
+        },
+        before: existing as unknown as Record<string, unknown>,
+        after: nextRecord as unknown as Record<string, unknown>,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Time Group mapping updated.' }
+  },
+
   createInfrastructureItem: (draft) => {
     const state = get()
     const now = new Date().toISOString()
@@ -1879,7 +1925,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const tenants = state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
         previousTenant = tenant
-        nextTenant = { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }
+        nextTenant = normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups)
         return nextTenant
       })
       return {
@@ -1920,7 +1966,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
       const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
       const tenants = state.tenants.map((tenant) =>
-        tenant.id === id ? { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now } : tenant,
+        tenant.id === id ? normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups) : tenant,
       )
       const committedTenant = {
         ...savedTenant,
@@ -2111,7 +2157,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const resolved = resolveTenantCreationSource({ projectId, systemId, requirementId }, state)
     if (resolved.error) return resolved.error
-    const { tenant, projectTenant, idCounters } = tenantCreationDraftFromSource(resolved.source, now)
+    const created = tenantCreationDraftFromSource(resolved.source, now)
+    const tenant = normalizeTenantTimeGroup(created.tenant, state.timeGroupLookups)
+    const { projectTenant, idCounters } = created
 
     set((current) => ({
       idCounters,
@@ -2656,7 +2704,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       accountName: '',
       country: '',
       timeGroup: '',
-      operationalStatus: '',
+      operationalStatus: 'Active',
+      lastManualOperationalStatus: 'Active',
       contractStatus: 'UNDER_CONTRACT',
       hostedSystemHistory: [],
       productType: '',
@@ -2805,7 +2854,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 current.projects,
               ),
               usedInRegion: assignmentLocation.region,
-              timeGroup: assignmentLocation.region,
+              timeGroup: assignmentLocation.timeGroup,
             }
           : candidate,
       ),
@@ -2852,7 +2901,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
               linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), projectId])),
               tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
               region: activeLinksForSystem.length === 0 ? assignmentLocation.region : candidate.region || assignmentLocation.region,
-              timeGroup: activeLinksForSystem.length === 0 ? assignmentLocation.region : candidate.timeGroup || assignmentLocation.region,
+              timeGroup: activeLinksForSystem.length === 0 ? assignmentLocation.timeGroup : candidate.timeGroup || assignmentLocation.timeGroup,
               updatedAt: now,
             }
           : candidate,

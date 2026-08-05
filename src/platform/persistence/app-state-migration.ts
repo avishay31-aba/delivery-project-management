@@ -13,6 +13,7 @@ import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } fro
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups } from '@/domain/time-groups'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
@@ -28,6 +29,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     ? state.projectSystems.map(normalizeProjectSystemLink)
     : seedState.projectSystems.map(normalizeProjectSystemLink)
   const referenceData = ensureInfrastructureReferenceData(Array.isArray(state.referenceData) ? state.referenceData : [])
+  const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [])
   const normalizedState = {
     ...state,
     salesManagers: (Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers).map((manager) => ({
@@ -39,7 +41,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       return {
         ...account,
         region,
-        timeGroup: region || normalizeBusinessRegion(account.timeGroup),
+        timeGroup: account.timeGroup || '',
       }
     }),
     opportunities,
@@ -54,10 +56,11 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ? state.systems.map(normalizeSystemInventoryRecord)
       : seedState.systems.map(normalizeSystemInventoryRecord),
     tenants: Array.isArray(state.tenants)
-      ? state.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems))
-      : seedState.tenants.map((tenant) => normalizeTenantOperationRecord(tenant, seedState.systems)),
+      ? state.tenants.map((tenant) => normalizeTenantTimeGroup(normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems), timeGroupLookups))
+      : seedState.tenants.map((tenant) => normalizeTenantTimeGroup(normalizeTenantOperationRecord(tenant, seedState.systems), timeGroupLookups)),
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     referenceData,
+    timeGroupLookups,
     versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
     infrastructureItems: normalizeInfrastructureItemsForReferenceData(Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : [], referenceData),
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),

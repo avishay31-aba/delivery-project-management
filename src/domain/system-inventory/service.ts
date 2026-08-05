@@ -1,4 +1,3 @@
-import { timeGroupForCountry } from '@/config/time-groups'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { reserveBusinessId } from '@/domain/business-identity'
 import {
@@ -322,17 +321,14 @@ export function linkedProjectDisplay(record: SystemInventoryRecord, projects: Pr
 }
 
 export function systemTimeGroup(record: SystemInventoryRecord, tenants: Tenant[]): string {
-  const oldestTenant = hostedTenantsForSystem(record.id, tenants)
-    .sort((first, second) => first.createdAt.localeCompare(second.createdAt))[0]
-  return timeGroupForCountry(oldestTenant?.country) || String(('timeGroup' in record ? record.timeGroup : '') ?? '')
+  void tenants
+  return String(('timeGroup' in record ? record.timeGroup : '') ?? '')
 }
 
 export function systemTimeGroupAlert(record: SystemInventoryRecord, tenants: Tenant[], fallback: unknown): string {
-  const activeTimeGroup = systemTimeGroup(record, tenants)
-  const tenant = hostedTenantsForSystem(record.id, tenants).find(
-    (candidate) => timeGroupForCountry(candidate.country) && timeGroupForCountry(candidate.country) !== activeTimeGroup,
-  )
-  return tenant ? `Tenant ${tenant.tid} does not belong to system time group` : String(fallback ?? '')
+  void record
+  void tenants
+  return String(fallback ?? '')
 }
 
 export function allocatedSystemsForActiveLinks(systems: System[], projectSystems: ProjectSystemLink[]): System[] {

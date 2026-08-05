@@ -378,6 +378,7 @@ export interface Tenant {
   country: string
   timeGroup: string
   operationalStatus: string
+  lastManualOperationalStatus?: string
   contractStatus?: TenantContractStatus
   hostedSystemHistory?: TenantHostedSystemHistory[]
   tenantFormType?: TenantFormType
@@ -955,6 +956,17 @@ export interface ProjectTenantLink {
   deallocatedAt?: string | null
 }
 
+export interface TimeGroupLookupRecord {
+  id: string
+  timeGroupId: string
+  timeGroup: string
+  timeZones: string[]
+  countries: string[]
+  states: string[]
+  active: boolean
+  updatedAt?: string
+}
+
 /** Root shape persisted by the application storage adapter */
 export interface AppDataState {
   version: number
@@ -968,6 +980,7 @@ export interface AppDataState {
   tenants: Tenant[]
   warrantyRecords: WarrantyRecord[]
   referenceData: ReferenceDataRecord[]
+  timeGroupLookups: TimeGroupLookupRecord[]
   versionUpdates: VersionUpdateRecord[]
   infrastructureItems: InfrastructureItem[]
   activityEvents: ActivityEvent[]

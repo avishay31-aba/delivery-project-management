@@ -65,10 +65,15 @@ const OPERATIONAL_PRESENTATIONS: Record<string, StatusPresentation> = {
   off: { ...DEFAULT_PRESENTATION, key: 'off', kind: 'operational', label: 'Off', icon: PowerOff, iconClassName: 'text-red-500', tooltip: 'Operational status: Off' },
   'access blocked': { ...DEFAULT_PRESENTATION, key: 'access blocked', kind: 'operational', label: 'Access Blocked', icon: LockKeyhole, iconClassName: 'text-amber-500', tooltip: 'Operational status: Access Blocked' },
   'access blocked - password reset': { ...DEFAULT_PRESENTATION, key: 'access blocked - password reset', kind: 'operational', label: 'Access Blocked - Password Reset', icon: LockKeyhole, iconClassName: 'text-amber-500', tooltip: 'Operational status: Access Blocked - Password Reset' },
+  'access blocked - system level': { ...DEFAULT_PRESENTATION, key: 'access blocked - system level', kind: 'operational', label: 'Access Blocked - System Level', icon: LockKeyhole, iconClassName: 'text-amber-500', tooltip: 'Operational status: Access Blocked - System Level' },
   'service blocked': { ...DEFAULT_PRESENTATION, key: 'service blocked', kind: 'operational', label: 'Service Blocked', icon: ShieldX, iconClassName: 'text-orange-500', tooltip: 'Operational status: Service Blocked' },
+  'service blocked - system level': { ...DEFAULT_PRESENTATION, key: 'service blocked - system level', kind: 'operational', label: 'Service Blocked - System Level', icon: ShieldX, iconClassName: 'text-orange-500', tooltip: 'Operational status: Service Blocked - System Level' },
   deleted: { ...DEFAULT_PRESENTATION, key: 'deleted', kind: 'operational', label: 'Deleted', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Deleted' },
+  'deleted - system level': { ...DEFAULT_PRESENTATION, key: 'deleted - system level', kind: 'operational', label: 'Deleted - System Level', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Deleted - System Level' },
   cancelled: { ...DEFAULT_PRESENTATION, key: 'cancelled', kind: 'operational', label: 'Cancelled', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Cancelled' },
+  'cancelled - system level': { ...DEFAULT_PRESENTATION, key: 'cancelled - system level', kind: 'operational', label: 'Cancelled - System Level', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Cancelled - System Level' },
   canceled: { ...DEFAULT_PRESENTATION, key: 'canceled', kind: 'operational', label: 'Canceled', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Canceled' },
+  'off - system level': { ...DEFAULT_PRESENTATION, key: 'off - system level', kind: 'operational', label: 'Off - System Level', icon: PowerOff, iconClassName: 'text-red-500', tooltip: 'Operational status: Off - System Level' },
 }
 
 const PROJECT_PRESENTATIONS: Record<string, StatusPresentation> = {

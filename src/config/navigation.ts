@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, Server, Users } from 'lucide-react'
+import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, Server, Timer, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -71,6 +71,12 @@ export const consoleNavigation: NavConsoleGroup[] = [
         path: '/activity-log',
         icon: History,
         description: 'Operational activity timeline',
+      },
+      {
+        label: 'Time Group Settings',
+        path: '/admin/time-groups',
+        icon: Timer,
+        description: 'Time Zone to Time Group reference mapping',
       },
     ],
   },
