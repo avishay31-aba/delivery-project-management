@@ -19,7 +19,7 @@ import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
 import { normalizeRemarks } from '@/domain/remarks'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
 import { daysBeforeExpiration, daysBetween, normalizeTenantWarranties } from '@/domain/warranty-collection'
-import { tenantFormType, tenantFormTypeForSystem } from './service'
+import { isManualTenantOperationalMode, tenantFormType, tenantFormTypeForSystem } from './service'
 import type { TenantConfigurationSaveDraft, TenantCreationDraft, TenantCreationSource } from './types'
 
 export function cloneTenant(tenant: Tenant): Tenant {
@@ -34,12 +34,19 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
         ? [{ systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
         : []
 
+  const normalizedOperationalStatus = tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active'
+  const normalizedManualStatus = tenant.lastManualOperationalStatus === 'Operative'
+    ? 'Active'
+    : isManualTenantOperationalMode(tenant.lastManualOperationalStatus)
+      ? tenant.lastManualOperationalStatus
+      : isManualTenantOperationalMode(normalizedOperationalStatus)
+        ? normalizedOperationalStatus
+        : 'Active'
+
   return {
     ...tenant,
-    operationalStatus: tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active',
-    lastManualOperationalStatus: tenant.lastManualOperationalStatus === 'Operative'
-      ? 'Active'
-      : tenant.lastManualOperationalStatus || (tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active'),
+    operationalStatus: normalizedOperationalStatus,
+    lastManualOperationalStatus: normalizedManualStatus,
     contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
     hostedSystemHistory: history,
     tenantFormType: tenant.tenantType === 'PENLINK_INTERNAL' ? 'INTERNAL' : tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',

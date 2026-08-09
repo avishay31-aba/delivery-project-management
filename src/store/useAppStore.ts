@@ -538,7 +538,7 @@ function removeTenantsFromSystemTransaction(
         hostedSystemId: tenant.hostedSystemId || tenant.systemId,
       },
       after: {
-        operationalStatus: reason,
+        operationalStatus: reason === 'Cancelled' ? TENANT_OPERATIONAL_STATUS_CANCELLED : TENANT_OPERATIONAL_STATUS_DELETED,
         hostedSystemId: '',
       },
     })

@@ -70,8 +70,10 @@ const OPERATIONAL_PRESENTATIONS: Record<string, StatusPresentation> = {
   'service blocked - system level': { ...DEFAULT_PRESENTATION, key: 'service blocked - system level', kind: 'operational', label: 'Service Blocked - System Level', icon: ShieldX, iconClassName: 'text-orange-500', tooltip: 'Operational status: Service Blocked - System Level' },
   deleted: { ...DEFAULT_PRESENTATION, key: 'deleted', kind: 'operational', label: 'Deleted', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Deleted' },
   'deleted - system level': { ...DEFAULT_PRESENTATION, key: 'deleted - system level', kind: 'operational', label: 'Deleted - System Level', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Deleted - System Level' },
+  'deleted - by system': { ...DEFAULT_PRESENTATION, key: 'deleted - by system', kind: 'operational', label: 'Deleted - By System', icon: Trash2, iconClassName: 'text-gray-500', tooltip: 'Operational status: Deleted - By System' },
   cancelled: { ...DEFAULT_PRESENTATION, key: 'cancelled', kind: 'operational', label: 'Cancelled', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Cancelled' },
   'cancelled - system level': { ...DEFAULT_PRESENTATION, key: 'cancelled - system level', kind: 'operational', label: 'Cancelled - System Level', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Cancelled - System Level' },
+  'cancelled - by system': { ...DEFAULT_PRESENTATION, key: 'cancelled - by system', kind: 'operational', label: 'Cancelled - By System', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Cancelled - By System' },
   canceled: { ...DEFAULT_PRESENTATION, key: 'canceled', kind: 'operational', label: 'Canceled', icon: Ban, iconClassName: 'text-purple-500', tooltip: 'Operational status: Canceled' },
   'off - system level': { ...DEFAULT_PRESENTATION, key: 'off - system level', kind: 'operational', label: 'Off - System Level', icon: PowerOff, iconClassName: 'text-red-500', tooltip: 'Operational status: Off - System Level' },
 }

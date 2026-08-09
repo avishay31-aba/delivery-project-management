@@ -36,7 +36,7 @@ import {
 import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
-import { isTenantLifecycleInactive, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { effectiveTenantOperationalMode, isTenantLifecycleInactive, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { useAppStore } from '@/store/useAppStore'
 
 type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'requirements' | 'documents' | 'activity'
@@ -301,7 +301,7 @@ export function Customer360Page() {
           tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-',
           tenantRequirementIdDisplay(tenant) || '-',
           tenant.productType,
-          operationalStatus(tenant.operationalStatus),
+          operationalStatus(effectiveTenantOperationalMode(tenant, systems.find((candidate) => candidate.id === (tenant.hostedSystemId || tenant.systemId)))),
           tenant.country,
         ]),
         'No tenants found for this customer.',

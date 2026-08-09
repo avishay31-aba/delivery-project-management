@@ -100,6 +100,7 @@ import {
   derivedTenantOperationalMode,
   effectiveTenantOperationalMode,
   isManualTenantOperationalMode,
+  isTenantLifecycleInactive,
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
@@ -871,6 +872,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function updateTenantOperationalMode(value: string) {
     if (isViewMode) return
+    if (!isManualTenantOperationalMode(value)) return
     setDraft((current) => (current ? { ...current, operationalStatus: value, lastManualOperationalStatus: value } : current))
     setMessages([])
   }
@@ -890,13 +892,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   function renderOperationalModeField() {
     const derivedMode = derivedTenantOperationalMode(activeSystem)
     const currentMode = effectiveTenantOperationalMode(tenantDraft, activeSystem)
-    if (derivedMode !== 'Active') {
+    const hostedSystemIsOn = !activeSystem || activeSystem.operationalStatus.toLocaleLowerCase() === 'on'
+    if (isTenantLifecycleInactive(tenantDraft) || derivedMode !== 'Active' || !hostedSystemIsOn) {
       return (
         <FormField label="Operational Status" controlWidthClassName="w-72">
           <div className="flex h-8 items-center rounded border border-sf-border bg-sf-surface-alt px-2 text-sm">
             {renderOperationalStatusOption(currentMode)}
           </div>
-          <span className="block pt-1 text-xs text-sf-text-muted">Derived from linked System</span>
+          <span className="block pt-1 text-xs text-sf-text-muted">
+            {isTenantLifecycleInactive(tenantDraft) ? 'Derived from System Tenant action' : 'Derived from linked System'}
+          </span>
         </FormField>
       )
     }
@@ -1011,7 +1016,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderHeaderField('Delivery PID', renderPidLinks(headerDeliveryPid))}
-          {renderHeaderField('POC ID', renderPidLinks(headerPocPid))}
+          {renderHeaderField('POC PID', renderPidLinks(headerPocPid))}
           {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
           {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
           {renderCurrentSidField()}

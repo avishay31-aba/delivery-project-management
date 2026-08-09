@@ -1,8 +1,8 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, BusinessIdListLinks, CountryFlag, WarrantyStatusPresentation } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, CountryFlag, OperationalStatusIcon, WarrantyStatusPresentation } from '@/components/ui'
 import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { effectiveTenantOperationalMode, inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
@@ -18,7 +18,7 @@ function sidForTenant(tenant: Tenant, systems: System[]): string {
 }
 
 function systemForTenant(tenant: Tenant, systems: System[]): System | undefined {
-  return systems.find((system) => system.id === tenant.systemId)
+  return systems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
 }
 
 function systemUrlForTenant(tenant: Tenant, systems: System[]): string {
@@ -120,7 +120,12 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'aiFeatures', label: 'AI Features', getValue: (row) => joinValues(row.aiFeatures) },
     { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
-    { id: 'tenantStatus', label: 'Tenant Status', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
+    {
+      id: 'tenantStatus',
+      label: 'Tenant Status',
+      getValue: (row) => effectiveTenantOperationalMode(row, systemForTenant(row, systems)),
+      render: (row) => createElement(OperationalStatusIcon, { status: effectiveTenantOperationalMode(row, systemForTenant(row, systems)), showLabel: true }),
+    },
     {
       ...tenantRuntimeColumn('warrantyStatus'),
       getValue: (row) => tenantDerivedWarrantyContractStatus(row).label,

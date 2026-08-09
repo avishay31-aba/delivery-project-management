@@ -9,6 +9,8 @@ import {
   tenantLatestHistoricalSystemId,
   TENANT_OPERATIONAL_STATUS_CANCELLED,
   TENANT_OPERATIONAL_STATUS_DELETED,
+  TENANT_LEGACY_OPERATIONAL_STATUS_CANCELLED,
+  TENANT_LEGACY_OPERATIONAL_STATUS_DELETED,
 } from './lifecycle'
 import {
   TENANT_WARRANTY_CONTRACT_GROUPS,
@@ -30,14 +32,16 @@ interface TenantMoveContext {
 
 export type TenantOperationalMode =
   | 'Active'
-  | 'Deleted'
-  | 'Cancelled'
   | 'Access Blocked - Password Reset'
   | 'Access Blocked - System Level'
   | 'Service Blocked - System Level'
   | 'Deleted - System Level'
   | 'Cancelled - System Level'
   | 'Off - System Level'
+  | 'Deleted - By System'
+  | 'Cancelled - By System'
+  | 'Deleted'
+  | 'Cancelled'
 
 export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
   TENANT_OPERATIONAL_STATUS_DELETED,
@@ -47,7 +51,6 @@ export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
 export const TENANT_MANUAL_OPERATIONAL_MODES: TenantOperationalMode[] = [
   'Active',
   'Access Blocked - Password Reset',
-  'Deleted',
 ]
 
 export function tenantFormType(tenant: Tenant): TenantFormType {
@@ -74,6 +77,12 @@ export function isManualTenantOperationalMode(value: string | undefined | null):
 }
 
 export function effectiveTenantOperationalMode(tenant: Tenant, system?: System): TenantOperationalMode {
+  if (tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_DELETED || tenant.operationalStatus === TENANT_LEGACY_OPERATIONAL_STATUS_DELETED) {
+    return TENANT_OPERATIONAL_STATUS_DELETED
+  }
+  if (tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_CANCELLED || tenant.operationalStatus === TENANT_LEGACY_OPERATIONAL_STATUS_CANCELLED) {
+    return TENANT_OPERATIONAL_STATUS_CANCELLED
+  }
   const systemDerivedMode = derivedTenantOperationalMode(system)
   if (systemDerivedMode !== 'Active') return systemDerivedMode
   const manual = tenant.lastManualOperationalStatus || tenant.operationalStatus
