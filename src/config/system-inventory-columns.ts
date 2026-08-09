@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon } from '@/components/ui'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
@@ -70,7 +70,14 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   { id: 'country', label: 'Country', getValue: (row) => row.country ?? '', editable: true, editKey: 'country' },
   { id: 'state', label: 'State', getValue: (row) => row.state ?? '', editable: true, editKey: 'state' },
   { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
-  { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
+  {
+    id: 'operationalStatus',
+    label: 'Operational Status',
+    getValue: (row) => row.operationalStatus,
+    editable: true,
+    editKey: 'operationalStatus',
+    render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
+  },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
 ]
 
@@ -105,7 +112,14 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
         businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
       }),
   },
-  { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editable: true, editKey: 'operationalStatus' },
+  {
+    id: 'operationalStatus',
+    label: 'Operational Status',
+    getValue: (row) => row.operationalStatus,
+    editable: true,
+    editKey: 'operationalStatus',
+    render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
+  },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
   ]
 }
@@ -171,7 +185,14 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editKey: 'cloudRegion', replaceable: true },
     { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true, options: REGION_OPTIONS },
     { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true, options: REGION_OPTIONS },
-    { id: 'operationalStatus', label: 'Operational Mode', getValue: (row) => row.operationalStatus, editKey: 'operationalStatus', replaceable: true },
+    {
+      id: 'operationalStatus',
+      label: 'Operational Status',
+      getValue: (row) => row.operationalStatus,
+      editKey: 'operationalStatus',
+      replaceable: true,
+      render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
+    },
     { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
   ]
 }

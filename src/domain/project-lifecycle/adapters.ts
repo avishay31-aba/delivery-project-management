@@ -34,6 +34,7 @@ export function projectStatusFromTaskCompletion(project: Pick<Project, 'tasks'>)
 }
 
 export function applyProjectLifecycleStatus(project: Project): Project {
+  if (project.progressStatus === 'DELETED') return project
   const progressStatus = projectStatusFromTaskCompletion(project)
   return progressStatus === project.progressStatus ? project : { ...project, progressStatus }
 }
@@ -51,7 +52,7 @@ export function normalizeProjectLifecycleProject(project: Project): Project {
     pocEndDate: project.pocEndDate ?? null,
     region,
     timeGroup: region || normalizeBusinessRegion(project.timeGroup),
-    progressStatus: projectStatusFromTaskCompletion(project),
+    progressStatus: project.progressStatus === 'DELETED' ? 'DELETED' : projectStatusFromTaskCompletion(project),
   }
 }
 

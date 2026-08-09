@@ -133,7 +133,7 @@ export function opportunityRowsForRequirementSection(
 }
 
 export function activePocProjectForOpportunity(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project | undefined {
-  return linkedPocProjectsForOpportunity(opportunity, savedOpportunity, projects).find((project) => project.progressStatus !== 'DONE' && !project.archivedAt)
+  return linkedPocProjectsForOpportunity(opportunity, savedOpportunity, projects).find((project) => project.progressStatus === 'OPEN' && !project.archivedAt)
 }
 
 export function finalProjectForOpportunity(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project | undefined {

@@ -315,6 +315,7 @@ export function projectMainTypeLabel(type: ProjectMainType | string | undefined)
 }
 
 export function projectStatusLabel(status: string): string {
+  if (status === 'DELETED') return 'Deleted'
   if (status === 'DONE') return 'Done'
   return 'Open'
 }
@@ -369,7 +370,7 @@ export function projectHealthReadModel(
   today = new Date(),
 ): ProjectHealthReadModel {
   const progress = deriveProjectProgress(context.project)
-  const completed = context.project.progressStatus === 'DONE'
+  const completed = context.project.progressStatus === 'DONE' || context.project.progressStatus === 'DELETED'
   const deadlineSummary = completed ? EMPTY_PROJECT_DEADLINE_SUMMARY : projectDeadlineSummary(context.project, today)
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
   const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
@@ -485,6 +486,7 @@ export function projectWorkspaceTenantSummary(context: ProjectSystemsTenantsCont
 
 export function projectListRowClassName(project: Project): string {
   if (project.archivedAt) return 'bg-gray-50 hover:bg-gray-100'
+  if (project.progressStatus === 'DELETED') return 'bg-gray-50 hover:bg-gray-100'
   return project.progressStatus === 'DONE'
     ? 'bg-blue-50 hover:bg-blue-100'
     : 'bg-green-50 hover:bg-green-100'
@@ -493,7 +495,7 @@ export function projectListRowClassName(project: Project): string {
 export const PROJECT_DASHBOARD_COLOR_LEGEND = [
   { label: 'Open', rowClassName: 'bg-green-50', swatchClassName: 'bg-green-50' },
   { label: 'Done', rowClassName: 'bg-blue-50', swatchClassName: 'bg-blue-50' },
-  { label: 'Archived', rowClassName: 'bg-gray-50', swatchClassName: 'bg-gray-50' },
+  { label: 'Deleted', rowClassName: 'bg-gray-50', swatchClassName: 'bg-gray-50' },
 ]
 
 function textValue(value: unknown): string {

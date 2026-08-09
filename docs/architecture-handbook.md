@@ -507,6 +507,21 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Tenant form manual status pick lists must expose only the two manual values. System-derived and action-derived values are read-only effective states and must not be manually selectable.
 - Tenant status presentation must use the shared Operational Status presenter everywhere Tenant effective status is shown.
 
+### Status Presentation Standard
+
+- Each business Status family has one shared presentation owner.
+- Forms, dashboards, tables, dialogs, related-object views, and future consumers must render equivalent status values through that same shared presenter.
+- Equivalent status values must never use different labels, icons, colors, badge treatment, spacing, typography, tooltip, or accessibility behavior across the application.
+- Status presentation is visual only. Sorting, filtering, searching, export, and business logic must continue to use the raw status value or approved status label text, never React markup or icon content.
+
+### Project Delete Lifecycle Standard
+
+- Project Delete is a lifecycle transition to `Project Status = Deleted`.
+- Delete preserves the Project record, PID, relationships, tasks, documents, Activity, Configuration History, and other historical/business data.
+- Delete is not archive, hiding, unlinking, or physical removal.
+- Deleted Projects remain persisted, navigable, dashboard-visible, and audit-visible.
+- Deleted is a terminal Project Status unless a future approved workflow explicitly introduces restoration.
+
 ### Tenant Lifecycle And Hosting Standard
 
 - Tenant is a virtual commercial and configuration Business Object. System is the physical infrastructure Business Object.

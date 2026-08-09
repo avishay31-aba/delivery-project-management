@@ -80,7 +80,7 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
-import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectTimeZoneResolution } from '@/domain/project-lifecycle'
+import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
@@ -875,11 +875,11 @@ function appendProjectSaveActivityEvents(
       ? `All Tasks were completed and Project ${nextProject.pid} status changed to DONE.`
       : previousProject.progressStatus === 'DONE' && nextProject.progressStatus === 'OPEN'
         ? `One or more Tasks were reopened and Project ${nextProject.pid} status changed to OPEN.`
-        : `Project ${nextProject.pid} status changed from ${previousProject.progressStatus} to ${nextProject.progressStatus}.`
+        : `Project ${nextProject.pid} status changed from ${projectStatusLabel(previousProject.progressStatus)} to ${projectStatusLabel(nextProject.progressStatus)}.`
     nextEvents = appendActivityEvent(nextEvents, now, {
       category: 'PROJECT',
       eventType: 'project.statusChanged',
-      severity: nextProject.progressStatus === 'DONE' ? 'SUCCESS' : 'INFO',
+      severity: nextProject.progressStatus === 'DONE' ? 'SUCCESS' : nextProject.progressStatus === 'DELETED' ? 'WARNING' : 'INFO',
       summary: statusSummary,
       primaryObject: projectReference,
       before: { progressStatus: previousProject.progressStatus },
@@ -984,7 +984,7 @@ interface AppStore extends AppDataState {
   hydrated: boolean
 
   updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>, options?: SaveTimestampOptions) => AppDataState['projects'][number] | undefined
-  archiveProject: (id: string, reason: string) => void
+  deleteProject: (id: string, reason: string) => AppDataState['projects'][number] | undefined
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
@@ -1197,33 +1197,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return committedProject
   },
 
-  archiveProject: (id, reason) => {
+  deleteProject: (id, reason) => {
     const now = new Date().toISOString()
+    let deletedProject: AppDataState['projects'][number] | undefined
     set((state) => {
       const project = state.projects.find((candidate) => candidate.id === id)
+      if (!project) return {}
+      const nextProject: AppDataState['projects'][number] = {
+        ...project,
+        progressStatus: 'DELETED',
+        deletionReason: reason.trim(),
+        updatedAt: now,
+      }
+      deletedProject = nextProject
       return {
         projects: state.projects.map((candidate) =>
-          candidate.id === id
-            ? {
-                ...candidate,
-                archivedAt: now,
-                deletionReason: reason.trim(),
-                updatedAt: now,
-              }
-            : candidate,
+          candidate.id === id ? nextProject : candidate,
         ),
-        activityEvents: project
-          ? appendActivityEvent(state.activityEvents, now, {
-              category: 'PROJECT',
-              eventType: 'project.archived',
-              severity: 'WARNING',
-              summary: `Project ${project.pid} archived. Reason: ${reason.trim()}`,
-              primaryObject: projectRef(project),
-            })
-          : state.activityEvents,
+        activityEvents: appendProjectSaveActivityEvents(state.activityEvents, now, project, nextProject, {
+          linkedOpportunity: state.opportunities.find((opportunity) => opportunity.opportunityId === nextProject.opportunityId),
+          account: state.accounts.find((candidate) => candidate.accountName === nextProject.accountName),
+        }),
       }
     })
     get().saveToStorage()
+    return deletedProject
   },
 
   updateSystem: (id, patch, options) => {

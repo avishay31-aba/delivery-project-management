@@ -1,4 +1,4 @@
-import type { ProgressStatus, Project } from '@/data/seed.types'
+import type { Project, WorkItemStatus } from '@/data/seed.types'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
@@ -75,7 +75,7 @@ export function orderedProjectTasks(project: MilestonePlan): ProjectTask[] {
   })
 }
 
-export function projectMilestoneStatus(project: MilestonePlan, milestoneId: string): ProgressStatus {
+export function projectMilestoneStatus(project: MilestonePlan, milestoneId: string): WorkItemStatus {
   const tasks = project.tasks?.filter((task) => task.milestoneId === milestoneId) ?? []
   if (tasks.length === 0) return 'OPEN'
   const doneCount = tasks.filter((task) => task.status === 'DONE').length
@@ -117,7 +117,7 @@ function todayTimestamp(today = new Date()): number {
 
 export function milestoneDeadlineAlertStatus(
   deadline: string | null | undefined,
-  status: ProgressStatus,
+  status: WorkItemStatus,
   today = new Date(),
 ): MilestoneDeadlineAlertStatus {
   if (!deadline || status === 'DONE') return 'NONE'

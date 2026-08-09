@@ -81,6 +81,7 @@ const OPERATIONAL_PRESENTATIONS: Record<string, StatusPresentation> = {
 const PROJECT_PRESENTATIONS: Record<string, StatusPresentation> = {
   open: { ...BADGE_PRESENTATIONS.open, key: 'open', kind: 'project', label: 'Open', tooltip: 'Project status: Open' },
   done: { ...BADGE_PRESENTATIONS.done, key: 'done', kind: 'project', label: 'Done', tooltip: 'Project status: Done' },
+  deleted: { ...BADGE_PRESENTATIONS.default, key: 'deleted', kind: 'project', label: 'Deleted', icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: 'Project status: Deleted' },
   archived: { ...BADGE_PRESENTATIONS.default, key: 'archived', kind: 'project', label: 'Archived', icon: Trash2, iconClassName: 'text-gray-500', badgeClassName: 'bg-gray-200 text-gray-800', tooltip: 'Project status: Archived' },
 }
 

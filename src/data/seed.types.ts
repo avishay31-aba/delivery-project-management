@@ -4,7 +4,8 @@ import type { ActivityEvent } from '@/domain/activity-log'
 
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
 export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL'
-export type ProgressStatus = 'OPEN' | 'DONE'
+export type WorkItemStatus = 'OPEN' | 'DONE'
+export type ProgressStatus = WorkItemStatus | 'DELETED'
 export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
 export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
@@ -169,7 +170,7 @@ export interface ProjectMilestone {
   id: string
   name: string
   order: number
-  status: ProgressStatus
+  status: WorkItemStatus
   deadline?: string | null
   comment?: string
 }
@@ -180,7 +181,7 @@ export interface ProjectTask {
   name: string
   department: string
   resource: string
-  status: ProgressStatus
+  status: WorkItemStatus
   order: number
   deadline?: string | null
   comment?: string

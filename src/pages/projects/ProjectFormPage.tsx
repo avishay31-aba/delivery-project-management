@@ -308,7 +308,7 @@ export function ProjectFormPage() {
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
-  const archiveProject = useAppStore((state) => state.archiveProject)
+  const deleteProject = useAppStore((state) => state.deleteProject)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const {
     value: draft,
@@ -628,16 +628,19 @@ export function ProjectFormPage() {
     navigationBlocker.proceed?.()
   }
 
-  function archiveCurrentProject() {
+  function deleteCurrentProject() {
     const reason = deletionReason.trim()
     if (!reason) {
       setSaveMessages(['Deletion reason is required.'])
       return
     }
-    archiveProject(projectDraft.id, reason)
+    const deletedProject = deleteProject(projectDraft.id, reason)
+    if (deletedProject) {
+      resetDraft(cloneProjectDraft(deletedProject))
+      setSaveMessages(['Project status changed to Deleted.'])
+    }
     setIsDeleteDialogOpen(false)
     setDeletionReason('')
-    navigate('/projects')
   }
 
   function renderHeaderField(field: ProjectHeaderFieldMetadata) {
@@ -1773,10 +1776,10 @@ export function ProjectFormPage() {
         <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-delete-title">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 id="project-delete-title" className="text-lg font-semibold">Archive project {projectDraft.pid}</h2>
-              <p className="text-sm text-sf-text-muted">Historical systems, tenants, warranties, links, and activity remain intact.</p>
+              <h2 id="project-delete-title" className="text-lg font-semibold">Delete project {projectDraft.pid}</h2>
+              <p className="text-sm text-sf-text-muted">The Project record remains available with Status = Deleted. Historical systems, tenants, warranties, links, and activity remain intact.</p>
             </div>
-            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close archive dialog" onClick={() => setIsDeleteDialogOpen(false)}>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close delete dialog" onClick={() => setIsDeleteDialogOpen(false)}>
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
@@ -1796,9 +1799,9 @@ export function ProjectFormPage() {
               type="button"
               className="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!deletionReason.trim()}
-              onClick={archiveCurrentProject}
+              onClick={deleteCurrentProject}
             >
-              Archive Project
+              Delete Project
             </button>
           </div>
         </div>

@@ -1,4 +1,3 @@
-import { projectStatusLabel } from '@/domain/project-lifecycle'
 import { projectStatusPresentation } from '@/domain/status-presentation'
 
 interface ProjectStatusIconProps {
@@ -20,7 +19,7 @@ export function ProjectStatusIcon({ status, showLabel = true, large = false }: P
       title={presentation.tooltip}
     >
       <Icon className={['h-4 w-4 stroke-[3]', presentation.iconClassName].join(' ')} aria-hidden="true" />
-      {showLabel ? <span>{projectStatusLabel(String(status ?? ''))}</span> : null}
+      {showLabel ? <span>{presentation.label}</span> : null}
     </span>
   )
 }

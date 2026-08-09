@@ -1059,7 +1059,7 @@ export function OpportunityFormPage() {
   const currentSavedOpportunity = savedOpportunity
 
   function opportunityProjectMilestoneSummary() {
-    const activeProject = createdProjects.find((project) => project.progressStatus !== 'DONE' && !project.archivedAt) ?? createdProjects[0]
+    const activeProject = createdProjects.find((project) => project.progressStatus === 'OPEN' && !project.archivedAt) ?? createdProjects[0]
     if (!activeProject) return { current: '', next: '' }
     const progress = deriveProjectProgress(activeProject)
     const nextMilestone = orderedProjectMilestones(activeProject).find(
