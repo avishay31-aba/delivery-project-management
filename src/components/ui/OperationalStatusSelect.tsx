@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown } from 'lucide-react'
+import { useFloatingOverlay } from '@/components/ui/FloatingOverlay'
 import { operationalStatusPresentation } from '@/domain/status-presentation'
 
 function OperationalStatusOption({ value }: { value: string }) {
@@ -28,14 +30,16 @@ export function OperationalStatusSelect({
   onChange: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const { triggerRef, overlayRef, style, containsEventTarget } = useFloatingOverlay<HTMLButtonElement, HTMLDivElement>(open, {
+    matchTriggerWidth: true,
+    maxHeight: 280,
+  })
 
   useEffect(() => {
     if (!open) return
 
     function handlePointerDown(event: PointerEvent) {
-      const target = event.target
-      if (target instanceof Node && rootRef.current?.contains(target)) return
+      if (containsEventTarget(event.target)) return
       setOpen(false)
     }
 
@@ -49,18 +53,18 @@ export function OperationalStatusSelect({
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open])
+  }, [containsEventTarget, open])
 
   return (
     <div
       className="relative"
-      ref={rootRef}
       onBlur={(event) => {
-        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+        if (containsEventTarget(event.relatedTarget)) return
         setOpen(false)
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={['h-9 w-full rounded border border-sf-border bg-white px-2 py-1 text-left text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted', className].filter(Boolean).join(' ')}
         disabled={disabled}
@@ -72,8 +76,12 @@ export function OperationalStatusSelect({
           <ChevronDown className="h-4 w-4 shrink-0 text-sf-text-muted" aria-hidden="true" />
         </span>
       </button>
-      {open ? (
-        <div className="absolute left-0 top-full z-30 mt-1 w-full rounded border border-sf-border bg-white py-1 shadow-lg">
+      {open ? createPortal(
+        <div
+          ref={overlayRef}
+          className="fixed z-50 overflow-y-auto rounded border border-sf-border bg-white py-1 shadow-lg"
+          style={style}
+        >
           {options.map((option) => (
             <button
               key={option}
@@ -87,7 +95,8 @@ export function OperationalStatusSelect({
               <OperationalStatusOption value={option} />
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )

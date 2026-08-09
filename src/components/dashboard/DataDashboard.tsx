@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, Dispatch, DragEvent, FormEvent, KeyboardEvent, ReactNode, SetStateAction } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   Eye,
@@ -43,7 +44,7 @@ import {
   type SavedDashboardViewState,
 } from '@/store/dashboardViews'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
-import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState } from '@/components/ui'
+import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState, useFloatingOverlay } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import {
   formatSemanticDateTimeValue,
@@ -510,16 +511,19 @@ interface ViewActionsMenuProps {
 
 function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetDefault }: ViewActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const menuWrapperRef = useRef<HTMLDivElement>(null)
+  const { triggerRef, overlayRef, style, containsEventTarget } = useFloatingOverlay<HTMLButtonElement, HTMLDivElement>(isOpen, {
+    minWidth: 176,
+    matchTriggerWidth: false,
+    maxHeight: 280,
+  })
   const isFullDashboard = selectedView.isFullDashboard
 
   useEffect(() => {
     if (!isOpen) return
 
     function handlePointerDown(event: PointerEvent) {
-      if (!menuWrapperRef.current?.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
+      if (containsEventTarget(event.target)) return
+      setIsOpen(false)
     }
 
     function handleEscape(event: globalThis.KeyboardEvent) {
@@ -535,7 +539,7 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetD
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen])
+  }, [containsEventTarget, isOpen])
 
   function closeAfterAction(action: () => void) {
     setIsOpen(false)
@@ -543,8 +547,9 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetD
   }
 
   return (
-    <div ref={menuWrapperRef} className="relative inline-flex">
+    <div className="inline-flex">
       <button
+        ref={triggerRef}
         type="button"
         className="rounded border border-sf-border px-3 py-1 hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:text-sf-text-muted disabled:hover:bg-white"
         title="Open saved view actions"
@@ -555,9 +560,11 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetD
         View Actions ▾
       </button>
 
-      {isOpen ? (
+      {isOpen ? createPortal(
         <div
-          className="absolute left-0 top-full z-30 mt-1 w-44 rounded border border-sf-border bg-white p-1 text-sm shadow-lg"
+          ref={overlayRef}
+          className="fixed z-50 overflow-y-auto rounded border border-sf-border bg-white p-1 text-sm shadow-lg"
+          style={style}
           role="menu"
           aria-label="Saved view actions"
         >
@@ -601,7 +608,8 @@ function ViewActionsMenu({ selectedView, onRename, onDuplicate, onDelete, onSetD
           </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )

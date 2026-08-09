@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Edit2, Maximize2, Plus, Save, Trash2, X } from 'lucide-react'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
@@ -6,7 +7,7 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, BusinessNumericInput, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, BusinessNumericInput, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, useFloatingOverlay, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
 import type { InfrastructureMaintenanceRecurrence, InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
@@ -63,13 +64,15 @@ const WEEKDAY_LABELS: Record<NonNullable<InfrastructureMaintenanceRecurrence['we
 
 function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanceTaskStatus; onChange: (value: InfrastructureMaintenanceTaskStatus) => void }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLSpanElement | null>(null)
+  const { triggerRef, overlayRef, style, containsEventTarget } = useFloatingOverlay<HTMLButtonElement, HTMLSpanElement>(open, {
+    matchTriggerWidth: true,
+    maxHeight: 224,
+  })
 
   useEffect(() => {
     if (!open) return
     function handlePointerDown(event: PointerEvent) {
-      const target = event.target
-      if (target instanceof Node && rootRef.current?.contains(target)) return
+      if (containsEventTarget(event.target)) return
       setOpen(false)
     }
     function handleKeyDown(event: KeyboardEvent) {
@@ -81,23 +84,22 @@ function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanc
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open])
+  }, [containsEventTarget, open])
 
   return (
     <span
-      ref={rootRef}
-      className="relative inline-block w-40"
+      className="inline-block w-40"
       onBlur={(event) => {
-        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+        if (containsEventTarget(event.relatedTarget)) return
         setOpen(false)
       }}
     >
-      <button type="button" className="flex h-8 w-full items-center justify-between rounded border border-sf-border bg-white px-2 py-1 text-left text-sm" onClick={() => setOpen((current) => !current)}>
+      <button ref={triggerRef} type="button" className="flex h-8 w-full items-center justify-between rounded border border-sf-border bg-white px-2 py-1 text-left text-sm" onClick={() => setOpen((current) => !current)}>
         <TaskStatusPresentation status={value} />
         <span className="text-sf-text-muted" aria-hidden="true">v</span>
       </button>
-      {open ? (
-        <span className="absolute left-0 top-full z-30 mt-1 block w-full rounded border border-sf-border bg-white py-1 shadow-lg">
+      {open ? createPortal(
+        <span ref={overlayRef} className="fixed z-50 block overflow-y-auto rounded border border-sf-border bg-white py-1 shadow-lg" style={style}>
           {INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.map((status) => (
             <button
               key={status}
@@ -111,7 +113,8 @@ function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanc
               <TaskStatusPresentation status={status} />
             </button>
           ))}
-        </span>
+        </span>,
+        document.body,
       ) : null}
     </span>
   )

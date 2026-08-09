@@ -48,6 +48,7 @@ import {
   SaveButtonLabel,
   StatusBadge,
   WarrantyStatusPresentation,
+  calculateFloatingOverlayPosition,
   formMessageClassName,
 } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
@@ -105,7 +106,7 @@ import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentati
 type RequirementGridKind = 'A' | 'B' | 'C'
 type RequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 type OpportunityDetailTab = 'requirements' | 'project' | 'activity'
-type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number }
+type ActiveMultiSelect = { id: string; rowId: string; columnKey: string; selected: string[]; left: number; top: number; width: number; maxHeight: number }
 type PendingSave = { stayOnPage?: boolean; onSaved?: () => void }
 type PendingOpportunityTypeChange = { type: OpportunityType; subType: OpportunitySubType }
 type CollapsibleSectionId = 'opportunityHeader' | 'existingSystems' | 'gridA' | 'gridB' | 'gridC' | 'createdProject' | 'activity'
@@ -396,6 +397,33 @@ function RequirementGrid({
     if (!activeMultiSelect) return
     const active = activeMultiSelect
 
+    function updateActivePosition() {
+      const trigger = document.querySelector(`[data-multiselect-trigger="${CSS.escape(active.id)}"]`)
+      const picker = document.querySelector(`[data-multiselect-picker="${CSS.escape(active.id)}"]`)
+      if (!(trigger instanceof HTMLElement) || !(picker instanceof HTMLElement)) return
+      const rect = trigger.getBoundingClientRect()
+      const position = calculateFloatingOverlayPosition(
+        rect,
+        {
+          width: picker.scrollWidth || picker.offsetWidth || Math.max(rect.width, 256),
+          height: picker.scrollHeight || picker.offsetHeight || 224,
+        },
+        { minWidth: 256, matchTriggerWidth: true, maxHeight: 224 },
+      )
+      setActiveMultiSelect((current) => {
+        if (current?.id !== active.id) return current
+        if (
+          current.left === position.left &&
+          current.top === position.top &&
+          current.width === position.width &&
+          current.maxHeight === position.maxHeight
+        ) {
+          return current
+        }
+        return { ...current, ...position }
+      })
+    }
+
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as HTMLElement | null
       if (
@@ -408,8 +436,23 @@ function RequirementGrid({
       setActiveMultiSelect(null)
     }
 
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      onUpdateRow(active.rowId, active.columnKey, active.selected)
+      setActiveMultiSelect(null)
+    }
+
     document.addEventListener('mousedown', handlePointerDown)
-    return () => document.removeEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', updateActivePosition)
+    window.addEventListener('scroll', updateActivePosition, true)
+    updateActivePosition()
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', updateActivePosition)
+      window.removeEventListener('scroll', updateActivePosition, true)
+    }
   }, [activeMultiSelect, onUpdateRow])
 
   function cellChanged(row: RequirementRow, key: string): boolean {
@@ -474,6 +517,11 @@ function RequirementGrid({
           title={selected.join('; ')}
           onClick={(event) => {
             const rect = event.currentTarget.getBoundingClientRect()
+            const position = calculateFloatingOverlayPosition(
+              rect,
+              { width: Math.max(rect.width, 256), height: Math.min(Math.max(options.length * 32 + 8, 96), 224) },
+              { minWidth: 256, matchTriggerWidth: true, maxHeight: 224 },
+            )
             setActiveMultiSelect((current) => {
               if (current?.id === pickerId) {
                 onUpdateRow(current.rowId, current.columnKey, current.selected)
@@ -487,9 +535,10 @@ function RequirementGrid({
                 rowId: row.id,
                 columnKey: column.key,
                 selected,
-                left: rect.left,
-                top: rect.bottom + 4,
-                width: Math.max(rect.width, 256),
+                left: position.left,
+                top: position.top,
+                width: position.width,
+                maxHeight: position.maxHeight,
               }
             })
           }}
@@ -500,8 +549,8 @@ function RequirementGrid({
           ? createPortal(
               <div
                 data-multiselect-picker={pickerId}
-                className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
-                style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
+                className="fixed z-50 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
+                style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width, maxHeight: activeMultiSelect.maxHeight }}
               >
                 {options.map((option) => (
                   <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-sm hover:bg-sf-surface-alt">

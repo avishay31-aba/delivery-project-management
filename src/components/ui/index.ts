@@ -7,6 +7,7 @@ export type { CheckboxMultiSelectOption } from '@/components/ui/CheckboxMultiSel
 export { PlaceholderCard } from '@/components/ui/PlaceholderCard'
 export { FormField, RequiredFieldMarker } from '@/components/ui/FormField'
 export { FileDownloadLink } from '@/components/ui/FileDownloadLink'
+export { calculateFloatingOverlayPosition, useFloatingOverlay } from '@/components/ui/FloatingOverlay'
 export { HeaderReadonlyValue } from '@/components/ui/HeaderReadonlyValue'
 export { MetadataHeaderField, effectiveHeaderFieldCanEdit } from '@/components/ui/MetadataHeaderField'
 export { ReadonlyField } from '@/components/ui/ReadonlyField'

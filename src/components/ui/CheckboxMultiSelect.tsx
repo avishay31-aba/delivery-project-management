@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFloatingOverlay } from '@/components/ui/FloatingOverlay'
 import { validationControlClassName } from '@/components/ui/validationPresentation'
 
 export interface CheckboxMultiSelectOption {
@@ -26,8 +27,11 @@ export function CheckboxMultiSelect({
   onChange: (selected: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [placement, setPlacement] = useState<{ left: number; top: number; width: number } | null>(null)
-  const rootRef = useRef<HTMLSpanElement | null>(null)
+  const { triggerRef, overlayRef, style, containsEventTarget } = useFloatingOverlay<HTMLButtonElement, HTMLDivElement>(open, {
+    minWidth: 256,
+    matchTriggerWidth: true,
+    maxHeight: 224,
+  })
   const pickerId = `checkbox-multiselect:${id}`
   const selectedText = selected.length > 0 ? selected.join('; ') : 'Select'
   const triggerWidth = `${Math.min(48, Math.max(16, selectedText.length + 3))}ch`
@@ -35,9 +39,7 @@ export function CheckboxMultiSelect({
   useEffect(() => {
     if (!open) return
     function handlePointerDown(event: PointerEvent) {
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-      if (rootRef.current?.contains(target) || target.closest(`[data-multiselect-picker="${pickerId}"]`)) return
+      if (containsEventTarget(event.target)) return
       setOpen(false)
     }
     function handleKeyDown(event: KeyboardEvent) {
@@ -49,7 +51,7 @@ export function CheckboxMultiSelect({
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open, pickerId])
+  }, [containsEventTarget, open])
 
   function toggleOption(value: string) {
     if (selected.includes(value)) onChange(selected.filter((candidate) => candidate !== value))
@@ -57,8 +59,9 @@ export function CheckboxMultiSelect({
   }
 
   return (
-    <span ref={rootRef} className="inline-block">
+    <span className="inline-block">
       <button
+        ref={triggerRef}
         type="button"
         data-multiselect-trigger={pickerId}
         aria-label={label}
@@ -70,20 +73,17 @@ export function CheckboxMultiSelect({
         ].join(' ')}
         style={{ width: triggerWidth }}
         title={selected.join('; ')}
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect()
-          setPlacement({ left: rect.left, top: rect.bottom + 4, width: Math.max(rect.width, 256) })
-          setOpen((current) => !current)
-        }}
+        onClick={() => setOpen((current) => !current)}
       >
         <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{selectedText}</span>
       </button>
-      {open && placement
+      {open
         ? createPortal(
             <div
+              ref={overlayRef}
               data-multiselect-picker={pickerId}
-              className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
-              style={placement}
+              className="fixed z-50 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
+              style={style}
             >
               {options.map((option) => (
                 <label

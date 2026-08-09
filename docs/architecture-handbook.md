@@ -456,6 +456,9 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Every custom ERP pick list must close when the user selects an option, clicks outside the control/menu, presses Escape, or tabs focus away.
 - The shared pick-list controller owns open/close behavior, cleanup, and keyboard/outside-click handling. Business pages must not patch individual pick lists locally.
 - Closing a pick list without selecting an option preserves the existing value and must not create a draft change or trigger a Save action.
+- Custom dropdowns, multi-selects, lookup selectors, autocomplete lists, checkbox selectors, and menu-style pick lists must render through the shared floating overlay infrastructure.
+- Floating selector overlays must be portaled outside scroll containers, detect available viewport space, open downward or upward as appropriate, clamp to the visible area, and provide their own internal scrolling when the list is taller than the available space.
+- Parent forms, dialogs, dashboards, grids, and workspace scroll frames must not own dropdown clipping behavior or local overflow workarounds.
 
 ### Pageable Child Collection Standard
 
