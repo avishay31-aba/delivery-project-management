@@ -1,6 +1,7 @@
 import type {
   Account,
   InfrastructureItem,
+  InfrastructureDeletionHistoryEntry,
   InfrastructureMaintenanceRecurrence,
   InfrastructureMaintenanceTask,
   InfrastructureMaintenanceTaskStatus,
@@ -22,6 +23,7 @@ import { reserveBusinessId } from '@/domain/business-identity'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
 import { daysBeforeExpiration, daysBetween, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
+import { richTextIsEmpty } from '@/domain/rich-text'
 
 export const INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE = 'INFRASTRUCTURE_CATEGORY'
 export const INFRASTRUCTURE_TYPE_REFERENCE_TYPE = 'INFRASTRUCTURE_TYPE'
@@ -36,8 +38,10 @@ export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
+export const INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES: InfrastructureOperationalStatus[] = [...INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS, 'Deleted']
 export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['None', 'Planned', 'Pending', 'Overdue', 'Delayed', 'Not Set Yet', 'Current', 'Expired', 'No Warranty', 'Obsolete']
 export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'In Progress', 'Done']
+export const INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS: InfrastructureOperationalStatus = 'Deleted'
 
 export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContact = {
   name: '',
@@ -334,7 +338,7 @@ export function esxiInfrastructureItems(
 ): InfrastructureItem[] {
   return items
     .filter((item) => isInfrastructureItemType(item, referenceData, 'ESXi'))
-    .filter((item) => item.operationalStatus !== 'Obsolete' || item.id === currentLinkedEsxiId)
+    .filter((item) => !['Obsolete', INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS].includes(item.operationalStatus) || item.id === currentLinkedEsxiId)
     .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
 }
 
@@ -1121,6 +1125,9 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
     ownerRefId: '',
     billingMethodRefId: '',
     operationalStatus: 'Active',
+    deletionReason: '',
+    deletionHistory: [],
+    deletionPreviousOperationalStatus: null,
     maintenanceStatus: 'None',
     linkedSystemIds: [],
     initialWarrantyStartDate: null,
@@ -1138,6 +1145,29 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
     createdAt: now,
     updatedAt: now,
   }
+}
+
+export function infrastructureDeletionHistory(item: Pick<InfrastructureItem, 'deletionHistory' | 'deletionReason' | 'updatedAt'>): InfrastructureDeletionHistoryEntry[] {
+  const history = (item.deletionHistory ?? [])
+    .filter((entry) => !richTextIsEmpty(entry.reason) && entry.timestamp)
+    .map((entry, index) => ({
+      id: entry.id || `legacy-infrastructure-deletion-${index + 1}`,
+      reason: entry.reason,
+      timestamp: entry.timestamp,
+      deletedBy: entry.deletedBy,
+    }))
+  if (history.length > 0) return [...history].sort((first, second) => first.timestamp.localeCompare(second.timestamp))
+  const legacyReason = item.deletionReason ?? ''
+  if (richTextIsEmpty(legacyReason)) return []
+  return [{
+    id: 'legacy-infrastructure-deletion-1',
+    reason: legacyReason,
+    timestamp: item.updatedAt,
+  }]
+}
+
+export function latestInfrastructureDeletionEntry(item: Pick<InfrastructureItem, 'deletionHistory' | 'deletionReason' | 'updatedAt'>): InfrastructureDeletionHistoryEntry | null {
+  return infrastructureDeletionHistory(item).at(-1) ?? null
 }
 
 export function normalizeInfrastructureItem(
@@ -1169,7 +1199,10 @@ export function normalizeInfrastructureItem(
     owner: (text(item.owner) as InfrastructureOwner | '') || 'Penlink',
     ownerRefId: text(item.ownerRefId),
     billingMethodRefId: text(item.billingMethodRefId),
-    operationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.operationalStatus as InfrastructureOperationalStatus) ? item.operationalStatus as InfrastructureOperationalStatus : 'Active',
+    operationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES.includes(item.operationalStatus as InfrastructureOperationalStatus) ? item.operationalStatus as InfrastructureOperationalStatus : 'Active',
+    deletionReason: text(item.deletionReason),
+    deletionHistory: infrastructureDeletionHistory(item as InfrastructureItem),
+    deletionPreviousOperationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.deletionPreviousOperationalStatus as InfrastructureOperationalStatus) ? item.deletionPreviousOperationalStatus as InfrastructureOperationalStatus : null,
     maintenanceStatus: infrastructureMaintenanceStatusFromTasks({ maintenanceTasks }),
     linkedSystemIds: Array.isArray(item.linkedSystemIds) ? item.linkedSystemIds.map(text).filter(Boolean) : [],
     initialWarrantyStartDate: text(item.initialWarrantyStartDate) || currentWarranty?.startDate || null,
@@ -1519,7 +1552,7 @@ export function eligibleInfrastructureItemsForSystemLink(
   tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
   return infrastructureDashboardRows(
-    items.filter((item) => item.operationalStatus !== 'Obsolete'),
+    items.filter((item) => item.operationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS),
     referenceData,
     systems,
     tenants,
@@ -1543,7 +1576,7 @@ export function validateInfrastructureItemDraft(
   if (!identifier) messages.push('Identifier is required.')
   if (!draft.owner && !draft.ownerRefId) messages.push('Owner is required.')
   if (draft.owner && !INFRASTRUCTURE_OWNER_OPTIONS.includes(draft.owner as InfrastructureOwner)) messages.push('Owner is invalid.')
-  if (!INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(draft.operationalStatus)) messages.push('Operational Status is invalid.')
+  if (!INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES.includes(draft.operationalStatus)) messages.push('Operational Status is invalid.')
   if (!INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS.includes(draft.maintenanceStatus)) messages.push('Maintenance Status is invalid.')
   if (draft.typeRefId && !infrastructureTypesForCategory(referenceData, draft.categoryRefId).some((type) => type.id === draft.typeRefId)) {
     messages.push('Type must belong to the selected Category.')

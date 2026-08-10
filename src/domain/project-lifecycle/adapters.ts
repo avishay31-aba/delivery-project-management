@@ -2,6 +2,7 @@ import type { Project } from './types'
 import type { ProjectDeletionHistoryEntry, WorkItemStatus } from '@/data/seed.types'
 import { normalizeMilestonePlanProject } from '@/domain/milestone-plan'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
+import { richTextIsEmpty } from '@/domain/rich-text'
 
 export function cloneProjectDraft(project: Project): Project {
   return JSON.parse(JSON.stringify(project)) as Project
@@ -31,7 +32,7 @@ export function projectSavePatch(project: Project): Partial<Project> {
 
 export function projectDeletionHistory(project: Pick<Project, 'deletionHistory' | 'deletionReason' | 'updatedAt'>): ProjectDeletionHistoryEntry[] {
   const history = (project.deletionHistory ?? [])
-    .filter((entry) => entry.reason.trim() && entry.timestamp)
+    .filter((entry) => !richTextIsEmpty(entry.reason) && entry.timestamp)
     .map((entry, index) => ({
       id: entry.id || `legacy-deletion-${index + 1}`,
       reason: entry.reason,
@@ -41,8 +42,8 @@ export function projectDeletionHistory(project: Pick<Project, 'deletionHistory' 
   if (history.length > 0) {
     return [...history].sort((first, second) => first.timestamp.localeCompare(second.timestamp))
   }
-  const legacyReason = project.deletionReason?.trim()
-  if (!legacyReason) return []
+  const legacyReason = project.deletionReason ?? ''
+  if (richTextIsEmpty(legacyReason)) return []
   return [{
     id: 'legacy-deletion-1',
     reason: legacyReason,

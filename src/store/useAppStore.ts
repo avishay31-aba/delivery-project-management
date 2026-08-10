@@ -85,6 +85,7 @@ import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
+import { richTextIsEmpty } from '@/domain/rich-text'
 import {
   normalizeReferenceLabel,
   referenceDataLabel,
@@ -117,10 +118,13 @@ import {
   INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE,
   INFRASTRUCTURE_TYPE_REFERENCE_TYPE,
   INFRASTRUCTURE_WARRANTY_TYPE_REFERENCE_TYPE,
+  INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS,
   normalizeInfrastructureMaintenanceTasks,
   normalizeInfrastructureWarrantyCollection,
   normalizeInfrastructureItem,
   normalizeInfrastructureIdentifier,
+  infrastructureDeletionHistory,
+  latestInfrastructureDeletionEntry,
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 
@@ -1009,6 +1013,8 @@ interface AppStore extends AppDataState {
   resetRecordsPerPagePreference: (context: string) => AllocationActionResult
   createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
+  deleteInfrastructureItem: (id: string, reason: string) => AllocationActionResult & { record?: InfrastructureItem }
+  restoreInfrastructureItem: (id: string) => AllocationActionResult & { record?: InfrastructureItem }
   linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
   unlinkInfrastructureItemFromSystem: (itemId: string, systemId: string) => AllocationActionResult
   saveVersionUpdate: (
@@ -1123,7 +1129,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const patchWithDeletionHistory = (() => {
           if (project.progressStatus !== 'DELETED' || typeof patch.deletionReason !== 'string') return patch
           const trimmedReason = patch.deletionReason.trim()
-          if (!trimmedReason || trimmedReason === latestProjectDeletionEntry(project)?.reason) return patch
+          if (richTextIsEmpty(trimmedReason) || trimmedReason === latestProjectDeletionEntry(project)?.reason) return patch
           const latestEntry = latestProjectDeletionEntry(project)
           const deletionHistory = latestEntry
             ? projectDeletionHistory(project).map((entry) =>
@@ -1697,6 +1703,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const existing = state.infrastructureItems.find((item) => item.id === id)
     if (!existing) return { ok: false, message: 'Infrastructure Item not found.' }
     const now = new Date().toISOString()
+    const latestDeletionEntry = latestInfrastructureDeletionEntry(existing)
+    const nextDeletionReason = draft.deletionReason ?? existing.deletionReason ?? ''
+    const deletionHistory =
+      existing.operationalStatus === INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS &&
+      !richTextIsEmpty(nextDeletionReason) &&
+      nextDeletionReason.trim() !== latestDeletionEntry?.reason
+        ? latestDeletionEntry
+          ? infrastructureDeletionHistory(existing).map((entry) =>
+              entry.id === latestDeletionEntry.id
+                ? { ...entry, reason: nextDeletionReason.trim(), timestamp: now }
+                : entry,
+            )
+          : [{
+              id: `infrastructure-deletion-${crypto.randomUUID()}`,
+              reason: nextDeletionReason.trim(),
+              timestamp: now,
+              deletedBy: CURRENT_USER_DISPLAY_NAME,
+            }]
+        : infrastructureDeletionHistory(existing)
     const record: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       id: existing.id,
@@ -1707,6 +1732,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       linkedSystemIds: Array.from(new Set(draft.linkedSystemIds ?? [])),
       maintenanceTasks: normalizeInfrastructureMaintenanceTasks(draft.maintenanceTasks ?? [], now, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id)),
       warranties: normalizeInfrastructureWarrantyCollection(draft.warranties ?? [], infrastructureWarrantyIds(state.infrastructureItems, existing.id)),
+      deletionReason: nextDeletionReason.trim(),
+      deletionHistory,
+      deletionPreviousOperationalStatus: existing.deletionPreviousOperationalStatus ?? draft.deletionPreviousOperationalStatus ?? null,
       createdAt: existing.createdAt,
       updatedAt: now,
     }, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id), infrastructureWarrantyIds(state.infrastructureItems, existing.id))
@@ -1720,7 +1748,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         eventTypePrefix: 'infrastructureItem',
         objectLabel: `Infrastructure Item ${record.infrastructureId}`,
         primaryObject: infrastructureRef(record),
-        excludeFields: ['maintenanceTasks'],
+        excludeFields: ['maintenanceTasks', 'deletionHistory'],
       })
       return {
         infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
@@ -1729,6 +1757,82 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return { ok: true, message: `Infrastructure Item ${record.infrastructureId} saved.`, record }
+  },
+
+  deleteInfrastructureItem: (id, reason) => {
+    const state = get()
+    const item = state.infrastructureItems.find((candidate) => candidate.id === id)
+    if (!item) return { ok: false, message: 'Infrastructure Item not found.' }
+    const trimmedReason = reason.trim()
+    if (richTextIsEmpty(trimmedReason)) return { ok: false, message: 'Deletion Reason is required.' }
+    const now = new Date().toISOString()
+    const previousOperationalStatus = item.operationalStatus === INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
+      ? item.deletionPreviousOperationalStatus ?? 'Active'
+      : item.operationalStatus
+    const record: InfrastructureItem = normalizeInfrastructureItem({
+      ...item,
+      operationalStatus: INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS,
+      deletionPreviousOperationalStatus: previousOperationalStatus,
+      deletionReason: trimmedReason,
+      deletionHistory: [
+        ...infrastructureDeletionHistory(item),
+        {
+          id: `infrastructure-deletion-${crypto.randomUUID()}`,
+          reason: trimmedReason,
+          timestamp: now,
+          deletedBy: CURRENT_USER_DISPLAY_NAME,
+        },
+      ],
+      updatedAt: now,
+      lastUpdatedDate: now,
+    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, item.id), infrastructureWarrantyIds(state.infrastructureItems, item.id))
+    set((current) => ({
+      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === id ? record : candidate),
+      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
+        previous: item as unknown as Record<string, unknown>,
+        next: record as unknown as Record<string, unknown>,
+        category: 'INFRASTRUCTURE',
+        eventTypePrefix: 'infrastructureItem',
+        objectLabel: `Infrastructure Item ${record.infrastructureId}`,
+        primaryObject: infrastructureRef(record),
+        excludeFields: ['maintenanceTasks', 'deletionHistory'],
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} status changed to Deleted.`, record }
+  },
+
+  restoreInfrastructureItem: (id) => {
+    const state = get()
+    const item = state.infrastructureItems.find((candidate) => candidate.id === id)
+    if (!item || item.operationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS) return { ok: false, message: 'Infrastructure Item could not be restored.' }
+    const now = new Date().toISOString()
+    const restoredStatus = item.deletionPreviousOperationalStatus && item.deletionPreviousOperationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
+      ? item.deletionPreviousOperationalStatus
+      : 'Active'
+    const record: InfrastructureItem = normalizeInfrastructureItem({
+      ...item,
+      operationalStatus: restoredStatus,
+      deletionReason: '',
+      deletionHistory: infrastructureDeletionHistory(item),
+      deletionPreviousOperationalStatus: null,
+      updatedAt: now,
+      lastUpdatedDate: now,
+    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, item.id), infrastructureWarrantyIds(state.infrastructureItems, item.id))
+    set((current) => ({
+      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === id ? record : candidate),
+      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
+        previous: item as unknown as Record<string, unknown>,
+        next: record as unknown as Record<string, unknown>,
+        category: 'INFRASTRUCTURE',
+        eventTypePrefix: 'infrastructureItem',
+        objectLabel: `Infrastructure Item ${record.infrastructureId}`,
+        primaryObject: infrastructureRef(record),
+        excludeFields: ['maintenanceTasks', 'deletionHistory'],
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} restored with Operational Status ${record.operationalStatus}.`, record }
   },
 
   linkInfrastructureItemToSystem: (itemId, systemId) => {

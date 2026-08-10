@@ -607,7 +607,7 @@ export interface ReferenceDataRecord {
 }
 
 export type InfrastructureOwner = 'Penlink' | 'Agent' | 'Customer'
-export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew'
+export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew' | 'Deleted'
 export type InfrastructureMaintenanceStatus = 'None' | 'Planned' | 'Pending' | 'Overdue' | 'Delayed' | 'Not Set Yet' | 'Current' | 'Expired' | 'No Warranty' | 'Obsolete'
 export type InfrastructureManualWarrantyStatus = 'NO_WARRANTY' | 'OBSOLETE'
 export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'PENDING' | 'EXPIRED' | InfrastructureManualWarrantyStatus
@@ -741,6 +741,9 @@ export interface InfrastructureItem {
   ownerRefId?: string
   billingMethodRefId: string
   operationalStatus: InfrastructureOperationalStatus
+  deletionReason?: string
+  deletionHistory?: InfrastructureDeletionHistoryEntry[]
+  deletionPreviousOperationalStatus?: InfrastructureOperationalStatus | null
   maintenanceStatus: InfrastructureMaintenanceStatus
   linkedSystemIds: string[]
   initialWarrantyStartDate: string | null
@@ -757,6 +760,13 @@ export interface InfrastructureItem {
   documents: DocumentRecord[]
   createdAt: string
   updatedAt: string
+}
+
+export interface InfrastructureDeletionHistoryEntry {
+  id: string
+  reason: string
+  timestamp: string
+  deletedBy?: string
 }
 
 export type VersionUpdateAttachmentCategory = 'CONFIG' | 'ATP' | 'CHECKLIST'

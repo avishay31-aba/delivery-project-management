@@ -21,6 +21,7 @@ import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components
 import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { DeletionHistoryField } from '@/components/lifecycle'
 import { ActivityTimeline } from '@/components/activity'
 import {
   ApplicationConfigurationComparisonCell,
@@ -77,7 +78,6 @@ import {
   projectRequirementReadonlyCellValue,
   projectRequirementRows,
   projectRequirementTitle,
-  latestProjectDeletionEntry,
   projectDeletionHistory,
   projectHeaderFieldValue,
   projectAlertLabels,
@@ -973,45 +973,16 @@ export function ProjectFormPage() {
   }
 
   function renderDeletionHistoryHeaderField() {
-    const deletionHistory = [...projectDeletionHistory(projectDraft)].reverse()
+    const deletionHistory = projectDeletionHistory(projectDraft)
     if (deletionHistory.length === 0) return null
-    const latestDeletionEntry = latestProjectDeletionEntry(projectDraft)
-    const canEditLatestReason = !isViewMode && projectDraft.progressStatus === 'DELETED'
 
     return (
-      <FormField key="deletionHistory" label="Deletion History" controlWidthClassName="w-[32rem] max-w-full">
-        <div className="space-y-3 rounded border border-sf-border bg-white px-2 py-2 text-sm text-sf-text">
-          {deletionHistory.map((entry, index) => {
-            const isLatestEntry = latestDeletionEntry?.id === entry.id
-            const isEditableEntry = canEditLatestReason && isLatestEntry
-            const reasonValue = isEditableEntry ? (projectDraft.deletionReason || entry.reason) : entry.reason
-            return (
-              <div key={entry.id} className={index === 0 ? 'space-y-2' : 'space-y-2 border-t border-dotted border-sf-border pt-3'}>
-                {isEditableEntry ? (
-                  <label className="block space-y-1">
-                    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-sf-text">
-                      <span className="font-medium"><DateTimeValue value={entry.timestamp} semanticType="datetime" fallback="-" /></span>
-                      {entry.deletedBy ? <span>{entry.deletedBy}</span> : null}
-                    </span>
-                    <textarea
-                      aria-label="Current Deletion Reason"
-                      className={fieldClassName(reasonValue !== latestDeletionEntry.reason, !reasonValue.trim(), 'min-h-16 w-full resize-y text-sm')}
-                      value={reasonValue}
-                      onChange={(event) => updateDraftField('deletionReason', event.target.value)}
-                    />
-                  </label>
-                ) : (
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-sf-text">
-                    <span className="font-medium"><DateTimeValue value={entry.timestamp} semanticType="datetime" fallback="-" /></span>
-                    {entry.deletedBy ? <span>{entry.deletedBy}</span> : null}
-                    <span>{entry.reason}</span>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </FormField>
+      <DeletionHistoryField
+        entries={deletionHistory}
+        currentReason={projectDraft.deletionReason ?? ''}
+        canEditLatestReason={!isViewMode && projectDraft.progressStatus === 'DELETED'}
+        onCurrentReasonChange={(value) => updateDraftField('deletionReason', value)}
+      />
     )
   }
 

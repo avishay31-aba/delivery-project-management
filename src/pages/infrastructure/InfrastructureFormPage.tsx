@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
+import { DeletionHistoryField } from '@/components/lifecycle'
 import { InfrastructureMaintenanceGrid } from '@/components/maintenance/InfrastructureMaintenanceGrid'
 import { RemarksGrid } from '@/components/remarks'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
@@ -9,6 +10,7 @@ import { SystemDeliveryTable } from '@/components/systems'
 import { WarrantyCollectionGrid } from '@/components/warranty/WarrantyCollectionGrid'
 import {
   FormField,
+  HeaderReadonlyValue,
   MaintenanceStatusPresentation,
   OperationalStatusIcon,
   OperationalStatusSelect,
@@ -22,6 +24,7 @@ import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import type { InfrastructureItem, InfrastructureItemProperties, InfrastructureTokenProperty, InfrastructureVmProperty, ReferenceDataRecord, ReferenceDataType, YesNo } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
+  INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS,
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
   INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE,
@@ -40,6 +43,7 @@ import {
   infrastructureDashboardRows,
   infrastructureItemRelationshipLabel,
   infrastructureLastMaintenanceDate,
+  infrastructureDeletionHistory,
   infrastructureMaintenanceStatusesFromTasks,
   infrastructureManufacturerPropertyScope,
   infrastructureManufacturersForType,
@@ -459,6 +463,8 @@ export function InfrastructureFormPage() {
   }
 
   function renderHeader() {
+    const deletionHistory = infrastructureDeletionHistory(draft)
+    const isDeletedLifecycleState = draft.operationalStatus === INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Header</h2>
@@ -473,13 +479,25 @@ export function InfrastructureFormPage() {
             </div>
           </FormField>
           <FormField label="Operational Status" required controlWidthClassName={WIDE_FIELD_WIDTH}>
-            <OperationalStatusSelect
-              value={draft.operationalStatus}
-              options={INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS}
-              disabled={isViewMode}
-              onChange={(value) => updateDraft({ operationalStatus: value as InfrastructureItem['operationalStatus'] })}
-            />
+            {isDeletedLifecycleState ? (
+              <HeaderReadonlyValue>
+                <OperationalStatusIcon status={draft.operationalStatus} showLabel />
+              </HeaderReadonlyValue>
+            ) : (
+              <OperationalStatusSelect
+                value={draft.operationalStatus}
+                options={INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS}
+                disabled={isViewMode}
+                onChange={(value) => updateDraft({ operationalStatus: value as InfrastructureItem['operationalStatus'] })}
+              />
+            )}
           </FormField>
+          <DeletionHistoryField
+            entries={deletionHistory}
+            currentReason={draft.deletionReason ?? ''}
+            canEditLatestReason={!isViewMode && isDeletedLifecycleState}
+            onCurrentReasonChange={(value) => updateDraft({ deletionReason: value })}
+          />
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderSelect('Item Owner', draft.ownerRefId ?? '', ownerPicklistOptions, (value) => {

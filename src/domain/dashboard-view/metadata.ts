@@ -18,6 +18,7 @@ export const DASHBOARD_VIEW_SCOPES: DashboardViewScope[] = [
   'requirementCoverage',
   'activityLog',
   'infrastructure',
+  'deletedInfrastructure',
   'infrastructurePlannedMaintenance',
   'infrastructureCurrentMaintenance',
 ]

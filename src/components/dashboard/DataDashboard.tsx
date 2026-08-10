@@ -168,6 +168,7 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
   infrastructure: ['infrastructureId', 'identifier'],
+  deletedInfrastructure: ['deletedBy', 'deletionReason', 'infrastructureId', 'identifier'],
   infrastructurePlannedMaintenance: ['taskId', 'infrastructureItemId'],
   infrastructureCurrentMaintenance: ['taskId', 'infrastructureItemId'],
 }

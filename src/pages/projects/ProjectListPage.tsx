@@ -7,7 +7,8 @@ import { PageHeader, WorkspaceFrame, WorkspaceTabs } from '@/components/record'
 import { createProjectListColumns } from '@/config/project-columns'
 import { PROJECT_DASHBOARD_COLOR_LEGEND, projectListRowClassName } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
-import { formMessageClassName } from '@/components/ui'
+import { RichTextEditor, formMessageClassName } from '@/components/ui'
+import { richTextIsEmpty } from '@/domain/rich-text'
 import type { Project } from '@/data/seed.types'
 
 type ProjectDashboardTab = 'active' | 'deleted'
@@ -88,7 +89,7 @@ function closeRestoreDialog() {
 function confirmDeleteProject() {
   if (!projectPendingDelete) return
   const reason = deletionReason.trim()
-  if (!reason) {
+  if (richTextIsEmpty(reason)) {
     setMessages(['Deletion Reason is required.'])
     return
   }
@@ -132,10 +133,10 @@ function renderDeleteDialog() {
         </div>
         <label className="block space-y-1">
           <span className="text-sm font-semibold">Deletion Reason <span className="text-red-600">*</span></span>
-          <textarea
-            className="min-h-24 w-full resize-y rounded border border-sf-border px-2 py-1 text-sm"
+          <RichTextEditor
             value={deletionReason}
-            onChange={(event) => setDeletionReason(event.target.value)}
+            onChange={setDeletionReason}
+            minHeightClassName="min-h-24"
           />
         </label>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -145,7 +146,7 @@ function renderDeleteDialog() {
           <button
             type="button"
             className="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!deletionReason.trim()}
+            disabled={richTextIsEmpty(deletionReason)}
             onClick={confirmDeleteProject}
           >
             Delete Project

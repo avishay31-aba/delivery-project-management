@@ -3,6 +3,8 @@ import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessObjectLink, ProgressBar } from '@/components/ui'
 import { ProjectAlertPresentation } from '@/components/projects/ProjectAlertPresentation'
 import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
+import { DeletionReasonCell } from '@/components/lifecycle'
+import { richTextPlainText } from '@/domain/rich-text'
 import type {
   Account,
   Opportunity,
@@ -84,7 +86,8 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
     } satisfies DashboardColumn<Project>, {
       id: 'deletionReason',
       label: 'Deletion Reason',
-      getValue: (project: Project) => latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? '',
+      getValue: (project: Project) => richTextPlainText(latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? ''),
+      render: (project: Project) => createElement(DeletionReasonCell, { value: latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? '' }),
     } satisfies DashboardColumn<Project>] : []),
     { id: 'pid', label: 'PID', getValue: (project) => projectRow(project).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
     { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project).projectName, editable: true, editKey: 'opportunityName' },

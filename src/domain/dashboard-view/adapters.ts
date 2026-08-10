@@ -117,6 +117,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
       requirementCoverage: sanitizeDashboardScopeViews(value.dashboards.requirementCoverage),
       activityLog: sanitizeDashboardScopeViews(value.dashboards.activityLog),
       infrastructure: sanitizeDashboardScopeViews(value.dashboards.infrastructure),
+      deletedInfrastructure: sanitizeDashboardScopeViews(value.dashboards.deletedInfrastructure),
       infrastructurePlannedMaintenance: sanitizeDashboardScopeViews(value.dashboards.infrastructurePlannedMaintenance),
       infrastructureCurrentMaintenance: sanitizeDashboardScopeViews(value.dashboards.infrastructureCurrentMaintenance),
     },
