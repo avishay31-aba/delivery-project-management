@@ -1,6 +1,6 @@
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { configurationColumnGroupLabel } from '@/components/configuration'
-import { RecordHistorySection, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, RecordHistorySection, type RecordHistoryColumn } from '@/components/ui'
 import type {
   ApplicationConfigurationFieldMetadata,
   ApplicationConfigurationHistoryRecord,
@@ -21,6 +21,11 @@ function textValue(value: unknown): string {
 
 function configurationValue(record: ApplicationConfigurationHistoryRecord, field: ApplicationConfigurationFieldMetadata): string {
   return textValue((record.configuration as unknown as Record<string, unknown>)[field.configKey]) || '-'
+}
+
+function renderTidValue(tid: string) {
+  if (!tid || tid === 'this') return tid || '-'
+  return <BusinessIdLink objectType="TENANT" businessId={tid}>{tid}</BusinessIdLink>
 }
 
 function defaultConfigurationHistorySort<TRecord extends ApplicationConfigurationHistoryRecord>(first: TRecord, second: TRecord): number {
@@ -52,7 +57,7 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
     {
       key: 'tid',
       label: 'TID',
-      render: tidValue,
+      render: (record) => renderTidValue(tidValue(record)),
       sortValue: tidValue,
     },
     {

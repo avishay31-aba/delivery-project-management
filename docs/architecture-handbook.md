@@ -144,6 +144,8 @@ New functionality must first reuse existing shared application patterns.
 
 Equivalent business meanings must use identical shared components, icons, labels, colors, typography, spacing and interaction patterns. External product concepts may guide behavior, but they must not introduce a separate visual language into the ERP. Any new local UI pattern requires explicit approval and Architecture Handbook documentation.
 
+Equivalent control patterns, including tabs and sub-tabs, must reuse the established product component or be minimally extracted to one shared component before reuse. A visually similar local implementation is not sufficient when an approved pattern already exists.
+
 ## Scope-Based Save Boundary
 
 Every explicit Save action is the commit boundary for the Business Object or save scope it owns. Child-object Save actions commit independently and do not require a subsequent parent-form Save.
@@ -429,6 +431,7 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 
 - Every displayed Business Object ID must render through the shared Business ID link presenter whenever that object has a supported route.
 - The standard presenter owns route-aware fallback behavior. Pages, dashboards, forms, tables, dialogs, tooltips, activity references, and history views must not create local anchor tags or duplicate routing logic for Business Object IDs.
+- Read-only summaries, child tables, configuration history, and historical/activity tables follow the same rule when the displayed ID is a current navigable Business Object reference. Empty values, self identity labels, non-business technical keys, and historical snapshots without a valid target remain plain text through the established fallback presentation.
 - Empty IDs display the shared empty value. IDs without a supported route may render as read-only text through the shared fallback.
 - Export and persistence paths keep plain ID text only; presentation components must not enter domain/read-model values.
 

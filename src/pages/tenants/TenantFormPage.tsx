@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, Edit2, Plus, Save, Settings2, Trash2, X } from 'lucide-react'
@@ -24,27 +24,21 @@ import {
   OperationalStatusIcon,
   OperationalStatusSelect,
   PlaceholderCard,
+  ProductSubTabs,
   RequiredFieldMarker,
   RichTextContent,
   RichTextEditor,
   SaveButtonLabel,
   WarrantyStatusPresentation,
   formMessageClassName,
-  validationControlClassName,
 } from '@/components/ui'
-import { configurationColumnGroupLabel } from '@/components/configuration'
+import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { isRouteViewMode } from '@/utils/route-mode'
-import {
-  ADDITIONAL_FEATURE_OPTIONS,
-  AI_OPTIONS,
-  CROSS_SYSTEM_OPTIONS,
-  YES_NO_OPTIONS,
-  type RequirementColumnMetadata,
-} from '@/config/opportunity-metadata'
+import { YES_NO_OPTIONS } from '@/config/opportunity-metadata'
 import {
   TENANT_CONFIGURATION_FIELDS,
   type TenantConfigurationFieldMetadata,
@@ -62,7 +56,6 @@ import type {
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
-  applicationConfigurationValue,
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
 import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
@@ -119,20 +112,22 @@ import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentati
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
 
-type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
-type ConfigKey = keyof TenantConfiguration
-type TenantConfigurationColumn = TenantConfigurationFieldMetadata & RequirementColumnMetadata
-type ActiveMultiSelect = { id: string; key: ConfigKey; selected: string[]; left: number; top: number; width: number }
+type TenantTab = 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
+type TenantHostingTab = 'environment' | 'applicationConfiguration'
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
-  { id: 'configuration', label: 'Configuration' },
   { id: 'hosting', label: 'Hosting' },
   { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'activity', label: 'Activity Log' },
+]
+
+const TENANT_HOSTING_TABS: Array<{ id: TenantHostingTab; label: string }> = [
+  { id: 'environment', label: 'Environment' },
+  { id: 'applicationConfiguration', label: 'Application Configuration' },
 ]
 
 const TENANT_WARRANTY_SCHEMA = WARRANTY_OBJECT_CONTEXT_SCHEMAS.tenant
@@ -157,7 +152,7 @@ const TENANT_WARRANTY_HEADERS = [
   'Remark',
 ]
 
-const CONFIGURATION_FIELDS: TenantConfigurationColumn[] = TENANT_CONFIGURATION_FIELDS as TenantConfigurationColumn[]
+const CONFIGURATION_FIELDS: TenantConfigurationFieldMetadata[] = TENANT_CONFIGURATION_FIELDS
 
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
@@ -192,27 +187,6 @@ function textValue(value: unknown): string {
   return value == null ? '' : String(value)
 }
 
-function digitString(value: unknown): string {
-  return value == null ? '' : String(value).replace(/\D/g, '')
-}
-
-function parseDigitValue(value: string): number | null {
-  return value === '' ? null : Number(value)
-}
-
-function splitMultiValue(value: string): string[] {
-  return value
-    .split(';')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function preventNonDigitKey(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.ctrlKey || event.metaKey || event.altKey) return
-  if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  if (!/^\d$/.test(event.key)) event.preventDefault()
-}
-
 function configurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
   return tenantConfigurationFromTenant(tenant, system)
 }
@@ -228,10 +202,6 @@ function formatWarrantyCompatibilityRef(value: string, fallbackTenantId: string)
 
 function licenseNumber(pid: string, sid: string, tid: string): string {
   return [pid, sid, tid].filter(Boolean).join('')
-}
-
-function configurationValue(configuration: TenantConfiguration, column: TenantConfigurationColumn): unknown {
-  return applicationConfigurationValue(configuration, column)
 }
 
 function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string; allocationStatus?: string }>, systems: System[]): Project | undefined {
@@ -317,7 +287,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const timeGroupLookups = useAppStore((state) => state.timeGroupLookups)
   const updateTenant = useAppStore((state) => state.updateTenant)
   const saveTenantConfiguration = useAppStore((state) => state.saveTenantConfiguration)
-  const updateSystemMapCenter = useAppStore((state) => state.updateSystemMapCenter)
   const savedTenant = useMemo(() => tenants.find((tenant) => tenant.tid === tid), [tenants, tid])
   const system = useMemo(
     () => systems.find((candidate) => candidate.id === (savedTenant?.hostedSystemId ?? savedTenant?.systemId)),
@@ -337,7 +306,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
-  const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
+  const [activeTab, setActiveTab] = useState<TenantTab>('hosting')
+  const [activeHostingTab, setActiveHostingTab] = useState<TenantHostingTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
@@ -345,9 +315,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [advancedWarrantyId, setAdvancedWarrantyId] = useState<string | null>(null)
   const [advancedWarrantySnapshot, setAdvancedWarrantySnapshot] = useState<TenantWarranty | null>(null)
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
-  const [activeMultiSelect, setActiveMultiSelect] = useState<ActiveMultiSelect | null>(null)
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
-  const [pendingAddNew, setPendingAddNew] = useState<{ key: ConfigKey; value: string } | null>(null)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(tenantParentSaveScope(savedTenant), tenantParentSaveScope(draft)))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
@@ -360,25 +328,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
-
-  useEffect(() => {
-    if (!activeMultiSelect) return
-    const activePickerId = activeMultiSelect.id
-
-    function closeMultiSelectOnOutsideClick(event: MouseEvent) {
-      const target = event.target as HTMLElement | null
-      if (
-        target?.closest(`[data-multiselect-picker="${activePickerId}"]`) ||
-        target?.closest(`[data-multiselect-trigger="${activePickerId}"]`)
-      ) {
-        return
-      }
-      setActiveMultiSelect(null)
-    }
-
-    document.addEventListener('mousedown', closeMultiSelectOnOutsideClick)
-    return () => document.removeEventListener('mousedown', closeMultiSelectOnOutsideClick)
-  }, [activeMultiSelect])
 
   if (!savedTenant || !draft) {
     return (
@@ -412,25 +361,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     ...tenantConfiguration,
     mapCenter: activeSystem ? systemConfiguration?.mapCenter ?? '' : tenantConfiguration.mapCenter,
   }
-  const invalidConfigurationFields = new Set<ConfigKey>()
-  messages
-    .filter((message) => message.startsWith('Configuration: '))
-    .forEach((message) => {
-      CONFIGURATION_FIELDS.forEach((field) => {
-        if (message.includes(field.label)) invalidConfigurationFields.add(field.configKey)
-      })
-    })
   const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
-  const countryOptions = Array.from(
-    new Set(
-      [
-        ...accounts.map((account) => account.country),
-        opportunity?.country,
-        tenantDraft.country,
-        activeSystem?.country,
-      ].filter((value): value is string => Boolean(value)),
-    ),
-  ).sort((first, second) => first.localeCompare(second))
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
   const linkedProjectRows = linkedProjectRowsForTenant(tenantDraft, { projects, projectSystems, projectTenants, opportunities, accounts, systems })
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
@@ -523,45 +454,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       validationOpportunity(),
       { accounts, systems, tenants, activeSystem },
     )
-  }
-
-  function updateConfiguration(key: ConfigKey, value: string | string[] | number | null) {
-    if (isViewMode) return
-    setDraft((current) => {
-      if (!current) return current
-      return {
-        ...current,
-        configuration: {
-          ...configurationFromTenant(current, activeSystem),
-          [key]: value,
-        },
-      }
-    })
-    setMessages([])
-  }
-
-  function updateSystemOwnedMapCenter(value: string) {
-    if (isViewMode) return
-    if (!activeSystem) {
-      setMessages(['Linked System configuration: Map Center requires a linked System.'])
-      return
-    }
-
-    const result = updateSystemMapCenter(activeSystem.id, value, { sourceTenantId: tenantDraft.id })
-    if (!result.ok && (result.affectedTenantCount ?? 0) >= 2) {
-      if (!window.confirm(result.message)) {
-        setMessages(['Map Center change canceled.'])
-        return
-      }
-      const confirmedResult = updateSystemMapCenter(activeSystem.id, value, {
-        confirmedMultiTenantChange: true,
-        sourceTenantId: tenantDraft.id,
-      })
-      setMessages([confirmedResult.message])
-      return
-    }
-
-    setMessages([result.message])
   }
 
   function updateTenantType(nextType: TenantFormType) {
@@ -1042,227 +934,61 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     ]
   }
 
-  function configurationOptions(field: TenantConfigurationColumn): string[] {
-    if (field.key === 'mapCenter') return [...countryOptions, 'Add new...']
-    if (field.key === 'crossSystemFeatures') return CROSS_SYSTEM_OPTIONS
-    if (field.key === 'aiFeatures') return AI_OPTIONS
-    if (field.key === 'additionalFeatures') return ADDITIONAL_FEATURE_OPTIONS
-    if (field.inputType === 'picklist') return YES_NO_OPTIONS
-    return []
-  }
-
-  function handleConfigurationPicklistChange(field: TenantConfigurationColumn, value: string) {
-    if (value === 'Add new...') {
-      setPendingAddNew({ key: field.configKey, value: '' })
-      return
-    }
-    if (field.configKey === 'mapCenter') {
-      updateSystemOwnedMapCenter(value)
-      return
-    }
-    updateConfiguration(field.configKey, value)
-  }
-
-  function renderConfigurationAddNew(field: TenantConfigurationColumn) {
-    if (pendingAddNew?.key !== field.configKey) return null
+  function renderHostingTab() {
+    const hostingRows = activeSystem
+      ? [TENANT_HOSTING_FIELDS.map((field) => {
+          if (field.key === 'sid') {
+            const sid = hosting.sid || activeSystem.sid || activeSystem.machineId || ''
+            return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
+          }
+          return textValue(hosting[field.key])
+        })]
+      : []
 
     return (
-      <div className="mt-1 flex w-40 items-center gap-1">
-        <input
-          className="h-7 min-w-0 flex-1 rounded border border-sf-border px-2 py-1 text-sm"
-          value={pendingAddNew.value}
-          autoFocus
-          onChange={(event) => setPendingAddNew({ key: field.configKey, value: event.target.value })}
-        />
-        <button
-          type="button"
-          className="rounded border border-sf-brand bg-sf-brand px-2 py-1 text-xs font-semibold text-white"
-          onClick={() => {
-            const nextValue = pendingAddNew.value.trim()
-            if (!nextValue) return
-            setCustomPicklistOptions((current) => addCustomPicklistOption(current, field.configKey, nextValue))
-            if (field.configKey === 'mapCenter') updateSystemOwnedMapCenter(nextValue)
-            else updateConfiguration(field.configKey, nextValue)
-            setPendingAddNew(null)
-          }}
-        >
-          Add
-        </button>
-        <button type="button" className="rounded border border-sf-border bg-white px-2 py-1 text-xs" onClick={() => setPendingAddNew(null)}>
-          Cancel
-        </button>
+      <div className="space-y-3">
+        <ProductSubTabs tabs={TENANT_HOSTING_TABS} activeTab={activeHostingTab} onTabChange={setActiveHostingTab} />
+        <div role="tabpanel" aria-label={TENANT_HOSTING_TABS.find((tab) => tab.id === activeHostingTab)?.label}>
+          {activeHostingTab === 'environment'
+            ? (
+              <ReadonlyTable
+                headers={TENANT_HOSTING_FIELDS.map((field) => field.label)}
+                rows={hostingRows}
+                emptyText="No hosting system is linked to this tenant."
+              />
+            )
+            : renderApplicationConfigurationTab()}
+        </div>
       </div>
     )
   }
 
-  function renderMultiSelect(field: TenantConfigurationColumn, selected: string[], isInvalid: boolean) {
-    const pickerId = `tenant-config:${field.configKey}`
-    const isOpen = activeMultiSelect?.id === pickerId
-    const selectedText = selected.length > 0 ? selected.join('; ') : 'Select'
-    const triggerWidth = `${Math.min(48, Math.max(16, selectedText.length + 3))}ch`
-    const options = configurationOptions(field)
-
-    function toggleOption(option: string) {
-      const nextSelected = selected.includes(option)
-        ? selected.filter((value) => value !== option)
-        : [...selected, option]
-      updateConfiguration(field.configKey, nextSelected)
-    }
-
-    return (
-      <>
-        <button
-          type="button"
-          data-multiselect-trigger={pickerId}
-          className={[
-            'h-7 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm',
-            validationControlClassName(isInvalid),
-          ].join(' ')}
-          style={{ width: triggerWidth }}
-          title={selected.join('; ')}
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            setActiveMultiSelect((current) =>
-              current?.id === pickerId
-                ? null
-                : {
-                    id: pickerId,
-                    key: field.configKey,
-                    selected,
-                    left: rect.left,
-                    top: rect.bottom + 4,
-                    width: Math.max(rect.width, 256),
-                  },
-            )
-          }}
-        >
-          <span className="block overflow-hidden text-ellipsis whitespace-nowrap">{selectedText}</span>
-        </button>
-        {isOpen
-          ? createPortal(
-              <div
-                data-multiselect-picker={pickerId}
-                className="fixed z-50 max-h-56 overflow-y-auto rounded border border-sf-border bg-white p-1 shadow-lg"
-                style={{ left: activeMultiSelect.left, top: activeMultiSelect.top, width: activeMultiSelect.width }}
-              >
-                {options.map((option) => (
-                  <label key={option} className="flex cursor-pointer items-center gap-2 px-2 py-1 text-sm hover:bg-sf-surface-alt">
-                    <input type="checkbox" checked={selected.includes(option)} onChange={() => toggleOption(option)} />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>,
-              document.body,
-            )
-          : null}
-      </>
-    )
-  }
-
-  function renderConfigurationCell(field: TenantConfigurationColumn) {
-    const value = configurationValue(configuration, field)
-    const isProduct = field.configKey === 'product'
-    const isInvalid = !isViewMode && invalidConfigurationFields.has(field.configKey)
-
-    if (isProduct) {
-      return <div className="min-h-7 px-1 py-1 text-sm text-sf-text">{textValue(value) || '-'}</div>
-    }
-
-    if (field.inputType === 'picklist') {
-      const options = configurationOptions(field)
+  function renderApplicationConfigurationTab() {
+    if (!activeSystem) {
       return (
-        <>
-          <select
-            className={[
-              'h-7 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm',
-              validationControlClassName(isInvalid),
-            ].join(' ')}
-            value={textValue(value)}
-            onChange={(event) => handleConfigurationPicklistChange(field, event.target.value)}
-          >
-            {optionsWithCustom(field.configKey, options).map((option) => (
-              <option key={option} value={option}>{option || 'Not set'}</option>
-            ))}
-          </select>
-          {renderConfigurationAddNew(field)}
-        </>
+        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
+          No active hosted System is linked to this tenant.
+        </div>
       )
     }
 
-    if (field.inputType === 'multiselect') {
-      return renderMultiSelect(field, Array.isArray(value) ? value : splitMultiValue(textValue(value)), isInvalid)
-    }
+    const applicationSummary = systemApplicationConfigurationSummary(activeSystem, tenants) as unknown as Record<string, unknown>
 
-    if (field.inputType === 'integer') {
-      return (
-        <input
-          className={[
-            'h-7 w-24 rounded border border-sf-border px-2 py-1 text-sm',
-            validationControlClassName(isInvalid),
-          ].join(' ')}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={digitString(value)}
-          onKeyDown={preventNonDigitKey}
-          onPaste={(event) => {
-            event.preventDefault()
-            updateConfiguration(field.configKey, parseDigitValue(event.clipboardData.getData('text').replace(/\D/g, '')))
-          }}
-          onChange={(event) => updateConfiguration(field.configKey, parseDigitValue(event.target.value.replace(/\D/g, '')))}
-        />
-      )
-    }
-
-    return (
-      <input
-        className={[
-          'h-7 w-36 rounded border border-sf-border px-2 py-1 text-sm',
-          validationControlClassName(isInvalid),
-        ].join(' ')}
-        value={textValue(value)}
-        onChange={(event) => updateConfiguration(field.configKey, event.target.value)}
-      />
-    )
-  }
-
-  function renderConfigurationTab() {
     return (
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="min-w-full border-collapse text-sm leading-tight">
+        <table className="w-max border-collapse text-sm leading-tight" aria-label="Application Configuration Summary">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
-              {CONFIGURATION_FIELDS.map((field) => (
-                <th key={field.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                  <span>{field.label}</span>
-                  <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
-                </th>
-              ))}
+              <ConfigurationColumnHeaders fields={CONFIGURATION_FIELDS} />
             </tr>
           </thead>
           <tbody>
             <tr>
-              {CONFIGURATION_FIELDS.map((field) => {
-                return (
-                  <td key={field.key} className="border border-sf-border px-1.5 py-1 align-top">
-                    {renderConfigurationCell(field)}
-                  </td>
-                )
-              })}
+              <ConfigurationValueCells record={applicationSummary} fields={CONFIGURATION_FIELDS} />
             </tr>
           </tbody>
         </table>
       </div>
-    )
-  }
-
-  function renderHostingTab() {
-    return (
-      <ReadonlyTable
-        headers={TENANT_HOSTING_FIELDS.map((field) => field.label)}
-        rows={[TENANT_HOSTING_FIELDS.map((field) => textValue(hosting[field.key]))]}
-        emptyText="No hosting system is linked to this tenant."
-      />
     )
   }
 
@@ -1303,7 +1029,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderActiveTab() {
-    if (activeTab === 'configuration') return renderConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()

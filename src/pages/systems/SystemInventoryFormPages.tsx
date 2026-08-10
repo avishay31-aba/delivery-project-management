@@ -32,7 +32,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
-import { BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, ProductSubTabs, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
@@ -1503,7 +1503,11 @@ export function InventoryForm<T extends InventoryRecord>({
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.typeLabel || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.manufacturerLabel || '-'}</td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.model || '-'}</td>
-                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{item.linkedSystemBusinessIds.join(', ') || '-'}</td>
+                            <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                              {item.linkedSystemBusinessIds.length > 0
+                                ? <BusinessIdListLinks objectType="SYSTEM" businessIds={item.linkedSystemBusinessIds} />
+                                : '-'}
+                            </td>
                             <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text"><WarrantyStatusPresentation status={item.warrantyStatus} /></td>
                           </tr>
                         )
@@ -1541,23 +1545,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
     return (
       <div className="space-y-4">
-        <div className="flex flex-wrap border-b border-sf-border bg-sf-surface-alt">
-          {innerTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={[
-                'sf-view-mode-allow border-b-2 px-4 py-2 text-sm font-semibold',
-                activeInfrastructureTab === tab.id
-                  ? 'border-sf-brand bg-white text-sf-text'
-                  : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
-              ].join(' ')}
-              onClick={() => setActiveInfrastructureTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <ProductSubTabs tabs={innerTabs} activeTab={activeInfrastructureTab} onTabChange={setActiveInfrastructureTab} />
 
         {activeInfrastructureTab === 'environment' ? (
           <div className="space-y-4">
@@ -2048,7 +2036,9 @@ export function InventoryForm<T extends InventoryRecord>({
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
                         {project ? <BusinessObjectLink reference={projectReference(project)}>{row.pid}</BusinessObjectLink> : row.pid}
                       </td>
-                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.sid}</td>
+                      <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">
+                        {row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '-'}
+                      </td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.projectName}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.accountName}</td>
                       <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{row.product}</td>
