@@ -106,6 +106,7 @@ export function normalizePersistedDashboardViews(value: unknown): PersistedDashb
     dashboards: {
       opportunities: sanitizeDashboardScopeViews(value.dashboards.opportunities),
       projects: sanitizeDashboardScopeViews(value.dashboards.projects),
+      deletedProjects: sanitizeDashboardScopeViews(value.dashboards.deletedProjects),
       productionSystemInventory: sanitizeDashboardScopeViews(value.dashboards.productionSystemInventory),
       reusedInternalSystems: sanitizeDashboardScopeViews(value.dashboards.reusedInternalSystems),
       systems: sanitizeDashboardScopeViews(value.dashboards.systems),

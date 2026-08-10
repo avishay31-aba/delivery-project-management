@@ -523,7 +523,9 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Delete preserves the Project record, PID, relationships, tasks, documents, Activity, Configuration History, and other historical/business data.
 - Delete is not archive, hiding, unlinking, or physical removal.
 - Deleted Projects remain persisted, navigable, dashboard-visible, and audit-visible.
-- Deleted is a terminal Project Status unless a future approved workflow explicitly introduces restoration.
+- Project deletion is initiated from the Active Projects dashboard, not from the individual Project form.
+- Each Project Delete creates a persisted deletion-history entry containing timestamp, deleting user, and reason. Current deleted Projects expose the latest reason as editable header metadata while preserving the original deleting user on that event; restored Projects retain all deletion-history entries as read-only header metadata, newest first.
+- Restore is a Project store/domain lifecycle transaction. It returns the Project to Active Projects and restores the previous legitimate `Open`/`Done` lifecycle status while preserving task-completion invariants and deletion history.
 
 ### Tenant Lifecycle And Hosting Standard
 

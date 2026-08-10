@@ -28,6 +28,7 @@ export function dashboardRecordRoutePath(scope: DashboardViewScope, row: unknown
     case 'opportunities':
       return routePathForBusinessReference('OPPORTUNITY', text(record.opportunityId) || text(record.id))
     case 'projects':
+    case 'deletedProjects':
       return routePathForBusinessReference('PROJECT', text(record.pid) || text(record.id))
     case 'systems':
       return routePathForBusinessReference('SYSTEM', text(record.sid) || text(record.machineId) || text(record.systemIdentity) || text(record.id))

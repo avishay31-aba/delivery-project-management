@@ -7,6 +7,7 @@ export const FULL_DASHBOARD_VIEW_NAME = 'Full Dashboard'
 export const DASHBOARD_VIEW_SCOPES: DashboardViewScope[] = [
   'opportunities',
   'projects',
+  'deletedProjects',
   'systems',
   'productionSystemInventory',
   'reusedInternalSystems',

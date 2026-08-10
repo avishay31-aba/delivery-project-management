@@ -99,6 +99,7 @@ interface DataDashboardProps<T extends { id: string }> {
   onView?: (row: T) => void
   onEditRecord?: (row: T) => void
   onEdit?: (row: T, columnId: string, value: string) => void
+  renderRecordActions?: (row: T) => ReactNode
   getRowClassName?: (row: T) => string
   toolbar?: ReactNode
   enableInlineEditing?: boolean
@@ -159,6 +160,7 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   customers: ['accountCode', 'customerId'],
   opportunities: ['opportunityId', 'oid', 'accountCode'],
   projects: ['pid', 'opportunityId'],
+  deletedProjects: ['deletedBy', 'deletionReason', 'pid', 'opportunityId'],
   systems: ['sid', 'machineId', 'mid', 'projects', 'pid'],
   productionSystemInventory: ['sid'],
   reusedInternalSystems: ['machineId', 'mid', 'sid'],
@@ -256,6 +258,40 @@ function DashboardActionLink<T extends { id: string }>({
     <span className={className} title={`${label} unavailable`} aria-label={`${label} unavailable`} aria-disabled="true">
       {icon}
     </span>
+  )
+}
+
+export function DashboardActionButton({
+  icon,
+  label,
+  onClick,
+  tone = 'default',
+  disabled = false,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  tone?: 'default' | 'danger'
+  disabled?: boolean
+}) {
+  const className = [
+    'inline-flex h-7 w-7 items-center justify-center rounded border bg-white hover:bg-sf-surface-alt disabled:cursor-not-allowed disabled:opacity-40',
+    tone === 'danger' ? 'border-red-200 text-red-700 hover:bg-red-50' : 'border-sf-border text-sf-text',
+  ].join(' ')
+  return (
+    <button
+      type="button"
+      className={className}
+      title={label}
+      aria-label={`${label} record`}
+      disabled={disabled}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
+    >
+      {icon}
+    </button>
   )
 }
 
@@ -932,6 +968,7 @@ export function DataDashboard<T extends { id: string }>({
   onView,
   onEditRecord,
   onEdit,
+  renderRecordActions,
   getRowClassName,
   toolbar,
   enableInlineEditing = false,
@@ -1103,6 +1140,7 @@ export function DataDashboard<T extends { id: string }>({
                 onFallback={onEditRecord}
                 row={row.original}
               />
+              {renderRecordActions?.(row.original)}
             </div>
           )
         },
@@ -1165,7 +1203,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat],
+    [dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
   )
 
   const table = useReactTable({

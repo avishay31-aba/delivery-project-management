@@ -1,6 +1,7 @@
 export type DashboardViewScope =
   | 'opportunities'
   | 'projects'
+  | 'deletedProjects'
   | 'systems'
   | 'productionSystemInventory'
   | 'reusedInternalSystems'

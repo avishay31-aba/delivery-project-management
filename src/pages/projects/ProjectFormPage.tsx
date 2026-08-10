@@ -77,6 +77,8 @@ import {
   projectRequirementReadonlyCellValue,
   projectRequirementRows,
   projectRequirementTitle,
+  latestProjectDeletionEntry,
+  projectDeletionHistory,
   projectHeaderFieldValue,
   projectAlertLabels,
   projectPatchFromOpportunitySelection,
@@ -308,7 +310,6 @@ export function ProjectFormPage() {
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
-  const deleteProject = useAppStore((state) => state.deleteProject)
   const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
   const {
     value: draft,
@@ -345,8 +346,6 @@ export function ProjectFormPage() {
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
   const [allocationCandidateSortDirection, setAllocationCandidateSortDirection] = useState<'asc' | 'desc'>('asc')
   const [allocationResult, setAllocationResult] = useState<AllocationActionResult | null>(null)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [deletionReason, setDeletionReason] = useState('')
   const [templateDialogMode, setTemplateDialogMode] = useState<'replacement' | 'new' | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateDialogError, setTemplateDialogError] = useState('')
@@ -628,21 +627,6 @@ export function ProjectFormPage() {
     navigationBlocker.proceed?.()
   }
 
-  function deleteCurrentProject() {
-    const reason = deletionReason.trim()
-    if (!reason) {
-      setSaveMessages(['Deletion reason is required.'])
-      return
-    }
-    const deletedProject = deleteProject(projectDraft.id, reason)
-    if (deletedProject) {
-      resetDraft(cloneProjectDraft(deletedProject))
-      setSaveMessages(['Project status changed to Deleted.'])
-    }
-    setIsDeleteDialogOpen(false)
-    setDeletionReason('')
-  }
-
   function renderHeaderField(field: ProjectHeaderFieldMetadata) {
     const isChanged = fieldChanged(field.key)
     const isMissing = missingFields.has(field.key)
@@ -827,9 +811,6 @@ export function ProjectFormPage() {
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" disabled={!isDirty} onClick={revertProject}>
               Revert
             </button>
-            <button type="button" className="rounded border border-red-200 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50" onClick={() => setIsDeleteDialogOpen(true)}>
-              Delete
-            </button>
           </>
         )}
         <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={cancelProject}>
@@ -989,6 +970,49 @@ export function ProjectFormPage() {
     })
     setSaveMessages([])
     setIsAddMilestoneDialogOpen(false)
+  }
+
+  function renderDeletionHistoryHeaderField() {
+    const deletionHistory = [...projectDeletionHistory(projectDraft)].reverse()
+    if (deletionHistory.length === 0) return null
+    const latestDeletionEntry = latestProjectDeletionEntry(projectDraft)
+    const canEditLatestReason = !isViewMode && projectDraft.progressStatus === 'DELETED'
+
+    return (
+      <FormField key="deletionHistory" label="Deletion History" controlWidthClassName="w-[32rem] max-w-full">
+        <div className="space-y-3 rounded border border-sf-border bg-white px-2 py-2 text-sm text-sf-text">
+          {deletionHistory.map((entry, index) => {
+            const isLatestEntry = latestDeletionEntry?.id === entry.id
+            const isEditableEntry = canEditLatestReason && isLatestEntry
+            const reasonValue = isEditableEntry ? (projectDraft.deletionReason || entry.reason) : entry.reason
+            return (
+              <div key={entry.id} className={index === 0 ? 'space-y-2' : 'space-y-2 border-t border-dotted border-sf-border pt-3'}>
+                {isEditableEntry ? (
+                  <label className="block space-y-1">
+                    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-sf-text">
+                      <span className="font-medium"><DateTimeValue value={entry.timestamp} semanticType="datetime" fallback="-" /></span>
+                      {entry.deletedBy ? <span>{entry.deletedBy}</span> : null}
+                    </span>
+                    <textarea
+                      aria-label="Current Deletion Reason"
+                      className={fieldClassName(reasonValue !== latestDeletionEntry.reason, !reasonValue.trim(), 'min-h-16 w-full resize-y text-sm')}
+                      value={reasonValue}
+                      onChange={(event) => updateDraftField('deletionReason', event.target.value)}
+                    />
+                  </label>
+                ) : (
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-sf-text">
+                    <span className="font-medium"><DateTimeValue value={entry.timestamp} semanticType="datetime" fallback="-" /></span>
+                    {entry.deletedBy ? <span>{entry.deletedBy}</span> : null}
+                    <span>{entry.reason}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </FormField>
+    )
   }
 
   function requestDeleteMilestone(milestoneId: string) {
@@ -1769,46 +1793,6 @@ export function ProjectFormPage() {
     )
   }
 
-  function renderDeleteDialog() {
-    if (!isDeleteDialogOpen) return null
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-        <div className="w-full max-w-lg rounded border border-sf-border bg-white p-4 text-sm text-sf-text shadow-xl" role="dialog" aria-modal="false" aria-labelledby="project-delete-title">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <h2 id="project-delete-title" className="text-lg font-semibold">Delete project {projectDraft.pid}</h2>
-              <p className="text-sm text-sf-text-muted">The Project record remains available with Status = Deleted. Historical systems, tenants, warranties, links, and activity remain intact.</p>
-            </div>
-            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close delete dialog" onClick={() => setIsDeleteDialogOpen(false)}>
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-          <label className="block space-y-1">
-            <span className="text-sm font-semibold">Deletion Reason <span className="text-red-600">*</span></span>
-            <textarea
-              className="min-h-24 w-full resize-y rounded border border-sf-border px-2 py-1 text-sm"
-              value={deletionReason}
-              onChange={(event) => setDeletionReason(event.target.value)}
-            />
-          </label>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!deletionReason.trim()}
-              onClick={deleteCurrentProject}
-            >
-              Delete Project
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   function renderPlanDeleteDialog() {
     if (!pendingPlanDeletion) return null
     const isMilestone = pendingPlanDeletion.kind === 'milestone'
@@ -1970,7 +1954,6 @@ export function ProjectFormPage() {
           onCancel={() => navigationBlocker.reset?.()}
         />
       ) : null}
-      {renderDeleteDialog()}
       {renderPlanDeleteDialog()}
       {renderTemplateNameDialog()}
       <PageHeader
@@ -2001,7 +1984,10 @@ export function ProjectFormPage() {
       >
         <div className="space-y-3">
           {projectHeaderFieldRows(formMetadata.headerFields).map((row, index) => (
-            <div key={index} className="flex flex-wrap items-start gap-3">{row.map(renderHeaderField)}</div>
+            <div key={index} className="flex flex-wrap items-start gap-3">
+              {row.map(renderHeaderField)}
+              {row.some((field) => field.key === 'projectComments') ? renderDeletionHistoryHeaderField() : null}
+            </div>
           ))}
         </div>
       </CollapsibleSection>

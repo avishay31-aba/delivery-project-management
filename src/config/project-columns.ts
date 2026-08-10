@@ -14,6 +14,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import {
+  latestProjectDeletionEntry,
   projectDeliveryDashboardReadModel,
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
@@ -27,6 +28,7 @@ interface ProjectDashboardColumnContext {
   tenants: Tenant[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
+  includeDeletionReason?: boolean
 }
 
 const EMPTY_PROJECT_DASHBOARD_CONTEXT: ProjectDashboardColumnContext = {
@@ -37,6 +39,7 @@ const EMPTY_PROJECT_DASHBOARD_CONTEXT: ProjectDashboardColumnContext = {
   tenants: [],
   projectSystems: [],
   projectTenants: [],
+  includeDeletionReason: false,
 }
 
 function renderChips(values: string[], title?: string) {
@@ -74,6 +77,15 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
   }
 
   return [
+    ...(context.includeDeletionReason ? [{
+      id: 'deletedBy',
+      label: 'Deleted By',
+      getValue: (project: Project) => latestProjectDeletionEntry(project)?.deletedBy ?? '',
+    } satisfies DashboardColumn<Project>, {
+      id: 'deletionReason',
+      label: 'Deletion Reason',
+      getValue: (project: Project) => latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? '',
+    } satisfies DashboardColumn<Project>] : []),
     { id: 'pid', label: 'PID', getValue: (project) => projectRow(project).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
     { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project).projectName, editable: true, editKey: 'opportunityName' },
     { id: 'type', label: 'Type', getValue: (project) => projectRow(project).type, editable: true, editKey: 'mainType', options: ['POC', 'DELIVERY', 'RENEWAL'] },

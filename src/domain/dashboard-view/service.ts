@@ -29,6 +29,7 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
     dashboards: {
       opportunities: createEmptyScopeViews(),
       projects: createEmptyScopeViews(),
+      deletedProjects: createEmptyScopeViews(),
       systems: createEmptyScopeViews(),
       productionSystemInventory: createEmptyScopeViews(),
       reusedInternalSystems: createEmptyScopeViews(),

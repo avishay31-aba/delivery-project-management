@@ -1,1 +1,1 @@
-export { DataDashboard } from '@/components/dashboard/DataDashboard'
+export { DashboardActionButton, DataDashboard } from '@/components/dashboard/DataDashboard'

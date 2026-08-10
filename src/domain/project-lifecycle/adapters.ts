@@ -1,4 +1,5 @@
 import type { Project } from './types'
+import type { ProjectDeletionHistoryEntry, WorkItemStatus } from '@/data/seed.types'
 import { normalizeMilestonePlanProject } from '@/domain/milestone-plan'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 
@@ -24,10 +25,36 @@ export function projectSavePatch(project: Project): Partial<Project> {
     tasks: project.tasks,
     documents: project.documents ?? [],
     projectComments: project.projectComments ?? '',
+    deletionReason: project.deletionReason ?? '',
   }
 }
 
-export function projectStatusFromTaskCompletion(project: Pick<Project, 'tasks'>): Project['progressStatus'] {
+export function projectDeletionHistory(project: Pick<Project, 'deletionHistory' | 'deletionReason' | 'updatedAt'>): ProjectDeletionHistoryEntry[] {
+  const history = (project.deletionHistory ?? [])
+    .filter((entry) => entry.reason.trim() && entry.timestamp)
+    .map((entry, index) => ({
+      id: entry.id || `legacy-deletion-${index + 1}`,
+      reason: entry.reason,
+      timestamp: entry.timestamp,
+      deletedBy: entry.deletedBy,
+    }))
+  if (history.length > 0) {
+    return [...history].sort((first, second) => first.timestamp.localeCompare(second.timestamp))
+  }
+  const legacyReason = project.deletionReason?.trim()
+  if (!legacyReason) return []
+  return [{
+    id: 'legacy-deletion-1',
+    reason: legacyReason,
+    timestamp: project.updatedAt,
+  }]
+}
+
+export function latestProjectDeletionEntry(project: Pick<Project, 'deletionHistory' | 'deletionReason' | 'updatedAt'>): ProjectDeletionHistoryEntry | null {
+  return projectDeletionHistory(project).at(-1) ?? null
+}
+
+export function projectStatusFromTaskCompletion(project: Pick<Project, 'tasks'>): WorkItemStatus {
   const tasks = project.tasks ?? []
   if (tasks.length > 0 && tasks.every((task) => task.status === 'DONE')) return 'DONE'
   return 'OPEN'
@@ -78,6 +105,8 @@ export function createStandaloneProject(nextPid: string, now: string): Project {
     canceledAt: null,
     archivedAt: null,
     deletionReason: '',
+    deletionHistory: [],
+    deletionPreviousProgressStatus: null,
     projectComments: '',
     documents: [],
     createdAt: now,

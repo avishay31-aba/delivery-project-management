@@ -80,7 +80,7 @@ import {
   type OpportunityProjectSyncResult,
   type ProjectLifecycleChange,
 } from '@/domain/opportunity-lifecycle'
-import { applyProjectLifecycleStatus, createStandaloneProject, projectHeaderFieldValue, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
+import { applyProjectLifecycleStatus, createStandaloneProject, latestProjectDeletionEntry, projectDeletionHistory, projectHeaderFieldValue, projectStatusFromTaskCompletion, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
@@ -915,7 +915,7 @@ function appendProjectSaveActivityEvents(
     objectLabel: `Project ${nextProject.pid}`,
     primaryObject: projectReference,
     relatedObjects: relatedRefs(context.linkedOpportunity ? activityObjectRefFromBusinessReference(opportunityReference(context.linkedOpportunity)) : null, customerRef(context.account)),
-    excludeFields: ['tasks', 'milestones', 'progressStatus'],
+    excludeFields: ['tasks', 'milestones', 'progressStatus', 'deletionHistory'],
   })
 }
 
@@ -985,6 +985,7 @@ interface AppStore extends AppDataState {
 
   updateProject: (id: string, patch: Partial<AppDataState['projects'][number]>, options?: SaveTimestampOptions) => AppDataState['projects'][number] | undefined
   deleteProject: (id: string, reason: string) => AppDataState['projects'][number] | undefined
+  restoreProject: (id: string) => AppDataState['projects'][number] | undefined
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
@@ -1119,10 +1120,33 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const projects = state.projects.map((project) => {
         if (project.id !== id) return project
         previousProject = project
+        const patchWithDeletionHistory = (() => {
+          if (project.progressStatus !== 'DELETED' || typeof patch.deletionReason !== 'string') return patch
+          const trimmedReason = patch.deletionReason.trim()
+          if (!trimmedReason || trimmedReason === latestProjectDeletionEntry(project)?.reason) return patch
+          const latestEntry = latestProjectDeletionEntry(project)
+          const deletionHistory = latestEntry
+            ? projectDeletionHistory(project).map((entry) =>
+                entry.id === latestEntry.id
+                  ? { ...entry, reason: trimmedReason, timestamp: now }
+                  : entry,
+              )
+            : [{
+                id: `project-deletion-${crypto.randomUUID()}`,
+                reason: trimmedReason,
+                timestamp: now,
+                deletedBy: CURRENT_USER_DISPLAY_NAME,
+              }]
+          return {
+            ...patch,
+            deletionReason: trimmedReason,
+            deletionHistory,
+          }
+        })()
         updatedProject = applyProjectLifecycleStatus({
           ...projectWithDerivedTimeZone(state, {
             ...project,
-            ...patch,
+            ...patchWithDeletionHistory,
             updatedAt: options?.preserveNewState ? project.createdAt : now,
           }),
         })
@@ -1203,10 +1227,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => {
       const project = state.projects.find((candidate) => candidate.id === id)
       if (!project) return {}
+      const previousProgressStatus = project.progressStatus === 'DELETED'
+        ? project.deletionPreviousProgressStatus ?? projectStatusFromTaskCompletion(project)
+        : project.progressStatus
+      const deletionPreviousProgressStatus = previousProgressStatus === 'OPEN' || previousProgressStatus === 'DONE'
+        ? previousProgressStatus
+        : projectStatusFromTaskCompletion(project)
       const nextProject: AppDataState['projects'][number] = {
         ...project,
         progressStatus: 'DELETED',
+        deletionPreviousProgressStatus,
         deletionReason: reason.trim(),
+        deletionHistory: [
+          ...projectDeletionHistory(project),
+          {
+            id: `project-deletion-${crypto.randomUUID()}`,
+            reason: reason.trim(),
+            timestamp: now,
+            deletedBy: CURRENT_USER_DISPLAY_NAME,
+          },
+        ],
         updatedAt: now,
       }
       deletedProject = nextProject
@@ -1222,6 +1262,36 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return deletedProject
+  },
+
+  restoreProject: (id) => {
+    const now = new Date().toISOString()
+    let restoredProject: AppDataState['projects'][number] | undefined
+    set((state) => {
+      const project = state.projects.find((candidate) => candidate.id === id)
+      if (!project || project.progressStatus !== 'DELETED') return {}
+      const requestedStatus = project.deletionPreviousProgressStatus ?? projectStatusFromTaskCompletion(project)
+      const nextProject = applyProjectLifecycleStatus({
+        ...project,
+        progressStatus: requestedStatus,
+        deletionReason: '',
+        deletionHistory: projectDeletionHistory(project),
+        deletionPreviousProgressStatus: null,
+        updatedAt: now,
+      })
+      restoredProject = nextProject
+      return {
+        projects: state.projects.map((candidate) =>
+          candidate.id === id ? nextProject : candidate,
+        ),
+        activityEvents: appendProjectSaveActivityEvents(state.activityEvents, now, project, nextProject, {
+          linkedOpportunity: state.opportunities.find((opportunity) => opportunity.opportunityId === nextProject.opportunityId),
+          account: state.accounts.find((candidate) => candidate.accountName === nextProject.accountName),
+        }),
+      }
+    })
+    get().saveToStorage()
+    return restoredProject
   },
 
   updateSystem: (id, patch, options) => {

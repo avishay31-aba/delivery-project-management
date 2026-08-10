@@ -157,6 +157,8 @@ export interface Project {
   canceledAt: string | null
   archivedAt?: string | null
   deletionReason?: string
+  deletionHistory?: ProjectDeletionHistoryEntry[]
+  deletionPreviousProgressStatus?: WorkItemStatus | null
   projectComments?: string
   milestoneTemplateId?: string
   milestones?: ProjectMilestone[]
@@ -164,6 +166,13 @@ export interface Project {
   documents?: DocumentRecord[]
   createdAt: string
   updatedAt: string
+}
+
+export interface ProjectDeletionHistoryEntry {
+  id: string
+  reason: string
+  timestamp: string
+  deletedBy?: string
 }
 
 export interface ProjectMilestone {
