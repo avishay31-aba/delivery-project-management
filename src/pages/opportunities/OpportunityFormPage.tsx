@@ -99,7 +99,7 @@ import {
 } from '@/domain/warranty-collection'
 import { tenantFormType, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
-import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
+import { accountReference, projectReference, systemBusinessId, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
@@ -142,7 +142,7 @@ function textValue(value: unknown): string {
 function existingSystemOptionLabel(system: System, opportunity: Opportunity): string {
   const relationship = system.accountId && system.accountId === opportunity.accountId ? 'Same Account' : 'Deal Owner Related'
   const accountName = (system as System & { accountName?: string }).accountName
-  return `${system.sid ?? system.machineId ?? system.id} | Customer: ${accountName || system.accountId || 'Unknown'} | Product: ${system.productType || '-'} | ${relationship}`
+  return `${systemReference(system).displayLabel || system.id} | Customer: ${accountName || system.accountId || 'Unknown'} | Product: ${system.productType || '-'} | ${relationship}`
 }
 
 function inputClassName(isChanged: boolean, extra = ''): string {
@@ -1888,7 +1888,7 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1">
-                      <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? system.id}</BusinessObjectLink>
+                      <BusinessObjectLink reference={systemReference(system)}>{systemBusinessId(system) || system.id}</BusinessObjectLink>
                     </td>
                     <td className="border border-sf-border px-2 py-1">
                       {system.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={system.deliveryPid}>{system.deliveryPid}</BusinessIdLink> : ''}

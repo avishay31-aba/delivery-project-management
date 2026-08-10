@@ -26,6 +26,7 @@ export type SystemPurpose =
   | 'Demo'
   | 'Training'
   | 'Support'
+  | 'OBSOLETE'
   | 'AVAILABLE'
   | 'DEMO'
   | 'TRAINING'
@@ -881,7 +882,7 @@ export interface ReusedInternalSystem {
   id: string
   machineId: string
   source: 'Reused Internal Systems'
-  purpose: 'Available' | 'POC' | 'Demo' | 'Training' | 'Support'
+  purpose: 'Available' | 'POC' | 'Demo' | 'Training' | 'Support' | 'OBSOLETE'
   status: ReusedInternalSystemStatus
   logo?: string
   url?: string

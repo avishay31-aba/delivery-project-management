@@ -358,11 +358,10 @@ const systemFields: ObjectFieldDefinition[] = [
   {
     key: 'availability',
     label: 'Availability Status',
-    type: 'picklist',
+    type: 'readonly',
     section: 'inventory',
-    editable: true,
-    source: { ...systemInventorySource, fieldKey: 'availability' },
-    picklistSource: { domain: 'SystemInventory', exportName: 'REUSED_STATUS_OPTIONS', fieldKey: 'availability' },
+    editable: false,
+    source: { ...systemInventorySource, fieldKey: 'status' },
   },
   {
     key: 'operationalStatus',

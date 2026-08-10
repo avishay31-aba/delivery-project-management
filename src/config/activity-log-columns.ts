@@ -47,6 +47,5 @@ export function createActivityLogColumns(): DashboardColumn<ActivityDashboardRow
     { id: 'businessObjectId', label: 'Business Object ID', getValue: (row) => row.businessObjectId },
     { id: 'description', label: 'Description', getValue: (row) => row.description },
     { id: 'source', label: 'Source', getValue: (row) => row.source },
-    { id: 'correlationId', label: 'Correlation ID', getValue: (row) => row.correlationId },
   ]
 }

@@ -279,7 +279,7 @@ export function Customer360Page() {
       return readOnlyTable(
         ['SID', 'Product', 'Hosting Type', 'Cloud Platform', 'CSP', 'Region', 'Status'],
         customer.systems.map((system) => [
-          <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? system.id}</BusinessObjectLink>,
+          <BusinessObjectLink reference={systemReference(system)}>{systemBusinessId(system) || system.id}</BusinessObjectLink>,
           system.productType,
           system.hostingType,
           system.cloudPlatform ?? '',

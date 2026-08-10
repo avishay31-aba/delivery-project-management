@@ -6,26 +6,41 @@ interface BusinessNumericInputProps {
   max?: number
   className?: string
   ariaLabel?: string
+  label?: string
+  disabled?: boolean
   onChange: (value: number | null) => void
+  onInvalidValue?: (message: string) => void
 }
 
-function normalizeBusinessNumber(rawValue: string, min: number, max: number): number | null {
-  const digits = rawValue.replace(/\D/g, '').slice(0, 2)
-  if (!digits) return null
-  const value = Math.min(max, Math.max(min, Number(digits)))
-  return Number.isFinite(value) ? value : null
+function parseBusinessNumber(rawValue: string): number | null {
+  const value = rawValue.trim()
+  if (!value) return null
+  if (!/^-?\d+$/.test(value)) return Number.NaN
+  return Number(value)
 }
 
 export function BusinessNumericInput({
   value,
   min = 1,
   max = 99,
-  className = 'h-9 w-full rounded border border-sf-border px-2 py-1',
+  className = 'h-9 w-14 rounded border border-sf-border px-2 py-1 text-center disabled:bg-sf-surface-alt disabled:text-sf-text-muted',
   ariaLabel,
+  label = 'Value',
+  disabled = false,
   onChange,
+  onInvalidValue,
 }: BusinessNumericInputProps) {
   function commit(rawValue: string) {
-    onChange(normalizeBusinessNumber(rawValue, min, max))
+    const parsed = parseBusinessNumber(rawValue)
+    if (parsed === null) {
+      onChange(null)
+      return
+    }
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+      onInvalidValue?.(`${label} must be between ${min} and ${max}.`)
+      return
+    }
+    onChange(parsed)
   }
 
   function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
@@ -42,24 +57,20 @@ export function BusinessNumericInput({
       type="number"
       min={min}
       max={max}
-      maxLength={2}
       inputMode="numeric"
-      pattern="[0-9]*"
+      pattern="-?[0-9]*"
       aria-label={ariaLabel}
       className={className}
+      disabled={disabled}
       value={value ?? ''}
       onWheel={handleWheel}
       onPaste={handlePaste}
       onKeyDown={(event) => {
         const allowed = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
         if (allowed.includes(event.key) || event.ctrlKey || event.metaKey) return
-        if (!/^\d$/.test(event.key)) {
+        if (!/^[\d-]$/.test(event.key)) {
           event.preventDefault()
-          return
         }
-        const target = event.currentTarget
-        const selectedLength = Math.max(0, (target.selectionEnd ?? 0) - (target.selectionStart ?? 0))
-        if (target.value.length - selectedLength >= 2) event.preventDefault()
       }}
       onChange={(event) => commit(event.target.value)}
     />

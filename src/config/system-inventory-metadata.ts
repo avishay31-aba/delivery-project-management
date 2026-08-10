@@ -5,7 +5,6 @@ import {
   REGION_OPTIONS,
   REUSED_OPERATIONAL_STATUS_OPTIONS,
   REUSED_PURPOSE_OPTIONS,
-  REUSED_STATUS_OPTIONS,
 } from '@/config/picklist-options'
 import {
   SYSTEM_INVENTORY_TABS,
@@ -61,9 +60,9 @@ export const reusedInternalSystemMetadata: SystemInventoryMetadata = {
   sourceSheet: 'System form-POC-Demo-Training',
   titleLabel: 'MID',
   headerFields: [
-    { key: 'machineId', label: 'MID', editable: true, source: '1. Sticky Title', line: 1, inputType: 'text', required: true },
+    { key: 'machineId', label: 'MID', editable: true, source: '1. Sticky Title', line: 1, inputType: 'text' },
     { key: 'purpose', label: 'Purpose', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: REUSED_PURPOSE_OPTIONS },
-    { key: 'status', label: 'Availability Status', editable: true, source: '2. Header', line: 1, inputType: 'picklist', options: REUSED_STATUS_OPTIONS },
+    { key: 'status', label: 'Availability Status', editable: false, source: '2. Header', line: 1, inputType: 'readonly' },
     {
       key: 'operationalStatus',
       label: 'Operational Status',

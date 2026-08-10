@@ -6,7 +6,7 @@ import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/component
 import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { projectReference, systemBusinessId, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
-import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 
 type SystemDeliveryTableRecord = System | ProductionSystemInventoryItem | ReusedInternalSystem
 
@@ -127,6 +127,7 @@ export function SystemDeliveryTable({
         <thead className="bg-sf-surface-alt text-left">
           <tr>
             {[
+              'New/Updated',
               'Actions',
               'Details',
               'SID',
@@ -157,6 +158,9 @@ export function SystemDeliveryTable({
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                  <RecordChangeBadge record={system} labels={{ New: 'Added' }} placeholder />
+                </td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {actions?.(system as System)}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -173,15 +177,12 @@ export function SystemDeliveryTable({
                   ) : null}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  <span className="inline-flex items-center gap-2">
-                    <BusinessObjectLink reference={systemReference(system)}>
-                      {systemBusinessId(system)}
-                    </BusinessObjectLink>
-                    <RecordChangeBadge record={system} labels={{ New: 'Added' }} />
-                  </span>
+                  <BusinessObjectLink reference={systemReference(system)}>
+                    {systemBusinessId(system)}
+                  </BusinessObjectLink>
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {'machineId' in system && system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
+                  {'machineId' in system && system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{formattedReusedInternalMachineId(system.machineId)}</BusinessObjectLink> : ''}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text" title={projectLabels.join('; ')}>
                   <span>

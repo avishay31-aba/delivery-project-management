@@ -5,11 +5,15 @@ import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedI
 import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
-import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS, REUSED_STATUS_OPTIONS } from '@/config/picklist-options'
+import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS } from '@/config/picklist-options'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import {
+  deriveReusedSystemOccupationWindow,
+  formattedReusedInternalMachineId,
   joinUniqueValues,
   currentProjectPidsForSystem,
   hostedTenantsForSystem,
+  reusedInternalAvailabilityStatus,
   systemSourceLabel,
   tenantCountForSystem,
 } from '@/domain/system-inventory'
@@ -82,16 +86,22 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
 ]
 
 export function createReusedInternalSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[]): DashboardColumn<ReusedInternalSystem>[] {
+  const activeAllocations = activeProjectSystemLinks(projectSystems)
+  const occupationWindow = (row: ReusedInternalSystem) =>
+    deriveReusedSystemOccupationWindow(row, activeAllocations, projects, new Date().toISOString())
+
   return [
   {
     id: 'machineId',
     label: 'MID',
-    getValue: (row) => row.machineId,
-    render: (row) => createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId }, row.machineId),
+    getValue: (row) => formattedReusedInternalMachineId(row.machineId),
+    render: (row) => row.machineId
+      ? createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId }, row.machineId)
+      : '',
   },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
   { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
-  { id: 'status', label: 'Status', getValue: (row) => row.status, editable: true, editKey: 'status', options: REUSED_STATUS_OPTIONS },
+  { id: 'status', label: 'Availability Status', getValue: (row) => reusedInternalAvailabilityStatus(row, activeAllocations, projects) },
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
   systemVersionColumn<ReusedInternalSystem>(),
   systemUrlColumn<ReusedInternalSystem>(),
@@ -100,8 +110,8 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
   { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.usedInRegion ?? row.timeGroup ?? '', editable: true, editKey: 'usedInRegion', options: REGION_OPTIONS },
-  { id: 'occupationStartDate', label: 'Occupation Start', getValue: (row) => row.occupationStartDate ?? '', editable: true, editKey: 'occupationStartDate' },
-  { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => row.occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
+  { id: 'occupationStartDate', label: 'Occupation Start', getValue: (row) => occupationWindow(row).occupationStartDate ?? '', editable: true, editKey: 'occupationStartDate' },
+  { id: 'occupationEndDate', label: 'Occupation End', getValue: (row) => occupationWindow(row).occupationEndDate ?? '', editable: true, editKey: 'occupationEndDate' },
   {
     id: 'currentProjects',
     label: 'Linked Projects',
@@ -146,8 +156,10 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'machineId',
       label: 'MID',
-      getValue: (row) => row.machineId ?? '',
-      render: (row) => createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId ?? '' }, row.machineId ?? ''),
+      getValue: (row) => formattedReusedInternalMachineId(row.machineId),
+      render: (row) => row.machineId
+        ? createElement(BusinessIdLink, { objectType: 'INTERNAL_REUSED_SYSTEM', businessId: row.machineId }, row.machineId)
+        : '',
     },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },

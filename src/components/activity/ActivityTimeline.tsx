@@ -45,7 +45,6 @@ function activitySearchText(event: ActivityEvent): string {
     activityBusinessObjectId(event),
     event.summary,
     event.source,
-    event.correlationId ?? '',
   ].join(' ').toLocaleLowerCase()
 }
 
@@ -114,15 +113,6 @@ const ACTIVITY_HISTORY_COLUMNS: Array<RecordHistoryColumn<ActivityEvent>> = ACTI
       sortValue: (event) => event.source,
     }
   }
-  if (column.id === 'correlationId') {
-    return {
-      key: column.id,
-      label: column.label,
-      render: (event) => event.correlationId || '-',
-      sortValue: (event) => event.correlationId ?? '',
-    }
-  }
-
   return {
     key: column.id,
     label: column.label,
@@ -189,7 +179,6 @@ export function ActivityTimeline({
         activityBusinessObjectId(event),
         event.summary,
         event.source,
-        event.correlationId ?? '',
       ].map(csvValue).join(','),
     )
     const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })

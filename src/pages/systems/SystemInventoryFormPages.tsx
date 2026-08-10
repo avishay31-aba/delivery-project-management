@@ -82,10 +82,19 @@ import {
   hostedTenantsForSystem,
   ACTIVE_POC_PURPOSE_LOCK_MESSAGE,
   currentProjectPidsForSystem,
+  deriveReusedSystemOccupationWindow,
+  formattedReusedInternalMachineId,
   hasActiveOpenPocPurposeLock,
+  isReusedInternalOccupied,
   isOccupationDateRequiredForPurpose,
+  isValidReusedInternalMachineId,
   linkedProjectDisplay,
   linkedProjectIdsForSystem,
+  normalizeReusedInternalMachineId,
+  reusedInternalAvailabilityStatus,
+  reusedInternalAvailabilityStatusForPurpose,
+  reusedInternalMachineIdRouteKey,
+  reusedInternalMachineIdsEqual,
   reusedInternalPurposeHistory,
   shouldConfirmEarlyNonPocPurposeChange,
   SYSTEM_SOURCE_PRODUCTION,
@@ -283,7 +292,7 @@ function deriveCurrentSid(record: InventoryRecord, systems: System[]): string {
   if ('sid' in record && record.sid) return record.sid
   if (!('machineId' in record) || !record.machineId) return ''
   return systems
-    .filter((system) => system.machineId === record.machineId && system.sid)
+    .filter((system) => reusedInternalMachineIdsEqual(system.machineId, record.machineId) && system.sid)
     .map((system) => system.sid as string)
     .filter((sid, index, all) => all.indexOf(sid) === index)
     .join('; ')
@@ -309,6 +318,9 @@ function derivedValue(
   if (key === 'usedInRegion') return textValue(readRecordValue(record, 'usedInRegion')) || textValue(readRecordValue(record, 'region')) || textValue(readRecordValue(record, 'timeGroup'))
   if (key === 'timeGroup') return deriveTimeGroup(record, tenants, timeGroupLookups)
   if (key === 'availability' && 'source' in record && record.source === SYSTEM_SOURCE_PRODUCTION) return 'Available'
+  if (key === 'status' && 'source' in record && record.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
+    return reusedInternalAvailabilityStatusForPurpose(textValue(readRecordValue(record, 'purpose')))
+  }
   if (key === 'timeGroupAlert') {
     return systemTimeGroupAlert(record, tenants, readRecordValue(record, key), timeGroupLookups)
   }
@@ -435,7 +447,7 @@ export function InventoryForm<T extends InventoryRecord>({
     if ('systemClass' in activeRecord) return activeRecord
     return allocatedSystems.find((system) => {
       const sameSid = 'sid' in activeRecord && activeRecord.sid && system.sid === activeRecord.sid
-      const sameMachine = 'machineId' in activeRecord && activeRecord.machineId && system.machineId === activeRecord.machineId
+      const sameMachine = 'machineId' in activeRecord && activeRecord.machineId && reusedInternalMachineIdsEqual(system.machineId, activeRecord.machineId)
       return sameSid || sameMachine
     })
   }
@@ -447,6 +459,14 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function updateField(key: string, value: unknown) {
     if (isViewMode) return
+    if (metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL && key === 'machineId') {
+      const nextMachineId = normalizeReusedInternalMachineId(typeof value === 'string' ? value : '')
+      if (!isValidReusedInternalMachineId(nextMachineId)) {
+        setMessages(['MID must contain digits only.'])
+        return
+      }
+      value = nextMachineId
+    }
     if (key === 'productType' && productChangeBlocked(value)) {
       setMessages([PRODUCT_CHANGE_WITH_TENANTS_MESSAGE])
       return
@@ -487,7 +507,7 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function validationMessageForField(label: string, key: string): string | undefined {
     if (!invalidFields.has(key) || messages.length === 0) return undefined
-    if (key === 'machineId') return messages.find((message) => message === 'MID is required.' || message === 'MID must be unique.')
+    if (key === 'machineId') return messages.find((message) => message === 'MID is required.' || message === 'MID must be unique.' || message === 'MID must contain digits only.')
     if (key === 'url') return messages.find((message) => message === 'URL is required.' || message.startsWith('URL must '))
     if (key === 'purpose') return messages.find((message) => message === ACTIVE_POC_PURPOSE_LOCK_MESSAGE)
     return messages.find((message) => message === `${label} is required.`)
@@ -497,6 +517,7 @@ export function InventoryForm<T extends InventoryRecord>({
     return [
       'MID is required.',
       'MID must be unique.',
+      'MID must contain digits only.',
       'Cognito Region is required.',
       'Used In Region is required.',
       'URL is required.',
@@ -561,7 +582,7 @@ export function InventoryForm<T extends InventoryRecord>({
       })
     }
 
-    validateSystemInventoryRequiredFields(activeDraft).forEach((message) => {
+    validateSystemInventoryRequiredFields(activeDraft, { projects, projectSystems }).forEach((message) => {
       if (message.field) invalidFields.add(message.field)
       nextMessages.push(message.message)
     })
@@ -709,17 +730,35 @@ export function InventoryForm<T extends InventoryRecord>({
     const hostingType = textValue(readRecordValue(activeDraft, 'hostingType'))
     if (field.key === 'cognitoRegion' && !requiresCloudPlatform(hostingType)) return null
 
+    const isReusedInternalRecord = metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
+    const isReusedInternalInventoryRecord = isReusedInternalRecord && 'currentProjectIds' in activeDraft
+    const isOccupationDateField = field.key === 'occupationStartDate' || field.key === 'occupationEndDate'
+    const activeSystemAllocations = projectSystems.filter((link) => link.allocationStatus !== 'DEALLOCATED')
+    const occupationWindow = isReusedInternalInventoryRecord
+      ? deriveReusedSystemOccupationWindow(activeDraft as ReusedInternalSystem, activeSystemAllocations, projects, new Date().toISOString())
+      : null
+    const availabilityStatus = isReusedInternalInventoryRecord
+      ? reusedInternalAvailabilityStatus(activeDraft as ReusedInternalSystem, activeSystemAllocations, projects)
+      : ''
+    const occupationDateInactive = isReusedInternalRecord && isOccupationDateField && (!isReusedInternalOccupied(availabilityStatus) || Boolean(occupationWindow?.derivedFromActivePocAllocation))
     const hasActiveSystemAllocation = projectSystems.some(
       (link) =>
         link.allocationStatus !== 'DEALLOCATED' &&
-        (link.systemId === activeRecord.id || ('machineId' in activeRecord && link.sourceMachineId === activeRecord.machineId)),
+        (link.systemId === activeRecord.id || ('machineId' in activeRecord && reusedInternalMachineIdsEqual(link.sourceMachineId, activeRecord.machineId))),
     )
     const hasPocPurposeLock =
       activePocPurposeLock &&
       (field.key === 'purpose' || field.key === 'status' || field.key === 'occupationStartDate' || field.key === 'occupationEndDate')
-    const businessEditable = field.editable && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
-    const sourceRecord = businessEditable ? activeDraft : activeRecord
-    const value = derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData, timeGroupLookups)
+    const businessEditable = field.editable && !occupationDateInactive && !(field.key === 'usedInRegion' && hasActiveSystemAllocation) && !hasPocPurposeLock
+    const derivesFromDraft = isReusedInternalRecord && (field.key === 'status' || isOccupationDateField)
+    const sourceRecord = businessEditable || derivesFromDraft ? activeDraft : activeRecord
+    const value = field.key === 'status' && isReusedInternalInventoryRecord
+      ? availabilityStatus
+      : occupationWindow?.derivedFromActivePocAllocation && field.key === 'occupationStartDate'
+      ? textValue(occupationWindow.occupationStartDate)
+      : occupationWindow?.derivedFromActivePocAllocation && field.key === 'occupationEndDate'
+        ? textValue(occupationWindow.occupationEndDate)
+        : derivedValue(sourceRecord, field.key, projects, tenants, projectSystems, allocatedSystems, versionUpdates, referenceData, timeGroupLookups)
     const isChanged = fieldChanged(field.key)
     const isInvalid = invalidFields.has(field.key) && messages.length > 0
     const error = validationMessageForField(field.label, field.key)
@@ -761,7 +800,9 @@ export function InventoryForm<T extends InventoryRecord>({
           businessEditable={false}
           editor={null}
           readOnlyValue={field.inputType === 'date' ? (
-            <DateTimeValue value={value} semanticType="date" fallback="-" />
+            <span className={occupationDateInactive ? 'text-sf-text-muted' : undefined}>
+              <DateTimeValue value={value} semanticType="date" fallback="-" />
+            </span>
           ) : (
             value || '-'
           )}
@@ -811,7 +852,13 @@ export function InventoryForm<T extends InventoryRecord>({
 
     return (
       <FormField key={field.key} label={field.label} controlWidthClassName={width} required={isRequired} error={error}>
-        <input className={fieldClassName(isChanged, isInvalid)} value={value} onChange={(event) => updateField(field.key, event.target.value)} />
+        <input
+          className={fieldClassName(isChanged, isInvalid)}
+          value={value}
+          inputMode={field.key === 'machineId' ? 'numeric' : undefined}
+          pattern={field.key === 'machineId' ? '\\d*' : undefined}
+          onChange={(event) => updateField(field.key, event.target.value)}
+        />
       </FormField>
     )
   }
@@ -2066,7 +2113,15 @@ export function InventoryForm<T extends InventoryRecord>({
         title={
           <span className="inline-flex items-center gap-2">
             <OperationalStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
-            <span>{`${metadata.titleLabel} ${systemIdentity(activeDraft)}`}</span>
+            <span>
+              {metadata.titleLabel === 'MID'
+                ? ['MID', formattedReusedInternalMachineId(textValue(readRecordValue(activeDraft, 'machineId')))].filter(Boolean).join(' ')
+                : `${metadata.titleLabel} ${
+                    metadata.titleLabel === 'SID'
+                      ? textValue(readRecordValue(activeDraft, 'sid'))
+                      : systemIdentity(activeDraft)
+                  }`}
+            </span>
           </span>
         }
         subtitle={metadata.sourceSheet}
@@ -2211,7 +2266,11 @@ export function ReusedInternalSystemFormPage() {
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source === SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
-  const record = useMemo(() => records.find((system) => system.machineId === mid || system.id === mid), [records, mid])
+  const routeMachineId = reusedInternalMachineIdRouteKey(mid)
+  const record = useMemo(
+    () => records.find((system) => reusedInternalMachineIdsEqual(system.machineId, routeMachineId) || system.id === mid),
+    [records, routeMachineId, mid],
+  )
 
   return (
     <InventoryForm

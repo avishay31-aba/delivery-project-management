@@ -62,15 +62,22 @@ import {
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
   hasActiveOpenPocPurposeLock,
+  isReusedInternalOccupied,
   normalizeSystemInventoryRecord,
+  normalizeReusedInternalMachineId,
   occupyReusedInternalSystem,
   applyReusedSystemOccupationWindow,
   purposeHistoryContextFromProject,
   releaseReusedInternalSystem,
+  reusedInternalHasActivePocAllocation,
+  reusedInternalMachineIdsEqual,
+  reusedInternalMachineIdRouteKey,
+  reusedInternalStatusForPurpose,
   systemApplicationConfigurationSummary,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
   updateReusedInternalPurpose,
+  validateReusedInternalPermanentDelete,
   validateReusedInternalPurposeChange,
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
@@ -623,16 +630,25 @@ function sanitizeReusedInternalSystemUserPatch(
   projects: AppDataState['projects'],
   projectSystems: AppDataState['projectSystems'],
 ): Partial<AppDataState['reusedInternalSystems'][number]> {
-  const { purposeHistory: _purposeHistory, ...safePatch } = patch
+  const safePatch = { ...patch }
+  delete safePatch.purposeHistory
+  delete safePatch.status
+  if (typeof safePatch.machineId === 'string') {
+    safePatch.machineId = normalizeReusedInternalMachineId(safePatch.machineId)
+  }
+  if (!isReusedInternalOccupied(reusedInternalStatusForPurpose(safePatch.purpose ?? system.purpose))) {
+    delete safePatch.occupationStartDate
+    delete safePatch.occupationEndDate
+  }
+  if (reusedInternalHasActivePocAllocation(system, activeProjectSystemLinks(projectSystems), projects)) {
+    delete safePatch.occupationStartDate
+    delete safePatch.occupationEndDate
+  }
   if (!hasActiveOpenPocPurposeLock(system, projects, projectSystems)) return safePatch
-  const {
-    purpose: _purpose,
-    status: _status,
-    occupationStartDate: _occupationStartDate,
-    occupationEndDate: _occupationEndDate,
-    ...unmanagedPatch
-  } = safePatch
-  return unmanagedPatch
+  delete safePatch.purpose
+  delete safePatch.occupationStartDate
+  delete safePatch.occupationEndDate
+  return safePatch
 }
 
 function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['projects'][number]) {
@@ -992,6 +1008,7 @@ interface AppStore extends AppDataState {
   restoreProject: (id: string) => AppDataState['projects'][number] | undefined
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
+  permanentDeleteReusedInternalSystem: (id: string) => AllocationActionResult
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
   updateSystemMapCenter: (
     systemId: string,
@@ -1199,8 +1216,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const pocProjectForPurposeSync = updatedProject
       const reusedInternalSystems = sourceMachineIds.size > 0 && pocProjectForPurposeSync
         ? state.reusedInternalSystems.map((system) => {
-            if (!sourceMachineIds.has(system.machineId)) return system
-            const context = sourceMachinePurposeContext.get(system.machineId)
+            if (!Array.from(sourceMachineIds).some((sourceMachineId) => reusedInternalMachineIdsEqual(sourceMachineId, system.machineId))) return system
+            const sourceMachineContextKey = Array.from(sourceMachinePurposeContext.keys()).find((sourceMachineId) =>
+              reusedInternalMachineIdsEqual(sourceMachineId, system.machineId),
+            )
+            const context = sourceMachineContextKey ? sourceMachinePurposeContext.get(sourceMachineContextKey) : undefined
             if (pocProjectForPurposeSync.progressStatus === 'OPEN') {
               return occupyReusedInternalSystem(system, id, now, context, state.projectSystems, projects)
             }
@@ -1381,12 +1401,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
                   state.projects,
                   state.projectSystems,
                 )
-                const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch })
+                const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch }, state)
                 if (blockedPurposeChange.length > 0 || requiredFieldMessages.length > 0) return system
                 const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
                   ? updateReusedInternalPurpose(system, safePatch.purpose, now)
                   : { ...system, updatedAt: updatedAtFor(system.createdAt) }
-                return { ...nextSystem, ...safePatch, updatedAt: updatedAtFor(system.createdAt) }
+                return applyReusedSystemOccupationWindow({
+                  ...nextSystem,
+                  ...safePatch,
+                  status: reusedInternalStatusForPurpose(safePatch.purpose ?? nextSystem.purpose),
+                  updatedAt: updatedAtFor(system.createdAt),
+                }, activeProjectSystemLinks(state.projectSystems), state.projects, now)
               })
             : state.reusedInternalSystems,
         systems:
@@ -1658,6 +1683,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   createInfrastructureItem: (draft) => {
     const state = get()
     const now = new Date().toISOString()
+    const draftMessages = validateInfrastructureItemDraft(draft, state.infrastructureItems, state.referenceData)
+    if (draftMessages.length > 0) return { ok: false, message: draftMessages.join(' ') }
     const normalizedDraft: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       identifier: draft.identifier.trim(),
@@ -1703,6 +1730,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const existing = state.infrastructureItems.find((item) => item.id === id)
     if (!existing) return { ok: false, message: 'Infrastructure Item not found.' }
     const now = new Date().toISOString()
+    const draftMessages = validateInfrastructureItemDraft(draft, state.infrastructureItems, state.referenceData)
+    if (draftMessages.length > 0) return { ok: false, message: draftMessages.join(' ') }
     const latestDeletionEntry = latestInfrastructureDeletionEntry(existing)
     const nextDeletionReason = draft.deletionReason ?? existing.deletionReason ?? ''
     const deletionHistory =
@@ -2631,7 +2660,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           state.projects,
           state.projectSystems,
         )
-        const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch })
+        const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch }, state)
         if (blockedPurposeChange.length > 0 || requiredFieldMessages.length > 0) {
           nextCommittedSystem = system
           return system
@@ -2639,7 +2668,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
           ? updateReusedInternalPurpose(system, safePatch.purpose, now)
           : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
-        nextCommittedSystem = normalizeSystemInventoryRecord({ ...nextSystem, ...safePatch, updatedAt: options?.preserveNewState ? system.createdAt : now })
+        nextCommittedSystem = normalizeSystemInventoryRecord(applyReusedSystemOccupationWindow({
+          ...nextSystem,
+          ...safePatch,
+          status: reusedInternalStatusForPurpose(safePatch.purpose ?? nextSystem.purpose),
+          updatedAt: options?.preserveNewState ? system.createdAt : now,
+        }, activeProjectSystemLinks(state.projectSystems), state.projects, now))
         return nextCommittedSystem
       })
       return {
@@ -2657,6 +2691,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     })
     get().saveToStorage()
+  },
+
+  permanentDeleteReusedInternalSystem: (id) => {
+    const state = get()
+    const system = state.reusedInternalSystems.find((candidate) => candidate.id === id)
+    if (!system) return { ok: false, message: 'Reused Internal System not found.' }
+    const messages = validateReusedInternalPermanentDelete(system, state)
+    if (messages.length > 0) return { ok: false, message: messages.map((message) => message.message).join(' ') }
+
+    const now = new Date().toISOString()
+    set((current) => ({
+      reusedInternalSystems: current.reusedInternalSystems.filter((candidate) => candidate.id !== id),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'SYSTEM',
+        eventType: 'system.permanentlyDeleted',
+        severity: 'WARNING',
+        summary: `Reused Internal System ${systemBusinessId(system)} permanently deleted.`,
+        primaryObject: systemRef(system),
+        before: { id: system.id, machineId: system.machineId, purpose: system.purpose, status: system.status },
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: `Reused Internal System ${systemBusinessId(system)} permanently deleted.` }
   },
 
   updateOpportunity: (id, patch, options) => {
@@ -2796,7 +2853,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   createReusedInternalSystem: (machineId = '') => {
-    const nextMid = machineId.trim()
+    const nextMid = normalizeReusedInternalMachineId(reusedInternalMachineIdRouteKey(machineId))
     const now = new Date().toISOString()
     const system = createReusedInternalInventorySystem(nextMid, now)
 
@@ -2806,7 +2863,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         category: 'SYSTEM',
         eventType: 'system.created',
         severity: 'SUCCESS',
-        summary: `System ${system.machineId} created.`,
+        summary: `System ${systemBusinessId(system)} created.`,
         primaryObject: systemRef(system),
       }),
     }))
@@ -3114,7 +3171,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 now,
                 purposeHistoryContextFromProject(project, allocatedSystem),
                 [
-                  ...activeProjectSystemLinks(current.projectSystems).filter((link) => link.sourceMachineId === candidate.machineId),
+                  ...activeProjectSystemLinks(current.projectSystems).filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, candidate.machineId)),
                   allocation,
                 ],
                 current.projects,
@@ -3228,7 +3285,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : system,
       )
       const releasedReusedSystems = current.reusedInternalSystems.map((system) =>
-        allocation.allocationType === 'REUSED_INTERNAL' && system.machineId === allocation.sourceMachineId
+        allocation.allocationType === 'REUSED_INTERNAL' && reusedInternalMachineIdsEqual(system.machineId, allocation.sourceMachineId)
           ? releaseReusedInternalSystem(system, allocation.projectId, now, project && allocatedSystemForPurposeHistory ? purposeHistoryContextFromProject(project, allocatedSystemForPurposeHistory) : {})
           : system,
       )

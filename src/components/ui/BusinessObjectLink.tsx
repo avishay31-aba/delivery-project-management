@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { LinkId } from '@/components/ui/LinkId'
 import {
+  displayBusinessIdForReference,
   routePathForBusinessReference,
   type BusinessObjectReference,
   type BusinessObjectType,
@@ -54,7 +55,9 @@ export function BusinessObjectLink({ reference, children, className }: BusinessO
 }
 
 export function BusinessIdLink({ objectType, businessId, children, className }: BusinessIdLinkProps) {
-  const label = children ?? businessId ?? ''
+  const label = objectType === 'INTERNAL_REUSED_SYSTEM'
+    ? displayBusinessIdForReference(objectType, businessId)
+    : children ?? businessId ?? ''
   const routePath = routePathForBusinessReference(objectType, businessId)
   if (!routePath || !label) return label
   return (

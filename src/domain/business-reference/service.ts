@@ -16,6 +16,11 @@ import type {
   BusinessReferenceContext,
   BusinessReferenceLookup,
 } from './types'
+import {
+  formattedReusedInternalMachineId,
+  normalizeReusedInternalMachineId,
+  reusedInternalMachineIdRouteKey,
+} from '@/domain/system-inventory'
 
 function normalized(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -58,9 +63,16 @@ export function routePathForBusinessReference(objectType: string, businessId: st
   if (objectType === 'TENANT') return `/tenants/${id}`
   if (objectType === 'INFRASTRUCTURE_ITEM') return `/infrastructure/${id}`
   if (objectType === 'PRODUCTION_SYSTEM') return `/systems/production-inventory/${id}`
-  if (objectType === 'INTERNAL_REUSED_SYSTEM') return `/systems/reused-internal/${id}`
+  if (objectType === 'INTERNAL_REUSED_SYSTEM') return `/systems/reused-internal/${formattedReusedInternalMachineId(reusedInternalMachineIdRouteKey(id))}`
   if (objectType === 'SYSTEM') return `/systems/${id}`
   return null
+}
+
+export function displayBusinessIdForReference(objectType: string, businessId: string | null | undefined): string {
+  const id = normalized(businessId)
+  if (!id) return ''
+  if (objectType === 'INTERNAL_REUSED_SYSTEM') return formattedReusedInternalMachineId(reusedInternalMachineIdRouteKey(id))
+  return id
 }
 
 export function accountReference(account: Account, lookup: Partial<BusinessReferenceLookup> = {}): BusinessObjectReference {
@@ -204,7 +216,7 @@ export function isStaleBusinessReference(context: BusinessReferenceContext, look
 
 export function systemBusinessId(system: System | ProductionSystemInventoryItem | ReusedInternalSystem): string {
   if ('sid' in system && system.sid) return system.sid
-  if ('machineId' in system && system.machineId) return system.machineId
+  if ('machineId' in system && system.machineId) return formattedReusedInternalMachineId(system.machineId)
   return system.id
 }
 
@@ -212,14 +224,14 @@ function systemBusinessIdForObjectType(
   system: System | ProductionSystemInventoryItem | ReusedInternalSystem,
   objectType: BusinessObjectType,
 ): string {
-  if (objectType === 'INTERNAL_REUSED_SYSTEM' && 'machineId' in system && system.machineId) return system.machineId
+  if (objectType === 'INTERNAL_REUSED_SYSTEM' && 'machineId' in system && system.machineId) return formattedReusedInternalMachineId(system.machineId)
   if (objectType === 'PRODUCTION_SYSTEM' && 'sid' in system && system.sid) return system.sid
   return systemBusinessId(system)
 }
 
 function systemObjectType(system: System | ProductionSystemInventoryItem | ReusedInternalSystem): BusinessObjectType {
   if ('source' in system && system.source === 'Production' && 'sid' in system && system.sid) return 'PRODUCTION_SYSTEM'
-  if ('source' in system && system.source === 'Reused Internal Systems' && 'machineId' in system && system.machineId) return 'INTERNAL_REUSED_SYSTEM'
+  if ('source' in system && system.source === 'Reused Internal Systems' && 'machineId' in system) return 'INTERNAL_REUSED_SYSTEM'
   if ('machineId' in system && system.machineId && (!('sid' in system) || !system.sid)) return 'INTERNAL_REUSED_SYSTEM'
   return 'SYSTEM'
 }
@@ -254,8 +266,11 @@ function resolveSystem(
 ): System | ProductionSystemInventoryItem | ReusedInternalSystem | null {
   const internalId = normalized(lookup.internalId)
   const businessId = normalized(lookup.businessId)
+  const reusedMachineId = normalizeReusedInternalMachineId(reusedInternalMachineIdRouteKey(businessId))
   const matches = (system: System | ProductionSystemInventoryItem | ReusedInternalSystem) =>
-    system.id === internalId || systemBusinessId(system) === businessId
+    system.id === internalId ||
+    systemBusinessId(system) === businessId ||
+    ('machineId' in system && normalizeReusedInternalMachineId(system.machineId) === reusedMachineId)
 
   if (lookup.objectType !== 'INTERNAL_REUSED_SYSTEM') {
     const activeOrProduction = [...context.systems, ...context.productionSystemInventory].find(matches)

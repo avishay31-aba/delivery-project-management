@@ -1,6 +1,6 @@
 import { createdProjectsForOpportunity } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
-import { systemIdentity, systemSource } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, systemIdentity, systemSource } from '@/domain/system-inventory'
 import {
   REQUIREMENT_COVERAGE_MISSING_STEP_LABELS,
   REQUIREMENT_COVERAGE_STATUS_LABELS,
@@ -95,7 +95,7 @@ function firstSystemIdentity(systems: System[]): { systemId: string; sid: string
   return {
     systemId: system.id,
     sid: system.sid ?? '',
-    mid: system.machineId ?? (systemSource(system) === 'Reused Internal Systems' ? identity : ''),
+    mid: system.machineId ? formattedReusedInternalMachineId(system.machineId) : (systemSource(system) === 'Reused Internal Systems' ? identity : ''),
   }
 }
 

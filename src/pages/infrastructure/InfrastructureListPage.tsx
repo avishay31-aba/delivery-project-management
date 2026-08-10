@@ -235,7 +235,6 @@ export function InfrastructureListPage() {
               rows={rows}
               columns={columns}
               initialSorting={[{ id: 'infrastructureId', desc: false }]}
-              freezeThroughColumnId="identifier"
               toolbar={
                 <button
                   type="button"
@@ -272,7 +271,6 @@ export function InfrastructureListPage() {
               rows={deletedRows}
               columns={deletedColumns}
               initialSorting={[{ id: 'infrastructureId', desc: false }]}
-              freezeThroughColumnId="identifier"
               onView={(row) => {
                 const routePath = infrastructureItemReference(row).routePath
                 if (routePath) navigate(routePath, { state: { returnTo, mode: 'view' } })
@@ -297,7 +295,6 @@ export function InfrastructureListPage() {
               rows={sortedMaintenanceRows}
               columns={maintenanceColumns}
               initialSorting={[{ id: 'startDate', desc: true }]}
-              freezeThroughColumnId="infrastructureItemId"
               getRowClassName={maintenanceRowClassName}
               contentModeControls={
                 <div className="inline-flex items-center gap-1">

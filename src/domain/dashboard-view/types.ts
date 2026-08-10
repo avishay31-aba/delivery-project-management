@@ -33,6 +33,7 @@ export interface DashboardViewState {
   sorting: DashboardViewSortingRule[]
   grouping: string[]
   globalFilter: string
+  freezeThroughColumnId: string | null
 }
 
 export interface SavedDashboardView {

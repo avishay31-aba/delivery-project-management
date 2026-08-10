@@ -4,6 +4,7 @@ import type {
   ProjectTenantLink,
   System,
 } from '@/data/seed.types'
+import { reusedInternalMachineIdRouteKey } from '@/domain/system-inventory'
 export {
   releaseReusedInternalSystem,
   systemFromProductionInventoryAllocation,
@@ -16,7 +17,7 @@ export function normalizeProjectSystemLink(link: ProjectSystemLink): ProjectSyst
     tenantIds: Array.isArray(link.tenantIds) ? link.tenantIds : [],
     allocationStatus: link.allocationStatus ?? 'ALLOCATED',
     allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
-    sourceMachineId: link.sourceMachineId ?? null,
+    sourceMachineId: link.sourceMachineId ? reusedInternalMachineIdRouteKey(link.sourceMachineId) : null,
     deallocatedAt: link.deallocatedAt ?? null,
   }
 }
@@ -46,7 +47,7 @@ export function createProjectSystemLink(
     tenantIds: options.tenantIds ?? [],
     allocationStatus: 'ALLOCATED',
     allocationType,
-    sourceMachineId: options.sourceMachineId ?? null,
+    sourceMachineId: options.sourceMachineId ? reusedInternalMachineIdRouteKey(options.sourceMachineId) : null,
     allocatedAt,
     deallocatedAt: null,
   }

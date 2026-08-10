@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { System, Tenant } from '@/data/seed.types'
+import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
 import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
@@ -35,6 +36,9 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
       <table className="w-max min-w-full border-collapse text-sm leading-tight">
         <thead className="bg-sf-surface-alt text-left">
           <tr>
+            <th className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+              New/Updated
+            </th>
             {actions ? (
               <th className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                 Actions
@@ -65,22 +69,22 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
             const configurationRecord = tenantConfigurationPresentationRecord(tenant, systems, tenants)
             return (
               <tr key={tenant.id} className="hover:bg-sf-surface-alt">
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                  <RecordChangeBadge record={tenant} placeholder />
+                </td>
                 {actions ? (
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                     {actions(tenant, system)}
                   </td>
                 ) : null}
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  <span className="inline-flex items-center gap-2">
-                    <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
-                    <RecordChangeBadge record={tenant} />
-                  </span>
+                  <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system ? <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? system.machineId ?? ''}</BusinessObjectLink> : null}
+                  {system ? <BusinessObjectLink reference={systemReference(system)}>{system.sid ?? formattedReusedInternalMachineId(system.machineId) ?? ''}</BusinessObjectLink> : null}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {system?.machineId ? <BusinessObjectLink reference={systemReference(system)}>{system.machineId}</BusinessObjectLink> : ''}
+                  {system?.machineId ? <BusinessObjectLink reference={systemReference(system)}>{formattedReusedInternalMachineId(system.machineId)}</BusinessObjectLink> : ''}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-'}

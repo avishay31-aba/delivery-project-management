@@ -2,6 +2,7 @@ import type { AppDataState, System, Tenant, TenantHostingSnapshot } from '@/data
 import { DEFAULT_HOSTING_CONTEXT, DEFAULT_HOSTING_INTENT } from './metadata'
 import type { HostingContext, HostingIntent } from './types'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
+import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
 
 export function defaultHostingIntent(): HostingIntent {
   return { ...DEFAULT_HOSTING_INTENT }
@@ -67,7 +68,7 @@ export function hostingSnapshotFromSystem(
     currentSystem: Boolean(system),
     sid: system?.sid ?? tenant.hostingSid ?? '',
     operationalStatus: system?.operationalStatus ?? tenant.operationalStatus ?? '',
-    machineNumber: system?.machineId ?? '',
+    machineNumber: formattedReusedInternalMachineId(system?.machineId) || '',
     versionNumber,
     hostingType: system?.hostingType ?? tenant.hostingType ?? '',
     url: system?.url ?? '',

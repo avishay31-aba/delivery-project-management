@@ -5,7 +5,7 @@ import {
   reusedInternalSystemMetadata,
 } from '@/config/system-inventory-metadata'
 import type { ProductionSystemInventoryItem, System } from '@/data/seed.types'
-import { SYSTEM_SOURCE_REUSED_INTERNAL } from '@/domain/system-inventory'
+import { reusedInternalMachineIdRouteKey, reusedInternalMachineIdsEqual, SYSTEM_SOURCE_REUSED_INTERNAL } from '@/domain/system-inventory'
 import { useAppStore } from '@/store/useAppStore'
 import { InventoryForm } from './SystemInventoryFormPages'
 
@@ -16,7 +16,10 @@ export function SystemFormPage() {
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const record = useMemo(
-    () => systems.find((system) => system.sid === sid || system.machineId === sid),
+    () => {
+      const routeMachineId = reusedInternalMachineIdRouteKey(sid)
+      return systems.find((system) => system.sid === sid || reusedInternalMachineIdsEqual(system.machineId, routeMachineId))
+    },
     [systems, sid],
   )
   const isReused = record?.source === SYSTEM_SOURCE_REUSED_INTERNAL

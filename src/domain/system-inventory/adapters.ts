@@ -22,7 +22,7 @@ import {
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
 } from './metadata'
-import { applyReusedSystemOccupationWindow, reusedInternalStatusForPurpose, systemIdentity, systemSource } from './service'
+import { applyReusedSystemOccupationWindow, reusedInternalMachineIdRouteKey, reusedInternalStatusForPurpose, systemIdentity, systemSource } from './service'
 import { reserveBusinessId } from '@/domain/business-identity'
 
 export function systemDisplayName(record: SystemInventoryRecord): string {
@@ -40,6 +40,7 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     ...('usedInRegion' in record ? { usedInRegion: normalizeBusinessRegion(record.usedInRegion) } : {}),
     ...('region' in record ? { region: normalizeBusinessRegion(record.region) } : {}),
     ...('timeGroup' in record ? { timeGroup: normalizeBusinessRegion(record.timeGroup) || record.timeGroup || '' } : {}),
+    ...('machineId' in record && record.machineId && systemSource(record) === SYSTEM_SOURCE_REUSED_INTERNAL ? { machineId: reusedInternalMachineIdRouteKey(record.machineId) } : {}),
     documents: Array.isArray(record.documents) ? record.documents : [],
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
@@ -229,14 +230,15 @@ export function releaseReusedInternalSystem(
 }
 
 export function createReusedInternalInventorySystem(machineId: string, now: string): ReusedInternalSystem {
+  const normalizedMachineId = reusedInternalMachineIdRouteKey(machineId)
   return {
     id: `reused-sys-${crypto.randomUUID()}`,
-    machineId,
+    machineId: normalizedMachineId,
     source: SYSTEM_SOURCE_REUSED_INTERNAL,
     purpose: REUSED_INTERNAL_PURPOSE_AVAILABLE,
     status: REUSED_INTERNAL_STATUS_AVAILABLE,
     logo: 'T',
-    url: `https://${machineId}.example.internal`,
+    url: `https://${normalizedMachineId}.example.internal`,
     cognitoRegion: 'NA',
     productType: 'Tangles',
     ...defaultHostingContext(),

@@ -19,7 +19,10 @@ import {
   infrastructureMaintenanceTaskTypes,
   infrastructureReferenceDataLabel,
   INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS,
+  MAINTENANCE_RECURRENCE_NUMBER_MAX,
+  MAINTENANCE_RECURRENCE_NUMBER_MIN,
   recurrenceSummary,
+  validateMaintenanceRecurrence,
 } from '@/domain/infrastructure-item'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
 import { handleDateInputPaste } from '@/utils/date-input'
@@ -60,6 +63,42 @@ const WEEKDAY_LABELS: Record<NonNullable<InfrastructureMaintenanceRecurrence['we
   thursday: 'Thursday',
   friday: 'Friday',
   saturday: 'Saturday',
+}
+const MONTH_OPTIONS = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+]
+const ORDINAL_OPTIONS: Array<NonNullable<InfrastructureMaintenanceRecurrence['monthlyOrdinal']>> = ['first', 'second', 'third', 'fourth', 'last']
+const RECURRENCE_FREQUENCIES: Array<Exclude<InfrastructureMaintenanceRecurrence['frequency'], 'none'>> = ['daily', 'weekly', 'monthly', 'yearly']
+const RECURRENCE_FREQUENCY_LABELS: Record<Exclude<InfrastructureMaintenanceRecurrence['frequency'], 'none'>, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+}
+
+function recurrenceDateParts(dateValue: string | null | undefined) {
+  const date = dateValue ? new Date(`${dateValue}T00:00:00`) : new Date()
+  const safeDate = Number.isNaN(date.valueOf()) ? new Date() : date
+  return {
+    month: safeDate.getMonth() + 1,
+    day: safeDate.getDate(),
+    weekday: WEEKDAYS[safeDate.getDay()],
+  }
+}
+
+function maxDayForRecurrenceMonth(month: number | null | undefined): number {
+  return new Date(2024, month || 1, 0).getDate()
 }
 
 function TaskStatusSelect({ value, onChange }: { value: InfrastructureMaintenanceTaskStatus; onChange: (value: InfrastructureMaintenanceTaskStatus) => void }) {
@@ -178,11 +217,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     if (draft.dueDate && Number.isNaN(new Date(`${draft.dueDate}T00:00:00`).valueOf())) errors.push('Due Date is invalid.')
     if (!INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(draft.taskStatus)) errors.push('Task Status is invalid.')
     if (draft.recurrence.frequency !== 'none') {
-      const recurrenceStartDate = draft.recurrence.startDate ?? draft.startDate
-      if (!recurrenceStartDate) errors.push('Recurrence Start is required.')
-      if (draft.recurrence.frequency === 'weekly' && (draft.recurrence.weeklyWeekdays ?? []).length === 0) errors.push('Select at least one recurrence weekday.')
-      if (draft.recurrence.endType === 'after' && (!draft.recurrence.endAfterOccurrences || draft.recurrence.endAfterOccurrences <= 0)) errors.push('End After occurrences must be greater than 0.')
-      if (draft.recurrence.endType === 'by' && (!draft.recurrence.endByDate || (recurrenceStartDate && draft.recurrence.endByDate < recurrenceStartDate))) errors.push('End By date must be on or after Recurrence Start.')
+      errors.push(...validateMaintenanceRecurrence(draft.recurrence, draft.startDate))
     }
     return errors
   }
@@ -250,6 +285,50 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     setAdvancedErrors([])
   }
 
+  function changeAdvancedRecurrenceFrequency(frequency: Exclude<InfrastructureMaintenanceRecurrence['frequency'], 'none'>) {
+    setAdvancedDraft((current) => {
+      if (!current) return current
+      const dateParts = recurrenceDateParts(current.recurrence.startDate ?? current.startDate)
+      const recurrence = current.recurrence
+      const switchingToYearly = frequency === 'yearly' && recurrence.frequency !== 'yearly'
+      return {
+        ...current,
+        recurrence: {
+          ...recurrence,
+          frequency,
+          interval: recurrence.interval || 1,
+          startDate: recurrence.startDate ?? current.startDate ?? null,
+          endType: recurrence.endType ?? 'none',
+          dailyMode: recurrence.dailyMode ?? 'interval',
+          weeklyWeekdays: recurrence.weeklyWeekdays?.length ? recurrence.weeklyWeekdays : [dateParts.weekday],
+          monthlyMode: recurrence.monthlyMode ?? 'day',
+          monthlyDay: recurrence.monthlyDay ?? dateParts.day,
+          monthlyOrdinal: recurrence.monthlyOrdinal ?? 'first',
+          monthlyRelativeDay: recurrence.monthlyRelativeDay ?? dateParts.weekday,
+          yearlyMode: recurrence.yearlyMode ?? 'date',
+          yearlyMonth: switchingToYearly ? dateParts.month : recurrence.yearlyMonth ?? dateParts.month,
+          yearlyDay: switchingToYearly ? Math.min(dateParts.day, maxDayForRecurrenceMonth(dateParts.month)) : recurrence.yearlyDay ?? Math.min(dateParts.day, maxDayForRecurrenceMonth(recurrence.yearlyMonth ?? dateParts.month)),
+          yearlyOrdinal: recurrence.yearlyOrdinal ?? 'first',
+          yearlyRelativeDay: recurrence.yearlyRelativeDay ?? dateParts.weekday,
+          endAfterOccurrences: recurrence.endAfterOccurrences ?? 10,
+        },
+      }
+    })
+    setAdvancedErrors([])
+  }
+
+  function setAdvancedRecurrenceEnabled(enabled: boolean) {
+    if (!enabled) {
+      updateAdvancedRecurrence({ frequency: 'none' })
+      return
+    }
+    changeAdvancedRecurrenceFrequency(advancedDraft?.recurrence.frequency === 'none' ? 'daily' : advancedDraft?.recurrence.frequency ?? 'daily')
+  }
+
+  function showAdvancedRecurrenceNumberError(message: string) {
+    setAdvancedErrors([message])
+  }
+
   function confirmAdvancedEdit() {
     if (!advancedDraft || !advancedTaskId) return
     const errors = validateTask(advancedDraft)
@@ -293,6 +372,11 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                   <EditableChildObjectActionButton onClick={() => editor.cancel(task.id)}>
                     <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
                   </EditableChildObjectActionButton>
+                  {permissions.canEdit ? (
+                    <EditableChildObjectActionButton onClick={() => openAdvancedEdit(task)}>
+                      <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" /> Advanced Edit
+                    </EditableChildObjectActionButton>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -505,122 +589,344 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
               </section>
 
               <section className="space-y-3">
-                <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Recurrence Pattern</h4>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                  <label className="block text-sm">
-                    <span className="mb-1 block font-medium text-sf-text">Repeats</span>
-                    <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8" value={advancedDraft.recurrence.frequency} onChange={(event) => updateAdvancedRecurrence({ frequency: event.target.value as InfrastructureMaintenanceRecurrence['frequency'] })}>
-                      <option value="none">Does not repeat</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
-                  </label>
+                <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Recurrence pattern</h4>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-sf-text">
+                    <span className="font-medium">Recurrence:</span>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="maintenance-recurrence-enabled"
+                        className="h-4 w-4 border-sf-border text-sf-brand"
+                        checked={advancedDraft.recurrence.frequency !== 'none'}
+                        onChange={() => setAdvancedRecurrenceEnabled(true)}
+                      />
+                      <span>Yes</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="maintenance-recurrence-enabled"
+                        className="h-4 w-4 border-sf-border text-sf-brand"
+                        checked={advancedDraft.recurrence.frequency === 'none'}
+                        onChange={() => setAdvancedRecurrenceEnabled(false)}
+                      />
+                      <span>No</span>
+                    </label>
+                  </div>
                   {advancedDraft.recurrence.frequency !== 'none' ? (
-                    <>
-                      <label className="block text-sm">
-                        <span className="mb-1 block font-medium text-sf-text">Every</span>
-                        <BusinessNumericInput value={advancedDraft.recurrence.interval} onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })} />
-                      </label>
-                      {advancedDraft.recurrence.frequency === 'daily' ? (
-                        <label className="block text-sm">
-                          <span className="mb-1 block font-medium text-sf-text">Daily Mode</span>
-                          <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8" value={advancedDraft.recurrence.dailyMode ?? 'interval'} onChange={(event) => updateAdvancedRecurrence({ dailyMode: event.target.value as 'interval' | 'weekday' })}>
-                            <option value="interval">Days</option>
-                            <option value="weekday">Every weekday</option>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-[9rem_1fr]">
+                      <div className="space-y-2 border-b border-sf-border pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-4">
+                        {RECURRENCE_FREQUENCIES.map((frequency) => (
+                          <label key={frequency} className="flex items-center gap-2 text-sm text-sf-text">
+                            <input
+                              type="radio"
+                              name="maintenance-recurrence-frequency"
+                              className="h-4 w-4 border-sf-border text-sf-brand"
+                              checked={advancedDraft.recurrence.frequency === frequency}
+                              onChange={() => changeAdvancedRecurrenceFrequency(frequency)}
+                            />
+                            <span>{RECURRENCE_FREQUENCY_LABELS[frequency]}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="min-h-28 space-y-3 text-sm text-sf-text">
+                    {advancedDraft.recurrence.frequency === 'daily' ? (
+                      <div className="space-y-3">
+                        <label className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-daily-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.dailyMode ?? 'interval') === 'interval'}
+                            onChange={() => updateAdvancedRecurrence({ dailyMode: 'interval' })}
+                          />
+                          <span>Every</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.interval}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="Recurrence interval"
+                            disabled={(advancedDraft.recurrence.dailyMode ?? 'interval') !== 'interval'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })}
+                          />
+                          <span>day(s)</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-daily-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.dailyMode ?? 'interval') === 'weekday'}
+                            onChange={() => updateAdvancedRecurrence({ dailyMode: 'weekday' })}
+                          />
+                          <span>Every weekday</span>
+                        </label>
+                      </div>
+                    ) : null}
+                    {advancedDraft.recurrence.frequency === 'weekly' ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>Recur every</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.interval}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="Recurrence interval"
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })}
+                          />
+                          <span>week(s) on:<RequiredFieldMarker /></span>
+                        </div>
+                        <div className={['grid grid-cols-2 gap-2 rounded border border-sf-border p-2 md:grid-cols-4', validationControlClassName(advancedErrors.includes('Select at least one recurrence weekday.'))].filter(Boolean).join(' ')}>
+                          {WEEKDAYS.map((day) => {
+                            const selected = advancedDraft.recurrence.weeklyWeekdays ?? []
+                            return (
+                              <label key={day} className="inline-flex items-center gap-2 text-sm text-sf-text">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-sf-border text-sf-brand"
+                                  checked={selected.includes(day)}
+                                  onChange={() => {
+                                    const nextSelected = selected.includes(day)
+                                      ? selected.filter((selectedDay) => selectedDay !== day)
+                                      : [...selected, day]
+                                    updateAdvancedRecurrence({ weeklyWeekdays: nextSelected })
+                                  }}
+                                />
+                                <span>{WEEKDAY_LABELS[day]}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                        {advancedErrors.includes('Select at least one recurrence weekday.') ? (
+                          <p className="text-xs text-red-700">Select at least one weekday.</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {advancedDraft.recurrence.frequency === 'monthly' ? (
+                      <div className="space-y-3">
+                        <label className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-monthly-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.monthlyMode ?? 'day') === 'day'}
+                            onChange={() => updateAdvancedRecurrence({ monthlyMode: 'day' })}
+                          />
+                          <span>Day</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.monthlyDay}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={31}
+                            label="Monthly day"
+                            disabled={(advancedDraft.recurrence.monthlyMode ?? 'day') !== 'day'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(monthlyDay) => updateAdvancedRecurrence({ monthlyDay })}
+                          />
+                          <span>of every</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.interval}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="Monthly interval"
+                            disabled={(advancedDraft.recurrence.monthlyMode ?? 'day') !== 'day'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })}
+                          />
+                          <span>month(s)</span>
+                        </label>
+                        <label className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-monthly-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.monthlyMode ?? 'day') === 'relative'}
+                            onChange={() => updateAdvancedRecurrence({ monthlyMode: 'relative' })}
+                          />
+                          <span>The</span>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.monthlyOrdinal ?? 'first'}
+                            disabled={(advancedDraft.recurrence.monthlyMode ?? 'day') !== 'relative'}
+                            onChange={(event) => updateAdvancedRecurrence({ monthlyOrdinal: event.target.value as InfrastructureMaintenanceRecurrence['monthlyOrdinal'] })}
+                          >
+                            {ORDINAL_OPTIONS.map((ordinal) => <option key={ordinal} value={ordinal}>{ordinal}</option>)}
+                          </select>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.monthlyRelativeDay ?? 'monday'}
+                            disabled={(advancedDraft.recurrence.monthlyMode ?? 'day') !== 'relative'}
+                            onChange={(event) => updateAdvancedRecurrence({ monthlyRelativeDay: event.target.value as InfrastructureMaintenanceRecurrence['monthlyRelativeDay'] })}
+                          >
+                            {WEEKDAYS.map((day) => <option key={day} value={day}>{WEEKDAY_LABELS[day]}</option>)}
+                          </select>
+                          <span>of every</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.interval}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="Monthly interval"
+                            disabled={(advancedDraft.recurrence.monthlyMode ?? 'day') !== 'relative'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })}
+                          />
+                          <span>month(s)</span>
+                        </label>
+                      </div>
+                    ) : null}
+                    {advancedDraft.recurrence.frequency === 'yearly' ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>Recur every</span>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.interval}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="Recurrence interval"
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(interval) => updateAdvancedRecurrence({ interval: interval ?? 1 })}
+                          />
+                          <span>year(s)</span>
+                        </div>
+                        <label className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-yearly-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.yearlyMode ?? 'date') === 'date'}
+                            onChange={() => updateAdvancedRecurrence({ yearlyMode: 'date' })}
+                          />
+                          <span>On:</span>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.yearlyMonth ?? recurrenceDateParts(advancedDraft.recurrence.startDate ?? advancedDraft.startDate).month}
+                            disabled={(advancedDraft.recurrence.yearlyMode ?? 'date') !== 'date'}
+                            onChange={(event) => {
+                              const yearlyMonth = Number(event.target.value)
+                              updateAdvancedRecurrence({
+                                yearlyMonth,
+                                yearlyDay: Math.min(advancedDraft.recurrence.yearlyDay ?? 1, maxDayForRecurrenceMonth(yearlyMonth)),
+                              })
+                            }}
+                          >
+                            {MONTH_OPTIONS.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+                          </select>
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.yearlyDay}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={maxDayForRecurrenceMonth(advancedDraft.recurrence.yearlyMonth)}
+                            label="Yearly day"
+                            disabled={(advancedDraft.recurrence.yearlyMode ?? 'date') !== 'date'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(yearlyDay) => updateAdvancedRecurrence({ yearlyDay })}
+                          />
+                        </label>
+                        <label className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="radio"
+                            name="maintenance-recurrence-yearly-mode"
+                            className="h-4 w-4 border-sf-border text-sf-brand"
+                            checked={(advancedDraft.recurrence.yearlyMode ?? 'date') === 'relative'}
+                            onChange={() => updateAdvancedRecurrence({ yearlyMode: 'relative' })}
+                          />
+                          <span>On the:</span>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.yearlyOrdinal ?? 'first'}
+                            disabled={(advancedDraft.recurrence.yearlyMode ?? 'date') !== 'relative'}
+                            onChange={(event) => updateAdvancedRecurrence({ yearlyOrdinal: event.target.value as InfrastructureMaintenanceRecurrence['yearlyOrdinal'] })}
+                          >
+                            {ORDINAL_OPTIONS.map((ordinal) => <option key={ordinal} value={ordinal}>{ordinal}</option>)}
+                          </select>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.yearlyRelativeDay ?? 'monday'}
+                            disabled={(advancedDraft.recurrence.yearlyMode ?? 'date') !== 'relative'}
+                            onChange={(event) => updateAdvancedRecurrence({ yearlyRelativeDay: event.target.value as InfrastructureMaintenanceRecurrence['yearlyRelativeDay'] })}
+                          >
+                            {WEEKDAYS.map((day) => <option key={day} value={day}>{WEEKDAY_LABELS[day]}</option>)}
+                          </select>
+                          <span>of</span>
+                          <select
+                            className="h-9 rounded border border-sf-border px-2 py-1 pr-8 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                            value={advancedDraft.recurrence.yearlyMonth ?? recurrenceDateParts(advancedDraft.recurrence.startDate ?? advancedDraft.startDate).month}
+                            disabled={(advancedDraft.recurrence.yearlyMode ?? 'date') !== 'relative'}
+                            onChange={(event) => updateAdvancedRecurrence({ yearlyMonth: Number(event.target.value) })}
+                          >
+                            {MONTH_OPTIONS.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
                           </select>
                         </label>
-                      ) : null}
-                      {advancedDraft.recurrence.frequency === 'weekly' ? (
-                        <div className="block text-sm md:col-span-3">
-                          <span className="mb-1 block font-medium text-sf-text">Recur every {advancedDraft.recurrence.interval} week(s) on:<RequiredFieldMarker /></span>
-                          <div className={['grid grid-cols-2 gap-2 rounded border border-sf-border p-2 md:grid-cols-4', validationControlClassName(advancedErrors.includes('Select at least one recurrence weekday.'))].filter(Boolean).join(' ')}>
-                            {WEEKDAYS.map((day) => {
-                              const selected = advancedDraft.recurrence.weeklyWeekdays ?? []
-                              return (
-                                <label key={day} className="inline-flex items-center gap-2 text-sm text-sf-text">
-                                  <input
-                                    type="checkbox"
-                                    className="h-4 w-4 rounded border-sf-border text-sf-brand"
-                                    checked={selected.includes(day)}
-                                    onChange={() => {
-                                      const nextSelected = selected.includes(day)
-                                        ? selected.filter((selectedDay) => selectedDay !== day)
-                                        : [...selected, day]
-                                      updateAdvancedRecurrence({ weeklyWeekdays: nextSelected })
-                                    }}
-                                  />
-                                  <span>{WEEKDAY_LABELS[day]}</span>
-                                </label>
-                              )
-                            })}
-                          </div>
-                          {advancedErrors.includes('Select at least one recurrence weekday.') ? (
-                            <p className="mt-1 text-xs text-red-700">Select at least one weekday.</p>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {advancedDraft.recurrence.frequency === 'monthly' ? (
-                        <>
-                          <label className="block text-sm">
-                            <span className="mb-1 block font-medium text-sf-text">Monthly Mode</span>
-                            <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8" value={advancedDraft.recurrence.monthlyMode ?? 'day'} onChange={(event) => updateAdvancedRecurrence({ monthlyMode: event.target.value as InfrastructureMaintenanceRecurrence['monthlyMode'] })}>
-                              <option value="day">Day of month</option>
-                              <option value="relative">Relative day</option>
-                            </select>
-                          </label>
-                          <label className="block text-sm">
-                            <span className="mb-1 block font-medium text-sf-text">Day</span>
-                            <BusinessNumericInput value={advancedDraft.recurrence.monthlyDay} max={31} onChange={(monthlyDay) => updateAdvancedRecurrence({ monthlyDay })} />
-                          </label>
-                        </>
-                      ) : null}
-                      {advancedDraft.recurrence.frequency === 'yearly' ? (
-                        <>
-                          <label className="block text-sm">
-                            <span className="mb-1 block font-medium text-sf-text">Month</span>
-                            <BusinessNumericInput value={advancedDraft.recurrence.yearlyMonth} max={12} onChange={(yearlyMonth) => updateAdvancedRecurrence({ yearlyMonth })} />
-                          </label>
-                          <label className="block text-sm">
-                            <span className="mb-1 block font-medium text-sf-text">Day</span>
-                            <BusinessNumericInput value={advancedDraft.recurrence.yearlyDay} max={31} onChange={(yearlyDay) => updateAdvancedRecurrence({ yearlyDay })} />
-                          </label>
-                        </>
-                      ) : null}
-                    </>
+                      </div>
+                    ) : null}
+                      </div>
+                    </div>
                   ) : null}
-                </div>
+                  </div>
               </section>
 
               {advancedDraft.recurrence.frequency !== 'none' ? (
                 <section className="space-y-3">
-                  <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Range of Recurrence</h4>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                    <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-sf-text">Recurrence Start<RequiredFieldMarker /></span>
-                      <input type="date" className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.startDate ?? advancedDraft.startDate ?? ''} onChange={(event) => updateAdvancedRecurrence({ startDate: event.target.value || null })} />
+                  <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Range of recurrence</h4>
+                  <div className="grid grid-cols-1 gap-3 text-sm text-sf-text md:grid-cols-[5rem_7.5rem_1fr]">
+                    <label className="contents">
+                      <span className="font-medium">Start:<RequiredFieldMarker /></span>
+                      <input type="date" className="h-9 rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.startDate ?? advancedDraft.startDate ?? ''} onChange={(event) => updateAdvancedRecurrence({ startDate: event.target.value || null })} />
                     </label>
-                    <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-sf-text">Ends</span>
-                      <select className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8" value={advancedDraft.recurrence.endType} onChange={(event) => updateAdvancedRecurrence({ endType: event.target.value as InfrastructureMaintenanceRecurrence['endType'] })}>
-                        <option value="none">No End Date</option>
-                        <option value="after">End After</option>
-                        <option value="by">End By</option>
-                      </select>
-                    </label>
-                    {advancedDraft.recurrence.endType === 'after' ? (
-                      <label className="block text-sm">
-                        <span className="mb-1 block font-medium text-sf-text">Occurrences</span>
-                        <BusinessNumericInput value={advancedDraft.recurrence.endAfterOccurrences} onChange={(endAfterOccurrences) => updateAdvancedRecurrence({ endAfterOccurrences })} />
+                    <span aria-hidden="true" />
+                    <div className="contents">
+                      <label className="contents">
+                        <input
+                          type="radio"
+                          name="maintenance-recurrence-end-type"
+                          className="h-4 w-4 border-sf-border text-sf-brand"
+                          checked={advancedDraft.recurrence.endType === 'by'}
+                          onChange={() => updateAdvancedRecurrence({ endType: 'by' })}
+                        />
+                        <span>End by:</span>
+                        <input
+                          type="date"
+                          className="h-9 rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                          value={advancedDraft.recurrence.endByDate ?? ''}
+                          disabled={advancedDraft.recurrence.endType !== 'by'}
+                          onChange={(event) => updateAdvancedRecurrence({ endByDate: event.target.value || null })}
+                        />
                       </label>
-                    ) : null}
-                    {advancedDraft.recurrence.endType === 'by' ? (
-                      <label className="block text-sm">
-                        <span className="mb-1 block font-medium text-sf-text">End By</span>
-                        <input type="date" className="h-9 w-full rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.endByDate ?? ''} onChange={(event) => updateAdvancedRecurrence({ endByDate: event.target.value || null })} />
+                      <label className="contents">
+                        <input
+                          type="radio"
+                          name="maintenance-recurrence-end-type"
+                          className="h-4 w-4 border-sf-border text-sf-brand"
+                          checked={advancedDraft.recurrence.endType === 'after'}
+                          onChange={() => updateAdvancedRecurrence({ endType: 'after', endAfterOccurrences: advancedDraft.recurrence.endAfterOccurrences ?? 10 })}
+                        />
+                        <span>End after:</span>
+                        <span className="flex items-center gap-2">
+                          <BusinessNumericInput
+                            value={advancedDraft.recurrence.endAfterOccurrences}
+                            min={MAINTENANCE_RECURRENCE_NUMBER_MIN}
+                            max={MAINTENANCE_RECURRENCE_NUMBER_MAX}
+                            label="End After occurrences"
+                            disabled={advancedDraft.recurrence.endType !== 'after'}
+                            onInvalidValue={showAdvancedRecurrenceNumberError}
+                            onChange={(endAfterOccurrences) => updateAdvancedRecurrence({ endAfterOccurrences })}
+                          />
+                          <span>occurrences</span>
+                        </span>
                       </label>
-                    ) : null}
+                      <label className="contents">
+                        <input
+                          type="radio"
+                          name="maintenance-recurrence-end-type"
+                          className="h-4 w-4 border-sf-border text-sf-brand"
+                          checked={advancedDraft.recurrence.endType === 'none'}
+                          onChange={() => updateAdvancedRecurrence({ endType: 'none' })}
+                        />
+                        <span>No end date</span>
+                        <span />
+                      </label>
+                    </div>
                   </div>
                 </section>
               ) : null}

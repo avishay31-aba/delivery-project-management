@@ -58,7 +58,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -861,7 +861,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (activeSystem) {
       return renderHeaderField(
         'Current SID',
-        <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || activeSystem.machineId}</BusinessObjectLink>,
+        <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)}</BusinessObjectLink>,
       )
     }
 
@@ -887,7 +887,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           <option value="">No system linked</option>
           {systems.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
-              {candidate.sid ?? candidate.machineId ?? candidate.id} - {candidate.productType}
+              {systemReference(candidate).displayLabel || candidate.id} - {candidate.productType}
             </option>
           ))}
         </select>
@@ -938,7 +938,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const hostingRows = activeSystem
       ? [TENANT_HOSTING_FIELDS.map((field) => {
           if (field.key === 'sid') {
-            const sid = hosting.sid || activeSystem.sid || activeSystem.machineId || ''
+            const sid = hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)
             return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
           }
           return textValue(hosting[field.key])

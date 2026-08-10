@@ -1,7 +1,7 @@
 import type { ProjectSystemLink } from '@/data/seed.types'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE } from '@/domain/system-inventory'
+import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE, reusedInternalMachineIdsEqual } from '@/domain/system-inventory'
 import { activeProjectSystemLinks } from './service'
 import type { AllocationActionResult, AllocationValidationContext, AllocationValidationInput } from './types'
 
@@ -91,18 +91,18 @@ export function validateReusedInternalAllocation(
   if (project.mainType !== 'POC') return failed('Delivery and Renewal projects cannot allocate Reused Internal Systems.')
   if (!reusedSystem) return failed('Reused internal system not found.')
   if (reusedSystem.status !== REUSED_INTERNAL_STATUS_AVAILABLE) return failed('Reused internal system is not available for allocation.')
-  if (reusedSystem.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE) return failed(`Reused internal system is occupied for ${reusedSystem.purpose}.`)
+  if (reusedSystem.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE) return failed(`Reused internal system is not available for allocation. Current Purpose is ${reusedSystem.purpose}.`)
   const projectRegion = projectBusinessRegionForAllocation(project, context)
   if (!projectRegion) return unmappedProjectRegionMessage()
   const activeLinks = activeProjectSystemLinks(context.projectSystems).filter((link) =>
-    (link.sourceMachineId === reusedSystem.machineId || reusedSystem.currentProjectIds.includes(link.projectId)) &&
+    (reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId) || reusedSystem.currentProjectIds.includes(link.projectId)) &&
     reusedSystem.currentProjectIds.includes(link.projectId),
   )
   const regionConflict = validateSystemRegionCompatibility(projectRegion, activeLinks, context, reusedSystem.usedInRegion)
   if (regionConflict) return regionConflict
   if (!projectPocDateForAllocation(project, context, 'pocStartDate')) return failed(`Project ${project.pid} must have a POC Start Date before this Reused System can be allocated.`)
   if (!projectPocDateForAllocation(project, context, 'pocEndDate')) return failed(`Project ${project.pid} must have a POC End Date before this Reused System can be allocated.`)
-  if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && link.sourceMachineId === reusedSystem.machineId)) {
+  if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId))) {
     return failed('This MID is already allocated to the project.')
   }
   return null

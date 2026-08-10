@@ -42,6 +42,8 @@ export const INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES: InfrastructureOperational
 export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['None', 'Planned', 'Pending', 'Overdue', 'Delayed', 'Not Set Yet', 'Current', 'Expired', 'No Warranty', 'Obsolete']
 export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'In Progress', 'Done']
 export const INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS: InfrastructureOperationalStatus = 'Deleted'
+export const MAINTENANCE_RECURRENCE_NUMBER_MIN = 1
+export const MAINTENANCE_RECURRENCE_NUMBER_MAX = 99
 
 export const EMPTY_INFRASTRUCTURE_WARRANTY_CONTACT: InfrastructureWarrantyContact = {
   name: '',
@@ -186,6 +188,14 @@ function boundedBusinessNumber(value: unknown, min: number, max: number, fallbac
 function nullableBoundedBusinessNumber(value: unknown, min: number, max: number): number | null {
   const parsed = numberOrNull(value)
   return parsed === null ? null : Math.min(max, Math.max(min, parsed))
+}
+
+function isWholeNumberInRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+}
+
+function maxDayForMonth(month: number): number {
+  return new Date(2024, month, 0).getDate()
 }
 
 function text(value: unknown): string {
@@ -609,6 +619,48 @@ function normalizeRelativeDay(value: unknown): InfrastructureMaintenanceRecurren
     : 'monday'
 }
 
+export function validateMaintenanceRecurrence(
+  recurrence: InfrastructureMaintenanceRecurrence,
+  fallbackStartDate: string | null | undefined = null,
+): string[] {
+  const errors: string[] = []
+  if (recurrence.frequency === 'none') return errors
+
+  const recurrenceStartDate = recurrence.startDate ?? fallbackStartDate ?? null
+  if (!recurrenceStartDate) errors.push('Recurrence Start is required.')
+  if (!isWholeNumberInRange(recurrence.interval, MAINTENANCE_RECURRENCE_NUMBER_MIN, MAINTENANCE_RECURRENCE_NUMBER_MAX)) {
+    errors.push(`Recurrence interval must be between ${MAINTENANCE_RECURRENCE_NUMBER_MIN} and ${MAINTENANCE_RECURRENCE_NUMBER_MAX}.`)
+  }
+
+  if (recurrence.frequency === 'weekly' && (recurrence.weeklyWeekdays ?? []).length === 0) {
+    errors.push('Select at least one recurrence weekday.')
+  }
+
+  if (recurrence.frequency === 'monthly' && (recurrence.monthlyMode ?? 'day') === 'day') {
+    if (!isWholeNumberInRange(recurrence.monthlyDay, 1, 31)) errors.push('Monthly day must be between 1 and 31.')
+  }
+
+  if (recurrence.frequency === 'yearly' && (recurrence.yearlyMode ?? 'date') === 'date') {
+    if (!isWholeNumberInRange(recurrence.yearlyMonth, 1, 12)) {
+      errors.push('Yearly month must be between 1 and 12.')
+    } else if (!isWholeNumberInRange(recurrence.yearlyDay, 1, maxDayForMonth(recurrence.yearlyMonth))) {
+      errors.push(`Yearly day must be between 1 and ${maxDayForMonth(recurrence.yearlyMonth)} for the selected month.`)
+    }
+  }
+  if (recurrence.frequency === 'yearly' && recurrence.yearlyMode === 'relative' && !isWholeNumberInRange(recurrence.yearlyMonth, 1, 12)) {
+    errors.push('Yearly month must be between 1 and 12.')
+  }
+
+  if (recurrence.endType === 'after' && !isWholeNumberInRange(recurrence.endAfterOccurrences, MAINTENANCE_RECURRENCE_NUMBER_MIN, MAINTENANCE_RECURRENCE_NUMBER_MAX)) {
+    errors.push(`End After occurrences must be between ${MAINTENANCE_RECURRENCE_NUMBER_MIN} and ${MAINTENANCE_RECURRENCE_NUMBER_MAX}.`)
+  }
+  if (recurrence.endType === 'by' && (!recurrence.endByDate || (recurrenceStartDate && recurrence.endByDate < recurrenceStartDate))) {
+    errors.push('End By date must be on or after Recurrence Start.')
+  }
+
+  return errors
+}
+
 function normalizeMaintenanceTask(
   record: Partial<InfrastructureMaintenanceTask> & Record<string, unknown>,
   index: number,
@@ -678,7 +730,10 @@ function parseDateOnly(value: string | null | undefined): Date | null {
 }
 
 function dateOnly(value: Date): string {
-  return businessDate(value)
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function addDays(value: Date, days: number): Date {
@@ -771,6 +826,73 @@ function weeklyOccurrenceDates(start: Date, maxDate: Date, recurrence: Infrastru
   return dates
 }
 
+function relativeDayMatches(date: Date, relativeDay: InfrastructureMaintenanceRecurrence['monthlyRelativeDay']): boolean {
+  const day = date.getDay()
+  if (relativeDay === 'day') return true
+  if (relativeDay === 'weekday') return day >= 1 && day <= 5
+  if (relativeDay === 'weekend-day') return day === 0 || day === 6
+  return WEEKDAY_INDEX_BY_RECURRENCE_DAY[relativeDay ?? 'monday'] === day
+}
+
+function relativeOccurrenceDate(year: number, monthIndex: number, ordinal: InfrastructureMaintenanceRecurrence['monthlyOrdinal'], relativeDay: InfrastructureMaintenanceRecurrence['monthlyRelativeDay']): Date {
+  if (ordinal === 'last') {
+    const cursor = new Date(year, monthIndex + 1, 0)
+    while (!relativeDayMatches(cursor, relativeDay)) cursor.setDate(cursor.getDate() - 1)
+    return cursor
+  }
+  const ordinalIndex = Math.max(0, ['first', 'second', 'third', 'fourth'].indexOf(ordinal ?? 'first'))
+  const cursor = new Date(year, monthIndex, 1)
+  let matches = 0
+  while (cursor.getMonth() === monthIndex) {
+    if (relativeDayMatches(cursor, relativeDay)) {
+      if (matches === ordinalIndex) return new Date(cursor)
+      matches += 1
+    }
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return relativeOccurrenceDate(year, monthIndex, 'last', relativeDay)
+}
+
+function monthlyCandidateDate(start: Date, recurrence: InfrastructureMaintenanceRecurrence, offset: number): Date {
+  const candidateMonth = start.getMonth() + offset * Math.max(1, recurrence.interval)
+  const year = start.getFullYear() + Math.floor(candidateMonth / 12)
+  const monthIndex = ((candidateMonth % 12) + 12) % 12
+  if (recurrence.monthlyMode === 'relative') {
+    return relativeOccurrenceDate(year, monthIndex, recurrence.monthlyOrdinal ?? 'first', recurrence.monthlyRelativeDay ?? 'monday')
+  }
+  const maxDay = new Date(year, monthIndex + 1, 0).getDate()
+  return new Date(year, monthIndex, Math.min(recurrence.monthlyDay ?? start.getDate(), maxDay))
+}
+
+function yearlyCandidateDate(start: Date, recurrence: InfrastructureMaintenanceRecurrence, offset: number): Date {
+  const year = start.getFullYear() + offset * Math.max(1, recurrence.interval)
+  const monthIndex = Math.max(0, Math.min(11, (recurrence.yearlyMonth ?? start.getMonth() + 1) - 1))
+  if (recurrence.yearlyMode === 'relative') {
+    return relativeOccurrenceDate(year, monthIndex, recurrence.yearlyOrdinal ?? 'first', recurrence.yearlyRelativeDay ?? 'monday')
+  }
+  const maxDay = new Date(year, monthIndex + 1, 0).getDate()
+  return new Date(year, monthIndex, Math.min(recurrence.yearlyDay ?? start.getDate(), maxDay))
+}
+
+function intervalOccurrenceDates(start: Date, maxDate: Date, recurrence: InfrastructureMaintenanceRecurrence, maxOccurrences: number): Date[] {
+  const dates: Date[] = []
+  if (recurrence.frequency === 'weekly') return weeklyOccurrenceDates(start, maxDate, recurrence, maxOccurrences)
+  let offset = 0
+  while (dates.length < maxOccurrences) {
+    const occurrenceDate = recurrence.frequency === 'monthly'
+      ? monthlyCandidateDate(start, recurrence, offset)
+      : recurrence.frequency === 'yearly'
+        ? yearlyCandidateDate(start, recurrence, offset)
+        : offset === 0
+          ? start
+          : nextSimpleOccurrenceDate(dates[dates.length - 1] ?? start, recurrence)
+    if (occurrenceDate > maxDate) break
+    if (occurrenceDate >= start) dates.push(new Date(occurrenceDate))
+    offset += 1
+  }
+  return dates
+}
+
 export function generateInfrastructureMaintenanceOccurrences(
   draft: InfrastructureMaintenanceTask,
   existingTasks: InfrastructureMaintenanceTask[],
@@ -792,17 +914,7 @@ export function generateInfrastructureMaintenanceOccurrences(
   const existingKeys = new Set(existingTasks.map((task) => `${task.recurrenceSeriesId ?? ''}:${task.recurrenceOccurrenceDate ?? ''}`))
   const generated: InfrastructureMaintenanceTask[] = []
   const usedIds = existingTasks.map((task) => task.taskId)
-  const occurrenceDates = recurrence.frequency === 'weekly'
-    ? weeklyOccurrenceDates(start, maxDate, recurrence, maxOccurrences)
-    : (() => {
-        const dates: Date[] = []
-        let occurrenceDate = start
-        while (dates.length < maxOccurrences && occurrenceDate <= maxDate) {
-          dates.push(new Date(occurrenceDate))
-          occurrenceDate = nextSimpleOccurrenceDate(occurrenceDate, recurrence)
-        }
-        return dates
-      })()
+  const occurrenceDates = intervalOccurrenceDates(start, maxDate, recurrence, maxOccurrences)
 
   occurrenceDates.forEach((occurrenceDate, occurrenceCount) => {
     const occurrenceDateText = dateOnly(occurrenceDate)
@@ -1603,6 +1715,11 @@ export function validateInfrastructureItemDraft(
   }
   ;(draft.properties?.disks ?? []).forEach((disk, index) => {
     if ((disk.quantity ?? 0) <= 0) messages.push(`Disk ${index + 1} Quantity must be greater than zero.`)
+  })
+  ;(draft.maintenanceTasks ?? []).forEach((task) => {
+    validateMaintenanceRecurrence(task.recurrence, task.startDate).forEach((message) => {
+      messages.push(`Maintenance Task ${task.taskId || task.id} recurrence: ${message}`)
+    })
   })
   if (identifier && items.some((item) => item.id !== draft.id && item.normalizedIdentifier === normalizedIdentifier)) {
     messages.push('Identifier must be unique.')

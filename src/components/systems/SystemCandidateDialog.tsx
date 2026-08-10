@@ -1,6 +1,7 @@
 import { type ReactNode, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System } from '@/data/seed.types'
+import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
 
 export type SystemCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 export type SystemCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
@@ -32,12 +33,12 @@ export const SYSTEM_CANDIDATE_FILTER_OPTIONS: Array<{ key: SystemCandidateFilter
 
 export function candidatePrimaryId(candidate: SystemCandidate): string {
   if ('sid' in candidate && candidate.sid) return candidate.sid
-  if ('machineId' in candidate && candidate.machineId) return candidate.machineId
+  if ('machineId' in candidate && candidate.machineId) return formattedReusedInternalMachineId(candidate.machineId)
   return candidate.id
 }
 
 export function candidateMachineId(candidate: SystemCandidate): string {
-  return 'machineId' in candidate ? candidate.machineId ?? '' : ''
+  return 'machineId' in candidate ? formattedReusedInternalMachineId(candidate.machineId) : ''
 }
 
 export function candidateSource(candidate: SystemCandidate): string {

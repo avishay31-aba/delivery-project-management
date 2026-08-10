@@ -46,6 +46,9 @@ export function sanitizeDashboardViewState(value: unknown): DashboardViewState |
     ? value.grouping.filter((columnId): columnId is string => typeof columnId === 'string')
     : []
   const globalFilter = typeof value.globalFilter === 'string' ? value.globalFilter : ''
+  const freezeThroughColumnId = typeof value.freezeThroughColumnId === 'string' && value.freezeThroughColumnId.trim()
+    ? value.freezeThroughColumnId
+    : null
 
   return {
     columnOrder,
@@ -54,6 +57,7 @@ export function sanitizeDashboardViewState(value: unknown): DashboardViewState |
     sorting,
     grouping,
     globalFilter,
+    freezeThroughColumnId,
   }
 }
 

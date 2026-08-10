@@ -106,7 +106,6 @@ interface DataDashboardProps<T extends { id: string }> {
   enableRecordActions?: boolean
   initialSorting?: SortingState
   colorLegend?: DashboardColorLegendItem[]
-  freezeThroughColumnId?: string
   contentModeControls?: ReactNode
   renderAlternateContent?: (rows: T[]) => ReactNode
 }
@@ -138,6 +137,9 @@ const COLUMN_DRAG_DATA_TYPE = 'application/x-dashboard-column-id'
 const ACTION_COLUMN_ID = '__actions'
 const ROW_INDICATOR_COLUMN_ID = '__rowIndicator'
 const CREATION_DATE_COLUMN_ID = '__createdAt'
+const LABELS_COLUMN_IDS = new Set(['__labels', 'labels'])
+const FIXED_SOURCE_COLUMN_IDS = new Set([ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, 'creationDate', ...LABELS_COLUMN_IDS])
+const FREEZE_ELIGIBLE_COLUMN_LIMIT = 5
 const BUSINESS_IDENTIFIER_COLUMN_PRIORITY = [
   'accountCode',
   'customerId',
@@ -198,6 +200,18 @@ function orderedDashboardColumns<T>(
     )
   const businessIdColumnIds = new Set(businessIdColumns.map((column) => column.id))
   return [...businessIdColumns, ...columns.filter((column) => !businessIdColumnIds.has(column.id))]
+}
+
+function isCreationDateColumn<T>(column: DashboardColumn<T>): boolean {
+  return column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date'
+}
+
+function isFixedDashboardColumn(columnId: string): boolean {
+  return columnId === ACTION_COLUMN_ID || FIXED_SOURCE_COLUMN_IDS.has(columnId)
+}
+
+function canOpenColumnMenu(columnId: string): boolean {
+  return !LABELS_COLUMN_IDS.has(columnId) && columnId !== ROW_INDICATOR_COLUMN_ID && columnId !== ACTION_COLUMN_ID
 }
 
 function DashboardColorLegend({ items }: { items: DashboardColorLegendItem[] }) {
@@ -976,7 +990,6 @@ export function DataDashboard<T extends { id: string }>({
   enableRecordActions = true,
   initialSorting = [],
   colorLegend = [],
-  freezeThroughColumnId,
   contentModeControls,
   renderAlternateContent,
 }: DataDashboardProps<T>) {
@@ -991,6 +1004,8 @@ export function DataDashboard<T extends { id: string }>({
   const initialSortingKey = JSON.stringify(initialSorting)
   const defaultSorting = useMemo(() => initialSorting, [initialSortingKey])
   const orderedColumns = useMemo(() => orderedDashboardColumns(columns, dashboardScope), [columns, dashboardScope])
+  const authoritativeCreationDateColumn = useMemo(() => orderedColumns.find(isCreationDateColumn), [orderedColumns])
+  const creationDateColumnId = authoritativeCreationDateColumn?.id ?? CREATION_DATE_COLUMN_ID
   const fullDashboardColumnVisibility = useMemo(
     () =>
       Object.fromEntries(
@@ -1000,16 +1015,14 @@ export function DataDashboard<T extends { id: string }>({
       ),
     [orderedColumns],
   )
-  const hasAuthoritativeCreationDateColumn = orderedColumns.some(
-    (column) => column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date',
-  )
+  const hasAuthoritativeCreationDateColumn = Boolean(authoritativeCreationDateColumn)
   const sourceColumnIds = useMemo(
     () => [
       ROW_INDICATOR_COLUMN_ID,
-      ...(hasAuthoritativeCreationDateColumn ? [] : [CREATION_DATE_COLUMN_ID]),
-      ...orderedColumns.map((column) => column.id),
+      creationDateColumnId,
+      ...orderedColumns.filter((column) => column.id !== creationDateColumnId).map((column) => column.id),
     ],
-    [hasAuthoritativeCreationDateColumn, orderedColumns],
+    [creationDateColumnId, orderedColumns],
   )
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>(() => defaultSorting)
@@ -1038,7 +1051,7 @@ export function DataDashboard<T extends { id: string }>({
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([])
-  const [isFreezeEnabled, setIsFreezeEnabled] = useState(false)
+  const [freezeThroughColumnId, setFreezeThroughColumnId] = useState<string | null>(null)
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set())
   const isApplyingDashboardUndoRef = useRef(false)
   const setHasUnsavedDashboardChanges = useUnsavedChangesGuardStore((state) => state.setHasUnsavedDashboardChanges)
@@ -1049,10 +1062,10 @@ export function DataDashboard<T extends { id: string }>({
   const dashboardViewStateSnapshot = useCallback(
     () =>
       normalizeDashboardViewState(
-        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter },
+        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter, freezeThroughColumnId },
         sourceColumnIds,
       ),
-    [columnFilters, columnOrder, columnVisibility, globalFilter, grouping, sorting, sourceColumnIds],
+    [columnFilters, columnOrder, columnVisibility, freezeThroughColumnId, globalFilter, grouping, sorting, sourceColumnIds],
   )
 
   function recordDashboardUndoSnapshot() {
@@ -1079,6 +1092,7 @@ export function DataDashboard<T extends { id: string }>({
     setGlobalFilter(normalizedState.globalFilter)
     setSorting(normalizedState.sorting)
     setGrouping(normalizedState.grouping)
+    setFreezeThroughColumnId(normalizedState.freezeThroughColumnId)
     setColumnFilters(normalizedState.columnFilters)
     setColumnOrder(normalizedState.columnOrder)
     setColumnVisibility(normalizedState.columnVisibility)
@@ -1088,13 +1102,34 @@ export function DataDashboard<T extends { id: string }>({
   }
 
   useEffect(() => {
-    setColumnOrder((currentColumnOrder) => {
-      const nextSourceColumnIdSet = new Set(sourceColumnIds)
-      const preservedColumnOrder = currentColumnOrder.filter((columnId) => nextSourceColumnIdSet.has(columnId))
-      const newColumnIds = sourceColumnIds.filter((columnId) => !preservedColumnOrder.includes(columnId))
-
-      return [...preservedColumnOrder, ...newColumnIds]
-    })
+    setColumnOrder((currentColumnOrder) =>
+      normalizeDashboardViewState(
+        {
+          columnOrder: currentColumnOrder,
+          columnVisibility: {},
+          columnFilters: [],
+          sorting: [],
+          grouping: [],
+          globalFilter: '',
+          freezeThroughColumnId: null,
+        },
+        sourceColumnIds,
+      ).columnOrder,
+    )
+    setColumnVisibility((currentColumnVisibility) =>
+      normalizeDashboardViewState(
+        {
+          columnOrder: [],
+          columnVisibility: currentColumnVisibility,
+          columnFilters: [],
+          sorting: [],
+          grouping: [],
+          globalFilter: '',
+          freezeThroughColumnId: null,
+        },
+        sourceColumnIds,
+      ).columnVisibility,
+    )
   }, [sourceColumnIds])
 
   useEffect(() => {
@@ -1102,14 +1137,32 @@ export function DataDashboard<T extends { id: string }>({
   }, [grouping])
 
   const internalColumnOrder = useMemo(
-    () => enableRecordActions
-      ? [ACTION_COLUMN_ID, ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)]
-      : columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID),
-    [columnOrder, enableRecordActions],
+    () => {
+      const fixedColumnIds = [
+        ROW_INDICATOR_COLUMN_ID,
+        ...(enableRecordActions ? [ACTION_COLUMN_ID] : []),
+        creationDateColumnId,
+      ]
+      const fixedColumnIdSet = new Set(fixedColumnIds)
+      return [
+        ...fixedColumnIds,
+        ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID && !fixedColumnIdSet.has(columnId)),
+      ]
+    },
+    [columnOrder, creationDateColumnId, enableRecordActions],
   )
   const internalColumnVisibility = useMemo(
-    () => enableRecordActions ? { ...columnVisibility, [ACTION_COLUMN_ID]: true } : columnVisibility,
-    [columnVisibility, enableRecordActions],
+    () => ({
+      ...columnVisibility,
+      [ROW_INDICATOR_COLUMN_ID]: true,
+      [creationDateColumnId]: true,
+      ...(enableRecordActions ? { [ACTION_COLUMN_ID]: true } : {}),
+    }),
+    [columnVisibility, creationDateColumnId, enableRecordActions],
+  )
+  const dashboardColumnById = useMemo(
+    () => new Map(orderedColumns.map((column) => [column.id, column] as const)),
+    [orderedColumns],
   )
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
@@ -1153,6 +1206,7 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: true,
         enableGrouping: false,
         enableColumnFilter: true,
+        enableHiding: false,
         cell: ({ row }) => <RowIndicator row={row.original} />,
       },
       ...(hasAuthoritativeCreationDateColumn ? [] : [{
@@ -1162,6 +1216,7 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: true,
         enableGrouping: false,
         enableColumnFilter: true,
+        enableHiding: false,
         cell: ({ row }) => {
           const raw = creationDateValue(row.original)
           return <ClampedTableCellContent title={raw}>{raw}</ClampedTableCellContent>
@@ -1174,6 +1229,7 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: column.sortable !== false,
         enableGrouping: column.groupable !== false,
         enableColumnFilter: column.filterable !== false,
+        enableHiding: column.id === creationDateColumnId ? false : undefined,
         ...(column.sortValue
           ? {
               sortingFn: (firstRow, secondRow) => {
@@ -1204,7 +1260,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
+    [creationDateColumnId, dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
   )
 
   const table = useReactTable({
@@ -1220,15 +1276,22 @@ export function DataDashboard<T extends { id: string }>({
         const nextColumnOrder = typeof updater === 'function'
           ? updater(enableRecordActions ? [ACTION_COLUMN_ID, ...current] : current)
           : updater
-        return nextColumnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID)
+        return normalizeDashboardViewState(
+          { columnOrder: nextColumnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID), columnVisibility, columnFilters, sorting, grouping, globalFilter, freezeThroughColumnId },
+          sourceColumnIds,
+        ).columnOrder
       }),
     onColumnVisibilityChange: (updater) =>
       updateDashboardState(setColumnVisibility, (current) => {
         const nextColumnVisibility = typeof updater === 'function'
           ? updater(enableRecordActions ? { ...current, [ACTION_COLUMN_ID]: true } : current)
           : updater
-        const { [ACTION_COLUMN_ID]: _actionVisibility, ...userColumnVisibility } = nextColumnVisibility
-        return userColumnVisibility
+        const userColumnVisibility = { ...nextColumnVisibility }
+        delete userColumnVisibility[ACTION_COLUMN_ID]
+        return normalizeDashboardViewState(
+          { columnOrder, columnVisibility: userColumnVisibility, columnFilters, sorting, grouping, globalFilter, freezeThroughColumnId },
+          sourceColumnIds,
+        ).columnVisibility
       }),
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -1240,6 +1303,28 @@ export function DataDashboard<T extends { id: string }>({
       setPageIndex(next.pageIndex)
     },
   })
+  const freezeColumnOptions = useMemo(
+    () => {
+      const visibleColumns = table.getVisibleLeafColumns()
+      const creationDateIndex = visibleColumns.findIndex((column) => column.id === creationDateColumnId)
+      const eligibleColumns = (creationDateIndex >= 0 ? visibleColumns.slice(creationDateIndex + 1) : visibleColumns)
+        .filter((column) => !isFixedDashboardColumn(column.id))
+        .slice(0, FREEZE_ELIGIBLE_COLUMN_LIMIT)
+
+      return eligibleColumns.map((column) => ({
+          id: column.id,
+          label: dashboardColumnById.get(column.id)?.label
+            ?? (column.id === CREATION_DATE_COLUMN_ID ? 'Creation Date' : String(column.columnDef.header ?? column.id)),
+        }))
+    },
+    [creationDateColumnId, dashboardColumnById, table],
+  )
+
+  useEffect(() => {
+    if (!freezeThroughColumnId) return
+    if (freezeColumnOptions.some((column) => column.id === freezeThroughColumnId)) return
+    setFreezeThroughColumnId(null)
+  }, [freezeColumnOptions, freezeThroughColumnId])
 
   useEffect(() => {
     setRecordsPerPage(effectivePageSizeDefault)
@@ -1260,16 +1345,23 @@ export function DataDashboard<T extends { id: string }>({
     setPageSizePreferenceMessage(result.ok ? `Your personal default for ${pageSizeTableLabel} was reset.` : result.message)
   }
 
-  const frozenColumnCount = useMemo(() => {
-    if (!isFreezeEnabled) return 0
+  const permanentFrozenColumnCount = useMemo(() => {
     const visibleColumns = table.getVisibleLeafColumns()
-    if (!freezeThroughColumnId) return Math.min(3, visibleColumns.length)
+    const firstNonPermanentIndex = visibleColumns.findIndex(
+      (column) => column.id !== ROW_INDICATOR_COLUMN_ID && column.id !== ACTION_COLUMN_ID,
+    )
+    return firstNonPermanentIndex >= 0 ? firstNonPermanentIndex : visibleColumns.length
+  }, [table])
+
+  const frozenColumnCount = useMemo(() => {
+    if (!freezeThroughColumnId) return permanentFrozenColumnCount
+    const visibleColumns = table.getVisibleLeafColumns()
     const boundaryIndex = visibleColumns.findIndex((column) => column.id === freezeThroughColumnId)
-    return boundaryIndex >= 0 ? boundaryIndex + 1 : Math.min(3, visibleColumns.length)
-  }, [freezeThroughColumnId, isFreezeEnabled, table])
+    return boundaryIndex >= 0 ? boundaryIndex + 1 : permanentFrozenColumnCount
+  }, [freezeThroughColumnId, permanentFrozenColumnCount, table])
 
   useLayoutEffect(() => {
-    if (!isFreezeEnabled || frozenColumnCount === 0) {
+    if (frozenColumnCount === 0) {
       setFrozenColumnOffsets((currentOffsets) =>
         currentOffsets.length === 0 ? currentOffsets : [],
       )
@@ -1300,11 +1392,11 @@ export function DataDashboard<T extends { id: string }>({
     const observer = new ResizeObserver(measureFrozenColumns)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [columnOrder, columnVisibility, frozenColumnCount, rows.length, isFreezeEnabled])
+  }, [columnOrder, columnVisibility, frozenColumnCount, rows.length])
 
   function columnPositionStyle(index: number, columnId: string): CSSProperties | undefined {
-    if (columnId === ACTION_COLUMN_ID) return { insetInlineStart: 0 }
-    return isFreezeEnabled && index < frozenColumnCount ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
+    void columnId
+    return index < frozenColumnCount ? { left: frozenColumnOffsets[index] ?? 0 } : undefined
   }
 
   function frozenColumnClassName(index: number, isHeader = false, columnId = ''): string {
@@ -1314,7 +1406,7 @@ export function DataDashboard<T extends { id: string }>({
         isHeader ? 'z-40 bg-sf-surface-alt' : 'z-30 bg-inherit',
       )
     }
-    if (!isFreezeEnabled || index >= frozenColumnCount) return ''
+    if (index >= frozenColumnCount) return ''
     const isLastFrozenColumn = index === frozenColumnCount - 1
     return joinClassNames(
       'sticky',
@@ -1331,17 +1423,13 @@ export function DataDashboard<T extends { id: string }>({
   )
   const selectedDashboardView =
     runtimeDashboardViews.find((view) => view.id === selectedViewId) ?? runtimeDashboardViews[0]
-  const dashboardColumnById = useMemo(
-    () => new Map(orderedColumns.map((column) => [column.id, column] as const)),
-    [orderedColumns],
-  )
   const currentDashboardViewState: SavedDashboardViewState = useMemo(
     () =>
       normalizeDashboardViewState(
-        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter },
+        { columnOrder, columnVisibility, columnFilters, sorting, grouping, globalFilter, freezeThroughColumnId },
         sourceColumnIds,
       ),
-    [columnFilters, columnOrder, columnVisibility, globalFilter, grouping, sorting, sourceColumnIds],
+    [columnFilters, columnOrder, columnVisibility, freezeThroughColumnId, globalFilter, grouping, sorting, sourceColumnIds],
   )
   const isSelectedViewModified = selectedDashboardView
     ? !areDashboardViewStatesEqual(currentDashboardViewState, selectedDashboardView.state, sourceColumnIds)
@@ -1620,21 +1708,24 @@ export function DataDashboard<T extends { id: string }>({
   }
 
   function updateColumnOrder(sourceColumnId: string, targetColumnId: string, placement: ColumnDropPlacement = 'before') {
+    if (isFixedDashboardColumn(sourceColumnId) || isFixedDashboardColumn(targetColumnId)) return
     updateDashboardState(setColumnOrder, (currentColumnOrder) => moveColumn(currentColumnOrder, sourceColumnId, targetColumnId, placement))
   }
 
   function moveColumnByOffset(columnId: string, offset: -1 | 1) {
+    if (isFixedDashboardColumn(columnId)) return
     updateDashboardState(setColumnOrder, (currentColumnOrder) => {
       const columnIndex = currentColumnOrder.indexOf(columnId)
       const targetColumnId = currentColumnOrder[columnIndex + offset]
 
-      if (!targetColumnId) return currentColumnOrder
+      if (!targetColumnId || isFixedDashboardColumn(targetColumnId)) return currentColumnOrder
 
       return moveColumn(currentColumnOrder, columnId, targetColumnId, offset === 1 ? 'after' : 'before')
     })
   }
 
   function handleColumnDragStart(event: DragEvent<HTMLButtonElement>, columnId: string) {
+    if (isFixedDashboardColumn(columnId)) return
     event.stopPropagation()
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData(COLUMN_DRAG_DATA_TYPE, columnId)
@@ -1645,7 +1736,7 @@ export function DataDashboard<T extends { id: string }>({
   function handleColumnDragOver(event: DragEvent<HTMLTableCellElement>, columnId: string) {
     const sourceColumnId = event.dataTransfer.getData(COLUMN_DRAG_DATA_TYPE) || draggedColumnId
 
-    if (!sourceColumnId || sourceColumnId === columnId) return
+    if (!sourceColumnId || sourceColumnId === columnId || isFixedDashboardColumn(sourceColumnId) || isFixedDashboardColumn(columnId)) return
 
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
@@ -1656,7 +1747,7 @@ export function DataDashboard<T extends { id: string }>({
     event.preventDefault()
     const sourceColumnId = event.dataTransfer.getData(COLUMN_DRAG_DATA_TYPE) || draggedColumnId
 
-    if (sourceColumnId) {
+    if (sourceColumnId && !isFixedDashboardColumn(sourceColumnId) && !isFixedDashboardColumn(targetColumnId)) {
       const targetRect = event.currentTarget.getBoundingClientRect()
       const placement = event.clientX > targetRect.left + targetRect.width / 2 ? 'after' : 'before'
       updateColumnOrder(sourceColumnId, targetColumnId, placement)
@@ -2002,19 +2093,19 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
             </button>
           ) : null}
 
-          <button
-            type="button"
-            aria-pressed={isFreezeEnabled}
-            className={joinClassNames(
-              'rounded border px-3 py-1 font-medium',
-              isFreezeEnabled
-                ? 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                : 'border-sf-border text-sf-text hover:bg-sf-surface-alt',
-            )}
-            onClick={() => setIsFreezeEnabled((current) => !current)}
-          >
-            {isFreezeEnabled ? 'Unfreeze Columns' : 'Freeze Columns'}
-          </button>
+          <label className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-sf-text-muted">Freeze through</span>
+            <select
+              className="rounded border border-sf-border px-2 py-1"
+              value={freezeThroughColumnId ?? ''}
+              onChange={(event) => updateDashboardState(setFreezeThroughColumnId, event.target.value || null)}
+            >
+              <option value="">None</option>
+              {freezeColumnOptions.map((column) => (
+                <option key={column.id} value={column.id}>{column.label}</option>
+              ))}
+            </select>
+          </label>
 
 <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -2130,6 +2221,8 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
                   {headerGroup.headers.map((header, headerIndex) => {
                     const sourceColumn = orderedColumns.find((column) => column.id === header.column.id)
                     const isActionColumn = header.column.id === ACTION_COLUMN_ID
+                    const isFixedColumn = isFixedDashboardColumn(header.column.id)
+                    const hasColumnMenu = canOpenColumnMenu(header.column.id)
 
                     return (
                       <th
@@ -2144,16 +2237,17 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
                             draggedColumnId !== header.column.id &&
                             'bg-blue-50 ring-2 ring-inset ring-sf-brand',
                         )}
-                        onDragOver={isActionColumn ? undefined : (event) => handleColumnDragOver(event, header.column.id)}
+                        onDragOver={isFixedColumn ? undefined : (event) => handleColumnDragOver(event, header.column.id)}
                         onDragLeave={() =>
                           setDragOverColumnId((columnId) => (columnId === header.column.id ? null : columnId))
                         }
-                        onDrop={isActionColumn ? undefined : (event) => handleColumnDrop(event, header.column.id)}
+                        onDrop={isFixedColumn ? undefined : (event) => handleColumnDrop(event, header.column.id)}
                       >
                         {header.isPlaceholder ? null : isActionColumn ? (
                           <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
                         ) : (
                           <div className="inline-flex items-center gap-1">
+                            {isFixedColumn ? null : (
                             <button
                               type="button"
                               className="cursor-grab rounded border border-transparent px-1 text-sf-text-muted hover:border-sf-border hover:bg-white active:cursor-grabbing"
@@ -2170,6 +2264,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
                             >
                               ⋮⋮
                             </button>
+                            )}
                             <button
                               type="button"
                               className="inline-flex items-center gap-1"
@@ -2188,22 +2283,24 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
                               {header.column.getIsSorted() === 'asc' ? '↑' : ''}
                               {header.column.getIsSorted() === 'desc' ? '↓' : ''}
                             </button>
-                            <HeaderMenu
-                              column={header.column}
-                              allColumns={table.getAllLeafColumns().filter((column) => column.id !== ACTION_COLUMN_ID)}
-                              sourceColumn={sourceColumn}
-                              rows={rows}
-                              grouping={grouping}
-                              setGrouping={(nextGrouping) => updateDashboardState(setGrouping, nextGrouping)}
-                              setSorting={(nextSorting) => updateDashboardState(setSorting, nextSorting)}
-                              isOpen={openMenuColumnId === header.column.id}
-                              onToggle={() =>
-                                setOpenMenuColumnId((columnId) =>
-                                  columnId === header.column.id ? null : header.column.id,
-                                )
-                              }
-                              onClose={() => setOpenMenuColumnId(null)}
-                            />
+                            {hasColumnMenu ? (
+                              <HeaderMenu
+                                column={header.column}
+                                allColumns={table.getAllLeafColumns().filter((column) => canOpenColumnMenu(column.id))}
+                                sourceColumn={sourceColumn}
+                                rows={rows}
+                                grouping={grouping}
+                                setGrouping={(nextGrouping) => updateDashboardState(setGrouping, nextGrouping)}
+                                setSorting={(nextSorting) => updateDashboardState(setSorting, nextSorting)}
+                                isOpen={openMenuColumnId === header.column.id}
+                                onToggle={() =>
+                                  setOpenMenuColumnId((columnId) =>
+                                    columnId === header.column.id ? null : header.column.id,
+                                  )
+                                }
+                                onClose={() => setOpenMenuColumnId(null)}
+                              />
+                            ) : null}
                           </div>
                         )}
                       </th>

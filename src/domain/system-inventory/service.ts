@@ -12,7 +12,9 @@ import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInt
 import type { ReusedInternalSystemStatus } from './types'
 import {
   REUSED_INTERNAL_PURPOSE_AVAILABLE,
+  REUSED_INTERNAL_PURPOSE_OBSOLETE,
   REUSED_INTERNAL_STATUS_AVAILABLE,
+  REUSED_INTERNAL_STATUS_OBSOLETE,
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
@@ -36,9 +38,13 @@ export function isReusedInternalOccupied(status: string | undefined): boolean {
 }
 
 export function reusedInternalStatusForPurpose(purpose: string | undefined): ReusedInternalSystemStatus {
-  return purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE
-    ? REUSED_INTERNAL_STATUS_AVAILABLE
-    : REUSED_INTERNAL_STATUS_OCCUPIED
+  if (purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE) return REUSED_INTERNAL_STATUS_AVAILABLE
+  if (purpose === REUSED_INTERNAL_PURPOSE_OBSOLETE) return REUSED_INTERNAL_STATUS_OBSOLETE
+  return REUSED_INTERNAL_STATUS_OCCUPIED
+}
+
+export function reusedInternalAvailabilityStatusForPurpose(purpose: string | undefined): ReusedInternalSystemStatus {
+  return reusedInternalStatusForPurpose(purpose)
 }
 
 export function isAllocationEligibleSystem(system: System): boolean {
@@ -51,6 +57,36 @@ export interface ReusedSystemOccupationWindow {
   message?: string
   occupationStartDate?: string | null
   occupationEndDate?: string | null
+  derivedFromActivePocAllocation?: boolean
+}
+
+export function normalizeReusedInternalMachineId(value: string | null | undefined): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function isValidReusedInternalMachineId(value: string | null | undefined): boolean {
+  const machineId = normalizeReusedInternalMachineId(value)
+  return !machineId || /^\d+$/.test(machineId)
+}
+
+export function formattedReusedInternalMachineId(value: string | null | undefined): string {
+  const machineId = normalizeReusedInternalMachineId(value)
+  return machineId ? `M${machineId}` : ''
+}
+
+export function reusedInternalMachineIdRouteKey(value: string | null | undefined): string {
+  const machineId = normalizeReusedInternalMachineId(value)
+  const match = machineId.match(/^M(\d+)$/i)
+  return match ? match[1] : machineId
+}
+
+export function reusedInternalMachineIdsEqual(
+  first: string | null | undefined,
+  second: string | null | undefined,
+): boolean {
+  const firstMachineId = reusedInternalMachineIdRouteKey(first)
+  const secondMachineId = reusedInternalMachineIdRouteKey(second)
+  return Boolean(firstMachineId && secondMachineId && firstMachineId === secondMachineId)
 }
 
 function sortedDate(values: string[], direction: 'asc' | 'desc'): string {
@@ -63,20 +99,15 @@ export function deriveReusedSystemOccupationWindow(
   projects: Project[],
   effectiveDate: string,
 ): ReusedSystemOccupationWindow {
-  if (system.purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE) {
-    return { ok: true, occupationStartDate: system.occupationStartDate ?? null, occupationEndDate: system.occupationEndDate ?? null }
-  }
-
   const activePocProjects = activeAllocations
     .filter((link) =>
       link.allocationStatus !== 'DEALLOCATED' &&
-      (link.sourceMachineId === system.machineId || system.currentProjectIds.includes(link.projectId)) &&
-      system.currentProjectIds.includes(link.projectId),
+      (reusedInternalMachineIdsEqual(link.sourceMachineId, system.machineId) || system.currentProjectIds.includes(link.projectId)),
     )
     .map((link) => projects.find((project) => project.id === link.projectId))
     .filter((project): project is Project => Boolean(project && project.mainType === 'POC'))
 
-  if (system.purpose === SYSTEM_PURPOSE_POC && activePocProjects.length > 0) {
+  if (activePocProjects.length > 0) {
     const missingStartDate = activePocProjects.find((project) => !project.pocStartDate)
     if (missingStartDate) {
       return { ok: false, message: `Project ${missingStartDate.pid} must have a POC Start Date before this Reused System can be allocated.` }
@@ -89,7 +120,12 @@ export function deriveReusedSystemOccupationWindow(
       ok: true,
       occupationStartDate: sortedDate(activePocProjects.map((project) => project.pocStartDate as string), 'asc'),
       occupationEndDate: sortedDate(activePocProjects.map((project) => project.pocEndDate as string), 'desc'),
+      derivedFromActivePocAllocation: true,
     }
+  }
+
+  if (reusedInternalStatusForPurpose(system.purpose) !== REUSED_INTERNAL_STATUS_OCCUPIED) {
+    return { ok: true, occupationStartDate: system.occupationStartDate ?? null, occupationEndDate: system.occupationEndDate ?? null }
   }
 
   return {
@@ -97,6 +133,23 @@ export function deriveReusedSystemOccupationWindow(
     occupationStartDate: system.occupationStartDate || effectiveDate,
     occupationEndDate: system.occupationEndDate ?? null,
   }
+}
+
+export function reusedInternalHasActivePocAllocation(
+  system: ReusedInternalSystem,
+  activeAllocations: ProjectSystemLink[],
+  projects: Project[],
+): boolean {
+  return Boolean(deriveReusedSystemOccupationWindow(system, activeAllocations, projects, '').derivedFromActivePocAllocation)
+}
+
+export function reusedInternalAvailabilityStatus(
+  system: ReusedInternalSystem,
+  activeAllocations: ProjectSystemLink[] = [],
+  projects: Project[] = [],
+): ReusedInternalSystemStatus {
+  if (reusedInternalHasActivePocAllocation(system, activeAllocations, projects)) return REUSED_INTERNAL_STATUS_OCCUPIED
+  return reusedInternalStatusForPurpose(system.purpose)
 }
 
 export function applyReusedSystemOccupationWindow(
@@ -109,6 +162,8 @@ export function applyReusedSystemOccupationWindow(
   if (!window.ok) return system
   return {
     ...system,
+    purpose: window.derivedFromActivePocAllocation ? SYSTEM_PURPOSE_POC : system.purpose,
+    status: window.derivedFromActivePocAllocation ? REUSED_INTERNAL_STATUS_OCCUPIED : reusedInternalStatusForPurpose(system.purpose),
     occupationStartDate: window.occupationStartDate ?? null,
     occupationEndDate: window.occupationEndDate ?? null,
   }
@@ -135,6 +190,8 @@ export function systemDashboardRowClassName(record: SystemInventoryRecord | Allo
         return 'bg-purple-50 hover:bg-purple-100'
       case 'Support':
         return 'bg-slate-50 hover:bg-slate-100'
+      case REUSED_INTERNAL_PURPOSE_OBSOLETE:
+        return 'bg-gray-100 hover:bg-gray-200'
       default:
         return 'bg-white hover:bg-sf-surface-alt'
     }
@@ -149,6 +206,7 @@ export const REUSED_INTERNAL_SYSTEM_DASHBOARD_COLOR_LEGEND = [
   { label: 'Demo', rowClassName: 'bg-red-50', swatchClassName: 'bg-red-50' },
   { label: 'Training', rowClassName: 'bg-purple-50', swatchClassName: 'bg-purple-50' },
   { label: 'Support', rowClassName: 'bg-slate-50', swatchClassName: 'bg-slate-50' },
+  { label: 'OBSOLETE', rowClassName: 'bg-gray-100', swatchClassName: 'bg-gray-100' },
 ]
 
 export const ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND = [
@@ -158,7 +216,7 @@ export const ALLOCATED_SYSTEM_DASHBOARD_COLOR_LEGEND = [
 
 export function systemIdentity(record: SystemInventoryRecord): string {
   if ('sid' in record && record.sid) return record.sid
-  if ('machineId' in record && record.machineId) return record.machineId
+  if ('machineId' in record && record.machineId) return formattedReusedInternalMachineId(record.machineId)
   return record.id
 }
 
@@ -369,7 +427,7 @@ export function allocatedSystemDashboardRows(
 
 export function systemRoutePath(record: SystemInventoryRecord): string {
   if (systemSource(record) === SYSTEM_SOURCE_REUSED_INTERNAL && 'machineId' in record && record.machineId) {
-    return `/systems/reused-internal/${record.machineId}`
+    return `/systems/reused-internal/${formattedReusedInternalMachineId(record.machineId)}`
   }
   return `/systems/production-inventory/${'sid' in record ? record.sid ?? '' : ''}`
 }
@@ -417,7 +475,7 @@ export function reusedInternalPurposeHistory(
   }
 
   const rows: ReusedInternalPurposeHistoryRow[] = projectSystems
-    .filter((link) => link.sourceMachineId === machineId)
+    .filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, machineId))
     .map((link) => {
       const project = projects.find((candidate) => candidate.id === link.projectId)
       const system = systems.find((candidate) => candidate.id === link.systemId)

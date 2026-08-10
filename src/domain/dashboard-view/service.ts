@@ -16,6 +16,8 @@ import {
   validateDashboardViewName,
 } from './validation'
 
+const FIXED_DASHBOARD_SOURCE_COLUMN_IDS = new Set(['__rowIndicator', '__createdAt', 'creationDate', '__labels', 'labels'])
+
 export function createEmptyScopeViews(): DashboardViewsForScope {
   return {
     defaultViewId: FULL_DASHBOARD_VIEW_ID,
@@ -59,24 +61,30 @@ export function createFullDashboardViewState(
     sorting: defaultSorting.filter((sort) => columnIds.includes(sort.id)),
     grouping: [],
     globalFilter: '',
+    freezeThroughColumnId: null,
   }
 }
 
 export function normalizeDashboardViewState(state: DashboardViewState, columnIds: string[]): DashboardViewState {
   const columnIdSet = new Set(columnIds)
-  const preservedColumnOrder = state.columnOrder.filter((columnId) => columnIdSet.has(columnId))
-  const newColumnIds = columnIds.filter((columnId) => !preservedColumnOrder.includes(columnId))
+  const fixedColumnIds = columnIds.filter((columnId) => FIXED_DASHBOARD_SOURCE_COLUMN_IDS.has(columnId))
+  const fixedColumnIdSet = new Set(fixedColumnIds)
+  const preservedMovableColumnOrder = state.columnOrder.filter((columnId) => columnIdSet.has(columnId) && !fixedColumnIdSet.has(columnId))
+  const newMovableColumnIds = columnIds.filter((columnId) => !fixedColumnIdSet.has(columnId) && !preservedMovableColumnOrder.includes(columnId))
   const columnVisibility = Object.fromEntries(
-    columnIds.map((columnId) => [columnId, state.columnVisibility[columnId] ?? true]),
+    columnIds.map((columnId) => [columnId, fixedColumnIdSet.has(columnId) ? true : state.columnVisibility[columnId] ?? true]),
   )
 
   return {
-    columnOrder: [...preservedColumnOrder, ...newColumnIds],
+    columnOrder: [...fixedColumnIds, ...preservedMovableColumnOrder, ...newMovableColumnIds],
     columnVisibility,
     columnFilters: state.columnFilters.filter((filter) => columnIdSet.has(filter.id)),
     sorting: state.sorting.filter((sort) => columnIdSet.has(sort.id)),
     grouping: state.grouping.filter((columnId) => columnIdSet.has(columnId)),
     globalFilter: state.globalFilter ?? '',
+    freezeThroughColumnId: state.freezeThroughColumnId && columnIdSet.has(state.freezeThroughColumnId)
+      ? state.freezeThroughColumnId
+      : null,
   }
 }
 
