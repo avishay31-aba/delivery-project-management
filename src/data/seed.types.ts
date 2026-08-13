@@ -645,6 +645,7 @@ export interface InfrastructureTokenProperty {
 }
 
 export type InfrastructureMaintenanceTaskStatus = 'Open' | 'In Progress' | 'Done'
+export type InfrastructureMaintenanceOccurrenceOverrideField = 'taskTypeRefId' | 'task' | 'startDate' | 'dueDate' | 'assignedResourceRefId' | 'taskStatus'
 
 export type InfrastructureMaintenanceRecurrenceFrequency = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 export type InfrastructureMaintenanceRecurrenceEndType = 'none' | 'after' | 'by'
@@ -690,6 +691,7 @@ export interface InfrastructureMaintenanceTask {
   recurrenceSeriesId: string | null
   recurrenceOccurrenceDate: string | null
   recurrenceDefinitionTaskId: string | null
+  recurrenceOverrideFields: InfrastructureMaintenanceOccurrenceOverrideField[]
   createdAt: string
   createdBy: string
   updatedAt: string

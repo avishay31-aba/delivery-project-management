@@ -77,7 +77,6 @@ import {
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
   updateReusedInternalPurpose,
-  validateReusedInternalPermanentDelete,
   validateReusedInternalPurposeChange,
   validateSystemInventoryRequiredFields,
 } from '@/domain/system-inventory'
@@ -1008,7 +1007,6 @@ interface AppStore extends AppDataState {
   restoreProject: (id: string) => AppDataState['projects'][number] | undefined
   updateProductionSystemInventoryItem: (id: string, patch: Partial<AppDataState['productionSystemInventory'][number]>, options?: SaveTimestampOptions) => void
   updateReusedInternalSystem: (id: string, patch: Partial<AppDataState['reusedInternalSystems'][number]>, options?: SaveTimestampOptions) => void
-  permanentDeleteReusedInternalSystem: (id: string) => AllocationActionResult
   updateSystem: (id: string, patch: Partial<AppDataState['systems'][number]>, options?: SaveTimestampOptions) => void
   updateSystemMapCenter: (
     systemId: string,
@@ -1030,8 +1028,6 @@ interface AppStore extends AppDataState {
   resetRecordsPerPagePreference: (context: string) => AllocationActionResult
   createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
-  deleteInfrastructureItem: (id: string, reason: string) => AllocationActionResult & { record?: InfrastructureItem }
-  restoreInfrastructureItem: (id: string) => AllocationActionResult & { record?: InfrastructureItem }
   linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
   unlinkInfrastructureItemFromSystem: (itemId: string, systemId: string) => AllocationActionResult
   saveVersionUpdate: (
@@ -1786,82 +1782,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return { ok: true, message: `Infrastructure Item ${record.infrastructureId} saved.`, record }
-  },
-
-  deleteInfrastructureItem: (id, reason) => {
-    const state = get()
-    const item = state.infrastructureItems.find((candidate) => candidate.id === id)
-    if (!item) return { ok: false, message: 'Infrastructure Item not found.' }
-    const trimmedReason = reason.trim()
-    if (richTextIsEmpty(trimmedReason)) return { ok: false, message: 'Deletion Reason is required.' }
-    const now = new Date().toISOString()
-    const previousOperationalStatus = item.operationalStatus === INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
-      ? item.deletionPreviousOperationalStatus ?? 'Active'
-      : item.operationalStatus
-    const record: InfrastructureItem = normalizeInfrastructureItem({
-      ...item,
-      operationalStatus: INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS,
-      deletionPreviousOperationalStatus: previousOperationalStatus,
-      deletionReason: trimmedReason,
-      deletionHistory: [
-        ...infrastructureDeletionHistory(item),
-        {
-          id: `infrastructure-deletion-${crypto.randomUUID()}`,
-          reason: trimmedReason,
-          timestamp: now,
-          deletedBy: CURRENT_USER_DISPLAY_NAME,
-        },
-      ],
-      updatedAt: now,
-      lastUpdatedDate: now,
-    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, item.id), infrastructureWarrantyIds(state.infrastructureItems, item.id))
-    set((current) => ({
-      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === id ? record : candidate),
-      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
-        previous: item as unknown as Record<string, unknown>,
-        next: record as unknown as Record<string, unknown>,
-        category: 'INFRASTRUCTURE',
-        eventTypePrefix: 'infrastructureItem',
-        objectLabel: `Infrastructure Item ${record.infrastructureId}`,
-        primaryObject: infrastructureRef(record),
-        excludeFields: ['maintenanceTasks', 'deletionHistory'],
-      }),
-    }))
-    get().saveToStorage()
-    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} status changed to Deleted.`, record }
-  },
-
-  restoreInfrastructureItem: (id) => {
-    const state = get()
-    const item = state.infrastructureItems.find((candidate) => candidate.id === id)
-    if (!item || item.operationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS) return { ok: false, message: 'Infrastructure Item could not be restored.' }
-    const now = new Date().toISOString()
-    const restoredStatus = item.deletionPreviousOperationalStatus && item.deletionPreviousOperationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
-      ? item.deletionPreviousOperationalStatus
-      : 'Active'
-    const record: InfrastructureItem = normalizeInfrastructureItem({
-      ...item,
-      operationalStatus: restoredStatus,
-      deletionReason: '',
-      deletionHistory: infrastructureDeletionHistory(item),
-      deletionPreviousOperationalStatus: null,
-      updatedAt: now,
-      lastUpdatedDate: now,
-    }, infrastructureMaintenanceTaskIds(state.infrastructureItems, item.id), infrastructureWarrantyIds(state.infrastructureItems, item.id))
-    set((current) => ({
-      infrastructureItems: current.infrastructureItems.map((candidate) => candidate.id === id ? record : candidate),
-      activityEvents: appendFieldChangeActivityEvents(current.activityEvents, now, {
-        previous: item as unknown as Record<string, unknown>,
-        next: record as unknown as Record<string, unknown>,
-        category: 'INFRASTRUCTURE',
-        eventTypePrefix: 'infrastructureItem',
-        objectLabel: `Infrastructure Item ${record.infrastructureId}`,
-        primaryObject: infrastructureRef(record),
-        excludeFields: ['maintenanceTasks', 'deletionHistory'],
-      }),
-    }))
-    get().saveToStorage()
-    return { ok: true, message: `Infrastructure Item ${record.infrastructureId} restored with Operational Status ${record.operationalStatus}.`, record }
   },
 
   linkInfrastructureItemToSystem: (itemId, systemId) => {
@@ -2691,29 +2611,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     })
     get().saveToStorage()
-  },
-
-  permanentDeleteReusedInternalSystem: (id) => {
-    const state = get()
-    const system = state.reusedInternalSystems.find((candidate) => candidate.id === id)
-    if (!system) return { ok: false, message: 'Reused Internal System not found.' }
-    const messages = validateReusedInternalPermanentDelete(system, state)
-    if (messages.length > 0) return { ok: false, message: messages.map((message) => message.message).join(' ') }
-
-    const now = new Date().toISOString()
-    set((current) => ({
-      reusedInternalSystems: current.reusedInternalSystems.filter((candidate) => candidate.id !== id),
-      activityEvents: appendActivityEvent(current.activityEvents, now, {
-        category: 'SYSTEM',
-        eventType: 'system.permanentlyDeleted',
-        severity: 'WARNING',
-        summary: `Reused Internal System ${systemBusinessId(system)} permanently deleted.`,
-        primaryObject: systemRef(system),
-        before: { id: system.id, machineId: system.machineId, purpose: system.purpose, status: system.status },
-      }),
-    }))
-    get().saveToStorage()
-    return { ok: true, message: `Reused Internal System ${systemBusinessId(system)} permanently deleted.` }
   },
 
   updateOpportunity: (id, patch, options) => {

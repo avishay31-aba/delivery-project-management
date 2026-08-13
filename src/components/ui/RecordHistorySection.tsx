@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Children, isValidElement, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { CURRENT_USER_ID } from '@/config/current-user'
 import {
   RECORDS_PER_PAGE_OPTIONS,
@@ -10,6 +10,7 @@ import {
   type RecordsPerPageValue,
 } from '@/domain/user-preferences'
 import { useAppStore } from '@/store/useAppStore'
+import { downloadCsv, type CsvCellValue } from '@/utils/csv-export'
 
 export type RecordHistoryPageSize = RecordsPerPageValue
 export type RecordHistorySortDirection = 'asc' | 'desc'
@@ -19,6 +20,9 @@ export interface RecordHistoryColumn<TRecord> {
   label: ReactNode
   render: (record: TRecord) => ReactNode
   sortValue?: (record: TRecord) => string | number | null | undefined
+  exportValue?: (record: TRecord) => CsvCellValue
+  exportLabel?: string
+  excludeFromExport?: boolean
   className?: string
   headerClassName?: string
 }
@@ -40,6 +44,7 @@ interface RecordHistorySectionProps<TRecord> {
   recordsPerPageLabel?: string
   pageSizeOptions?: RecordHistoryPageSize[]
   initialPageSize?: RecordHistoryPageSize
+  initialSort?: { key: string; direction: RecordHistorySortDirection } | null
   logicalTableType?: string
   logicalTableLabel?: string
   controls?: ReactNode
@@ -47,6 +52,7 @@ interface RecordHistorySectionProps<TRecord> {
   message?: ReactNode
   resetPageSignal?: unknown
   tableClassName?: string
+  exportFileName?: string
 }
 
 const DEFAULT_PAGE_SIZE_OPTIONS: RecordHistoryPageSize[] = RECORDS_PER_PAGE_OPTIONS
@@ -62,6 +68,12 @@ function normalized(value: unknown): string {
 function compareValues(first: string | number | null | undefined, second: string | number | null | undefined): number {
   if (typeof first === 'number' && typeof second === 'number') return first - second
   return normalized(first).localeCompare(normalized(second), undefined, { numeric: true, sensitivity: 'base' })
+}
+
+function reactNodeText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (!isValidElement<{ children?: ReactNode }>(node)) return ''
+  return Children.toArray(node.props.children).map(reactNodeText).filter(Boolean).join(' ')
 }
 
 export function RecordHistorySection<TRecord>({
@@ -81,6 +93,7 @@ export function RecordHistorySection<TRecord>({
   recordsPerPageLabel = 'Records per page',
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   initialPageSize = 10,
+  initialSort = null,
   logicalTableType,
   logicalTableLabel,
   controls,
@@ -88,6 +101,7 @@ export function RecordHistorySection<TRecord>({
   message,
   resetPageSignal,
   tableClassName = 'w-max min-w-full border-collapse text-sm leading-tight',
+  exportFileName,
 }: RecordHistorySectionProps<TRecord>) {
   const userPresentationPreferences = useAppStore((state) => state.userPresentationPreferences)
   const setRecordsPerPagePreference = useAppStore((state) => state.setRecordsPerPagePreference)
@@ -102,7 +116,7 @@ export function RecordHistorySection<TRecord>({
   const [search, setSearch] = useState('')
   const [pageSize, setPageSize] = useState<RecordHistoryPageSize>(effectiveInitialPageSize)
   const [pageNumber, setPageNumber] = useState(1)
-  const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(null)
+  const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(initialSort)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [preferenceMessage, setPreferenceMessage] = useState('')
@@ -189,6 +203,15 @@ export function RecordHistorySection<TRecord>({
   }
 
   const emptyMessage = records.length > 0 && totalMatchingRecords === 0 ? filteredEmptyText : emptyText
+  const exportColumns = columns.filter((column) => column.key !== 'actions' && !column.excludeFromExport)
+
+  function exportCsv() {
+    downloadCsv(
+      exportFileName ?? `${(logicalTableLabel ?? logicalTableType ?? 'table').toLocaleLowerCase().replaceAll(/[^a-z0-9]+/g, '-')}.csv`,
+      exportColumns.map((column) => column.exportLabel ?? (reactNodeText(column.label) || column.key)),
+      sortedAndFilteredRecords.map((record) => exportColumns.map((column) => column.exportValue?.(record) ?? column.sortValue?.(record) ?? '')),
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -235,16 +258,31 @@ export function RecordHistorySection<TRecord>({
           {enableSearch ? (
             <label className="block text-sm font-medium text-sf-text">
               <span className="mb-1 block text-xs font-semibold uppercase text-sf-text-muted">{searchLabel}</span>
-              <input
-                aria-label={searchLabel}
-                className="h-8 w-72 rounded border border-sf-border px-2 py-1 text-sm"
-                placeholder={searchPlaceholder}
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value)
-                  resetToFirstPage()
-                }}
-              />
+              <div className="relative">
+                <input
+                  aria-label={searchLabel}
+                  className="h-8 w-72 rounded border border-sf-border px-2 py-1 pr-8 text-sm"
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value)
+                    resetToFirstPage()
+                  }}
+                />
+                {search ? (
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-sf-text-muted hover:bg-sf-surface-alt hover:text-sf-text"
+                    aria-label={`Clear ${searchLabel.toLocaleLowerCase()}`}
+                    onClick={() => {
+                      setSearch('')
+                      resetToFirstPage()
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
             </label>
           ) : null}
           {getDateValue ? (
@@ -275,22 +313,16 @@ export function RecordHistorySection<TRecord>({
                   }}
                 />
               </label>
-              <button
-                type="button"
-                className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt"
-                onClick={() => {
-                  setFromDate('')
-                  setToDate('')
-                  resetToFirstPage()
-                }}
-              >
-                Clear / All Dates
-              </button>
             </>
           ) : null}
           {controls}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="h-8 rounded border border-sf-border bg-white px-3 text-sm hover:bg-sf-surface-alt" onClick={exportCsv}>
+            Export CSV
+          </button>
+          {actions}
+        </div>
       </div>
 
       {message}

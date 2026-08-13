@@ -1,7 +1,7 @@
 import type { Project, ProjectSystemLink, ReusedInternalSystem, SystemInventoryRecord, SystemInventoryValidationMessage } from './types'
 import { requiresCloudPlatform } from '@/domain/hosting-context'
 import type { AppDataState } from '@/data/seed.types'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_PURPOSE_OBSOLETE, SYSTEM_PURPOSE_POC } from './metadata'
+import { REUSED_INTERNAL_PURPOSE_AVAILABLE, SYSTEM_PURPOSE_POC } from './metadata'
 import {
   deriveReusedSystemOccupationWindow,
   isReusedInternalOccupied,
@@ -80,35 +80,6 @@ export function validateSystemInventoryRequiredFields(
 
 export function isOccupationDateRequiredForPurpose(purpose: string | undefined): boolean {
   return isReusedInternalOccupied(reusedInternalStatusForPurpose(textValue(purpose)))
-}
-
-export function validateReusedInternalPermanentDelete(
-  system: ReusedInternalSystem,
-  state: Pick<AppDataState, 'projectSystems' | 'systems' | 'infrastructureItems' | 'versionUpdates'>,
-): SystemInventoryValidationMessage[] {
-  const messages: SystemInventoryValidationMessage[] = []
-  if (system.purpose !== REUSED_INTERNAL_PURPOSE_OBSOLETE) {
-    messages.push({ field: 'purpose', message: 'Permanent Delete is available only when Purpose is OBSOLETE.' })
-  }
-  if (system.currentProjectIds.length > 0) {
-    messages.push({ field: 'currentProjectIds', message: 'Reused Internal System has active Project usage.' })
-  }
-  if (state.projectSystems.some((link) =>
-    link.allocationStatus !== 'DEALLOCATED' &&
-    (link.systemId === system.id || reusedInternalMachineIdsEqual(link.sourceMachineId, system.machineId))
-  )) {
-    messages.push({ field: 'projectSystems', message: 'Reused Internal System is linked to active Project allocation records.' })
-  }
-  if (state.systems.some((allocatedSystem) => reusedInternalMachineIdsEqual(allocatedSystem.machineId, system.machineId))) {
-    messages.push({ field: 'systems', message: 'Reused Internal System has allocated System records.' })
-  }
-  if (state.infrastructureItems.some((item) => item.linkedSystemIds.includes(system.id))) {
-    messages.push({ field: 'infrastructureItems', message: 'Reused Internal System is linked to Infrastructure Items.' })
-  }
-  if (state.versionUpdates.some((record) => record.systemCollection === 'reused' && record.systemId === system.id && !record.deletedAt)) {
-    messages.push({ field: 'versionUpdates', message: 'Reused Internal System has active Version Update records.' })
-  }
-  return messages
 }
 
 export const ACTIVE_POC_PURPOSE_LOCK_MESSAGE =

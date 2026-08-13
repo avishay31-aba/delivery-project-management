@@ -4,6 +4,7 @@ import type {
   InfrastructureDeletionHistoryEntry,
   InfrastructureMaintenanceRecurrence,
   InfrastructureMaintenanceTask,
+  InfrastructureMaintenanceOccurrenceOverrideField,
   InfrastructureMaintenanceTaskStatus,
   InfrastructureItemProperties,
   InfrastructureMaintenanceStatus,
@@ -159,6 +160,7 @@ export interface InfrastructureMaintenanceDashboardRow {
   taskStatus: InfrastructureMaintenanceTaskStatus
   assignedResource: string
   recurrenceSummary: string
+  recurrenceSeriesId: string | null
   infrastructureItemId: string
   infrastructureItemName: string
   infrastructureType: string
@@ -682,9 +684,12 @@ function normalizeMaintenanceTask(
     taskStatus: status,
     completionDate: status === 'Done' ? text(record.completionDate) || businessDate(new Date(now)) : null,
     recurrence,
-    recurrenceSeriesId: recurrence.seriesId,
+    recurrenceSeriesId: recurrence.seriesId ?? (text(record.recurrenceSeriesId) || null),
     recurrenceOccurrenceDate: text(record.recurrenceOccurrenceDate) || null,
     recurrenceDefinitionTaskId: text(record.recurrenceDefinitionTaskId) || null,
+    recurrenceOverrideFields: Array.isArray(record.recurrenceOverrideFields)
+      ? record.recurrenceOverrideFields.filter((field): field is InfrastructureMaintenanceOccurrenceOverrideField => MAINTENANCE_OCCURRENCE_OVERRIDE_FIELDS.includes(field as InfrastructureMaintenanceOccurrenceOverrideField))
+      : [],
     createdAt: text(record.createdAt) || now,
     createdBy: text(record.createdBy) || 'System',
     updatedAt: text(record.updatedAt) || now,
@@ -758,6 +763,51 @@ function addYearsClamped(value: Date, years: number): Date {
 
 export function infrastructureMaintenanceTaskIsActive(task: Pick<InfrastructureMaintenanceTask, 'taskStatus'>): boolean {
   return task.taskStatus !== 'Done'
+}
+
+export const MAINTENANCE_OCCURRENCE_OVERRIDE_FIELDS: InfrastructureMaintenanceOccurrenceOverrideField[] = [
+  'taskTypeRefId',
+  'task',
+  'startDate',
+  'dueDate',
+  'assignedResourceRefId',
+  'taskStatus',
+]
+
+export function infrastructureMaintenanceTaskBelongsToSeries(
+  task: Pick<InfrastructureMaintenanceTask, 'recurrenceSeriesId' | 'recurrence'>,
+): boolean {
+  return Boolean(task.recurrenceSeriesId || task.recurrence.seriesId)
+}
+
+function changedOccurrenceFields(
+  previous: InfrastructureMaintenanceTask,
+  draft: InfrastructureMaintenanceTask,
+): InfrastructureMaintenanceOccurrenceOverrideField[] {
+  return MAINTENANCE_OCCURRENCE_OVERRIDE_FIELDS.filter((field) => previous[field] !== draft[field])
+}
+
+export function commitInfrastructureMaintenanceOccurrence(
+  draft: InfrastructureMaintenanceTask,
+  previous: InfrastructureMaintenanceTask,
+  seriesDefinition: InfrastructureMaintenanceTask,
+  now = new Date().toISOString(),
+  user = 'Demo User',
+): InfrastructureMaintenanceTask {
+  const committed = commitInfrastructureMaintenanceTask({
+    ...draft,
+    recurrence: seriesDefinition.recurrence,
+    recurrenceSeriesId: seriesDefinition.recurrenceSeriesId,
+    recurrenceDefinitionTaskId: seriesDefinition.recurrenceDefinitionTaskId ?? seriesDefinition.id,
+    recurrenceOccurrenceDate: previous.recurrenceOccurrenceDate,
+  }, previous, now, user)
+  return {
+    ...committed,
+    recurrenceOverrideFields: Array.from(new Set([
+      ...previous.recurrenceOverrideFields,
+      ...changedOccurrenceFields(previous, draft),
+    ])),
+  }
 }
 
 export function recurrenceSummary(recurrence: InfrastructureMaintenanceRecurrence | null | undefined): string {
@@ -959,6 +1009,108 @@ export function commitInfrastructureMaintenanceTask(
     return { ...normalized, completionDate: null }
   }
   return { ...normalized, completionDate: null }
+}
+
+export function updateInfrastructureMaintenanceSeries(
+  draft: InfrastructureMaintenanceTask,
+  tasks: InfrastructureMaintenanceTask[],
+  now = new Date().toISOString(),
+  user = 'Demo User',
+): InfrastructureMaintenanceTask[] {
+  const seriesId = draft.recurrenceSeriesId ?? draft.recurrence.seriesId
+  if (!seriesId) return tasks.map((task) => task.id === draft.id ? commitInfrastructureMaintenanceTask(draft, task, now, user) : task)
+
+  const members = tasks.filter((task) => task.recurrenceSeriesId === seriesId)
+  const definition = members.find((task) => task.id === task.recurrenceDefinitionTaskId)
+    ?? members.find((task) => task.id === draft.recurrenceDefinitionTaskId)
+    ?? members[0]
+  if (!definition) return tasks
+
+  if (draft.recurrence.frequency === 'none') {
+    const cancelledRecurrence = normalizeMaintenanceRecurrence({ ...draft.recurrence, frequency: 'none' }, null, null)
+    const retainedSourceMembers = members.filter((task) => task.taskStatus === 'Done' || task.taskStatus === 'In Progress')
+    const retainedDefinitionTaskId = retainedSourceMembers.some((task) => task.id === definition.id)
+      ? definition.id
+      : retainedSourceMembers[0]?.id ?? null
+    const retainedMembers = retainedSourceMembers
+      .map((task) => ({
+        ...task,
+        recurrence: cancelledRecurrence,
+        recurrenceSeriesId: seriesId,
+        recurrenceDefinitionTaskId: retainedDefinitionTaskId,
+        updatedAt: now,
+        updatedBy: user,
+      }))
+    return [...tasks.filter((task) => task.recurrenceSeriesId !== seriesId), ...retainedMembers]
+  }
+
+  const changedSharedFields = MAINTENANCE_OCCURRENCE_OVERRIDE_FIELDS.filter((field) => definition[field] !== draft[field])
+  const changedSharedFieldSet = new Set(changedSharedFields)
+
+  const definitionDraft = commitInfrastructureMaintenanceTask({
+    ...definition,
+    taskTypeRefId: draft.taskTypeRefId,
+    task: draft.task,
+    startDate: draft.startDate,
+    dueDate: draft.dueDate,
+    assignedResourceRefId: draft.assignedResourceRefId,
+    taskStatus: draft.taskStatus,
+    recurrence: { ...draft.recurrence, seriesId },
+    recurrenceSeriesId: seriesId,
+    recurrenceDefinitionTaskId: definition.id,
+    recurrenceOverrideFields: [],
+  }, definition, now, user)
+  const unrelatedTasks = tasks.filter((task) => task.recurrenceSeriesId !== seriesId)
+  const regenerated = generateInfrastructureMaintenanceOccurrences(definitionDraft, unrelatedTasks, now)
+  const existingByDate = new Map(members.map((task) => [task.recurrenceOccurrenceDate, task]))
+  const desiredDates = new Set(regenerated.map((task) => task.recurrenceOccurrenceDate))
+  const today = businessDate(new Date(now))
+
+  const reconciled = regenerated.map((generated) => {
+    const existing = existingByDate.get(generated.recurrenceOccurrenceDate)
+    if (!existing) return {
+      ...generated,
+      taskStatus: 'Open' as const,
+      completionDate: null,
+      recurrenceDefinitionTaskId: definition.id,
+      recurrenceOverrideFields: [],
+    }
+    const remainingOverrideFields = existing.recurrenceOverrideFields.filter((field) => !changedSharedFieldSet.has(field))
+    const reconciledDraft = {
+      ...generated,
+      id: existing.id,
+      taskId: existing.taskId,
+      createdAt: existing.createdAt,
+      createdBy: existing.createdBy,
+      recurrenceDefinitionTaskId: definition.id,
+      recurrenceOverrideFields: remainingOverrideFields,
+      taskStatus: changedSharedFieldSet.has('taskStatus') ? definitionDraft.taskStatus : existing.taskStatus,
+    }
+    remainingOverrideFields.forEach((field) => {
+      Object.assign(reconciledDraft, { [field]: existing[field] })
+    })
+    return commitInfrastructureMaintenanceTask(reconciledDraft, existing, now, user)
+  })
+
+  // Past and completed occurrences remain as historical series members even when a
+  // pattern change means they are no longer part of the future generated schedule.
+  const historical = members
+    .filter((task) => !desiredDates.has(task.recurrenceOccurrenceDate) && (task.taskStatus === 'Done' || (task.recurrenceOccurrenceDate ?? '') < today))
+    .map((task) => {
+      const remainingOverrideFields = task.recurrenceOverrideFields.filter((field) => !changedSharedFieldSet.has(field))
+      const historicalDraft = {
+        ...task,
+        recurrence: definitionDraft.recurrence,
+        recurrenceDefinitionTaskId: definition.id,
+        recurrenceOverrideFields: remainingOverrideFields,
+      }
+      changedSharedFields.forEach((field) => {
+        Object.assign(historicalDraft, { [field]: definitionDraft[field] })
+      })
+      return commitInfrastructureMaintenanceTask(historicalDraft, task, now, user)
+    })
+
+  return [...unrelatedTasks, ...historical, ...reconciled]
 }
 
 export type InfrastructureMaintenanceAlert = '' | 'Planned' | 'Pending' | 'Overdue' | 'Delayed'
@@ -1572,6 +1724,7 @@ export function infrastructureMaintenanceDashboardRows(
       taskStatus: task.taskStatus,
       assignedResource: infrastructureReferenceDataLabel(referenceData, task.assignedResourceRefId),
       recurrenceSummary: recurrenceSummary(task.recurrence),
+      recurrenceSeriesId: task.recurrenceSeriesId,
       infrastructureItemId: item.infrastructureId,
       infrastructureItemName: item.identifier,
       infrastructureType: infrastructureReferenceDataLabel(referenceData, item.typeRefId),

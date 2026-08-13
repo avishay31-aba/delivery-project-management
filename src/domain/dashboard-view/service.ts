@@ -42,7 +42,6 @@ export function createEmptyDashboardViews(): PersistedDashboardViews {
       requirementCoverage: createEmptyScopeViews(),
       activityLog: createEmptyScopeViews(),
       infrastructure: createEmptyScopeViews(),
-      deletedInfrastructure: createEmptyScopeViews(),
       infrastructurePlannedMaintenance: createEmptyScopeViews(),
       infrastructureCurrentMaintenance: createEmptyScopeViews(),
     },

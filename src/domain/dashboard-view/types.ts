@@ -12,7 +12,6 @@ export type DashboardViewScope =
   | 'requirementCoverage'
   | 'activityLog'
   | 'infrastructure'
-  | 'deletedInfrastructure'
   | 'infrastructurePlannedMaintenance'
   | 'infrastructureCurrentMaintenance'
 

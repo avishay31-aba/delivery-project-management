@@ -1,17 +1,14 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useMemo, useState } from 'react'
-import { DashboardActionButton, DataDashboard } from '@/components/dashboard'
+import { useMemo } from 'react'
+import { DataDashboard } from '@/components/dashboard'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
 import { createReusedInternalSystemColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
 import {
-  formattedReusedInternalMachineId,
-  REUSED_INTERNAL_PURPOSE_OBSOLETE,
   REUSED_INTERNAL_SYSTEM_DASHBOARD_COLOR_LEGEND,
   systemDashboardRowClassName,
 } from '@/domain/system-inventory'
-import { formMessageClassName, PERMANENT_DELETE_LABEL, PermanentDeleteIcon, permanentDeleteConfirmationMessage } from '@/components/ui'
 
 export function ReusedInternalSystemsInventoryPage() {
   const navigate = useNavigate()
@@ -26,8 +23,6 @@ export function ReusedInternalSystemsInventoryPage() {
   )
   const createSystem = useAppStore((state) => state.createReusedInternalSystem)
   const updateSystem = useAppStore((state) => state.updateReusedInternalSystem)
-  const permanentDeleteSystem = useAppStore((state) => state.permanentDeleteReusedInternalSystem)
-  const [messages, setMessages] = useState<string[]>([])
   const reusedInternalSystemColumns = useMemo(
     () => createReusedInternalSystemColumns(projects, projectSystems),
     [projectSystems, projects],
@@ -74,26 +69,7 @@ export function ReusedInternalSystemsInventoryPage() {
           const routePath = systemReference(row).routePath
           if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
         }}
-        renderRecordActions={(row) => row.purpose === REUSED_INTERNAL_PURPOSE_OBSOLETE ? (
-          <DashboardActionButton
-            icon={<PermanentDeleteIcon />}
-            label={PERMANENT_DELETE_LABEL}
-            tone="danger"
-            onClick={() => {
-              const label = formattedReusedInternalMachineId(row.machineId) || row.id
-              const confirmed = window.confirm(permanentDeleteConfirmationMessage(`Reused Internal System ${label}`))
-              if (!confirmed) return
-              const result = permanentDeleteSystem(row.id)
-              setMessages([result.message])
-            }}
-          />
-        ) : null}
       />
-      {messages.length > 0 ? (
-        <div className={`mt-3 ${formMessageClassName(messages)}`}>
-          {messages.map((message) => <div key={message}>{message}</div>)}
-        </div>
-      ) : null}
       </WorkspaceScrollContent>
     </WorkspaceFrame>
   )
