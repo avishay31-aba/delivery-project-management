@@ -7,21 +7,24 @@ import {
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { BusinessIdLink, BusinessNumericInput, MaintenanceStatusPresentation, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, useFloatingOverlay, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, BusinessNumericInput, MaintenanceStatusPresentation, RecurrenceIndicator, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, TaskStatusPresentation, formMessageClassName, useFloatingOverlay, validationControlClassName, type RecordHistoryColumn } from '@/components/ui'
 import type { InfrastructureMaintenanceRecurrence, InfrastructureMaintenanceTask, InfrastructureMaintenanceTaskStatus, ReferenceDataRecord } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
   commitInfrastructureMaintenanceTask,
+  commitInfrastructureMaintenanceOccurrence,
   createInfrastructureMaintenanceTask,
   generateInfrastructureMaintenanceOccurrences,
   infrastructureMaintenanceAssignedResources,
   infrastructureMaintenanceAlert,
+  infrastructureMaintenanceTaskBelongsToSeries,
   infrastructureMaintenanceTaskTypes,
   infrastructureReferenceDataLabel,
   INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS,
   MAINTENANCE_RECURRENCE_NUMBER_MAX,
   MAINTENANCE_RECURRENCE_NUMBER_MIN,
   recurrenceSummary,
+  updateInfrastructureMaintenanceSeries,
   validateMaintenanceRecurrence,
 } from '@/domain/infrastructure-item'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
@@ -35,6 +38,8 @@ interface InfrastructureMaintenanceGridProps {
   onAddAssignedResource: (label: string) => { ok: boolean; message: string; record?: ReferenceDataRecord }
   readOnly?: boolean
 }
+
+type AdvancedEditScope = 'occurrence' | 'series'
 
 function normalizedTask(record: InfrastructureMaintenanceTask) {
   return {
@@ -164,6 +169,10 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
   const [advancedTaskId, setAdvancedTaskId] = useState<string | null>(null)
   const [advancedDraft, setAdvancedDraft] = useState<InfrastructureMaintenanceTask | null>(null)
   const [advancedErrors, setAdvancedErrors] = useState<string[]>([])
+  const [advancedEditScope, setAdvancedEditScope] = useState<AdvancedEditScope>('occurrence')
+  const [scopePromptTaskId, setScopePromptTaskId] = useState<string | null>(null)
+  const [scopePromptChoice, setScopePromptChoice] = useState<AdvancedEditScope | null>(null)
+  const [pendingEditScopes, setPendingEditScopes] = useState<Record<string, AdvancedEditScope>>({})
   const permissions = editableChildObjectPermissions({ readOnly })
   const taskTypeOptions = infrastructureMaintenanceTaskTypes(referenceData)
   const assignedResourceOptions = infrastructureMaintenanceAssignedResources(referenceData)
@@ -175,6 +184,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
 
   useEffect(() => {
     editor.reset()
+    setPendingEditScopes({})
   }, [committedTaskIds])
 
   function addTask() {
@@ -190,6 +200,22 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       : [committedTask]
     if (isNew) {
       onChange([...tasks, ...generatedTasks])
+      return
+    }
+    if (previous && infrastructureMaintenanceTaskBelongsToSeries(previous)) {
+      const scope = pendingEditScopes[draft.id] ?? 'occurrence'
+      if (scope === 'series') {
+        onChange(updateInfrastructureMaintenanceSeries(draft, tasks, new Date().toISOString(), CURRENT_USER_DISPLAY_NAME))
+      } else {
+        const definition = tasks.find((task) => task.id === previous.recurrenceDefinitionTaskId) ?? previous
+        const occurrence = commitInfrastructureMaintenanceOccurrence(draft, previous, definition, new Date().toISOString(), CURRENT_USER_DISPLAY_NAME)
+        onChange(tasks.map((task) => task.id === previous.id ? occurrence : task))
+      }
+      setPendingEditScopes((current) => {
+        const next = { ...current }
+        delete next[draft.id]
+        return next
+      })
       return
     }
     const updatedTasks = tasks.map((task) => (task.id === draft.id ? generatedTasks[0] ?? committedTask : task))
@@ -210,13 +236,31 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     })
   }
 
-  function validateTask(draft: InfrastructureMaintenanceTask): string[] {
+  function cancelTask(id: string) {
+    editor.cancel(id)
+    setPendingEditScopes((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+  }
+
+  function beginInlineEdit(task: InfrastructureMaintenanceTask) {
+    setPendingEditScopes((current) => {
+      const next = { ...current }
+      delete next[task.id]
+      return next
+    })
+    editor.beginEdit(task)
+  }
+
+  function validateTask(draft: InfrastructureMaintenanceTask, validateRecurrence = true): string[] {
     const errors: string[] = []
     if (!draft.taskTypeRefId) errors.push('Task Type is required.')
     if (draft.startDate && Number.isNaN(new Date(`${draft.startDate}T00:00:00`).valueOf())) errors.push('Start Date is invalid.')
     if (draft.dueDate && Number.isNaN(new Date(`${draft.dueDate}T00:00:00`).valueOf())) errors.push('Due Date is invalid.')
     if (!INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS.includes(draft.taskStatus)) errors.push('Task Status is invalid.')
-    if (draft.recurrence.frequency !== 'none') {
+    if (validateRecurrence && draft.recurrence.frequency !== 'none') {
       errors.push(...validateMaintenanceRecurrence(draft.recurrence, draft.startDate))
     }
     return errors
@@ -268,11 +312,42 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
     })
   }
 
-  function openAdvancedEdit(task: InfrastructureMaintenanceTask) {
+  function openAdvancedEditWithScope(task: InfrastructureMaintenanceTask, scope: AdvancedEditScope) {
     const current = editor.draftFor(task.id) ?? task
     if (!editor.isEditing(task.id)) editor.beginEdit(task)
     setAdvancedTaskId(task.id)
-    setAdvancedDraft(current)
+    if (scope === 'series') {
+      const definition = tasks.find((candidate) => candidate.id === task.recurrenceDefinitionTaskId) ?? task
+      setAdvancedDraft({
+        ...current,
+        taskTypeRefId: definition.taskTypeRefId,
+        task: definition.task,
+        startDate: definition.startDate,
+        dueDate: definition.dueDate,
+        assignedResourceRefId: definition.assignedResourceRefId,
+        taskStatus: definition.taskStatus,
+        recurrence: definition.recurrence,
+      })
+    } else {
+      setAdvancedDraft(current)
+    }
+    setAdvancedEditScope(scope)
+  }
+
+  function requestAdvancedEdit(task: InfrastructureMaintenanceTask) {
+    if (!infrastructureMaintenanceTaskBelongsToSeries(task)) {
+      openAdvancedEditWithScope(task, 'occurrence')
+      return
+    }
+    setScopePromptTaskId(task.id)
+    setScopePromptChoice(null)
+  }
+
+  function confirmScopePrompt() {
+    const task = tasks.find((candidate) => candidate.id === scopePromptTaskId)
+    if (!task || !scopePromptChoice) return
+    setScopePromptTaskId(null)
+    openAdvancedEditWithScope(task, scopePromptChoice)
   }
 
   function updateAdvancedDraft(patch: Partial<InfrastructureMaintenanceTask>) {
@@ -331,12 +406,13 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
 
   function confirmAdvancedEdit() {
     if (!advancedDraft || !advancedTaskId) return
-    const errors = validateTask(advancedDraft)
+    const errors = validateTask(advancedDraft, advancedEditScope === 'series' || !infrastructureMaintenanceTaskBelongsToSeries(advancedDraft))
     if (errors.length > 0) {
       setAdvancedErrors(errors)
       return
     }
     editor.replaceDraft(advancedDraft)
+    setPendingEditScopes((current) => ({ ...current, [advancedTaskId]: advancedEditScope }))
     setAdvancedTaskId(null)
     setAdvancedDraft(null)
     setAdvancedErrors([])
@@ -369,11 +445,11 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                   <EditableChildObjectActionButton variant="primary" disabled={editor.isSaving(task.id)} onClick={() => saveTask(task.id)}>
                     <Save className="h-3.5 w-3.5" aria-hidden="true" /> Save
                   </EditableChildObjectActionButton>
-                  <EditableChildObjectActionButton onClick={() => editor.cancel(task.id)}>
+                  <EditableChildObjectActionButton onClick={() => cancelTask(task.id)}>
                     <X className="h-3.5 w-3.5" aria-hidden="true" /> Cancel
                   </EditableChildObjectActionButton>
                   {permissions.canEdit ? (
-                    <EditableChildObjectActionButton onClick={() => openAdvancedEdit(task)}>
+                    <EditableChildObjectActionButton onClick={() => requestAdvancedEdit(task)}>
                       <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" /> Advanced Edit
                     </EditableChildObjectActionButton>
                   ) : null}
@@ -381,12 +457,12 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
               ) : (
                 <>
                   {permissions.canEdit ? (
-                    <EditableChildObjectActionButton onClick={() => editor.beginEdit(task)}>
+                    <EditableChildObjectActionButton onClick={() => beginInlineEdit(task)}>
                       <Edit2 className="h-3.5 w-3.5" aria-hidden="true" /> Inline Edit
                     </EditableChildObjectActionButton>
                   ) : null}
                   {permissions.canEdit ? (
-                    <EditableChildObjectActionButton onClick={() => openAdvancedEdit(task)}>
+                    <EditableChildObjectActionButton onClick={() => requestAdvancedEdit(task)}>
                       <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" /> Advanced Edit
                     </EditableChildObjectActionButton>
                   ) : null}
@@ -408,7 +484,12 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
       label: 'Task ID',
       render: (task) => {
         const row = editor.draftFor(task.id) ?? task
-        return <BusinessIdLink objectType="INFRASTRUCTURE_MAINTENANCE_TASK" businessId={row.taskId}>{row.taskId}</BusinessIdLink>
+        return (
+          <span className="inline-flex items-center gap-2">
+            <BusinessIdLink objectType="INFRASTRUCTURE_MAINTENANCE_TASK" businessId={row.taskId}>{row.taskId}</BusinessIdLink>
+            <RecurrenceIndicator recurring={infrastructureMaintenanceTaskBelongsToSeries(row)} done={row.taskStatus === 'Done'} />
+          </span>
+        )
       },
       sortValue: (task) => task.taskId,
     },
@@ -516,6 +597,28 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
 
   return (
     <TableSection title="Maintenance">
+      {scopePromptTaskId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-md rounded border border-sf-border bg-white p-4 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="maintenance-edit-scope-title">
+            <h3 id="maintenance-edit-scope-title" className="text-lg font-semibold text-sf-text">Edit recurring task</h3>
+            <p className="mt-1 text-sm text-sf-text-muted">Choose whether this change applies to one occurrence or the complete recurrence series.</p>
+            <div className="mt-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm text-sf-text">
+                <input type="radio" name="maintenance-edit-scope" className="h-4 w-4 border-sf-border text-sf-brand" checked={scopePromptChoice === 'occurrence'} onChange={() => setScopePromptChoice('occurrence')} />
+                <span>Edit this task</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-sf-text">
+                <input type="radio" name="maintenance-edit-scope" className="h-4 w-4 border-sf-border text-sf-brand" checked={scopePromptChoice === 'series'} onChange={() => setScopePromptChoice('series')} />
+                <span>Edit entire series</span>
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <EditableChildObjectActionButton onClick={() => { setScopePromptTaskId(null); setScopePromptChoice(null) }}>Cancel</EditableChildObjectActionButton>
+              <EditableChildObjectActionButton variant="primary" disabled={!scopePromptChoice} onClick={confirmScopePrompt}>Continue</EditableChildObjectActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {advancedDraft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded border border-sf-border bg-white p-4 shadow-xl">
@@ -588,6 +691,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                 </div>
               </section>
 
+              <fieldset disabled={advancedEditScope === 'occurrence' && infrastructureMaintenanceTaskBelongsToSeries(advancedDraft)} className={advancedEditScope === 'occurrence' && infrastructureMaintenanceTaskBelongsToSeries(advancedDraft) ? 'space-y-5 opacity-60' : 'space-y-5'} aria-label={advancedEditScope === 'occurrence' ? 'Recurrence settings (read only)' : 'Recurrence settings'}>
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Recurrence pattern</h4>
                 <div className="space-y-4">
@@ -869,13 +973,12 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
               {advancedDraft.recurrence.frequency !== 'none' ? (
                 <section className="space-y-3">
                   <h4 className="text-sm font-semibold uppercase text-sf-text-muted">Range of recurrence</h4>
-                  <div className="grid grid-cols-1 gap-3 text-sm text-sf-text md:grid-cols-[5rem_7.5rem_1fr]">
-                    <label className="contents">
+                  <div className="grid grid-cols-[auto_auto] items-start justify-start gap-x-10 text-sm text-sf-text">
+                    <label className="grid grid-cols-[auto_10rem] items-center gap-2">
                       <span className="font-medium">Start:<RequiredFieldMarker /></span>
-                      <input type="date" className="h-9 rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.startDate ?? advancedDraft.startDate ?? ''} onChange={(event) => updateAdvancedRecurrence({ startDate: event.target.value || null })} />
+                      <input type="date" className="h-9 w-40 rounded border border-sf-border px-2 py-1" value={advancedDraft.recurrence.startDate ?? advancedDraft.startDate ?? ''} onChange={(event) => updateAdvancedRecurrence({ startDate: event.target.value || null })} />
                     </label>
-                    <span aria-hidden="true" />
-                    <div className="contents">
+                    <div className="grid grid-cols-[1rem_auto_10rem] items-center gap-x-2 gap-y-3">
                       <label className="contents">
                         <input
                           type="radio"
@@ -887,7 +990,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                         <span>End by:</span>
                         <input
                           type="date"
-                          className="h-9 rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+                          className="h-9 w-40 rounded border border-sf-border px-2 py-1 disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
                           value={advancedDraft.recurrence.endByDate ?? ''}
                           disabled={advancedDraft.recurrence.endType !== 'by'}
                           onChange={(event) => updateAdvancedRecurrence({ endByDate: event.target.value || null })}
@@ -930,6 +1033,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
                   </div>
                 </section>
               ) : null}
+              </fieldset>
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
@@ -968,6 +1072,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
         searchLabel="Search / Filter"
         searchPlaceholder="Search Maintenance"
         recordsPerPageLabel="Records per page"
+        initialSort={{ key: 'startDate', direction: 'desc' }}
         logicalTableType="infrastructure-maintenance"
         logicalTableLabel="Maintenance Tasks"
         actions={actions}

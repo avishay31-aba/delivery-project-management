@@ -50,16 +50,16 @@ export const consoleNavigation: NavConsoleGroup[] = [
         description: 'System operations and inventory',
       },
       {
-        label: 'Infrastructure',
-        path: '/infrastructure',
-        icon: HardDrive,
-        description: 'Global infrastructure item inventory',
-      },
-      {
         label: 'Tenants',
         path: '/tenants',
         icon: Users,
         description: 'Tenant list',
+      },
+      {
+        label: 'Infrastructure',
+        path: '/infrastructure',
+        icon: HardDrive,
+        description: 'Global infrastructure item inventory',
       },
     ],
   },

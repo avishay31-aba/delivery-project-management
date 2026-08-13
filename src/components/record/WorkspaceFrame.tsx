@@ -86,7 +86,7 @@ export function WorkspaceScrollContent({ children, className = '', viewMode = fa
       ].filter(Boolean).join(' ')}
       tabIndex={0}
     >
-      {children}
+      <div className="min-w-[64rem]">{children}</div>
     </div>
   )
 }

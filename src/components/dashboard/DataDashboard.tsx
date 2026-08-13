@@ -64,6 +64,7 @@ import {
   type RecordsPerPageValue,
 } from '@/domain/user-preferences'
 import { useAppStore } from '@/store/useAppStore'
+import { downloadCsv } from '@/utils/csv-export'
 
 export interface DashboardColumn<T> {
   id: string
@@ -170,7 +171,6 @@ const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardView
   warranties: ['warrantyId', 'tid'],
   activityLog: ['activityId', 'eventId'],
   infrastructure: ['infrastructureId', 'identifier'],
-  deletedInfrastructure: ['deletedBy', 'deletionReason', 'infrastructureId', 'identifier'],
   infrastructurePlannedMaintenance: ['taskId', 'infrastructureItemId'],
   infrastructureCurrentMaintenance: ['taskId', 'infrastructureItemId'],
 }
@@ -1911,28 +1911,21 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
 
   function exportCsv() {
     const visibleColumns = table.getVisibleLeafColumns().filter((column) => column.id !== ACTION_COLUMN_ID)
-    const header = visibleColumns.map((column) => column.columnDef.header as string).join(',')
-    const lines = table.getFilteredRowModel().rows.map((row) =>
-      visibleColumns
-        .map((column) => {
+    const effectiveRows = table.getSortedRowModel().flatRows.filter((row) => row.subRows.length === 0)
+    downloadCsv(
+      `${title.toLowerCase().replaceAll(' ', '-')}.csv`,
+      visibleColumns.map((column) => column.id === ROW_INDICATOR_COLUMN_ID ? 'New/Updated' : String(column.columnDef.header ?? column.id)),
+      effectiveRows.map((row) => visibleColumns.map((column) => {
           const sourceColumn = dashboardColumnById.get(column.id)
-          const value =
+          return (
             column.id === CREATION_DATE_COLUMN_ID
               ? creationDateValue(row.original)
               : sourceColumn
                 ? formattedDashboardCellValue(sourceColumn, String(row.getValue(column.id) ?? ''))
                 : String(row.getValue(column.id) ?? '')
-          return `"${value.replaceAll('"', '""')}"`
-        })
-        .join(','),
+          )
+        })),
     )
-    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${title.toLowerCase().replaceAll(' ', '-')}.csv`
-    anchor.click()
-    URL.revokeObjectURL(url)
   }
 
   function applyReplaceAll() {
@@ -1951,7 +1944,8 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col space-y-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col space-y-4 overflow-x-auto">
+      <div className="flex h-full min-w-[64rem] flex-col space-y-4">
       {pendingViewId ? (
         <UnsavedChangesDialog
           onSave={saveChangesAndApplyPendingView}
@@ -2374,7 +2368,7 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
           </div>
         </div>
       </div>
+      </div>
     </div>
   )
 }
-

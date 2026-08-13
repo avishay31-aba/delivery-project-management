@@ -1,10 +1,8 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { DeletionReasonCell } from '@/components/lifecycle'
-import { BusinessIdLink, MaintenanceStatusPresentation, OperationalStatusIcon, TaskStatusPresentation, WarrantyStatusPresentation } from '@/components/ui'
+import { BusinessIdLink, MaintenanceStatusPresentation, OperationalStatusIcon, RecurrenceIndicator, TaskStatusPresentation, WarrantyStatusPresentation } from '@/components/ui'
 import { displayWarrantyStatus } from '@/domain/warranty-collection'
-import { latestInfrastructureDeletionEntry, type InfrastructureDashboardRow, type InfrastructureMaintenanceDashboardRow } from '@/domain/infrastructure-item'
-import { richTextPlainText } from '@/domain/rich-text'
+import { type InfrastructureDashboardRow, type InfrastructureMaintenanceDashboardRow } from '@/domain/infrastructure-item'
 
 function renderLinkedSidTid(value: string) {
   if (!value || value === '-') return '-'
@@ -39,18 +37,8 @@ function renderLinkedSidTid(value: string) {
   )
 }
 
-export function createInfrastructureColumns(options: { includeActions?: boolean; includeDeletionReason?: boolean } = {}): DashboardColumn<InfrastructureDashboardRow>[] {
+export function createInfrastructureColumns(options: { includeActions?: boolean } = {}): DashboardColumn<InfrastructureDashboardRow>[] {
   const columns: DashboardColumn<InfrastructureDashboardRow>[] = [
-    ...(options.includeDeletionReason ? [{
-      id: 'deletedBy',
-      label: 'Deleted By',
-      getValue: (row) => latestInfrastructureDeletionEntry(row)?.deletedBy ?? '',
-    } satisfies DashboardColumn<InfrastructureDashboardRow>, {
-      id: 'deletionReason',
-      label: 'Deletion Reason',
-      getValue: (row) => richTextPlainText(latestInfrastructureDeletionEntry(row)?.reason ?? row.deletionReason ?? ''),
-      render: (row) => createElement(DeletionReasonCell, { value: latestInfrastructureDeletionEntry(row)?.reason ?? row.deletionReason ?? '' }),
-    } satisfies DashboardColumn<InfrastructureDashboardRow>] : []),
     {
       id: 'infrastructureId',
       label: 'Item ID',
@@ -98,7 +86,10 @@ export function createInfrastructureMaintenanceTaskColumns(options: { includeDay
       id: 'taskId',
       label: 'Task ID',
       getValue: (row) => row.taskId,
-      render: (row) => createElement(BusinessIdLink, { objectType: 'INFRASTRUCTURE_ITEM', businessId: row.infrastructureItemId }, row.taskId),
+      render: (row) => createElement('span', { className: 'inline-flex items-center gap-2' },
+        createElement(BusinessIdLink, { objectType: 'INFRASTRUCTURE_ITEM', businessId: row.infrastructureItemId }, row.taskId),
+        createElement(RecurrenceIndicator, { recurring: Boolean(row.recurrenceSeriesId), done: row.taskStatus === 'Done' }),
+      ),
     },
     { id: 'taskType', label: 'Task Type', getValue: (row) => row.taskType },
     { id: 'description', label: 'Description', getValue: (row) => row.description },

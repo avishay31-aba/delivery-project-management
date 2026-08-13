@@ -23,11 +23,10 @@ function optionsForRecord(
 ): CheckboxMultiSelectOption[] {
   const selected = new Set(record[key])
   return distinctValues(rows, key)
-    .filter((value) => {
-      if (selected.has(value)) return true
-      return !rows.some((row) => row.active && row.id !== record.id && row[key].includes(value))
-    })
-    .map((value) => ({ value }))
+    .map((value) => ({
+      value,
+      disabled: !selected.has(value) && rows.some((row) => row.active && row.id !== record.id && row[key].includes(value)),
+    }))
 }
 
 export function TimeGroupSettingsPage() {
@@ -176,7 +175,7 @@ export function TimeGroupSettingsPage() {
       render: (row) => <BusinessIdListLinks objectType="TENANT" businessIds={row.linkedTids} />,
       sortValue: (row) => row.linkedTids.join('; '),
     },
-  ], [draft, editingId])
+  ], [draft, editingId, lookups])
 
   return (
     <WorkspaceFrame>

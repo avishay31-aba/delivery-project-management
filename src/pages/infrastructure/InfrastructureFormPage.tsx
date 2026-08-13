@@ -492,12 +492,6 @@ export function InfrastructureFormPage() {
               />
             )}
           </FormField>
-          <DeletionHistoryField
-            entries={deletionHistory}
-            currentReason={draft.deletionReason ?? ''}
-            canEditLatestReason={!isViewMode && isDeletedLifecycleState}
-            onCurrentReasonChange={(value) => updateDraft({ deletionReason: value })}
-          />
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {renderSelect('Item Owner', draft.ownerRefId ?? '', ownerPicklistOptions, (value) => {
@@ -513,6 +507,14 @@ export function InfrastructureFormPage() {
               <MaintenanceStatusPresentation status={infrastructureMaintenanceStatusesFromTasks(draft)} />
             </div>
           </FormField>
+        </div>
+        <div className="flex flex-nowrap items-start gap-3">
+          <DeletionHistoryField
+            entries={deletionHistory}
+            currentReason={draft.deletionReason ?? ''}
+            canEditLatestReason={!isViewMode && isDeletedLifecycleState}
+            onCurrentReasonChange={(value) => updateDraft({ deletionReason: value })}
+          />
         </div>
       </section>
     )

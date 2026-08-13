@@ -12,10 +12,6 @@ import { RecordHistorySection, type RecordHistoryColumn } from '@/components/ui'
 
 const ACTIVITY_COLUMNS = createActivityLogColumns()
 
-function csvValue(value: string): string {
-  return `"${value.replaceAll('"', '""')}"`
-}
-
 function activityTimestampPresentation(value: string): string {
   return formatSemanticDateTimeValue(value, 'datetime', { fallback: '' })
 }
@@ -63,6 +59,7 @@ const ACTIVITY_HISTORY_COLUMNS: Array<RecordHistoryColumn<ActivityEvent>> = ACTI
       label: column.label,
       render: (event) => <DateTimeValue value={event.occurredAt} semanticType="datetime" />,
       sortValue: (event) => event.occurredAt,
+      exportValue: (event) => activityTimestampPresentation(event.occurredAt),
     }
   }
   if (column.id === 'user') {
@@ -157,39 +154,6 @@ export function ActivityTimeline({
     resetToFirstPage()
   }
 
-  function clearDateFilter() {
-    setDateError('')
-    setFromDateDraft('')
-    setToDateDraft('')
-    setFromDate('')
-    setToDate('')
-    resetToFirstPage()
-  }
-
-  function exportCsv() {
-    const header = ACTIVITY_COLUMNS.map((column) => column.label).join(',')
-    const lines = dateFilteredEvents.map((event) =>
-      [
-        event.id,
-        activityTimestampPresentation(event.occurredAt),
-        event.actorName,
-        activityEventCategoryLabel(event),
-        event.eventType,
-        activityBusinessObject(event),
-        activityBusinessObjectId(event),
-        event.summary,
-        event.source,
-      ].map(csvValue).join(','),
-    )
-    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'activity-log.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <section className="space-y-3">
       <RecordHistorySection
@@ -232,16 +196,9 @@ export function ActivityTimeline({
             <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={applyDateFilter}>
               Apply
             </button>
-            <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={clearDateFilter}>
-              Clear / All Dates
-            </button>
           </>
         )}
-        actions={(
-          <button type="button" className="h-8 rounded border border-sf-border px-3 text-sm hover:bg-sf-surface-alt" onClick={exportCsv}>
-            Export CSV
-          </button>
-        )}
+        exportFileName="activity-log.csv"
         message={dateError ? (
           <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
             {dateError}
