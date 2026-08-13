@@ -117,15 +117,21 @@ export function useFloatingOverlay<TTrigger extends HTMLElement, TOverlay extend
   useLayoutEffect(() => {
     if (!open) return
 
-    function handleViewportChange() {
+    function handleResize() {
       updatePosition()
     }
 
-    window.addEventListener('resize', handleViewportChange)
-    window.addEventListener('scroll', handleViewportChange, true)
+    function handleScroll(event: Event) {
+      const target = event.target
+      if (target instanceof Node && overlayRef.current?.contains(target)) return
+      updatePosition()
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('scroll', handleScroll, true)
     return () => {
-      window.removeEventListener('resize', handleViewportChange)
-      window.removeEventListener('scroll', handleViewportChange, true)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('scroll', handleScroll, true)
     }
   }, [open, updatePosition])
 
