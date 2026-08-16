@@ -342,9 +342,9 @@ export function createSystemConfigurationHistoryRecord(
 
 export function tenantCountForSystem(record: SystemInventoryRecord, tenants: Tenant[]): number {
   if ('sid' in record) {
-    const hostedTenantCount = hostedTenantsForSystem(record.id, tenants).length
-    const storedTenantCount = 'tenantCount' in record ? record.tenantCount : 0
-    return hostedTenantCount || storedTenantCount || 0
+    // Hosting lifecycle is the authoritative System↔Tenant relationship. Use
+    // the complete collection so table filtering and pagination cannot alter it.
+    return hostedTenantsForSystem(record.id, tenants).length
   }
   return record.tenantCount || 0
 }

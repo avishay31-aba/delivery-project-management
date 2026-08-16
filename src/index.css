@@ -201,6 +201,19 @@
     background-color: transparent;
   }
 
+  /* Approved Business Object header rows retain their logical canvas at narrow
+     effective widths. The card owns horizontal scrolling rather than allowing
+     browser zoom to move fields to another row. */
+  .sf-card:has(> .flex.flex-wrap.items-start.gap-3) {
+    overflow-x: auto;
+  }
+
+  .sf-card > .flex.flex-wrap.items-start.gap-3 {
+    width: max-content;
+    min-width: 100%;
+    flex-wrap: nowrap;
+  }
+
   .fixed.inset-0:has([role='dialog']) {
     pointer-events: none;
     background: transparent !important;
