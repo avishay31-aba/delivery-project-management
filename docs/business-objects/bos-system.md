@@ -285,8 +285,6 @@ No new lifecycle states are introduced by this BOS.
 
 ## 13. Validation Rules
 
-Number of Tenants is an authoritative derived System value: the distinct complete set of Tenant records actively associated with the System across the Not Set Yet, Under Contract, and Out of Contract views. Pagination, search, filters, and movement between those views do not affect the total. All System, Tenant Hosting, Project Systems, dashboard, and read-model presentations consume this same derivation.
-
 SystemInventory-owned validations may include:
 
 - System identity is required.

@@ -51,15 +51,6 @@ export function validateOpportunityHeader(opportunity: Opportunity, context: Opp
 
   if (
     opportunity.stage === 'POC' &&
-    opportunity.deliveryDate &&
-    opportunity.pocStartDate &&
-    opportunity.deliveryDate > opportunity.pocStartDate
-  ) {
-    messages.push({ level: 'error', message: 'Delivery Date must be on or before Start Date.' })
-  }
-
-  if (
-    opportunity.stage === 'POC' &&
     opportunity.pocStartDate &&
     opportunity.pocEndDate &&
     opportunity.pocEndDate < opportunity.pocStartDate

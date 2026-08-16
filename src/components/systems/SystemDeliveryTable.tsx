@@ -6,7 +6,7 @@ import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/component
 import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
 import { projectReference, systemBusinessId, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
-import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary, tenantCountForSystem } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 
 type SystemDeliveryTableRecord = System | ProductionSystemInventoryItem | ReusedInternalSystem
 
@@ -133,7 +133,6 @@ export function SystemDeliveryTable({
               'SID',
               'MID',
               'PIDs',
-              'Number of Tenants',
               'Time Group',
               'Used In Region',
               'Operational Status',
@@ -197,7 +196,6 @@ export function SystemDeliveryTable({
                     })}
                   </span>
                 </td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantCountForSystem(system, tenants)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{system.timeGroup}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{systemRecordRegion(system)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{renderOperationalStatus(systemRecordOperationalStatus(system))}</td>
@@ -216,7 +214,7 @@ export function SystemDeliveryTable({
               </tr>,
               isExpanded ? (
                 <tr key={`${system.id}-details`}>
-                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={11 + APPLICATION_CONFIGURATION_SUMMARY_FIELDS.length}>
+                  <td className="border border-sf-border bg-sf-surface-alt p-0" colSpan={10 + APPLICATION_CONFIGURATION_SUMMARY_FIELDS.length}>
                     {renderSystemDetails(system)}
                   </td>
                 </tr>

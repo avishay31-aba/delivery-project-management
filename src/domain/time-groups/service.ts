@@ -187,7 +187,7 @@ export function normalizeTenantTimeGroup(tenant: Tenant, records: TimeGroupLooku
   const result = tenantTimeGroupFromLocation(tenant, records)
   return {
     ...tenant,
-    timeGroup: result.timeGroup,
+    timeGroup: result.timeGroup || tenant.timeGroup || '',
   }
 }
 

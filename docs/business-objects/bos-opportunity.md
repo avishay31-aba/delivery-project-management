@@ -115,7 +115,6 @@ OpportunityLifecycle-owned validations may include:
 - Subtype valid for type.
 - Financial profile required/defaulted when Stage = POC.
 - POC start/end dates valid when Stage = POC.
-- When Stage = POC, Delivery Date must be on or before Start Date (`Delivery Date <= Start Date`); OpportunityLifecycle rejects an invalid save.
 - Delivery date valid when required by stage/type.
 - Requirement rows valid according to TenantRequirement metadata.
 - Project creation blocked or warned when required fields are missing.
