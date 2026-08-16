@@ -24,7 +24,6 @@ import {
   OperationalStatusIcon,
   OperationalStatusSelect,
   PlaceholderCard,
-  ProductSubTabs,
   RequiredFieldMarker,
   RichTextContent,
   RichTextEditor,
@@ -58,7 +57,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary, tenantCountForSystem } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -112,22 +111,17 @@ import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentati
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
 
-type TenantTab = 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
-type TenantHostingTab = 'environment' | 'applicationConfiguration'
+type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
+  { id: 'configuration', label: 'Tenant Configuration' },
   { id: 'hosting', label: 'Hosting' },
   { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
   { id: 'activity', label: 'Activity Log' },
-]
-
-const TENANT_HOSTING_TABS: Array<{ id: TenantHostingTab; label: string }> = [
-  { id: 'environment', label: 'Environment' },
-  { id: 'applicationConfiguration', label: 'Application Configuration' },
 ]
 
 const TENANT_WARRANTY_SCHEMA = WARRANTY_OBJECT_CONTEXT_SCHEMAS.tenant
@@ -306,8 +300,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
-  const [activeTab, setActiveTab] = useState<TenantTab>('hosting')
-  const [activeHostingTab, setActiveHostingTab] = useState<TenantHostingTab>('environment')
+  const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [messages, setMessages] = useState<string[]>([])
@@ -936,29 +929,22 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderHostingTab() {
     const hostingRows = activeSystem
-      ? [TENANT_HOSTING_FIELDS.map((field) => {
+      ? [[...TENANT_HOSTING_FIELDS.flatMap((field) => {
           if (field.key === 'sid') {
             const sid = hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)
-            return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
+            return [sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-', tenantCountForSystem(activeSystem, tenants)]
           }
-          return textValue(hosting[field.key])
-        })]
+          return [textValue(hosting[field.key])]
+        })]]
       : []
 
     return (
       <div className="space-y-3">
-        <ProductSubTabs tabs={TENANT_HOSTING_TABS} activeTab={activeHostingTab} onTabChange={setActiveHostingTab} />
-        <div role="tabpanel" aria-label={TENANT_HOSTING_TABS.find((tab) => tab.id === activeHostingTab)?.label}>
-          {activeHostingTab === 'environment'
-            ? (
-              <ReadonlyTable
-                headers={TENANT_HOSTING_FIELDS.map((field) => field.label)}
-                rows={hostingRows}
-                emptyText="No hosting system is linked to this tenant."
-              />
-            )
-            : renderApplicationConfigurationTab()}
-        </div>
+        <ReadonlyTable
+          headers={TENANT_HOSTING_FIELDS.flatMap((field) => field.key === 'sid' ? [field.label, 'Number of Tenants'] : [field.label])}
+          rows={hostingRows}
+          emptyText="No hosting system is linked to this tenant."
+        />
       </div>
     )
   }
@@ -1029,6 +1015,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderActiveTab() {
+    if (activeTab === 'configuration') return renderApplicationConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()
