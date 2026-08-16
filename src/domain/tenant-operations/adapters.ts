@@ -82,8 +82,9 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
     sourceRequirementId: source.requirement.requirementId,
     configuration,
     accountName: source.project.accountName || (source.account?.accountName ?? ''),
-    country: source.opportunity.country ?? source.account?.country ?? source.system.country ?? '',
-    timeGroup: source.opportunity.timeGroup ?? source.account?.timeGroup ?? source.system.timeGroup,
+    country: source.opportunity.country || source.account?.country || source.project.country || '',
+    // Normalized by the authoritative Country -> Time Zone -> Time Group service.
+    timeGroup: '',
     operationalStatus: 'Active',
     lastManualOperationalStatus: 'Active',
     contractStatus: 'UNDER_CONTRACT',

@@ -241,10 +241,14 @@ export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: st
 
 export function systemsWithDerivedTimeGroups<T extends System>(systems: T[], tenants: Tenant[], records: TimeGroupLookupRecord[]): T[] {
   return systems.map((system) => {
-    const derived = systemTimeGroupFromVeteranTenant(system.id, tenants, records)
-    return derived.timeGroup === system.timeGroup
+    const configuredGovernor = system.timeGroupGovernanceTenantId
+      ? tenants.find((tenant) => tenant.id === system.timeGroupGovernanceTenantId && tenantIsActivelyHostedBySystem(tenant, system.id))
+      : undefined
+    const governor = configuredGovernor ?? mostVeteranActiveTenantForSystem(system.id, tenants)
+    const timeGroup = governor ? tenantTimeGroupFromLocation(governor, records).timeGroup : ''
+    return timeGroup === system.timeGroup && governor?.id === system.timeGroupGovernanceTenantId
       ? system
-      : { ...system, timeGroup: derived.timeGroup }
+      : { ...system, timeGroup, timeGroupGovernanceTenantId: governor?.id }
   })
 }
 
