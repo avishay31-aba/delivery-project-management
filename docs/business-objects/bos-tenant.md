@@ -504,3 +504,7 @@ Do not include in V1:
 - Tenant capacity forecasting.
 - Generic tenant object builder.
 - Configurable permission designer.
+
+## V1.2 Geography, Configuration, and Hosting
+
+Tenant geography follows its Project/Customer context. Country/State derives Time Zone and active Time Group Settings resolves Time Group; absent Time Zone produces no Time Group and Region is not a fallback. Tenant Configuration is Tenant-owned and editable through its existing save/history boundary. The hosted System Application Configuration Summary is a distinct read-only System-owned aggregation.

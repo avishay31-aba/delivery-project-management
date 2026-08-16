@@ -583,3 +583,7 @@ Do not include in V1:
 - Generic cross-object Remarks rollout beyond approved parent objects.
 - Generic cross-object Owner rollout beyond approved parent objects.
 - Generic Configuration History framework outside System.
+
+## V1.2 Time Group Hosting Governance
+
+System Time Group is governed by its active hosted Tenant population. The first active Tenant establishes governance. A mismatch on later creation/allocation pauses before mutation: Continue adds the Tenant and preserves System governance, Cancel performs no mutation, and Change atomically adds the Tenant and makes it the System Time Group governor. Removal follows the configured governor/most-veteran-active-Tenant lifecycle; no active Tenant leaves System Time Group empty. Number of Tenants derives from the complete active hosting relationship. The System Application Configuration Summary remains the shared read-only aggregation of active hosted Tenant configuration.

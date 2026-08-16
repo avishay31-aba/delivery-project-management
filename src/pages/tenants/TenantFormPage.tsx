@@ -8,6 +8,7 @@ import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { RemarksGrid } from '@/components/remarks'
 import { ActivityTimeline } from '@/components/activity'
 import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
+import { ApplicationConfigurationSummaryTable } from '@/components/application-configuration/ApplicationConfigurationSummaryTable'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { projectMainTypeLabel } from '@/domain/project-lifecycle'
@@ -61,7 +62,7 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, tenantCountForSystem } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -115,11 +116,12 @@ import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentati
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
 
-type TenantTab = 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
-type TenantHostingTab = 'environment' | 'applicationConfiguration'
+type TenantTab = 'tenantConfiguration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
+type TenantHostingTab = 'environment' | 'systemApplicationConfiguration'
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
+  { id: 'tenantConfiguration', label: 'Tenant Configuration' },
   { id: 'hosting', label: 'Hosting' },
   { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
@@ -130,7 +132,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
 
 const TENANT_HOSTING_TABS: Array<{ id: TenantHostingTab; label: string }> = [
   { id: 'environment', label: 'Environment' },
-  { id: 'applicationConfiguration', label: 'Application Configuration' },
+  { id: 'systemApplicationConfiguration', label: 'System Application Configuration' },
 ]
 
 const TENANT_WARRANTY_SCHEMA = WARRANTY_OBJECT_CONTEXT_SCHEMAS.tenant
@@ -309,7 +311,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
-  const [activeTab, setActiveTab] = useState<TenantTab>('hosting')
+  const [activeTab, setActiveTab] = useState<TenantTab>('tenantConfiguration')
   const [activeHostingTab, setActiveHostingTab] = useState<TenantHostingTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -952,6 +954,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             const sid = hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)
             return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
           }
+          if (field.key === 'tenantCount') return activeSystem ? String(tenantCountForSystem(activeSystem, tenants)) : '0'
           return textValue(hosting[field.key])
         })]
       : []
@@ -968,7 +971,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                 emptyText="No hosting system is linked to this tenant."
               />
             )
-            : renderApplicationConfigurationTab()}
+            : activeSystem
+              ? <ApplicationConfigurationSummaryTable system={activeSystem} tenants={tenants} />
+              : <div className="text-sm text-sf-text-muted">No hosting system is linked to this tenant.</div>}
         </div>
       </div>
     )
@@ -1058,6 +1063,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderActiveTab() {
+    if (activeTab === 'tenantConfiguration') return renderApplicationConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()

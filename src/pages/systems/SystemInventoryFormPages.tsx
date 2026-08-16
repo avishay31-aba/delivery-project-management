@@ -24,6 +24,7 @@ import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
 import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import { RemarksGrid } from '@/components/remarks'
 import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
+import { ApplicationConfigurationSummaryTable } from '@/components/application-configuration/ApplicationConfigurationSummaryTable'
 import {
   EMPTY_SYSTEM_CANDIDATE_FILTERS,
   SystemCandidateDialog,
@@ -32,6 +33,7 @@ import {
   type SystemCandidateSortKey,
 } from '@/components/systems'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
+import { TenantTimeGroupMismatchDialog, type TenantTimeGroupMismatchAction } from '@/components/tenants/TenantTimeGroupMismatchDialog'
 import { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, ProductSubTabs, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
@@ -99,7 +101,6 @@ import {
   shouldConfirmEarlyNonPocPurposeChange,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
-  systemApplicationConfigurationSummary,
   systemIdentity,
   systemTimeGroup,
   systemTimeGroupAlert,
@@ -385,6 +386,14 @@ export function InventoryForm<T extends InventoryRecord>({
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
+  const [timeGroupMismatch, setTimeGroupMismatch] = useState<null | {
+    kind: 'internal' | 'requirement'
+    projectId: string
+    systemId: string
+    requirementId?: string
+    currentTimeGroup: string
+    incomingTimeGroup: string
+  }>(null)
   const [moveTenantId, setMoveTenantId] = useState('')
   const [moveMode, setMoveMode] = useState<TenantMoveMode>('DELIVERED')
   const [selectedMoveDestinationIds, setSelectedMoveDestinationIds] = useState<string[]>([])
@@ -1006,14 +1015,6 @@ export function InventoryForm<T extends InventoryRecord>({
     return textValue(readRecordValue(activeDraft, 'productType')) || (hostedTenantsForDraft().find((tenant) => textValue(tenant.configuration?.product ?? tenant.productType))?.productType ?? '')
   }
 
-  function applicationConfigurationSummaryRecord(): Record<string, unknown> {
-    return systemApplicationConfigurationSummary((allocatedSystemForTenantCreation() ?? activeRecord) as System, tenants) as unknown as Record<string, unknown>
-  }
-
-  function tenantSummaryValue(field: TenantConfigurationFieldMetadata, summary: Record<string, unknown>): string {
-    return formatConfigurationCellValue(summary[field.configKey])
-  }
-
   function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {
     const moduleKeys: Array<keyof NewTenantRequirement> = ['tangles', 'tanglesGo', 'webloc', 'webeye', 'ingest', 'blockchain']
     const moduleCount = moduleKeys.reduce((count, key) => {
@@ -1090,18 +1091,7 @@ export function InventoryForm<T extends InventoryRecord>({
     if (selectedRequirementId === 'INTERNAL') {
       const result = createInternalTenantForSystem(selectedProjectId, systemForTenant.id)
       if (result.requiresTimeGroupOverride) {
-        if (!window.confirm(result.message)) {
-          setMessages(['Tenant was not added.'])
-          return
-        }
-        const confirmedResult = createInternalTenantForSystem(selectedProjectId, systemForTenant.id, { confirmedTimeGroupMismatch: true })
-        setMessages([confirmedResult.message])
-        if (confirmedResult.ok) {
-          if (confirmedResult.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, confirmedResult.tenantId as string])))
-          setAddTenantOpen(false)
-          setSelectedProjectId('')
-          setSelectedRequirementId('')
-        }
+        setTimeGroupMismatch({ kind: 'internal', projectId: selectedProjectId, systemId: systemForTenant.id, currentTimeGroup: result.currentSystemTimeGroup ?? '', incomingTimeGroup: result.incomingTenantTimeGroup ?? '' })
         return
       }
       setMessages([result.message])
@@ -1128,18 +1118,7 @@ export function InventoryForm<T extends InventoryRecord>({
     const systemId = systemForTenant.id
     const result = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId)
     if (result.requiresTimeGroupOverride) {
-      if (!window.confirm(result.message)) {
-        setMessages(['Tenant was not added.'])
-        return
-      }
-      const confirmedResult = createTenantFromSystemRequirement(selectedProjectId, systemId, selectedRequirementId, { confirmedTimeGroupMismatch: true })
-      setMessages([confirmedResult.message])
-      if (confirmedResult.ok) {
-        if (confirmedResult.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, confirmedResult.tenantId as string])))
-        setAddTenantOpen(false)
-        setSelectedProjectId('')
-        setSelectedRequirementId('')
-      }
+      setTimeGroupMismatch({ kind: 'requirement', projectId: selectedProjectId, systemId, requirementId: selectedRequirementId, currentTimeGroup: result.currentSystemTimeGroup ?? '', incomingTimeGroup: result.incomingTenantTimeGroup ?? '' })
       return
     }
     setMessages([result.message])
@@ -1149,6 +1128,25 @@ export function InventoryForm<T extends InventoryRecord>({
       setSelectedProjectId('')
       setSelectedRequirementId('')
     }
+  }
+
+  function resolveTimeGroupMismatch(action: TenantTimeGroupMismatchAction) {
+    const pending = timeGroupMismatch
+    setTimeGroupMismatch(null)
+    if (!pending || action === 'cancel') {
+      setMessages(['Tenant was not added.'])
+      return
+    }
+    const options = { timeGroupMismatchDecision: action } as const
+    const result = pending.kind === 'internal'
+      ? createInternalTenantForSystem(pending.projectId, pending.systemId, options)
+      : createTenantFromSystemRequirement(pending.projectId, pending.systemId, pending.requirementId ?? '', options)
+    setMessages([result.message])
+    if (!result.ok) return
+    if (result.tenantId) setPendingTenantCreationIds((current) => Array.from(new Set([...current, result.tenantId as string])))
+    setAddTenantOpen(false)
+    setSelectedProjectId('')
+    setSelectedRequirementId('')
   }
 
   function deleteHostedTenant(tenant: Tenant) {
@@ -1339,38 +1337,7 @@ export function InventoryForm<T extends InventoryRecord>({
   }
 
   function renderApplicationConfigurationSummarySection() {
-    const applicationSummary = applicationConfigurationSummaryRecord()
-
-    return (
-      <section className="sf-card" aria-labelledby="system-application-summary-section-title">
-        <div className="border-b border-sf-border bg-sf-surface-alt px-3 py-2">
-          <h3 id="system-application-summary-section-title" className="whitespace-nowrap text-lg font-semibold text-sf-text">Application Configuration Summary</h3>
-        </div>
-        <div className="sf-scroll-x bg-white">
-          <table className="w-max border-collapse text-sm leading-tight">
-            <thead className="bg-sf-surface-alt text-left">
-              <tr>
-                {APPLICATION_SUMMARY_FIELDS.map((column) => (
-                  <th key={column.key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-bottom text-sm font-semibold text-sf-text">
-                    <span>{column.label}</span>
-                    <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(column)}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {APPLICATION_SUMMARY_FIELDS.map((column) => (
-                  <td key={column.key} className="max-w-64 border border-sf-border px-1.5 py-1 text-sf-text">
-                    {tenantSummaryValue(column, applicationSummary)}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    )
+    return <ApplicationConfigurationSummaryTable system={(allocatedSystemForTenantCreation() ?? activeRecord) as System} tenants={tenants} />
   }
 
   function renderInfrastructureTab() {
@@ -2229,6 +2196,13 @@ export function InventoryForm<T extends InventoryRecord>({
       ) : null}
       {renderAddTenantDialog()}
       {renderMoveTenantDialog()}
+      {timeGroupMismatch ? (
+        <TenantTimeGroupMismatchDialog
+          currentTimeGroup={timeGroupMismatch.currentTimeGroup}
+          incomingTimeGroup={timeGroupMismatch.incomingTimeGroup}
+          onAction={resolveTimeGroupMismatch}
+        />
+      ) : null}
     </WorkspaceFrame>
   )
 }
