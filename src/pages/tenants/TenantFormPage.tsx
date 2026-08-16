@@ -18,6 +18,7 @@ import {
 import {
   AlertStatusIcon,
   BusinessObjectLink,
+  CheckboxMultiSelect,
   FormField,
   LinkedProjectsLinks,
   MetadataHeaderField,
@@ -32,13 +33,15 @@ import {
   WarrantyStatusPresentation,
   formMessageClassName,
 } from '@/components/ui'
-import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
+import { ConfigurationColumnHeaders } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { isRouteViewMode } from '@/utils/route-mode'
 import { YES_NO_OPTIONS } from '@/config/opportunity-metadata'
+import { PRODUCT_OPTIONS } from '@/config/cloud-platform-metadata'
+import { ADDITIONAL_FEATURE_OPTIONS, AI_OPTIONS, CROSS_SYSTEM_OPTIONS } from '@/config/picklist-options'
 import {
   TENANT_CONFIGURATION_FIELDS,
   type TenantConfigurationFieldMetadata,
@@ -58,7 +61,8 @@ import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/cust
 import {
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, tenantCountForSystem } from '@/domain/system-inventory'
+import { SystemApplicationConfigurationSummary } from '@/components/systems/SystemApplicationConfigurationSummary'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -112,11 +116,12 @@ import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentati
 import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
 
-type TenantTab = 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
+type TenantTab = 'configuration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
 type TenantHostingTab = 'environment' | 'applicationConfiguration'
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
+  { id: 'configuration', label: 'Tenant Configuration' },
   { id: 'hosting', label: 'Hosting' },
   { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
@@ -127,7 +132,7 @@ const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
 
 const TENANT_HOSTING_TABS: Array<{ id: TenantHostingTab; label: string }> = [
   { id: 'environment', label: 'Environment' },
-  { id: 'applicationConfiguration', label: 'Application Configuration' },
+  { id: 'applicationConfiguration', label: 'System Application Configuration' },
 ]
 
 const TENANT_WARRANTY_SCHEMA = WARRANTY_OBJECT_CONTEXT_SCHEMAS.tenant
@@ -306,7 +311,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
-  const [activeTab, setActiveTab] = useState<TenantTab>('hosting')
+  const [activeTab, setActiveTab] = useState<TenantTab>('configuration')
   const [activeHostingTab, setActiveHostingTab] = useState<TenantHostingTab>('environment')
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -356,11 +361,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const inheritedEngagementCircle = inheritedEngagementCircleForTenant(tenantDraft, opportunity)
   const formType = tenantFormType(tenantDraft)
   const tenantConfiguration = configurationFromTenant(tenantDraft, activeSystem)
-  const systemConfiguration = activeSystem ? systemApplicationConfigurationSummary(activeSystem, tenants) : null
-  const configuration = {
-    ...tenantConfiguration,
-    mapCenter: activeSystem ? systemConfiguration?.mapCenter ?? '' : tenantConfiguration.mapCenter,
-  }
+  const configuration = tenantConfiguration
   const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
   const linkedProjectRows = linkedProjectRowsForTenant(tenantDraft, { projects, projectSystems, projectTenants, opportunities, accounts, systems })
@@ -454,6 +455,18 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       validationOpportunity(),
       { accounts, systems, tenants, activeSystem },
     )
+  }
+
+  function updateConfiguration(field: TenantConfigurationFieldMetadata, value: string | string[] | number | null) {
+    if (isViewMode || !field.editable) return
+    setDraft((current) => current ? {
+      ...current,
+      configuration: {
+        ...configurationFromTenant(current, activeSystem),
+        [field.configKey]: value,
+      },
+    } : current)
+    setMessages([])
   }
 
   function updateTenantType(nextType: TenantFormType) {
@@ -936,12 +949,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderHostingTab() {
     const hostingRows = activeSystem
-      ? [TENANT_HOSTING_FIELDS.map((field) => {
+      ? [TENANT_HOSTING_FIELDS.flatMap((field) => {
           if (field.key === 'sid') {
             const sid = hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)
-            return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
+            return [
+              sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-',
+              tenantCountForSystem(activeSystem, tenants),
+            ]
           }
-          return textValue(hosting[field.key])
+          return [textValue(hosting[field.key])]
         })]
       : []
 
@@ -952,31 +968,49 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {activeHostingTab === 'environment'
             ? (
               <ReadonlyTable
-                headers={TENANT_HOSTING_FIELDS.map((field) => field.label)}
+                headers={TENANT_HOSTING_FIELDS.flatMap((field) => field.key === 'sid' ? [field.label, 'Number of Tenants'] : [field.label])}
                 rows={hostingRows}
                 emptyText="No hosting system is linked to this tenant."
               />
             )
-            : renderApplicationConfigurationTab()}
+            : renderSystemApplicationConfigurationTab()}
         </div>
       </div>
     )
   }
 
   function renderApplicationConfigurationTab() {
-    if (!activeSystem) {
-      return (
-        <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
-          No active hosted System is linked to this tenant.
-        </div>
-      )
+    function optionsFor(field: TenantConfigurationFieldMetadata): string[] {
+      if (field.configKey === 'product') return PRODUCT_OPTIONS
+      if (field.configKey === 'mapCenter') return Array.from(new Set(accounts.map((account) => account.country).filter(Boolean))).sort()
+      if (field.configKey === 'crossSystemFeatures') return CROSS_SYSTEM_OPTIONS
+      if (field.configKey === 'aiFeatures') return AI_OPTIONS
+      if (field.configKey === 'additionalFeatures') return ADDITIONAL_FEATURE_OPTIONS
+      return field.options ?? YES_NO_OPTIONS
     }
 
-    const applicationSummary = systemApplicationConfigurationSummary(activeSystem, tenants) as unknown as Record<string, unknown>
+    function editorFor(field: TenantConfigurationFieldMetadata) {
+      const value = configuration[field.configKey]
+      if (isViewMode || !field.editable) return textValue(value) || '-'
+      if (field.inputType === 'multiselect') {
+        return <CheckboxMultiSelect id={`tenant-configuration-${field.configKey}`} label={field.label} selected={Array.isArray(value) ? value.map(String) : []} options={optionsFor(field).filter(Boolean).map((option) => ({ value: option }))} onChange={(selected) => updateConfiguration(field, selected)} />
+      }
+      if (field.inputType === 'picklist') {
+        return (
+          <select className="h-8 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm" value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)}>
+            {optionsFor(field).map((option) => <option key={option} value={option}>{option || 'Not set'}</option>)}
+          </select>
+        )
+      }
+      if (field.inputType === 'integer') {
+        return <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" type="number" min="0" step="1" inputMode="numeric" value={value == null ? '' : String(value)} onChange={(event) => updateConfiguration(field, event.target.value === '' ? null : Math.max(0, Math.trunc(Number(event.target.value))))} />
+      }
+      return <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)} />
+    }
 
     return (
       <div className="overflow-x-auto rounded border border-sf-border bg-white">
-        <table className="w-max border-collapse text-sm leading-tight" aria-label="Application Configuration Summary">
+        <table className="w-max border-collapse text-sm leading-tight" aria-label="Tenant Application Configuration">
           <thead className="bg-sf-surface-alt text-left">
             <tr>
               <ConfigurationColumnHeaders fields={CONFIGURATION_FIELDS} />
@@ -984,12 +1018,19 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           </thead>
           <tbody>
             <tr>
-              <ConfigurationValueCells record={applicationSummary} fields={CONFIGURATION_FIELDS} />
+              {CONFIGURATION_FIELDS.map((field) => <td key={field.key} className="border border-sf-border px-1.5 py-1 align-top text-sf-text">{editorFor(field)}</td>)}
             </tr>
           </tbody>
         </table>
       </div>
     )
+  }
+
+  function renderSystemApplicationConfigurationTab() {
+    if (!activeSystem) {
+      return <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">No active hosted System is linked to this tenant.</div>
+    }
+    return <SystemApplicationConfigurationSummary system={activeSystem} tenants={tenants} />
   }
 
   function renderEngagementTab() {
@@ -1029,6 +1070,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderActiveTab() {
+    if (activeTab === 'configuration') return renderApplicationConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
     if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()

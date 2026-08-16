@@ -169,13 +169,22 @@ export function timeGroupForTimeZone(records: TimeGroupLookupRecord[], timeZone:
   return records.find((record) => record.active && record.timeZones.includes(normalizedZone))?.timeGroup ?? ''
 }
 
+export function timeGroupFromLocation(
+  records: TimeGroupLookupRecord[],
+  country: string | null | undefined,
+  state?: string | null,
+  referenceDate?: string | null,
+): { timeZone: string; timeGroup: string } {
+  const timeZone = geographicTimeZoneDisplayValue(country, state, referenceDate)
+  return { timeZone, timeGroup: timeGroupForTimeZone(records, timeZone) }
+}
+
 export function tenantTimeGroupFromLocation(
   tenant: Pick<Tenant, 'country'> & { state?: string; timeGroup?: string },
   records: TimeGroupLookupRecord[],
   referenceDate?: string | null,
 ): { timeZone: string; timeGroup: string; alert: string } {
-  const timeZone = geographicTimeZoneDisplayValue(tenant.country, tenant.state, referenceDate)
-  const timeGroup = timeGroupForTimeZone(records, timeZone)
+  const { timeZone, timeGroup } = timeGroupFromLocation(records, tenant.country, tenant.state, referenceDate)
   return {
     timeZone,
     timeGroup,
@@ -187,7 +196,7 @@ export function normalizeTenantTimeGroup(tenant: Tenant, records: TimeGroupLooku
   const result = tenantTimeGroupFromLocation(tenant, records)
   return {
     ...tenant,
-    timeGroup: result.timeGroup || tenant.timeGroup || '',
+    timeGroup: result.timeGroup,
   }
 }
 
@@ -213,8 +222,12 @@ export function systemTimeGroupFromVeteranTenant(
   systemId: string,
   tenants: Tenant[],
   records: TimeGroupLookupRecord[],
+  preferredTenantId?: string | null,
 ): { timeGroup: string; tenant?: Tenant; timeZone: string } {
-  const tenant = mostVeteranActiveTenantForSystem(systemId, tenants)
+  const preferredTenant = preferredTenantId
+    ? tenants.find((tenant) => tenant.id === preferredTenantId && tenantIsActivelyHostedBySystem(tenant, systemId))
+    : undefined
+  const tenant = preferredTenant ?? mostVeteranActiveTenantForSystem(systemId, tenants)
   if (!tenant) return { timeGroup: '', tenant: undefined, timeZone: '' }
   const derived = tenantTimeGroupFromLocation(tenant, records)
   return { timeGroup: derived.timeGroup, tenant, timeZone: derived.timeZone }
@@ -232,10 +245,11 @@ export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: st
 
 export function systemsWithDerivedTimeGroups<T extends System>(systems: T[], tenants: Tenant[], records: TimeGroupLookupRecord[]): T[] {
   return systems.map((system) => {
-    const derived = systemTimeGroupFromVeteranTenant(system.id, tenants, records)
+    const overrideIsActive = Boolean(system.timeGroupOverrideTenantId && tenants.some((tenant) => tenant.id === system.timeGroupOverrideTenantId && tenantIsActivelyHostedBySystem(tenant, system.id)))
+    const derived = systemTimeGroupFromVeteranTenant(system.id, tenants, records, overrideIsActive ? system.timeGroupOverrideTenantId : null)
     return derived.timeGroup === system.timeGroup
-      ? system
-      : { ...system, timeGroup: derived.timeGroup }
+      ? overrideIsActive === Boolean(system.timeGroupOverrideTenantId) ? system : { ...system, timeGroupOverrideTenantId: null }
+      : { ...system, timeGroup: derived.timeGroup, timeGroupOverrideTenantId: overrideIsActive ? system.timeGroupOverrideTenantId : null }
   })
 }
 

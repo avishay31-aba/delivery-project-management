@@ -13,24 +13,53 @@ import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } fro
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemsWithDerivedTimeGroups } from '@/domain/time-groups'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemsWithDerivedTimeGroups, timeGroupForTimeZone, timeGroupFromLocation } from '@/domain/time-groups'
+import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { normalizeUserPresentationPreferences } from '@/domain/user-preferences'
 
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
-  const projects = Array.isArray(state.projects) ? state.projects.map(normalizeProjectLifecycleProject) : seedState.projects.map(normalizeProjectLifecycleProject)
+  const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [])
+  const baseProjects = (Array.isArray(state.projects) ? state.projects : seedState.projects).map((source) => {
+    const project = normalizeProjectLifecycleProject(source)
+    const timeZone = geographicTimeZoneDisplayValue(project.country, project.state, project.deliveryDate)
+    return { ...project, timeZone, timeGroup: timeGroupForTimeZone(timeGroupLookups, timeZone) }
+  })
   const sourceOpportunities = Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities
   const usedOpportunityIds = sourceOpportunities.map((opportunity) => opportunity.opportunityId)
   const opportunities = sourceOpportunities.map((opportunity) => {
-    const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, projects, usedOpportunityIds)
+    const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, baseProjects, usedOpportunityIds)
     usedOpportunityIds.push(normalized.opportunityId)
-    return normalized
+    const location = timeGroupFromLocation(timeGroupLookups, normalized.country, normalized.state, normalized.deliveryDate ?? normalized.pocStartDate)
+    return { ...normalized, timeZone: location.timeZone, timeGroup: location.timeGroup }
+  })
+  const projects = baseProjects.map((project) => {
+    const opportunity = opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId)
+    const country = opportunity?.country ?? project.country ?? ''
+    const state = opportunity?.state ?? project.state ?? ''
+    const location = timeGroupFromLocation(timeGroupLookups, country, state, project.deliveryDate)
+    return { ...project, country, state, timeZone: location.timeZone, timeGroup: location.timeGroup }
   })
   const projectSystems = Array.isArray(state.projectSystems)
     ? state.projectSystems.map(normalizeProjectSystemLink)
     : seedState.projectSystems.map(normalizeProjectSystemLink)
   const referenceData = ensureInfrastructureReferenceData(Array.isArray(state.referenceData) ? state.referenceData : [])
-  const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [])
+  const projectTenants = Array.isArray(state.projectTenants)
+    ? state.projectTenants.map(normalizeProjectTenantLink)
+    : seedState.projectTenants.map(normalizeProjectTenantLink)
+  const sourceTenants = Array.isArray(state.tenants) ? state.tenants : seedState.tenants
+  const tenantSystems = Array.isArray(state.systems) ? state.systems : seedState.systems
+  const tenants = sourceTenants.map((sourceTenant) => {
+    const tenant = normalizeTenantOperationRecord(sourceTenant, tenantSystems)
+    const projectLink = projectTenants.find((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
+    const project = projects.find((candidate) => candidate.id === projectLink?.projectId || candidate.pid === tenant.deliveryPid)
+    return normalizeTenantTimeGroup({
+      ...tenant,
+      country: project?.country ?? tenant.country,
+      state: project?.state ?? tenant.state ?? '',
+      timeZone: project?.timeZone ?? tenant.timeZone ?? '',
+    }, timeGroupLookups)
+  })
   const normalizedState = {
     ...state,
     salesManagers: (Array.isArray(state.salesManagers) ? state.salesManagers : seedState.salesManagers).map((manager) => ({
@@ -39,10 +68,12 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     })),
     accounts: (Array.isArray(state.accounts) ? state.accounts : seedState.accounts).map((account) => {
       const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+      const location = timeGroupFromLocation(timeGroupLookups, account.country, account.state)
       return {
         ...account,
         region,
-        timeGroup: account.timeGroup || '',
+        timeZone: location.timeZone,
+        timeGroup: location.timeGroup,
       }
     }),
     opportunities,
@@ -56,9 +87,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     systems: Array.isArray(state.systems)
       ? state.systems.map(normalizeSystemInventoryRecord)
       : seedState.systems.map(normalizeSystemInventoryRecord),
-    tenants: Array.isArray(state.tenants)
-      ? state.tenants.map((tenant) => normalizeTenantTimeGroup(normalizeTenantOperationRecord(tenant, Array.isArray(state.systems) ? state.systems : seedState.systems), timeGroupLookups))
-      : seedState.tenants.map((tenant) => normalizeTenantTimeGroup(normalizeTenantOperationRecord(tenant, seedState.systems), timeGroupLookups)),
+    tenants,
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     referenceData,
     timeGroupLookups,
@@ -67,9 +96,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     infrastructureItems: normalizeInfrastructureItemsForReferenceData(Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : [], referenceData),
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
     projectSystems,
-    projectTenants: Array.isArray(state.projectTenants)
-      ? state.projectTenants.map(normalizeProjectTenantLink)
-      : seedState.projectTenants.map(normalizeProjectTenantLink),
+    projectTenants,
   }
 
   const activeSystemLinks = activeProjectSystemLinks(normalizedState.projectSystems)

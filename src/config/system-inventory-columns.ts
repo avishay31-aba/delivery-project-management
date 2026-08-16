@@ -69,11 +69,11 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
-  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.timeGroup ?? '', editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
+  { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? '', editable: true, editKey: 'region', options: REGION_OPTIONS },
   { id: 'region', label: 'Region', getValue: (row) => row.region ?? '', editable: true, editKey: 'region', options: REGION_OPTIONS },
   { id: 'country', label: 'Country', getValue: (row) => row.country ?? '', editable: true, editKey: 'country' },
   { id: 'state', label: 'State', getValue: (row) => row.state ?? '', editable: true, editKey: 'state' },
-  { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
+  { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup },
   {
     id: 'operationalStatus',
     label: 'Operational Status',
@@ -196,7 +196,7 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editKey: 'cloudRegion', replaceable: true },
     { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true, options: REGION_OPTIONS },
-    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true, options: REGION_OPTIONS },
+    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup },
     {
       id: 'operationalStatus',
       label: 'Operational Status',

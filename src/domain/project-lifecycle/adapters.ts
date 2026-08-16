@@ -79,7 +79,7 @@ export function normalizeProjectLifecycleProject(project: Project): Project {
     pocStartDate: project.pocStartDate ?? null,
     pocEndDate: project.pocEndDate ?? null,
     region,
-    timeGroup: region || normalizeBusinessRegion(project.timeGroup),
+    timeGroup: project.timeGroup ?? '',
     progressStatus: project.progressStatus === 'DELETED' ? 'DELETED' : projectStatusFromTaskCompletion(project),
   }
 }

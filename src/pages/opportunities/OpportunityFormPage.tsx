@@ -50,6 +50,7 @@ import {
   WarrantyStatusPresentation,
   calculateFloatingOverlayPosition,
   formMessageClassName,
+  validationControlClassName,
 } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { configurationColumnGroupLabel } from '@/components/configuration'
@@ -156,7 +157,7 @@ function inputClassName(isChanged: boolean, extra = ''): string {
 function fieldClassName(isChanged: boolean, isMissing: boolean, extra = ''): string {
   return [
     inputClassName(isChanged, extra),
-    isMissing ? 'border-red-500 ring-1 ring-red-500' : '',
+    validationControlClassName(isMissing),
   ].join(' ')
 }
 
@@ -1162,8 +1163,8 @@ export function OpportunityFormPage() {
       opportunityName: ['Opportunity name is required.'],
       accountId: ['Account is required.'],
       salesManagerId: ['Sales Manager / Deal Owner is required.'],
-      deliveryDate: ['Delivery date is required.'],
-      pocStartDate: ['Start Date is required.', 'POC End Date cannot be earlier than POC Start Date.'],
+      deliveryDate: ['Delivery date is required.', 'Delivery Date must be on or before Start Date.'],
+      pocStartDate: ['Start Date is required.', 'POC End Date cannot be earlier than POC Start Date.', 'Delivery Date must be on or before Start Date.'],
       pocEndDate: ['End Date is required.', 'POC End Date cannot be earlier than POC Start Date.'],
       warrantyRecordId: ['Warranty record to extend is required.'],
     }

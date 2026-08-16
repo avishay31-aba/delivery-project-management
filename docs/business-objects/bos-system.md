@@ -285,6 +285,10 @@ No new lifecycle states are introduced by this BOS.
 
 ## 13. Validation Rules
 
+Number of Tenants is an authoritative derived System value: the distinct complete set of Tenant records actively associated with the System across the Not Set Yet, Under Contract, and Out of Contract views. Pagination, search, filters, and movement between those views do not affect the total. All System, Tenant Hosting, Project Systems, dashboard, and read-model presentations consume this same derivation.
+
+System Time Group is the hosting exception to customer-geography inheritance. The most veteran active hosted Tenant establishes the baseline. An incompatible incoming Tenant requires an explicit three-action decision: Continue completes allocation and retains existing System governance, Cancel changes nothing, and Change atomically completes allocation while replacing System Time Group/governance. Removal of the governing Tenant reevaluates the next veteran, and no active hosted Tenant yields an empty System Time Group.
+
 SystemInventory-owned validations may include:
 
 - System identity is required.

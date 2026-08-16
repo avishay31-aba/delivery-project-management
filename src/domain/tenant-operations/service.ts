@@ -367,8 +367,9 @@ export function tenantTimeZoneDisplayValue(
   opportunity?: Opportunity,
   system?: System,
 ): string {
-  const country = tenant.country || opportunity?.country || system?.country || ''
-  const state = opportunity?.state || system?.state || ''
+  void system
+  const country = tenant.country || opportunity?.country || ''
+  const state = tenant.state || opportunity?.state || ''
   const referenceDate = opportunity?.deliveryDate ?? opportunity?.pocStartDate ?? null
   return geographicTimeZoneDisplayValue(country, state, referenceDate)
 }

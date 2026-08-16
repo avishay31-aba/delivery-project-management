@@ -89,7 +89,7 @@ import {
 import { applyProjectLifecycleStatus, createStandaloneProject, latestProjectDeletionEntry, projectDeletionHistory, projectHeaderFieldValue, projectStatusFromTaskCompletion, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, timeGroupForTimeZone, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import {
@@ -136,7 +136,7 @@ import {
 
 type ActivityEventDraft = Omit<ActivityEventInput, 'id' | 'occurredAt'>
 type SaveTimestampOptions = { preserveNewState?: boolean }
-type TenantTimeGroupOverrideOptions = { confirmedTimeGroupMismatch?: boolean }
+type TenantTimeGroupOverrideOptions = { timeGroupMismatchAction?: 'CONTINUE' | 'CHANGE' }
 let unsubscribeCommittedStateChanges: (() => void) | null = null
 
 function opportunityWithCommittedRequirementContext(opportunity: Opportunity, tenants: AppDataState['tenants']): Opportunity {
@@ -159,9 +159,9 @@ function opportunityWithCommittedRequirementContext(opportunity: Opportunity, te
   }
 }
 
-function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity {
+function opportunityWithDerivedGeography(opportunity: Opportunity, timeGroupLookups: TimeGroupLookupRecord[]): Opportunity {
   const region = getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
-  return applyGeographicTimeZone(
+  const located = applyGeographicTimeZone(
     {
       ...opportunity,
       region,
@@ -169,15 +169,17 @@ function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity 
     },
     opportunity.deliveryDate ?? opportunity.pocStartDate,
   )
+  return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
-function accountWithDerivedGeography(account: AppDataState['accounts'][number]): AppDataState['accounts'][number] {
+function accountWithDerivedGeography(account: AppDataState['accounts'][number], timeGroupLookups: TimeGroupLookupRecord[]): AppDataState['accounts'][number] {
   const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
-  return applyGeographicTimeZone({
+  const located = applyGeographicTimeZone({
     ...account,
     region,
     timeGroup: account.timeGroup || '',
   })
+  return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
 function appendActivityEvent(
@@ -600,8 +602,10 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   const context = { linkedOpportunity, account }
   return {
     region: projectBusinessRegionForAllocation(project, state),
+    country: projectHeaderFieldValue(project, 'country', context),
+    state: projectHeaderFieldValue(project, 'state', context),
     timeZone: projectHeaderFieldValue(project, 'timeZone', context),
-    timeGroup: '',
+    timeGroup: timeGroupForTimeZone(state.timeGroupLookups, projectHeaderFieldValue(project, 'timeZone', context)),
     timeGroupAlert: '',
   }
 }
@@ -655,19 +659,11 @@ function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['
   return {
     ...project,
     region: location.region,
+    country: location.country,
+    state: location.state,
     timeGroup: location.timeGroup,
     timeZone: location.timeZone,
   }
-}
-
-function appendUniqueSemicolonValue(current: string | null | undefined, value: string | null | undefined): string {
-  const nextValue = String(value ?? '').trim()
-  const values = String(current ?? '')
-    .split(';')
-    .map((candidate) => candidate.trim())
-    .filter(Boolean)
-  if (nextValue && !values.includes(nextValue)) values.push(nextValue)
-  return values.join('; ')
 }
 
 function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): string[] {
@@ -679,9 +675,22 @@ function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): 
 
 function tenantSystemTimeGroupMismatchMessage(state: AppDataState, tenant: AppDataState['tenants'][number], system: AppDataState['systems'][number]): string {
   const tenantTimeGroup = tenantTimeGroupFromLocation(tenant, state.timeGroupLookups).timeGroup
-  const systemTimeGroup = systemTimeGroupFromVeteranTenant(system.id, state.tenants, state.timeGroupLookups).timeGroup
+  const systemTimeGroup = systemTimeGroupFromVeteranTenant(system.id, state.tenants, state.timeGroupLookups, system.timeGroupOverrideTenantId).timeGroup
   if (!systemTimeGroup || !tenantTimeGroup || systemTimeGroup === tenantTimeGroup) return ''
-  return `The selected Tenant belongs to Time Group ${tenantTimeGroup}, while System ${systemBusinessId(system)} currently belongs to Time Group ${systemTimeGroup}, based on its most veteran hosted Tenant.\n\nDo you want to continue adding this Tenant to the System?`
+  return `Current System Time Group: ${systemTimeGroup}\nIncoming Tenant Time Group: ${tenantTimeGroup}\n\nThe values differ. Choose Continue to add the Tenant without changing the System, Cancel to stop, or Change to replace the System Time Group and add the Tenant.`
+}
+
+function tenantWithProjectGeography(state: AppDataState, tenant: AppDataState['tenants'][number]): AppDataState['tenants'][number] {
+  const activeLink = state.projectTenants.find((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')
+  const project = state.projects.find((candidate) => candidate.id === activeLink?.projectId || candidate.pid === tenant.deliveryPid)
+  if (!project) return tenant
+  return {
+    ...tenant,
+    country: project.country ?? tenant.country,
+    state: project.state ?? tenant.state ?? '',
+    timeZone: project.timeZone ?? tenant.timeZone ?? '',
+    timeGroup: project.timeGroup ?? '',
+  }
 }
 
 function relationshipAllocationTypeForSystem(system: AppDataState['systems'][number]): AllocationType {
@@ -808,14 +817,12 @@ function ensureProjectTenantHostingRelationships(
         : link,
     )
 
-    const assignmentLocation = projectAssignmentLocation({ ...state, systems, projectSystems, projectTenants }, project)
     systems = systems.map((system) =>
       system.id === hostingSystem.id
         ? {
             ...system,
             linkedProjectIds: Array.from(new Set([...(system.linkedProjectIds ?? []), project.id])),
             tenantIds: Array.from(new Set([...(system.tenantIds ?? []), tenant.id])),
-            timeGroup: appendUniqueSemicolonValue(system.timeGroup, assignmentLocation.timeGroup),
             updatedAt: now,
           }
         : system,
@@ -1324,7 +1331,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const systems = state.systems.map((system) => {
         if (system.id !== id) return system
         previousSystem = system
-        nextSystem = { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        const { timeGroup: _timeGroup, timeGroupOverrideTenantId: _timeGroupOverrideTenantId, ...userPatch } = patch
+        void _timeGroup
+        void _timeGroupOverrideTenantId
+        nextSystem = { ...system, ...userPatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
         return nextSystem
       })
       return {
@@ -2102,7 +2112,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const tenants = state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
         previousTenant = tenant
-        nextTenant = normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups)
+        nextTenant = normalizeTenantTimeGroup(tenantWithProjectGeography(state, { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }), state.timeGroupLookups)
         return nextTenant
       })
       return {
@@ -2143,7 +2153,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
       const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
       const tenants = state.tenants.map((tenant) =>
-        tenant.id === id ? normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups) : tenant,
+        tenant.id === id ? normalizeTenantTimeGroup(tenantWithProjectGeography(state, { ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }), state.timeGroupLookups) : tenant,
       )
       const committedTenant = {
         ...savedTenant,
@@ -2339,7 +2349,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const { projectTenant, idCounters } = created
     const system = state.systems.find((candidate) => candidate.id === systemId)
     const mismatchMessage = system ? tenantSystemTimeGroupMismatchMessage(state, tenant, system) : ''
-    if (mismatchMessage && !options?.confirmedTimeGroupMismatch) {
+    if (mismatchMessage && !options?.timeGroupMismatchAction) {
       return { ok: false, message: mismatchMessage, requiresTimeGroupOverride: true }
     }
 
@@ -2357,12 +2367,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           customerRef(resolved.source.account),
         ),
       })
-      if (mismatchMessage && options?.confirmedTimeGroupMismatch && system) {
+      if (mismatchMessage && options?.timeGroupMismatchAction && system) {
         activityEvents = appendActivityEvent(activityEvents, now, {
           category: 'TENANT',
           eventType: 'tenant.timeGroupMismatchAccepted',
           severity: 'WARNING',
-          summary: `Tenant ${tenant.tid} was added to System ${systemBusinessId(system)} despite a Time Group mismatch.`,
+          summary: options.timeGroupMismatchAction === 'CHANGE'
+            ? `Tenant ${tenant.tid} was added and replaced the Time Group for System ${systemBusinessId(system)}.`
+            : `Tenant ${tenant.tid} was added to System ${systemBusinessId(system)} while its existing Time Group was retained.`,
           primaryObject: tenantRef(tenant),
           relatedObjects: relatedRefs(systemRef(system), projectRef(resolved.source.project)),
           metadata: { warning: mismatchMessage },
@@ -2376,6 +2388,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? {
                 ...candidate,
                 tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), tenant.id])),
+                ...(mismatchMessage && options?.timeGroupMismatchAction === 'CHANGE' ? { timeGroup: tenant.timeGroup, timeGroupOverrideTenantId: tenant.id } : {}),
                 updatedAt: now,
               }
             : candidate,
@@ -2414,8 +2427,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenantType: 'PENLINK_INTERNAL',
       tenantFormType: 'INTERNAL',
       accountName: 'Internal',
-      country: system.country ?? '',
-      timeGroup: system.timeGroup,
+      country: project.country ?? '',
+      state: project.state ?? '',
+      timeZone: project.timeZone ?? '',
+      timeGroup: project.timeGroup ?? '',
       operationalStatus: '',
       contractStatus: 'UNDER_CONTRACT',
       hostedSystemHistory: [{ systemId: system.id, startedAt: now, endedAt: null, reason: 'Created' }],
@@ -2457,7 +2472,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     const normalizedTenant = normalizeTenantTimeGroup(tenant, state.timeGroupLookups)
     const mismatchMessage = tenantSystemTimeGroupMismatchMessage(state, normalizedTenant, system)
-    if (mismatchMessage && !options?.confirmedTimeGroupMismatch) {
+    if (mismatchMessage && !options?.timeGroupMismatchAction) {
       return { ok: false, message: mismatchMessage, requiresTimeGroupOverride: true }
     }
     const projectTenant = createProjectTenantLink(
@@ -2477,12 +2492,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
         primaryObject: tenantRef(normalizedTenant),
         relatedObjects: relatedRefs(projectRef(project), systemRef(system)),
       })
-      if (mismatchMessage && options?.confirmedTimeGroupMismatch) {
+      if (mismatchMessage && options?.timeGroupMismatchAction) {
         activityEvents = appendActivityEvent(activityEvents, now, {
           category: 'TENANT',
           eventType: 'tenant.timeGroupMismatchAccepted',
           severity: 'WARNING',
-          summary: `Tenant ${normalizedTenant.tid} was added to System ${systemBusinessId(system)} despite a Time Group mismatch.`,
+          summary: options.timeGroupMismatchAction === 'CHANGE'
+            ? `Tenant ${normalizedTenant.tid} was added and replaced the Time Group for System ${systemBusinessId(system)}.`
+            : `Tenant ${normalizedTenant.tid} was added to System ${systemBusinessId(system)} while its existing Time Group was retained.`,
           primaryObject: tenantRef(normalizedTenant),
           relatedObjects: relatedRefs(projectRef(project), systemRef(system)),
           metadata: { warning: mismatchMessage },
@@ -2493,7 +2510,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         tenants: [normalizedTenant, ...current.tenants],
         systems: current.systems.map((candidate) =>
           candidate.id === system.id
-            ? { ...candidate, tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), normalizedTenant.id])), updatedAt: now }
+            ? {
+                ...candidate,
+                tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), normalizedTenant.id])),
+                ...(mismatchMessage && options?.timeGroupMismatchAction === 'CHANGE' ? { timeGroup: normalizedTenant.timeGroup, timeGroupOverrideTenantId: normalizedTenant.id } : {}),
+                updatedAt: now,
+              }
             : candidate,
         ),
         projectSystems: current.projectSystems.map((link) =>
@@ -2517,7 +2539,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const accounts = state.accounts.map((account) => {
         if (account.id !== id) return account
         previousAccount = account
-        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now })
+        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now }, state.timeGroupLookups)
         return nextAccount
       })
       return {
@@ -2625,7 +2647,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now },
           state.tenants,
         )
-        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity)
+        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity, state.timeGroupLookups)
         return nextOpportunityRecord
       })
       return {
@@ -2687,7 +2709,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       wonAt: null,
       createdAt: now,
       updatedAt: now,
-    })
+    }, state.timeGroupLookups)
 
     set((currentState) => ({
       idCounters: nextOpportunityId.counters,
@@ -2806,7 +2828,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => {
       const opportunities = currentState.opportunities.map((candidate) =>
         candidate.id === savedOpportunity.id
-          ? opportunityWithDerivedGeography(result.opportunity)
+          ? opportunityWithDerivedGeography(result.opportunity, currentState.timeGroupLookups)
           : candidate
       )
       const committedState = { ...currentState, opportunities }
@@ -2877,7 +2899,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return {
-      opportunity: opportunityWithDerivedGeography(result.opportunity),
+      opportunity: opportunityWithDerivedGeography(result.opportunity, get().timeGroupLookups),
       projectChanges: result.projectChanges,
     }
   },
@@ -3074,7 +3096,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 current.projects,
               ),
               usedInRegion: assignmentLocation.region,
-              timeGroup: assignmentLocation.timeGroup,
             }
           : candidate,
       ),
@@ -3121,7 +3142,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
               linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), projectId])),
               tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
               region: activeLinksForSystem.length === 0 ? assignmentLocation.region : candidate.region || assignmentLocation.region,
-              timeGroup: activeLinksForSystem.length === 0 ? assignmentLocation.timeGroup : candidate.timeGroup || assignmentLocation.timeGroup,
               updatedAt: now,
             }
           : candidate,

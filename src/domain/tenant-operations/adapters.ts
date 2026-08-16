@@ -83,7 +83,9 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
     configuration,
     accountName: source.project.accountName || (source.account?.accountName ?? ''),
     country: source.opportunity.country ?? source.account?.country ?? source.system.country ?? '',
-    timeGroup: source.opportunity.timeGroup ?? source.account?.timeGroup ?? source.system.timeGroup,
+    state: source.opportunity.state ?? source.account?.state ?? '',
+    timeZone: source.opportunity.timeZone ?? source.account?.timeZone ?? '',
+    timeGroup: source.project.timeGroup ?? source.opportunity.timeGroup ?? source.account?.timeGroup ?? '',
     operationalStatus: 'Active',
     lastManualOperationalStatus: 'Active',
     contractStatus: 'UNDER_CONTRACT',
@@ -139,11 +141,8 @@ function tenantAllocationTypeForSystem(system: TenantCreationSource['system']): 
 }
 
 export function tenantConfigurationFromTenant(tenant: Tenant, system?: System): TenantConfiguration {
-  const configuration = applicationConfigurationFromTenant(tenant, system?.productType)
-  return {
-    ...configuration,
-    mapCenter: system ? system.mapCenter ?? '' : configuration.mapCenter,
-  }
+  void system
+  return applicationConfigurationFromTenant(tenant)
 }
 
 export function tenantRequirementFromConfiguration(

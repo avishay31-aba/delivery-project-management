@@ -85,6 +85,7 @@ Project-owned fields include:
 - `pocStartDate`
 - `pocEndDate`
 - `owner`
+- Customer geography (`country`/`state`) inherited through Opportunity, with derived `timeZone` and `timeGroup`
 - `createdAt`
 - `updatedAt`
 - Project milestone plan reference / embedded milestone data where currently modeled

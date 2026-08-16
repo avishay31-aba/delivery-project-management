@@ -364,6 +364,7 @@ export interface System {
   country?: string
   state?: string
   timeGroup: string
+  timeGroupOverrideTenantId?: string | null
   timeGroupAlert?: string
   operationalStatus: string
   remarks?: RemarkRecord[]
@@ -387,6 +388,8 @@ export interface Tenant {
   tenantType: TenantType
   accountName: string
   country: string
+  state?: string
+  timeZone?: string
   timeGroup: string
   operationalStatus: string
   lastManualOperationalStatus?: string
