@@ -169,13 +169,22 @@ export function timeGroupForTimeZone(records: TimeGroupLookupRecord[], timeZone:
   return records.find((record) => record.active && record.timeZones.includes(normalizedZone))?.timeGroup ?? ''
 }
 
+export function timeGroupFromLocation(
+  records: TimeGroupLookupRecord[],
+  country: string | null | undefined,
+  state?: string | null,
+  referenceDate?: string | null,
+): { timeZone: string; timeGroup: string } {
+  const timeZone = geographicTimeZoneDisplayValue(country, state, referenceDate)
+  return { timeZone, timeGroup: timeGroupForTimeZone(records, timeZone) }
+}
+
 export function tenantTimeGroupFromLocation(
   tenant: Pick<Tenant, 'country'> & { state?: string; timeGroup?: string },
   records: TimeGroupLookupRecord[],
   referenceDate?: string | null,
 ): { timeZone: string; timeGroup: string; alert: string } {
-  const timeZone = geographicTimeZoneDisplayValue(tenant.country, tenant.state, referenceDate)
-  const timeGroup = timeGroupForTimeZone(records, timeZone)
+  const { timeZone, timeGroup } = timeGroupFromLocation(records, tenant.country, tenant.state, referenceDate)
   return {
     timeZone,
     timeGroup,
@@ -187,7 +196,7 @@ export function normalizeTenantTimeGroup(tenant: Tenant, records: TimeGroupLooku
   const result = tenantTimeGroupFromLocation(tenant, records)
   return {
     ...tenant,
-    timeGroup: result.timeGroup || tenant.timeGroup || '',
+    timeGroup: result.timeGroup,
   }
 }
 

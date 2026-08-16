@@ -15,6 +15,12 @@
 }
 
 @layer components {
+  /* FormField is the generic validation contour owner. Any native form control
+     placed in an invalid shared field receives the approved red contour. */
+  [data-invalid='true'] :is(input, select, textarea, button[role='combobox']) {
+    border-color: rgb(239 68 68);
+    box-shadow: 0 0 0 1px rgb(239 68 68);
+  }
   .sf-card {
     @apply rounded-md border border-sf-border bg-sf-surface shadow-sf;
   }

@@ -89,7 +89,7 @@ import {
 import { applyProjectLifecycleStatus, createStandaloneProject, latestProjectDeletionEntry, projectDeletionHistory, projectHeaderFieldValue, projectStatusFromTaskCompletion, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, timeGroupForTimeZone, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import {
@@ -159,9 +159,9 @@ function opportunityWithCommittedRequirementContext(opportunity: Opportunity, te
   }
 }
 
-function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity {
+function opportunityWithDerivedGeography(opportunity: Opportunity, timeGroupLookups: TimeGroupLookupRecord[]): Opportunity {
   const region = getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
-  return applyGeographicTimeZone(
+  const located = applyGeographicTimeZone(
     {
       ...opportunity,
       region,
@@ -169,15 +169,17 @@ function opportunityWithDerivedGeography(opportunity: Opportunity): Opportunity 
     },
     opportunity.deliveryDate ?? opportunity.pocStartDate,
   )
+  return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
-function accountWithDerivedGeography(account: AppDataState['accounts'][number]): AppDataState['accounts'][number] {
+function accountWithDerivedGeography(account: AppDataState['accounts'][number], timeGroupLookups: TimeGroupLookupRecord[]): AppDataState['accounts'][number] {
   const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
-  return applyGeographicTimeZone({
+  const located = applyGeographicTimeZone({
     ...account,
     region,
     timeGroup: account.timeGroup || '',
   })
+  return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
 function appendActivityEvent(
@@ -601,7 +603,7 @@ function projectAssignmentLocation(state: AppDataState, project: AppDataState['p
   return {
     region: projectBusinessRegionForAllocation(project, state),
     timeZone: projectHeaderFieldValue(project, 'timeZone', context),
-    timeGroup: '',
+    timeGroup: timeGroupForTimeZone(state.timeGroupLookups, projectHeaderFieldValue(project, 'timeZone', context)),
     timeGroupAlert: '',
   }
 }
@@ -2517,7 +2519,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const accounts = state.accounts.map((account) => {
         if (account.id !== id) return account
         previousAccount = account
-        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now })
+        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now }, state.timeGroupLookups)
         return nextAccount
       })
       return {
@@ -2625,7 +2627,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now },
           state.tenants,
         )
-        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity)
+        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity, state.timeGroupLookups)
         return nextOpportunityRecord
       })
       return {
@@ -2687,7 +2689,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       wonAt: null,
       createdAt: now,
       updatedAt: now,
-    })
+    }, state.timeGroupLookups)
 
     set((currentState) => ({
       idCounters: nextOpportunityId.counters,
@@ -2806,7 +2808,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((currentState) => {
       const opportunities = currentState.opportunities.map((candidate) =>
         candidate.id === savedOpportunity.id
-          ? opportunityWithDerivedGeography(result.opportunity)
+          ? opportunityWithDerivedGeography(result.opportunity, currentState.timeGroupLookups)
           : candidate
       )
       const committedState = { ...currentState, opportunities }
@@ -2877,7 +2879,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })
     get().saveToStorage()
     return {
-      opportunity: opportunityWithDerivedGeography(result.opportunity),
+      opportunity: opportunityWithDerivedGeography(result.opportunity, get().timeGroupLookups),
       projectChanges: result.projectChanges,
     }
   },

@@ -161,7 +161,7 @@ export function normalizeOpportunityLifecycleOpportunity(
     ...opportunity,
     opportunityId,
     region,
-    timeGroup: region || normalizeBusinessRegion(opportunity.timeGroup),
+    timeGroup: opportunity.timeGroup ?? '',
     stage: opportunity.stage === 'WON' ? 'WON' : opportunity.stage === 'POC' ? 'POC' : 'OPEN',
     engagementCircles: normalizeOpportunityEngagementCircles(opportunity),
     pocProjectIds,

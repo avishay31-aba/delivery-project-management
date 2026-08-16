@@ -223,6 +223,7 @@ No new lifecycle states are introduced by this BOS.
 
 ## 12. Business Rules
 
+- Tenant Application Configuration is Tenant-owned delivered-runtime configuration. Its editor uses the authoritative Application Configuration metadata, field order, and shared controls, is read-only in view mode, and persists only through the Tenant save transaction.
 - Tenant is Delivery-owned.
 - Tenant executes inside System.
 - Tenant may move between Systems.
