@@ -520,7 +520,7 @@ export function projectHeaderFieldValue(
     case 'timeZone':
       return projectLocationContext(project, context.linkedOpportunity, context.account).timeZone
     case 'timeGroup':
-      return context.linkedOpportunity?.timeGroup ?? context.account?.timeGroup ?? ''
+      return project.timeGroup ?? ''
     case 'pocStartDate':
       return project.pocStartDate ?? context.linkedOpportunity?.pocStartDate ?? ''
     case 'pocEndDate':
