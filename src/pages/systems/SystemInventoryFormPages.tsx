@@ -36,7 +36,6 @@ import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarra
 import { TenantTimeGroupMismatchDialog, type TenantTimeGroupMismatchAction } from '@/components/tenants/TenantTimeGroupMismatchDialog'
 import { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, ProductSubTabs, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
-import { configurationColumnGroupLabel, formatConfigurationCellValue } from '@/components/configuration'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
@@ -54,7 +53,6 @@ import {
 } from '@/config/cloud-platform-metadata'
 import {
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
-  type TenantConfigurationFieldMetadata,
 } from '@/config/application-configuration-fields'
 import { configurationHistoryReadModel } from '@/domain/application-configuration'
 import {
@@ -127,6 +125,7 @@ import {
   validateTenantMoveDestination,
   type TenantMoveMode,
 } from '@/domain/tenant-operations'
+import { systemTimeGroupSource } from '@/domain/time-groups'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
@@ -1302,6 +1301,8 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
+    const hostingSystem = (allocatedSystemForTenantCreation() ?? activeRecord) as System
+    const governingTenantId = systemTimeGroupSource(hostingSystem, tenants, timeGroupLookups).tenant?.id
 
     return (
       <div className="space-y-4">
@@ -1329,6 +1330,7 @@ export function InventoryForm<T extends InventoryRecord>({
             systems={allocatedSystems}
             emptyTextForSection={() => 'No hosted tenants in this section.'}
             actions={isViewMode ? undefined : (tenant) => renderHostedTenantActions(tenant)}
+            governingTenantId={governingTenantId}
           />
         </section>
         {renderApplicationConfigurationSummarySection()}
