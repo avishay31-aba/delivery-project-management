@@ -128,6 +128,7 @@ import {
   type TenantMoveMode,
 } from '@/domain/tenant-operations'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
+import { systemTimeGroupSource } from '@/domain/time-groups'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type SaveTimestampOptions = { preserveNewState?: boolean }
@@ -1302,6 +1303,11 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function renderTenantTab() {
     const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
+    const governingTenantId = systemTimeGroupSource(
+      (allocatedSystemForTenantCreation() ?? activeRecord) as System,
+      tenants,
+      timeGroupLookups,
+    ).governorTenantId
 
     return (
       <div className="space-y-4">
@@ -1329,6 +1335,7 @@ export function InventoryForm<T extends InventoryRecord>({
             systems={allocatedSystems}
             emptyTextForSection={() => 'No hosted tenants in this section.'}
             actions={isViewMode ? undefined : (tenant) => renderHostedTenantActions(tenant)}
+            systemTimeGroupGovernorTenantId={governingTenantId}
           />
         </section>
         {renderApplicationConfigurationSummarySection()}

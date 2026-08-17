@@ -200,6 +200,10 @@ export function normalizeTenantTimeGroup(tenant: Tenant, records: TimeGroupLooku
   }
 }
 
+export function tenantIsEligibleSystemTimeGroupGovernor(tenant: Pick<Tenant, 'tenantType'>): boolean {
+  return tenant.tenantType === 'CUSTOMER' || tenant.tenantType === 'POC'
+}
+
 function activeHostingDateForTenant(tenant: Tenant, systemId: string): string {
   const activeHistory = (tenant.hostedSystemHistory ?? [])
     .filter((entry) => entry.systemId === systemId && entry.endedAt == null)
@@ -209,7 +213,9 @@ function activeHostingDateForTenant(tenant: Tenant, systemId: string): string {
 
 export function mostVeteranActiveTenantForSystem(systemId: string, tenants: Tenant[]): Tenant | undefined {
   return tenants
-    .filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId))
+    .filter((tenant) =>
+      tenantIsEligibleSystemTimeGroupGovernor(tenant) && tenantIsActivelyHostedBySystem(tenant, systemId),
+    )
     .sort((first, second) => {
       const firstDate = activeHostingDateForTenant(first, systemId)
       const secondDate = activeHostingDateForTenant(second, systemId)
@@ -218,37 +224,55 @@ export function mostVeteranActiveTenantForSystem(systemId: string, tenants: Tena
     })[0]
 }
 
-export function systemTimeGroupFromVeteranTenant(
-  systemId: string,
-  tenants: Tenant[],
-  records: TimeGroupLookupRecord[],
-): { timeGroup: string; tenant?: Tenant; timeZone: string } {
-  const tenant = mostVeteranActiveTenantForSystem(systemId, tenants)
-  if (!tenant) return { timeGroup: '', tenant: undefined, timeZone: '' }
-  const derived = tenantTimeGroupFromLocation(tenant, records)
-  return { timeGroup: derived.timeGroup, tenant, timeZone: derived.timeZone }
+export interface SystemTimeGroupSourceReadModel {
+  timeGroup: string
+  timeZone: string
+  governorTenantId?: string
+  tenant?: Tenant
+  source: 'EXPLICIT' | 'VETERAN' | 'NONE'
 }
 
-export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: string, next: string, veteranTenant?: Tenant): string {
+/** The single authoritative source selection for System Time Group governance. */
+export function systemTimeGroupSource(
+  system: Pick<System, 'id' | 'timeGroupGovernanceTenantId'>,
+  tenants: Tenant[],
+  records: TimeGroupLookupRecord[],
+): SystemTimeGroupSourceReadModel {
+  const explicitGovernor = system.timeGroupGovernanceTenantId
+    ? tenants.find((tenant) =>
+        tenant.id === system.timeGroupGovernanceTenantId &&
+        tenantIsEligibleSystemTimeGroupGovernor(tenant) &&
+        tenantIsActivelyHostedBySystem(tenant, system.id),
+      )
+    : undefined
+  const tenant = explicitGovernor ?? mostVeteranActiveTenantForSystem(system.id, tenants)
+  if (!tenant) return { timeGroup: '', timeZone: '', source: 'NONE' }
+  const derived = tenantTimeGroupFromLocation(tenant, records)
+  return {
+    timeGroup: derived.timeGroup,
+    timeZone: derived.timeZone,
+    governorTenantId: tenant.id,
+    tenant,
+    source: explicitGovernor ? 'EXPLICIT' : 'VETERAN',
+  }
+}
+
+export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: string, next: string, governorTenant?: Tenant): string {
   if (previous && next) {
-    return `System ${systemIdLabel} Time Group changed from ${previous} to ${next}. The value is now derived from Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
+    return `System ${systemIdLabel} Time Group changed from ${previous} to ${next}. The value is now derived from eligible Tenant ${governorTenant?.tid ?? '-'}.`
   }
   if (previous && !next) {
-    return `System ${systemIdLabel} Time Group changed from ${previous} to empty because the System no longer has an active hosted Tenant.`
+    return `System ${systemIdLabel} Time Group changed from ${previous} to empty because the System no longer has an active Customer/POC Tenant.`
   }
-  return `System ${systemIdLabel} Time Group was set to ${next}, based on Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
+  return `System ${systemIdLabel} Time Group was set to ${next}, based on eligible Tenant ${governorTenant?.tid ?? '-'}.`
 }
 
 export function systemsWithDerivedTimeGroups<T extends System>(systems: T[], tenants: Tenant[], records: TimeGroupLookupRecord[]): T[] {
   return systems.map((system) => {
-    const configuredGovernor = system.timeGroupGovernanceTenantId
-      ? tenants.find((tenant) => tenant.id === system.timeGroupGovernanceTenantId && tenantIsActivelyHostedBySystem(tenant, system.id))
-      : undefined
-    const governor = configuredGovernor ?? mostVeteranActiveTenantForSystem(system.id, tenants)
-    const timeGroup = governor ? tenantTimeGroupFromLocation(governor, records).timeGroup : ''
-    return timeGroup === system.timeGroup && governor?.id === system.timeGroupGovernanceTenantId
+    const source = systemTimeGroupSource(system, tenants, records)
+    return source.timeGroup === system.timeGroup && source.governorTenantId === system.timeGroupGovernanceTenantId
       ? system
-      : { ...system, timeGroup, timeGroupGovernanceTenantId: governor?.id }
+      : { ...system, timeGroup: source.timeGroup, timeGroupGovernanceTenantId: source.governorTenantId }
   })
 }
 
@@ -262,7 +286,7 @@ export function linkedSidsForTimeGroup(
     systems
       .filter((system) => {
         if (!('sid' in system)) return false
-        return systemTimeGroupFromVeteranTenant(system.id, tenants, records).timeGroup === record.timeGroup
+        return systemTimeGroupSource(system, tenants, records).timeGroup === record.timeGroup
       })
       .map((system) => ('sid' in system ? system.sid : 'machineId' in system ? system.machineId : ''))
       .filter((value): value is string => Boolean(value)),

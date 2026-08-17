@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Globe2 } from 'lucide-react'
 import type { System, Tenant } from '@/data/seed.types'
 import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
 import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
@@ -20,9 +21,10 @@ interface TenantDeliveryTableProps {
   systems: System[]
   emptyText: string
   actions?: (tenant: Tenant, system: System | undefined) => ReactNode
+  systemTimeGroupGovernorTenantId?: string
 }
 
-export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: TenantDeliveryTableProps) {
+export function TenantDeliveryTable({ tenants, systems, emptyText, actions, systemTimeGroupGovernorTenantId }: TenantDeliveryTableProps) {
   if (tenants.length === 0) {
     return (
       <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
@@ -92,7 +94,16 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions }: Te
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.timeGroup}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                  <span className="inline-flex items-center gap-1">
+                    {tenant.timeGroup}
+                    {tenant.id === systemTimeGroupGovernorTenantId ? (
+                      <span title="System Time Group source" aria-label="System Time Group source">
+                        <Globe2 className="h-3.5 w-3.5 text-sf-blue" aria-hidden="true" />
+                      </span>
+                    ) : null}
+                  </span>
+                </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>

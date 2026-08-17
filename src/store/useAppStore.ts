@@ -89,7 +89,7 @@ import {
 import { applyProjectLifecycleStatus, createStandaloneProject, latestProjectDeletionEntry, projectDeletionHistory, projectHeaderFieldValue, projectStatusFromTaskCompletion, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupFromVeteranTenant, systemsWithDerivedTimeGroups, tenantTimeGroupFromLocation, timeGroupForTimeZone, validateTimeGroupLookupRows } from '@/domain/time-groups'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupSource, systemsWithDerivedTimeGroups, tenantIsEligibleSystemTimeGroupGovernor, tenantTimeGroupFromLocation, timeGroupForTimeZone, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import {
@@ -576,17 +576,12 @@ function removeTenantsFromSystemTransaction(
     systems: state.systems.map((system) => {
       if (!removedSystemIds.has(system.id)) return system
       const remainingTenantIds = (system.tenantIds ?? []).filter((tenantId) => !tenantIdSet.has(tenantId))
-      const governingTenantStillActive = system.timeGroupGovernanceTenantId
-        ? tenants.some((tenant) => tenant.id === system.timeGroupGovernanceTenantId && tenantIsActivelyHostedBySystem(tenant, system.id))
-        : false
-      const replacement = governingTenantStillActive
-        ? tenants.find((tenant) => tenant.id === system.timeGroupGovernanceTenantId)
-        : systemTimeGroupFromVeteranTenant(system.id, tenants, state.timeGroupLookups).tenant
+      const source = systemTimeGroupSource(system, tenants, state.timeGroupLookups)
       return {
         ...system,
         tenantIds: remainingTenantIds,
-        timeGroupGovernanceTenantId: replacement?.id,
-        timeGroup: replacement ? tenantTimeGroupFromLocation(replacement, state.timeGroupLookups).timeGroup : '',
+        timeGroupGovernanceTenantId: source.governorTenantId,
+        timeGroup: source.timeGroup,
         updatedAt: now,
       }
     }),
@@ -690,10 +685,28 @@ function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): 
 }
 
 function tenantSystemTimeGroupMismatchMessage(state: AppDataState, tenant: AppDataState['tenants'][number], system: AppDataState['systems'][number]): string {
+  if (!tenantIsEligibleSystemTimeGroupGovernor(tenant)) return ''
   const tenantTimeGroup = tenantTimeGroupFromLocation(tenant, state.timeGroupLookups).timeGroup
   const systemTimeGroup = system.timeGroup
   if (!systemTimeGroup || !tenantTimeGroup || systemTimeGroup === tenantTimeGroup) return ''
-  return `The selected Tenant belongs to Time Group ${tenantTimeGroup}, while System ${systemBusinessId(system)} currently belongs to Time Group ${systemTimeGroup}, based on its most veteran hosted Tenant.\n\nDo you want to continue adding this Tenant to the System?`
+  return `The selected Tenant belongs to Time Group ${tenantTimeGroup}, while System ${systemBusinessId(system)} currently belongs to Time Group ${systemTimeGroup}, based on its governing Customer/POC Tenant.\n\nDo you want to continue adding this Tenant to the System?`
+}
+
+function systemWithAddedTenantTimeGroupGovernance(
+  system: AppDataState['systems'][number],
+  existingTenants: AppDataState['tenants'],
+  incomingTenant: AppDataState['tenants'][number],
+  records: TimeGroupLookupRecord[],
+  decision?: TenantTimeGroupMismatchDecision,
+) {
+  const candidate = {
+    ...system,
+    timeGroupGovernanceTenantId: decision === 'change' && tenantIsEligibleSystemTimeGroupGovernor(incomingTenant)
+      ? incomingTenant.id
+      : system.timeGroupGovernanceTenantId,
+  }
+  const source = systemTimeGroupSource(candidate, [incomingTenant, ...existingTenants], records)
+  return { timeGroup: source.timeGroup, timeGroupGovernanceTenantId: source.governorTenantId }
 }
 
 function timeGroupMismatchResult(state: AppDataState, tenant: AppDataState['tenants'][number], system: AppDataState['systems'][number]) {
@@ -2290,8 +2303,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
         .map((link) => link.projectId),
     )
     const now = new Date().toISOString()
-    set((state) => ({
-      tenants: state.tenants.map((tenant) => {
+    set((state) => {
+      const tenants = state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
         return {
           ...tenant,
@@ -2302,8 +2315,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
           hostedSystemHistory: movedTenantHostedSystemHistory(tenant, destinationSystemId, now),
           updatedAt: now,
         }
-      }),
-      systems: state.systems.map((system) => {
+      })
+      const systems = state.systems.map((system) => {
         if (system.id === sourceSystemId) {
           return {
             ...system,
@@ -2319,33 +2332,37 @@ export const useAppStore = create<AppStore>((set, get) => ({
           }
         }
         return system
-      }),
-      projectSystems: state.projectSystems.map((link) => {
-        if (link.allocationStatus === 'DEALLOCATED') return link
-        if (link.systemId === sourceSystemId) {
-          return { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => tenantId !== tenant.id) }
-        }
-        if (link.systemId === destinationSystemId && linkedProjectIds.has(link.projectId)) {
-          return { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
-        }
-        return link
-      }),
-      projectTenants: state.projectTenants.map((link) =>
-        link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED'
-          ? { ...link, systemId: destinationSystemId }
-          : link,
-      ),
-      activityEvents: appendActivityEvent(state.activityEvents, now, {
-        category: 'TENANT',
-        eventType: 'tenant.movedToSystem',
-        severity: 'INFO',
-        summary: `Tenant ${tenant.tid} moved from system ${sourceSystem ? systemBusinessId(sourceSystem) : sourceSystemId} to system ${systemBusinessId(destinationSystem)}.`,
-        primaryObject: tenantRef(tenant),
-        relatedObjects: relatedRefs(sourceSystem ? systemRef(sourceSystem) : null, systemRef(destinationSystem)),
-        before: { hostedSystemId: sourceSystemId, operationalStatus: tenant.operationalStatus },
-        after: { hostedSystemId: destinationSystemId, operationalStatus: tenant.operationalStatus },
-      }),
-    }))
+      })
+      return {
+        tenants,
+        systems: systemsWithDerivedTimeGroups(systems, tenants, state.timeGroupLookups),
+        projectSystems: state.projectSystems.map((link) => {
+          if (link.allocationStatus === 'DEALLOCATED') return link
+          if (link.systemId === sourceSystemId) {
+            return { ...link, tenantIds: (link.tenantIds ?? []).filter((tenantId) => tenantId !== tenant.id) }
+          }
+          if (link.systemId === destinationSystemId && linkedProjectIds.has(link.projectId)) {
+            return { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+          }
+          return link
+        }),
+        projectTenants: state.projectTenants.map((link) =>
+          link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED'
+            ? { ...link, systemId: destinationSystemId }
+            : link,
+        ),
+        activityEvents: appendActivityEvent(state.activityEvents, now, {
+          category: 'TENANT',
+          eventType: 'tenant.movedToSystem',
+          severity: 'INFO',
+          summary: `Tenant ${tenant.tid} moved from system ${sourceSystem ? systemBusinessId(sourceSystem) : sourceSystemId} to system ${systemBusinessId(destinationSystem)}.`,
+          primaryObject: tenantRef(tenant),
+          relatedObjects: relatedRefs(sourceSystem ? systemRef(sourceSystem) : null, systemRef(destinationSystem)),
+          before: { hostedSystemId: sourceSystemId, operationalStatus: tenant.operationalStatus },
+          after: { hostedSystemId: destinationSystemId, operationalStatus: tenant.operationalStatus },
+        }),
+      }
+    })
     get().saveToStorage()
     return { ok: true, message: `Tenant ${tenant.tid} moved to ${systemBusinessId(destinationSystem)}.` }
   },
@@ -2399,10 +2416,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? {
                 ...candidate,
                 tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), tenant.id])),
-                timeGroup: options?.timeGroupMismatchDecision === 'change' ? tenant.timeGroup : candidate.timeGroup || tenant.timeGroup,
-                timeGroupGovernanceTenantId: options?.timeGroupMismatchDecision === 'change' || !(candidate.tenantIds ?? []).length
-                  ? tenant.id
-                  : candidate.timeGroupGovernanceTenantId,
+                ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, tenant, current.timeGroupLookups, options?.timeGroupMismatchDecision),
                 updatedAt: now,
               }
             : candidate,
@@ -2528,10 +2542,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? {
                 ...candidate,
                 tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), normalizedTenant.id])),
-                timeGroup: options?.timeGroupMismatchDecision === 'change' ? normalizedTenant.timeGroup : candidate.timeGroup || normalizedTenant.timeGroup,
-                timeGroupGovernanceTenantId: options?.timeGroupMismatchDecision === 'change' || !(candidate.tenantIds ?? []).length
-                  ? normalizedTenant.id
-                  : candidate.timeGroupGovernanceTenantId,
+                ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, normalizedTenant, current.timeGroupLookups, options?.timeGroupMismatchDecision),
                 updatedAt: now,
               }
             : candidate,
