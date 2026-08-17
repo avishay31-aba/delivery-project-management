@@ -583,3 +583,7 @@ Do not include in V1:
 - Generic cross-object Remarks rollout beyond approved parent objects.
 - Generic cross-object Owner rollout beyond approved parent objects.
 - Generic Configuration History framework outside System.
+
+## V1.2 Time Group Hosting Governance
+
+System Time Group represents the external Customer/POC working-hours context used for off-hours maintenance planning. Only active Customer or POC Tenants may govern it. An active explicit Change governor takes priority; otherwise the most veteran active Customer/POC Tenant governs. Internal Tenants never govern or change System Time Group, and an Internal-only System has an empty Time Group. Project and Region are never fallbacks. A Customer/POC mismatch pauses before mutation: Continue adds the Tenant and preserves System governance, Cancel performs no mutation, and Change atomically adds the Tenant and makes it the explicit governor. When a governor ceases active hosting, the next most veteran active Customer/POC Tenant governs, or Time Group becomes empty if none remains. Number of Tenants derives from the complete active hosting relationship. The System Application Configuration Summary remains the shared read-only aggregation of active hosted Tenant configuration.

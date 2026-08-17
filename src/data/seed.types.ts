@@ -364,6 +364,8 @@ export interface System {
   country?: string
   state?: string
   timeGroup: string
+  /** Active hosted Tenant that currently governs the System Time Group. */
+  timeGroupGovernanceTenantId?: string
   timeGroupAlert?: string
   operationalStatus: string
   remarks?: RemarkRecord[]

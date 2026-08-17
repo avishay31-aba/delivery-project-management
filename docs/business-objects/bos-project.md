@@ -532,3 +532,7 @@ Do not include in V1:
 - External project-management integrations.
 - Advanced resource planning engine.
 - Advanced portfolio analytics engine beyond approved V1 dashboards/read models.
+
+## V1.2 Geography and Time Group Authority
+
+Project Country follows its Opportunity/Customer geography. Project Time Zone derives from Country/State, and Project Time Group is populated only by resolving that Time Zone through active Time Group Settings. Region is not a fallback, and System veteran-Tenant governance never determines Project Time Group.

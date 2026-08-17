@@ -243,3 +243,7 @@ Do not include in V1:
 - CRM integration framework.
 - Customer-specific metadata customization.
 - Generic account object builder.
+
+## V1.2 Geography Authority
+
+Customer Country/State is the business geography origin for Opportunity, Project, and Tenant. Time Zone derives from Country/State and Time Group resolves only from that Time Zone through active Time Group Settings; Region is never a Time Group fallback.

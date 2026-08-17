@@ -20,6 +20,8 @@ export interface AllocationActionResult {
   allocationId?: string
   tenantId?: string
   requiresTimeGroupOverride?: boolean
+  currentSystemTimeGroup?: string
+  incomingTenantTimeGroup?: string
 }
 
 export interface AllocationValidationContext {

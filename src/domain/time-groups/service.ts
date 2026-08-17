@@ -207,15 +207,38 @@ function activeHostingDateForTenant(tenant: Tenant, systemId: string): string {
   return activeHistory?.startedAt || tenant.createdAt || ''
 }
 
+export function tenantCanGovernSystemTimeGroup(tenant: Tenant): boolean {
+  const type = tenant.tenantFormType ?? tenant.tenantType
+  return type === 'CUSTOMER' || type === 'POC'
+}
+
 export function mostVeteranActiveTenantForSystem(systemId: string, tenants: Tenant[]): Tenant | undefined {
   return tenants
-    .filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId))
+    .filter((tenant) => tenantCanGovernSystemTimeGroup(tenant) && tenantIsActivelyHostedBySystem(tenant, systemId))
     .sort((first, second) => {
       const firstDate = activeHostingDateForTenant(first, systemId)
       const secondDate = activeHostingDateForTenant(second, systemId)
       if (firstDate !== secondDate) return firstDate.localeCompare(secondDate)
       return first.tid.localeCompare(second.tid, undefined, { numeric: true, sensitivity: 'base' })
     })[0]
+}
+
+export function systemTimeGroupSource(
+  system: Pick<System, 'id' | 'timeGroupGovernanceTenantId'>,
+  tenants: Tenant[],
+  records: TimeGroupLookupRecord[],
+): { timeGroup: string; tenant?: Tenant; timeZone: string } {
+  const explicitGovernor = system.timeGroupGovernanceTenantId
+    ? tenants.find((tenant) =>
+        tenant.id === system.timeGroupGovernanceTenantId &&
+        tenantCanGovernSystemTimeGroup(tenant) &&
+        tenantIsActivelyHostedBySystem(tenant, system.id),
+      )
+    : undefined
+  const tenant = explicitGovernor ?? mostVeteranActiveTenantForSystem(system.id, tenants)
+  if (!tenant) return { timeGroup: '', tenant: undefined, timeZone: '' }
+  const derived = tenantTimeGroupFromLocation(tenant, records)
+  return { timeGroup: derived.timeGroup, tenant, timeZone: derived.timeZone }
 }
 
 export function systemTimeGroupFromVeteranTenant(
@@ -231,20 +254,20 @@ export function systemTimeGroupFromVeteranTenant(
 
 export function systemTimeGroupChangeMessage(systemIdLabel: string, previous: string, next: string, veteranTenant?: Tenant): string {
   if (previous && next) {
-    return `System ${systemIdLabel} Time Group changed from ${previous} to ${next}. The value is now derived from Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
+    return `System ${systemIdLabel} Time Group changed from ${previous} to ${next}. The value is now governed by active Customer/POC Tenant ${veteranTenant?.tid ?? '-'}.`
   }
   if (previous && !next) {
     return `System ${systemIdLabel} Time Group changed from ${previous} to empty because the System no longer has an active hosted Tenant.`
   }
-  return `System ${systemIdLabel} Time Group was set to ${next}, based on Tenant ${veteranTenant?.tid ?? '-'}, the most veteran active hosted Tenant.`
+  return `System ${systemIdLabel} Time Group was set to ${next}, based on active Customer/POC Tenant ${veteranTenant?.tid ?? '-'}.`
 }
 
 export function systemsWithDerivedTimeGroups<T extends System>(systems: T[], tenants: Tenant[], records: TimeGroupLookupRecord[]): T[] {
   return systems.map((system) => {
-    const derived = systemTimeGroupFromVeteranTenant(system.id, tenants, records)
-    return derived.timeGroup === system.timeGroup
+    const source = systemTimeGroupSource(system, tenants, records)
+    return source.timeGroup === system.timeGroup && source.tenant?.id === system.timeGroupGovernanceTenantId
       ? system
-      : { ...system, timeGroup: derived.timeGroup }
+      : { ...system, timeGroup: source.timeGroup, timeGroupGovernanceTenantId: source.tenant?.id }
   })
 }
 
@@ -258,7 +281,7 @@ export function linkedSidsForTimeGroup(
     systems
       .filter((system) => {
         if (!('sid' in system)) return false
-        return systemTimeGroupFromVeteranTenant(system.id, tenants, records).timeGroup === record.timeGroup
+        return systemTimeGroupSource(system, tenants, records).timeGroup === record.timeGroup
       })
       .map((system) => ('sid' in system ? system.sid : 'machineId' in system ? system.machineId : ''))
       .filter((value): value is string => Boolean(value)),

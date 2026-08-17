@@ -93,12 +93,15 @@ function projectLocationContext(
   const country = linkedOpportunity?.country ?? account?.country ?? project.country ?? ''
   const state = linkedOpportunity?.state ?? account?.state ?? project.state ?? ''
   const businessRegion = getBusinessRegionForCountry(country, state)
+  const timeZone = projectTimeZoneDisplayValue(country, state, project.deliveryDate)
   return {
     region: businessRegion || (project.region ?? ''),
     country,
     state,
-    timeZone: projectTimeZoneDisplayValue(country, state, project.deliveryDate),
-    timeGroup: businessRegion || (project.timeGroup ?? ''),
+    timeZone,
+    // The store resolves the active Time Group Settings row from this Time Zone.
+    // Never use Region or a stale persisted value as a Time Group fallback.
+    timeGroup: timeZone ? (project.timeGroup ?? '') : '',
   }
 }
 
