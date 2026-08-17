@@ -9,6 +9,7 @@ interface TenantWarrantyContractSectionsProps {
   emptyTextForSection: (title: string) => string
   headingLevel?: 'h3' | 'h4'
   actions?: (tenant: Tenant, system: System | undefined) => ReactNode
+  governingTenantId?: string
 }
 
 export function TenantWarrantyContractSections({
@@ -17,6 +18,7 @@ export function TenantWarrantyContractSections({
   emptyTextForSection,
   headingLevel = 'h4',
   actions,
+  governingTenantId,
 }: TenantWarrantyContractSectionsProps) {
   const sections = useMemo(() => tenantsGroupedByDerivedWarrantyContractStatus(tenants), [tenants])
   const Heading = headingLevel
@@ -34,6 +36,7 @@ export function TenantWarrantyContractSections({
             systems={systems}
             emptyText={emptyTextForSection(section.title)}
             actions={actions}
+            governingTenantId={governingTenantId}
           />
         </section>
       ))}
