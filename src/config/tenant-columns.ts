@@ -1,8 +1,9 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, BusinessIdListLinks, CountryFlag, OperationalStatusIcon, WarrantyStatusPresentation } from '@/components/ui'
-import type { Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { effectiveTenantOperationalMode, inheritedTenantMapCenter, tenantDeliveryPidDisplay, tenantDerivedWarrantyContractStatus, tenantPocPidDisplay, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon, WarrantyStatusPresentation } from '@/components/ui'
+import type { Account, Opportunity, Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
+import { effectiveTenantOperationalMode, tenantActivePocProject, tenantDashboardProjectPids, tenantDashboardRequirementIds, tenantDerivedWarrantyContractStatus } from '@/domain/tenant-operations'
+import { warrantyCollectionReadModel } from '@/domain/warranty-collection'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
@@ -46,7 +47,19 @@ function tenantRuntimeColumn(
   return column
 }
 
-export function createTenantColumns(systems: System[], projects: Project[] = [], projectTenants: ProjectTenantLink[] = []): DashboardColumn<Tenant>[] {
+export function createTenantColumns(
+  systems: System[],
+  projects: Project[] = [],
+  projectTenants: ProjectTenantLink[] = [],
+  opportunities: Opportunity[] = [],
+  accounts: Account[] = [],
+): DashboardColumn<Tenant>[] {
+  const accountForTenant = (tenant: Tenant) => accounts.find((account) => account.id === tenant.accountId)
+  const regionForTenant = (tenant: Tenant) => accountForTenant(tenant)?.region ?? ''
+  const warrantyRows = (tenant: Tenant) => warrantyCollectionReadModel(tenant.warranties ?? [], tenant.tid)
+  const currentWarranty = (tenant: Tenant) => warrantyRows(tenant).find((row) => row.successorRefs.length === 0)?.warranty
+  const initialWarranty = (tenant: Tenant) => warrantyRows(tenant).find((row) => row.firstWarranty)?.warranty
+
   return [
     { id: 'tid', label: 'TID', getValue: (row) => row.tid, render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tid }, row.tid) },
     {
@@ -56,22 +69,31 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
       render: (row) => createElement(BusinessIdLink, { objectType: 'SYSTEM', businessId: sidForTenant(row, systems) }, sidForTenant(row, systems)),
     },
     {
-      id: 'pocPid',
-      label: 'POC PID',
-      getValue: (row) => tenantPocPidDisplay(row, projects, projectTenants),
-      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantPocPidDisplay(row, projects, projectTenants) }),
+      id: 'pid',
+      label: 'PID',
+      getValue: (row) => tenantDashboardProjectPids(row, projects, projectTenants),
+      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDashboardProjectPids(row, projects, projectTenants) }),
+    },
+    { id: 'tenantType', label: 'Tenant Type', getValue: (row) => row.tenantType === 'PENLINK_INTERNAL' ? 'Internal' : row.tenantType === 'POC' ? 'POC' : 'Customer' },
+    { id: 'accountName', label: 'Account Name', getValue: (row) => accountForTenant(row)?.accountName ?? row.accountName },
+    { id: 'region', label: 'Region', getValue: regionForTenant },
+    {
+      id: 'tenantStatus',
+      label: 'Operational Status',
+      getValue: (row) => effectiveTenantOperationalMode(row, systemForTenant(row, systems)),
+      render: (row) => createElement(OperationalStatusIcon, { status: effectiveTenantOperationalMode(row, systemForTenant(row, systems)), showLabel: true }),
     },
     {
-      id: 'deliveryPid',
-      label: 'Delivery PID',
-      getValue: (row) => tenantDeliveryPidDisplay(row, projects, projectTenants),
-      render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDeliveryPidDisplay(row, projects, projectTenants) }),
+      ...tenantRuntimeColumn('warrantyStatus'),
+      getValue: (row) => row.tenantType === 'CUSTOMER' ? tenantDerivedWarrantyContractStatus(row).label : '',
+      render: (row) => row.tenantType === 'CUSTOMER' ? createElement(WarrantyStatusPresentation, {
+        status: tenantDerivedWarrantyContractStatus(row).visualStatus,
+        label: tenantDerivedWarrantyContractStatus(row).label,
+        tooltip: `Tenant warranty status: ${tenantDerivedWarrantyContractStatus(row).label}`,
+      }) : '',
     },
-    { id: 'requirementId', label: 'Requirement ID', getValue: (row) => tenantRequirementIdDisplay(row) },
-    { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName ?? `${row.tid} ${row.accountName}`.trim() },
-    { id: 'accountName', label: 'Customer / End User / Account', getValue: (row) => row.accountName },
+    { id: 'requirementId', label: 'Requirement ID', getValue: (row) => tenantDashboardRequirementIds(row, projects, projectTenants, opportunities) },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
-    { id: 'systemVersion', label: 'Version', getValue: (row) => systemVersionForTenant(row, systems) },
     {
       id: 'systemUrl',
       label: 'System URL',
@@ -92,17 +114,10 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
         )
       },
     },
-    { id: 'accountId', label: 'Account ID', getValue: (row) => row.accountId },
+    { id: 'systemVersion', label: 'System Version', getValue: (row) => systemVersionForTenant(row, systems) },
     { id: 'hosting', label: 'Hosting', getValue: (row) => row.hostingType ?? '' },
-    { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '' },
-    {
-      id: 'mapCenter',
-      label: 'Map Center',
-      getValue: (row) => inheritedTenantMapCenter(row, systems),
-      render: (row) => createElement(CountryFlag, { value: inheritedTenantMapCenter(row, systems), country: row.country }),
-    },
-    { id: 'licenses', label: 'Licenses', getValue: (row) => row.licenses ?? '' },
-    { id: 'users', label: 'Users', getValue: (row) => row.users ?? '' },
+    { id: 'cloudPlatform', label: 'Platform', getValue: (row) => row.cloudPlatform ?? '' },
+    { id: 'users', label: 'Number of Users', getValue: (row) => row.users ?? '' },
     { id: 'concurrentSearches', label: 'Concurrent Searches', getValue: (row) => row.concurrentSearches ?? '' },
     { id: 'concurrentAnalyses', label: 'Concurrent Analyses', getValue: (row) => row.concurrentAnalyses ?? '' },
     { id: 'topicAnalysis', label: 'Topic Analysis', getValue: (row) => row.topicAnalyses ?? '' },
@@ -120,29 +135,12 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     { id: 'aiFeatures', label: 'AI Features', getValue: (row) => joinValues(row.aiFeatures) },
     { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
-    {
-      id: 'tenantStatus',
-      label: 'Tenant Status',
-      getValue: (row) => effectiveTenantOperationalMode(row, systemForTenant(row, systems)),
-      render: (row) => createElement(OperationalStatusIcon, { status: effectiveTenantOperationalMode(row, systemForTenant(row, systems)), showLabel: true }),
-    },
-    {
-      ...tenantRuntimeColumn('warrantyStatus'),
-      getValue: (row) => row.tenantType === 'CUSTOMER' ? tenantDerivedWarrantyContractStatus(row).label : '',
-      render: (row) => {
-        if (row.tenantType !== 'CUSTOMER') return ''
-        const headerStatus = tenantDerivedWarrantyContractStatus(row)
-        return createElement(WarrantyStatusPresentation, {
-          status: headerStatus.visualStatus,
-          label: headerStatus.label,
-          tooltip: `Tenant warranty status: ${headerStatus.label}`,
-        })
-      },
-    },
-    { id: 'warrantyStartDate', label: 'Warranty Start Date', getValue: (row) => row.warrantyStartDate ?? '', semanticType: 'date' },
-    { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.warrantyEndDate ?? '', editable: true, editKey: 'warrantyEndDate', semanticType: 'date' },
-    { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editable: true, editKey: 'pocStartDate', semanticType: 'date' },
-    { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '', editable: true, editKey: 'pocEndDate', semanticType: 'date' },
-    { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
+    { id: 'warrantyInitialDate', label: 'Warranty Initial Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? initialWarranty(row)?.initialWarrantyDate ?? '' : '', semanticType: 'date' },
+    { id: 'warrantyStartDate', label: 'Warranty Start Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? currentWarranty(row)?.startDate ?? '' : '', semanticType: 'date' },
+    { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? currentWarranty(row)?.endDate ?? '' : '', semanticType: 'date' },
+    { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => tenantActivePocProject(row, projects, projectTenants)?.pocStartDate ?? '', semanticType: 'date' },
+    { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => tenantActivePocProject(row, projects, projectTenants)?.pocEndDate ?? '', semanticType: 'date' },
+    { id: 'updatedAt', label: 'Update Date', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
+    { id: 'creationDate', label: 'Creation Date', getValue: (row) => row.createdAt, semanticType: 'datetime' },
   ]
 }

@@ -109,6 +109,7 @@ import {
   TENANT_OPERATIONAL_STATUS_CANCELLED,
   TENANT_OPERATIONAL_STATUS_DELETED,
   tenantIsActivelyHostedBySystem,
+  tenantFormType,
   tenantCreationDraftFromSource,
   tenantConfigurationSaveDraft,
   validateTenantMoveDestination,
@@ -665,16 +666,6 @@ function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['
     timeGroup: location.timeGroup,
     timeZone: location.timeZone,
   }
-}
-
-function appendUniqueSemicolonValue(current: string | null | undefined, value: string | null | undefined): string {
-  const nextValue = String(value ?? '').trim()
-  const values = String(current ?? '')
-    .split(';')
-    .map((candidate) => candidate.trim())
-    .filter(Boolean)
-  if (nextValue && !values.includes(nextValue)) values.push(nextValue)
-  return values.join('; ')
 }
 
 function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): string[] {
@@ -2921,12 +2912,35 @@ export const useAppStore = create<AppStore>((set, get) => ({
           excludeFields: ['tasks', 'milestones', 'progressStatus'],
         })
       })
+      const isApprovedPocConversion = shouldSyncWonRelationships &&
+        result.opportunity.subType === 'UPSELL' &&
+        (result.opportunity.type === 'DELIVERY' || result.opportunity.type === 'RENEWAL')
+      const conversionTenantIds = new Set(
+        isApprovedPocConversion
+          ? result.opportunity.changeRequestRequirements.map((requirement) => requirement.tenantId)
+          : [],
+      )
+      const tenants = currentState.tenants.map((tenant) => {
+        if (!conversionTenantIds.has(tenant.id) || tenant.tenantType !== 'POC') return tenant
+        const hostingSystem = currentState.systems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
+        if (hostingSystem?.systemClass !== 'CUSTOMER' || tenant.operationalStatus === 'Deleted' || tenant.operationalStatus === 'Cancelled') return tenant
+        activityEvents = appendActivityEvent(activityEvents, now, {
+          category: 'TENANT',
+          eventType: 'tenant.pocConvertedToCustomerFromUpsell',
+          severity: 'SUCCESS',
+          summary: `Tenant ${tenant.tid} converted from POC to Customer through ${projectForRelationshipSync?.pid ?? 'the Upsell Project'}.`,
+          primaryObject: tenantRef(tenant),
+          relatedObjects: relatedRefs(projectForRelationshipSync ? projectRef(projectForRelationshipSync) : null, customerRef(account)),
+        })
+        return { ...tenant, tenantType: 'CUSTOMER' as const, tenantFormType: 'CUSTOMER' as const, updatedAt: now }
+      })
       return {
         idCounters: result.idCounters,
         projects,
         systems: relationshipState.systems,
         projectSystems: relationshipState.projectSystems,
         projectTenants: relationshipState.projectTenants,
+        tenants,
         activityEvents,
         projectLifecycleChangesByOpportunityId: {
           ...currentState.projectLifecycleChangesByOpportunityId,

@@ -419,6 +419,8 @@ ActivityLog owns event shape, selectors, and timeline presentation.
 - Shared Configuration Renderer
 - Shared Delivery Tables
 - DataDashboard for Project dashboard
+
+An Upsell Project that selects an existing eligible POC Tenant retains the historical POC relationship and adds its own Project-Tenant relationship. The System currently hosting that Tenant is visible through the Project-System relationship without allocating or creating a duplicate System solely for visibility.
 - FormField / read-only field components
 - DocumentsPanel / document display components where relevant
 - ClampedTableCellContent
