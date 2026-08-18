@@ -128,8 +128,9 @@ export function createTenantColumns(systems: System[], projects: Project[] = [],
     },
     {
       ...tenantRuntimeColumn('warrantyStatus'),
-      getValue: (row) => tenantDerivedWarrantyContractStatus(row).label,
+      getValue: (row) => row.tenantType === 'CUSTOMER' ? tenantDerivedWarrantyContractStatus(row).label : '',
       render: (row) => {
+        if (row.tenantType !== 'CUSTOMER') return ''
         const headerStatus = tenantDerivedWarrantyContractStatus(row)
         return createElement(WarrantyStatusPresentation, {
           status: headerStatus.visualStatus,

@@ -19,7 +19,7 @@ import { normalizeEngagementCircleSnapshot } from '@/domain/engagement-circle'
 import { normalizeRemarks } from '@/domain/remarks'
 import { SYSTEM_SOURCE_REUSED_INTERNAL, systemSource } from '@/domain/system-inventory'
 import { daysBeforeExpiration, daysBetween, normalizeTenantWarranties } from '@/domain/warranty-collection'
-import { isManualTenantOperationalMode, tenantFormType, tenantFormTypeForSystem } from './service'
+import { isManualTenantOperationalMode, tenantFormType } from './service'
 import type { TenantConfigurationSaveDraft, TenantCreationDraft, TenantCreationSource } from './types'
 
 export function cloneTenant(tenant: Tenant): Tenant {
@@ -291,15 +291,15 @@ export function tenantDraftWithAttachedSystem(
   nextProject: Project | undefined,
   attachedAt: string,
 ): Tenant {
-  const nextType = nextSystem ? tenantFormTypeForSystem(nextSystem) : tenantFormType(tenant)
   return {
     ...tenant,
     systemId: nextSystemId,
     hostedSystemId: nextSystemId,
     hostingSid: nextSystem?.sid ?? '',
     deliveryPid: nextProject?.pid ?? '',
-    tenantType: nextType === 'INTERNAL' ? 'PENLINK_INTERNAL' : nextType === 'POC' ? 'POC' : 'CUSTOMER',
-    tenantFormType: nextType,
+    // Tenant Type is creation-owned identity and is not recalculated by a move.
+    tenantType: tenant.tenantType,
+    tenantFormType: tenantFormType(tenant),
     productType: nextSystem?.productType ?? tenant.productType,
     hostedSystemHistory: nextSystemId
       ? [
