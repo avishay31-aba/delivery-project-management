@@ -1019,8 +1019,13 @@ export function OpportunityFormPage() {
     [draft, systems],
   )
   const accountTenants = useMemo(
-    () => (draft ? getAccountTenants(draft.accountId, tenants).filter((tenant) => tenantFormType(tenant) !== 'INTERNAL') : []),
-    [draft, tenants],
+    () => (draft ? getAccountTenants(draft.accountId, tenants).filter((tenant) => {
+      if (tenantFormType(tenant) === 'CUSTOMER') return true
+      if (tenantFormType(tenant) !== 'POC') return false
+      const hostingSystem = systems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
+      return hostingSystem?.systemClass === 'CUSTOMER' && tenant.operationalStatus !== 'Deleted' && tenant.operationalStatus !== 'Cancelled'
+    }) : []),
+    [draft, systems, tenants],
   )
   const createdProjects = useMemo(
     () =>
@@ -1830,7 +1835,7 @@ export function OpportunityFormPage() {
   function renderExistingTenantsAndSystemsSection() {
     const tenantSystemIds = new Set(accountTenants.map((tenant) => tenant.systemId))
     const systemOnlyRows = accountSystems.filter((system) => !tenantSystemIds.has(system.id))
-    const colSpan = 9
+    const colSpan = 10
 
     return (
       <CollapsibleSection
@@ -1849,6 +1854,7 @@ export function OpportunityFormPage() {
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Tenant Name</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">SID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Delivery PID</th>
+                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Project Type</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Requirement ID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Current product/config summary</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Warranty status</th>
@@ -1872,6 +1878,7 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">
                       {tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : ''}
                     </td>
+                    <td className="border border-sf-border px-2 py-1">{projects.find((project) => project.pid === tenant.deliveryPid)?.mainType ?? ''}</td>
                     <td className="border border-sf-border px-2 py-1">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                     <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
                     <td className="border border-sf-border px-2 py-1">
@@ -1894,6 +1901,7 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">
                       {system.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={system.deliveryPid}>{system.deliveryPid}</BusinessIdLink> : ''}
                     </td>
+                    <td className="border border-sf-border px-2 py-1">{projects.find((project) => project.pid === system.deliveryPid)?.mainType ?? ''}</td>
                     <td className="border border-sf-border px-2 py-1" />
                     <td className="border border-sf-border px-2 py-1">
                       {[system.productType, system.hostingType, system.cloudPlatform].filter(Boolean).join(' | ')}

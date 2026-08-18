@@ -512,3 +512,7 @@ Do not include in V1:
 ## V1.2 Geography, Configuration, and Hosting
 
 Tenant geography follows its Project/Customer context. Country/State derives Time Zone and active Time Group Settings resolves Time Group; absent Time Zone produces no Time Group and Region is not a fallback. Tenant Configuration is Tenant-owned and editable through its existing save/history boundary. The hosted System Application Configuration Summary is a distinct read-only System-owned aggregation.
+
+Tenant Type is not manually editable after creation. The only lifecycle-controlled exception is POC-to-Customer conversion through fulfillment of a Delivery-Upsell or Renewal-Upsell Change Request for a surviving POC Tenant already hosted on a Production System. The same Tenant and System are retained; historical POC Project/Requirement relationships remain intact; the new Upsell Project/Requirement relationships are additional and Activity records the transition. Customer warranty rules apply only after conversion.
+
+The Tenant Dashboard uses one multi-value PID column and one relationship-aware multi-value Requirement ID column, each derived from all currently active Project-Tenant relationships without artificial precedence. Account Name and Region remain Tenant Customer/Account-context values. Its approved default order ends with Warranty Initial/Start/End Date, active POC Project Start/End Date, Update Date, and Creation Date; Creation Date is last.

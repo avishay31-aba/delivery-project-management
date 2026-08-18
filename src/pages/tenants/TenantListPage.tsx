@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/useAppStore'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
+import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/components/record'
 import { createTenantColumns } from '@/config/tenant-columns'
 import { tenantReference } from '@/domain/business-reference'
 import { TENANT_DASHBOARD_COLOR_LEGEND, tenantDashboardRowClassName } from '@/domain/tenant-operations'
@@ -14,15 +14,17 @@ const tenants = useAppStore((s) => s.tenants)
 const systems = useAppStore((s) => s.systems)
 const projects = useAppStore((s) => s.projects)
 const projectTenants = useAppStore((s) => s.projectTenants)
+const opportunities = useAppStore((s) => s.opportunities)
+const accounts = useAppStore((s) => s.accounts)
 const updateTenant = useAppStore((s) => s.updateTenant)
 const createTenant = useAppStore((s) => s.createTenant)
-const tenantListColumns = createTenantColumns(systems, projects, projectTenants)
+const tenantListColumns = createTenantColumns(systems, projects, projectTenants, opportunities, accounts)
 
 return (
 <WorkspaceFrame>
 <PageHeader title="Tenants" subtitle="Tenant list with warranty columns" />
 
-<WorkspaceScrollContent>
+<WorkspaceDashboardContent>
   <DataDashboard
     title="Tenant list"
     dashboardScope="tenants"
@@ -58,7 +60,7 @@ return (
       if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
     }}
   />
-</WorkspaceScrollContent>
+</WorkspaceDashboardContent>
 </WorkspaceFrame>
 )
 }

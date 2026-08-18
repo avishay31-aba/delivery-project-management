@@ -1,5 +1,5 @@
 export { PageHeader } from '@/components/record/PageHeader'
 export { TabPanel } from '@/components/record/TabPanel'
-export { WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record/WorkspaceFrame'
+export { WorkspaceDashboardContent, WorkspaceFrame, WorkspaceScrollContent, WorkspaceTabs } from '@/components/record/WorkspaceFrame'
 export type { WorkspaceTabDefinition } from '@/components/record/WorkspaceFrame'
 export type { TabDefinition } from '@/components/record/TabPanel'

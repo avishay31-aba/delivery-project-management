@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DataDashboard } from '@/components/dashboard'
-import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
+import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/components/record'
 import { createWarrantyColumns } from '@/config/warranty-columns'
 import type { Tenant } from '@/data/seed.types'
 import {
@@ -72,8 +72,8 @@ export function WarrantyDashboardPage() {
     <WorkspaceFrame>
       <PageHeader title="Warranty Workspace" subtitle="Operational warranty work queue" />
 
-      <WorkspaceScrollContent className="space-y-4">
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+      <section className="grid shrink-0 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {KPI_LABELS.map((item) => (
           <div key={item.key} className="rounded border border-sf-border bg-white p-3">
             <div className="text-xs font-semibold uppercase text-sf-text-muted">{item.label}</div>
@@ -82,7 +82,7 @@ export function WarrantyDashboardPage() {
         ))}
       </section>
 
-      <DataDashboard
+      <WorkspaceDashboardContent><DataDashboard
         title="Warranty Workspace"
         dashboardScope="warranties"
         rows={rows}
@@ -96,8 +96,8 @@ export function WarrantyDashboardPage() {
           const routePath = routePathForBusinessReference('TENANT', row.tenantTid)
           if (routePath) navigate(routePath, { state: { mode: 'edit' } })
         }}
-      />
-      </WorkspaceScrollContent>
+      /></WorkspaceDashboardContent>
+      </div>
     </WorkspaceFrame>
   )
 }

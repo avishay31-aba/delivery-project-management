@@ -16,7 +16,7 @@ import {
   validateDashboardViewName,
 } from './validation'
 
-const FIXED_DASHBOARD_SOURCE_COLUMN_IDS = new Set(['__rowIndicator', '__createdAt', 'creationDate', '__labels', 'labels'])
+const FIXED_DASHBOARD_SOURCE_COLUMN_IDS = new Set(['__rowIndicator'])
 
 export function createEmptyScopeViews(): DashboardViewsForScope {
   return {

@@ -356,6 +356,8 @@ System may trigger or coordinate:
 
 System must not directly execute Project delivery lifecycle, Opportunity lifecycle, Warranty chain behavior, or RequirementCoverage validation calculations.
 
+When an approved Delivery/Renewal Upsell retains an eligible POC Tenant already hosted on a Production System, the existing System remains the hosting System and is related to the Upsell Project for visibility; no duplicate allocation resource is created merely to represent the retained Tenant.
+
 ## 16. Statuses Owned
 
 SystemInventory owns:

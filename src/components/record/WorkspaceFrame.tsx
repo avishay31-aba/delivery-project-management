@@ -90,3 +90,11 @@ export function WorkspaceScrollContent({ children, className = '', viewMode = fa
     </div>
   )
 }
+
+export function WorkspaceDashboardContent({ children, className = '' }: Omit<WorkspaceScrollContentProps, 'viewMode'>) {
+  return (
+    <div className={['min-h-0 min-w-0 flex-1 overflow-hidden', className].filter(Boolean).join(' ')}>
+      {children}
+    </div>
+  )
+}

@@ -203,6 +203,8 @@ Do not invent Activity integration unless event selectors/emission exist.
 - RichTextEditor for free-text fields if present
 - Configuration renderer for requirement configuration fields
 - DataDashboard for Opportunity dashboard
+
+Customer Existing Tenants / Systems includes Customer Tenants and surviving POC Tenants only when hosted on a Production System; Deleted/Cancelled POC Tenants and POC-only infrastructure are excluded. Project Type follows Delivery PID in the table and is relationship-derived. Delivery-Upsell and Renewal-Upsell may select an eligible POC Tenant as an existing-Tenant Change Request; fulfillment reuses the Tenant and hosting System and must not create a duplicate Tenant.
 - Shared table cells / clamped cell content
 - Dialog components where existing
 

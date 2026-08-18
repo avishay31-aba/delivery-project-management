@@ -138,72 +138,16 @@ const COLUMN_DRAG_DATA_TYPE = 'application/x-dashboard-column-id'
 const ACTION_COLUMN_ID = '__actions'
 const ROW_INDICATOR_COLUMN_ID = '__rowIndicator'
 const CREATION_DATE_COLUMN_ID = '__createdAt'
-const LABELS_COLUMN_IDS = new Set(['__labels', 'labels'])
-const FIXED_SOURCE_COLUMN_IDS = new Set([ROW_INDICATOR_COLUMN_ID, CREATION_DATE_COLUMN_ID, 'creationDate', ...LABELS_COLUMN_IDS])
+const FIXED_SOURCE_COLUMN_IDS = new Set([ROW_INDICATOR_COLUMN_ID])
 const FREEZE_ELIGIBLE_COLUMN_LIMIT = 5
-const BUSINESS_IDENTIFIER_COLUMN_PRIORITY = [
-  'accountCode',
-  'customerId',
-  'opportunityId',
-  'oid',
-  'pid',
-  'deliveryPid',
-  'requirementId',
-  'pocPid',
-  'sid',
-  'machineId',
-  'mid',
-  'tid',
-  'warrantyId',
-  'activityId',
-  'eventId',
-  'documentId',
-]
-const BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE: Partial<Record<DashboardViewScope, string[]>> = {
-  customers: ['accountCode', 'customerId'],
-  opportunities: ['opportunityId', 'oid', 'accountCode'],
-  projects: ['pid', 'opportunityId'],
-  deletedProjects: ['deletedBy', 'deletionReason', 'pid', 'opportunityId'],
-  systems: ['sid', 'machineId', 'mid', 'projects', 'pid'],
-  productionSystemInventory: ['sid'],
-  reusedInternalSystems: ['machineId', 'mid', 'sid'],
-  tenants: ['tid', 'sid', 'pocPid', 'deliveryPid', 'pid', 'requirementId', 'systemVersion', 'systemUrl', 'accountId'],
-  warranties: ['warrantyId', 'tid'],
-  activityLog: ['activityId', 'eventId'],
-  infrastructure: ['infrastructureId', 'identifier'],
-  infrastructurePlannedMaintenance: ['taskId', 'infrastructureItemId'],
-  infrastructureCurrentMaintenance: ['taskId', 'infrastructureItemId'],
-}
 function joinClassNames(...classNames: Array<string | false | undefined>): string {
   return classNames.filter(Boolean).join(' ')
 }
 
-function isBusinessIdentifierColumn<T>(column: DashboardColumn<T>, dashboardScope: DashboardViewScope): boolean {
-  if (column.promoteAsBusinessIdentifier === false) return false
-  if ((BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE[dashboardScope] ?? []).includes(column.id)) return true
-  if (BUSINESS_IDENTIFIER_COLUMN_PRIORITY.includes(column.id)) return true
-  return /\b(ID|PID|SID|MID|TID|CID|OID)\b/i.test(column.label)
-}
-
 function orderedDashboardColumns<T>(
   columns: DashboardColumn<T>[],
-  dashboardScope: DashboardViewScope,
 ): DashboardColumn<T>[] {
-  const scopedPriority = BUSINESS_IDENTIFIER_COLUMN_PRIORITY_BY_SCOPE[dashboardScope] ?? []
-  const columnPriority = [...scopedPriority, ...BUSINESS_IDENTIFIER_COLUMN_PRIORITY.filter((columnId) => !scopedPriority.includes(columnId))]
-  const priorityByColumnId = new Map(columnPriority.map((columnId, index) => [columnId, index]))
-  const businessIdColumns = columns
-    .filter((column) => isBusinessIdentifierColumn(column, dashboardScope))
-    .sort((first, second) =>
-      (priorityByColumnId.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
-      (priorityByColumnId.get(second.id) ?? Number.MAX_SAFE_INTEGER),
-    )
-  const businessIdColumnIds = new Set(businessIdColumns.map((column) => column.id))
-  return [...businessIdColumns, ...columns.filter((column) => !businessIdColumnIds.has(column.id))]
-}
-
-function isCreationDateColumn<T>(column: DashboardColumn<T>): boolean {
-  return column.id === 'creationDate' || column.label.trim().toLocaleLowerCase() === 'creation date'
+  return columns
 }
 
 function isFixedDashboardColumn(columnId: string): boolean {
@@ -211,7 +155,7 @@ function isFixedDashboardColumn(columnId: string): boolean {
 }
 
 function canOpenColumnMenu(columnId: string): boolean {
-  return !LABELS_COLUMN_IDS.has(columnId) && columnId !== ROW_INDICATOR_COLUMN_ID && columnId !== ACTION_COLUMN_ID
+  return columnId !== ROW_INDICATOR_COLUMN_ID && columnId !== ACTION_COLUMN_ID
 }
 
 function DashboardColorLegend({ items }: { items: DashboardColorLegendItem[] }) {
@@ -308,10 +252,6 @@ export function DashboardActionButton({
       {icon}
     </button>
   )
-}
-
-function creationDateValue(row: unknown): string {
-  return formatSemanticDateTimeValue((row as { createdAt?: string }).createdAt, 'datetime')
 }
 
 function inferredDatePresentationType<T>(column: DashboardColumn<T>, raw: string): DateTimeSemanticType | undefined {
@@ -1003,9 +943,20 @@ export function DataDashboard<T extends { id: string }>({
   const effectivePageSizeDefault = effectiveRecordsPerPage(userPresentationPreferences, CURRENT_USER_ID, pageSizePreferenceContext)
   const initialSortingKey = JSON.stringify(initialSorting)
   const defaultSorting = useMemo(() => initialSorting, [initialSortingKey])
-  const orderedColumns = useMemo(() => orderedDashboardColumns(columns, dashboardScope), [columns, dashboardScope])
-  const authoritativeCreationDateColumn = useMemo(() => orderedColumns.find(isCreationDateColumn), [orderedColumns])
-  const creationDateColumnId = authoritativeCreationDateColumn?.id ?? CREATION_DATE_COLUMN_ID
+  const orderedColumns = useMemo(() => {
+    const suppliedColumns = orderedDashboardColumns(columns)
+    const hasCreationDate = suppliedColumns.some(
+      (column) => column.id === CREATION_DATE_COLUMN_ID || column.id === 'creationDate' || column.label.trim().toLowerCase() === 'creation date',
+    )
+    return hasCreationDate
+      ? suppliedColumns
+      : [...suppliedColumns, {
+          id: CREATION_DATE_COLUMN_ID,
+          label: 'Creation Date',
+          getValue: (row: T) => (row as T & { createdAt?: string }).createdAt ?? '',
+          semanticType: 'datetime' as const,
+        }]
+  }, [columns])
   const fullDashboardColumnVisibility = useMemo(
     () =>
       Object.fromEntries(
@@ -1015,14 +966,12 @@ export function DataDashboard<T extends { id: string }>({
       ),
     [orderedColumns],
   )
-  const hasAuthoritativeCreationDateColumn = Boolean(authoritativeCreationDateColumn)
   const sourceColumnIds = useMemo(
     () => [
       ROW_INDICATOR_COLUMN_ID,
-      creationDateColumnId,
-      ...orderedColumns.filter((column) => column.id !== creationDateColumnId).map((column) => column.id),
+      ...orderedColumns.map((column) => column.id),
     ],
-    [creationDateColumnId, orderedColumns],
+    [orderedColumns],
   )
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>(() => defaultSorting)
@@ -1141,7 +1090,6 @@ export function DataDashboard<T extends { id: string }>({
       const fixedColumnIds = [
         ROW_INDICATOR_COLUMN_ID,
         ...(enableRecordActions ? [ACTION_COLUMN_ID] : []),
-        creationDateColumnId,
       ]
       const fixedColumnIdSet = new Set(fixedColumnIds)
       return [
@@ -1149,16 +1097,15 @@ export function DataDashboard<T extends { id: string }>({
         ...columnOrder.filter((columnId) => columnId !== ACTION_COLUMN_ID && !fixedColumnIdSet.has(columnId)),
       ]
     },
-    [columnOrder, creationDateColumnId, enableRecordActions],
+    [columnOrder, enableRecordActions],
   )
   const internalColumnVisibility = useMemo(
     () => ({
       ...columnVisibility,
       [ROW_INDICATOR_COLUMN_ID]: true,
-      [creationDateColumnId]: true,
       ...(enableRecordActions ? { [ACTION_COLUMN_ID]: true } : {}),
     }),
-    [columnVisibility, creationDateColumnId, enableRecordActions],
+    [columnVisibility, enableRecordActions],
   )
   const dashboardColumnById = useMemo(
     () => new Map(orderedColumns.map((column) => [column.id, column] as const)),
@@ -1167,6 +1114,16 @@ export function DataDashboard<T extends { id: string }>({
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () => [
+      {
+        id: ROW_INDICATOR_COLUMN_ID,
+        header: 'Update/New',
+        accessorFn: (row) => recordChangeState(row as { createdAt?: string; updatedAt?: string }) ?? '',
+        enableSorting: true,
+        enableGrouping: false,
+        enableColumnFilter: true,
+        enableHiding: false,
+        cell: ({ row }) => <RowIndicator row={row.original} />,
+      },
       ...(enableRecordActions ? [{
         id: ACTION_COLUMN_ID,
         header: 'Actions',
@@ -1199,29 +1156,6 @@ export function DataDashboard<T extends { id: string }>({
           )
         },
       } satisfies ColumnDef<T>] : []),
-      {
-        id: ROW_INDICATOR_COLUMN_ID,
-        header: '',
-        accessorFn: (row) => recordChangeState(row as { createdAt?: string; updatedAt?: string }) ?? '',
-        enableSorting: true,
-        enableGrouping: false,
-        enableColumnFilter: true,
-        enableHiding: false,
-        cell: ({ row }) => <RowIndicator row={row.original} />,
-      },
-      ...(hasAuthoritativeCreationDateColumn ? [] : [{
-        id: CREATION_DATE_COLUMN_ID,
-        header: 'Creation Date',
-        accessorFn: (row) => creationDateValue(row),
-        enableSorting: true,
-        enableGrouping: false,
-        enableColumnFilter: true,
-        enableHiding: false,
-        cell: ({ row }) => {
-          const raw = creationDateValue(row.original)
-          return <ClampedTableCellContent title={raw}>{raw}</ClampedTableCellContent>
-        },
-      } satisfies ColumnDef<T>]),
       ...orderedColumns.map((column): ColumnDef<T> => ({
         id: column.id,
         header: column.label,
@@ -1229,7 +1163,7 @@ export function DataDashboard<T extends { id: string }>({
         enableSorting: column.sortable !== false,
         enableGrouping: column.groupable !== false,
         enableColumnFilter: column.filterable !== false,
-        enableHiding: column.id === creationDateColumnId ? false : undefined,
+        enableHiding: undefined,
         ...(column.sortValue
           ? {
               sortingFn: (firstRow, secondRow) => {
@@ -1260,7 +1194,7 @@ export function DataDashboard<T extends { id: string }>({
         },
       })),
     ],
-    [creationDateColumnId, dashboardScope, enableRecordActions, hasAuthoritativeCreationDateColumn, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
+    [dashboardScope, enableRecordActions, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
   )
 
   const table = useReactTable({
@@ -1297,6 +1231,7 @@ export function DataDashboard<T extends { id: string }>({
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
+    groupedColumnMode: false,
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: (updater) => {
       const next = typeof updater === 'function' ? updater(pagination) : updater
@@ -1306,18 +1241,16 @@ export function DataDashboard<T extends { id: string }>({
   const freezeColumnOptions = useMemo(
     () => {
       const visibleColumns = table.getVisibleLeafColumns()
-      const creationDateIndex = visibleColumns.findIndex((column) => column.id === creationDateColumnId)
-      const eligibleColumns = (creationDateIndex >= 0 ? visibleColumns.slice(creationDateIndex + 1) : visibleColumns)
+      const eligibleColumns = visibleColumns
         .filter((column) => !isFixedDashboardColumn(column.id))
         .slice(0, FREEZE_ELIGIBLE_COLUMN_LIMIT)
 
       return eligibleColumns.map((column) => ({
           id: column.id,
-          label: dashboardColumnById.get(column.id)?.label
-            ?? (column.id === CREATION_DATE_COLUMN_ID ? 'Creation Date' : String(column.columnDef.header ?? column.id)),
+          label: dashboardColumnById.get(column.id)?.label ?? String(column.columnDef.header ?? column.id),
         }))
     },
-    [creationDateColumnId, dashboardColumnById, table],
+    [dashboardColumnById, table],
   )
 
   useEffect(() => {
@@ -1914,16 +1847,12 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
     const effectiveRows = table.getSortedRowModel().flatRows.filter((row) => row.subRows.length === 0)
     downloadCsv(
       `${title.toLowerCase().replaceAll(' ', '-')}.csv`,
-      visibleColumns.map((column) => column.id === ROW_INDICATOR_COLUMN_ID ? 'New/Updated' : String(column.columnDef.header ?? column.id)),
+      visibleColumns.map((column) => column.id === ROW_INDICATOR_COLUMN_ID ? 'Update/New' : String(column.columnDef.header ?? column.id)),
       effectiveRows.map((row) => visibleColumns.map((column) => {
           const sourceColumn = dashboardColumnById.get(column.id)
-          return (
-            column.id === CREATION_DATE_COLUMN_ID
-              ? creationDateValue(row.original)
-              : sourceColumn
-                ? formattedDashboardCellValue(sourceColumn, String(row.getValue(column.id) ?? ''))
-                : String(row.getValue(column.id) ?? '')
-          )
+          return sourceColumn
+            ? formattedDashboardCellValue(sourceColumn, String(row.getValue(column.id) ?? ''))
+            : String(row.getValue(column.id) ?? '')
         })),
     )
   }
@@ -2274,6 +2203,9 @@ const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => 
                                   <FilterFunnelIcon className="h-3.5 w-3.5" />
                                 </span>
                               ) : null}  
+                              {grouping.includes(header.column.id) ? (
+                                <span className="text-sf-brand" title={`${String(header.column.columnDef.header)} column is grouped`} aria-label="Grouped">▦</span>
+                              ) : null}
                               {header.column.getIsSorted() === 'asc' ? '↑' : ''}
                               {header.column.getIsSorted() === 'desc' ? '↓' : ''}
                             </button>

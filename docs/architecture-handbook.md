@@ -425,6 +425,8 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - The View action, represented by an eye icon, opens the target form/workspace in read-only View mode.
 - The Edit action, represented by a pencil icon, opens the target form/workspace in Edit mode.
 - Dashboard action columns are UI controls only. They are not business data, object fields, report columns, or saved-view business columns.
+- Shared dashboards permanently fix only `Update/New` first and `Actions` second. Creation Date and Labels are ordinary business columns. Freeze Through begins with eligible business columns, and grouping preserves configured column order while presenting its indicator in the grouped column's own header.
+- Project Dashboard's constrained table frame is the approved scrolling reference. Equivalent dashboard workspaces use the shared constrained dashboard-content container so the body owns vertical scrolling, the header remains continuously visible, and horizontal header/body alignment is preserved.
 - Saved dashboard views may preserve user display preferences, but action controls must not become editable business facts or domain-owned fields.
 
 ### Business ID Link Standard

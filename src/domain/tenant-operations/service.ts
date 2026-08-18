@@ -183,6 +183,43 @@ export function tenantCurrentActiveProjects(
   )
 }
 
+export function tenantDashboardProjectPids(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): string {
+  return tenantCurrentActiveProjects(tenant, projects, projectTenants)
+    .map((project) => project.pid)
+    .filter(Boolean)
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+    .join('; ')
+}
+
+export function tenantDashboardRequirementIds(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+  opportunities: Opportunity[] = [],
+): string {
+  const requirementIds = tenantCurrentActiveProjects(tenant, projects, projectTenants).flatMap((project) => {
+    const opportunity = opportunities.find(
+      (candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId,
+    )
+    if (!opportunity) return []
+    const relationshipRequirements = [
+      ...(opportunity.changeRequestRequirements ?? []).filter((requirement) => requirement.tenantId === tenant.id),
+      ...(opportunity.standardRenewalRequirements ?? []).filter((requirement) => requirement.tenantId === tenant.id),
+      ...(opportunity.newTenantRequirements ?? []).filter(
+        (requirement) => requirement.requirementId === tenant.sourceRequirementId || requirement.id === tenant.sourceRequirementId,
+      ),
+    ]
+    return relationshipRequirements.map((requirement) => requirement.requirementId).filter(Boolean)
+  })
+  return Array.from(new Set(requirementIds))
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+    .join('; ')
+}
+
 export function tenantActivePocProject(
   tenant: Tenant,
   projects: Project[],
