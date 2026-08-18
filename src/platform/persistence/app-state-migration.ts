@@ -20,18 +20,38 @@ import { normalizeUserPresentationPreferences } from '@/domain/user-preferences'
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
   const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [])
-  const projects = (Array.isArray(state.projects) ? state.projects : seedState.projects).map((source) => {
-    const project = normalizeProjectLifecycleProject(source)
-    const timeZone = geographicTimeZoneDisplayValue(project.country, project.state, project.deliveryDate)
-    return { ...project, timeZone, timeGroup: timeGroupForTimeZone(timeGroupLookups, timeZone) }
-  })
+  const sourceProjects = (Array.isArray(state.projects) ? state.projects : seedState.projects).map(normalizeProjectLifecycleProject)
   const sourceOpportunities = Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities
   const usedOpportunityIds = sourceOpportunities.map((opportunity) => opportunity.opportunityId)
   const opportunities = sourceOpportunities.map((opportunity) => {
-    const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, projects, usedOpportunityIds)
+    const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, sourceProjects, usedOpportunityIds)
     usedOpportunityIds.push(normalized.opportunityId)
     const location = timeGroupFromLocation(timeGroupLookups, normalized.country, normalized.state, normalized.deliveryDate ?? normalized.pocStartDate)
     return { ...normalized, timeZone: location.timeZone, timeGroup: location.timeGroup }
+  })
+  const accounts = (Array.isArray(state.accounts) ? state.accounts : seedState.accounts).map((account) => {
+    const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+    const location = timeGroupFromLocation(timeGroupLookups, account.country, account.state)
+    return { ...account, region, timeZone: location.timeZone, timeGroup: location.timeGroup }
+  })
+  const projects = sourceProjects.map((project) => {
+    const opportunity = opportunities.find((candidate) =>
+      candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId,
+    )
+    const account = accounts.find((candidate) =>
+      candidate.id === opportunity?.accountId || candidate.accountName === project.accountName,
+    )
+    const country = opportunity?.country || account?.country || project.country || ''
+    const state = opportunity?.state || account?.state || project.state || ''
+    const timeZone = geographicTimeZoneDisplayValue(country, state, project.deliveryDate)
+    return {
+      ...project,
+      country,
+      state,
+      region: getBusinessRegionForCountry(country, state) || normalizeBusinessRegion(project.region),
+      timeZone,
+      timeGroup: timeGroupForTimeZone(timeGroupLookups, timeZone),
+    }
   })
   const projectSystems = Array.isArray(state.projectSystems)
     ? state.projectSystems.map(normalizeProjectSystemLink)
@@ -43,16 +63,7 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ...manager,
       region: normalizeBusinessRegion(manager.region) || manager.region,
     })),
-    accounts: (Array.isArray(state.accounts) ? state.accounts : seedState.accounts).map((account) => {
-      const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
-      const location = timeGroupFromLocation(timeGroupLookups, account.country, account.state)
-      return {
-        ...account,
-        region,
-        timeZone: location.timeZone,
-        timeGroup: location.timeGroup,
-      }
-    }),
+    accounts,
     opportunities,
     projects,
     productionSystemInventory: Array.isArray(state.productionSystemInventory)

@@ -535,4 +535,4 @@ Do not include in V1:
 
 ## V1.2 Geography and Time Group Authority
 
-Project Country follows its Opportunity/Customer geography. Project Time Zone derives from Country/State, and Project Time Group is populated only by resolving that Time Zone through active Time Group Settings. Region is not a fallback, and System veteran-Tenant governance never determines Project Time Group.
+Project Country and State follow authoritative Opportunity/Customer geography. Project Time Zone derives from that Country/State, and Project Time Group is a read-only value populated only by resolving the Time Zone through the applicable active Time Group Settings row. This derivation is normalized on create, save, persistence reload, and read-model hydration so stale persisted values cannot survive. Region is not a fallback, and System Tenant governance never determines Project Time Group.
