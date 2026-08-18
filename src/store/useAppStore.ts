@@ -2136,7 +2136,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const tenants = state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
         previousTenant = tenant
-        nextTenant = normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups)
+        nextTenant = normalizeTenantTimeGroup({
+          ...tenant,
+          ...patch,
+          // Tenant Type is immutable after creation, including for direct store callers.
+          tenantType: tenant.tenantType,
+          tenantFormType: tenantFormType(tenant),
+          updatedAt: options?.preserveNewState ? tenant.createdAt : now,
+        }, state.timeGroupLookups)
         return nextTenant
       })
       return {
@@ -2177,13 +2184,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
       const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
       const tenants = state.tenants.map((tenant) =>
-        tenant.id === id ? normalizeTenantTimeGroup({ ...tenant, ...patch, updatedAt: options?.preserveNewState ? tenant.createdAt : now }, state.timeGroupLookups) : tenant,
+        tenant.id === id ? normalizeTenantTimeGroup({
+          ...tenant,
+          ...patch,
+          tenantType: savedTenant.tenantType,
+          tenantFormType: tenantFormType(savedTenant),
+          updatedAt: options?.preserveNewState ? tenant.createdAt : now,
+        }, state.timeGroupLookups) : tenant,
       )
-      const committedTenant = {
-        ...savedTenant,
-        ...draft,
-        ...patch,
-      }
+      const committedTenant = tenants.find((tenant) => tenant.id === id) ?? savedTenant
       const relationshipState = ensureTenantCommittedProjectRelationships(
         { ...state, tenants },
         committedTenant,

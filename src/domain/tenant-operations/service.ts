@@ -169,6 +169,42 @@ export function tenantActiveProjects(
     .filter((project): project is Project => Boolean(project))
 }
 
+/**
+ * Projects that are both linked through the authoritative active allocation
+ * relationship and still active in the Project lifecycle.
+ */
+export function tenantCurrentActiveProjects(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): Project[] {
+  return tenantActiveProjects(tenant, projects, projectTenants).filter(
+    (project) => project.progressStatus === 'OPEN' && !project.archivedAt && !project.canceledAt,
+  )
+}
+
+export function tenantActivePocProject(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): Project | undefined {
+  if (tenantFormType(tenant) !== 'POC') return undefined
+  return tenantCurrentActiveProjects(tenant, projects, projectTenants).find(
+    (project) => project.mainType === 'POC',
+  )
+}
+
+export function tenantHasActiveWarrantyProject(
+  tenant: Tenant,
+  projects: Project[],
+  projectTenants: ProjectTenantLink[] = [],
+): boolean {
+  if (tenantFormType(tenant) !== 'CUSTOMER') return false
+  return tenantCurrentActiveProjects(tenant, projects, projectTenants).some(
+    (project) => project.mainType === 'DELIVERY' || project.mainType === 'RENEWAL',
+  )
+}
+
 export function tenantRelatedProjects(
   tenant: Tenant,
   projects: Project[],

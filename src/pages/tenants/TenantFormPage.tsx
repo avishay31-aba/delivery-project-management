@@ -53,7 +53,6 @@ import type {
   System,
   Tenant,
   TenantConfiguration,
-  TenantFormType,
   TenantWarranty,
   YesNo,
 } from '@/data/seed.types'
@@ -101,7 +100,9 @@ import {
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
+  tenantActivePocProject,
   tenantFormType,
+  tenantHasActiveWarrantyProject,
   tenantPocPidDisplay,
   tenantRelatedProjects,
   tenantTimeZoneDisplayValue,
@@ -370,14 +371,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const originalDeliveryProject = tenantDraft.deliveryPid
     ? projects.find((candidate) => candidate.pid === tenantDraft.deliveryPid && candidate.mainType !== 'POC')
     : undefined
-  const headerPocProject = pocPidDisplay
-    ? projects.find((candidate) => candidate.pid === pocPidDisplay.split(';')[0]?.trim() && candidate.mainType === 'POC')
-    : tenantDraft.deliveryPid
-      ? projects.find((candidate) => candidate.pid === tenantDraft.deliveryPid && candidate.mainType === 'POC')
-      : undefined
+  const headerPocProject = tenantActivePocProject(tenantDraft, projects, projectTenants)
   const headerProject = formType === 'POC' ? headerPocProject : originalDeliveryProject
   const headerDeliveryPid = formType === 'POC' ? '' : tenantDraft.deliveryPid ?? ''
   const headerPocPid = formType === 'POC' ? headerPocProject?.pid ?? pocPidDisplay : ''
+  const showWarrantySection = tenantHasActiveWarrantyProject(tenantDraft, projects, projectTenants)
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
@@ -466,20 +464,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         [field.configKey]: value,
       },
     } : current)
-    setMessages([])
-  }
-
-  function updateTenantType(nextType: TenantFormType) {
-    if (isViewMode) return
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            tenantType: nextType === 'INTERNAL' ? 'PENLINK_INTERNAL' : nextType === 'POC' ? 'POC' : 'CUSTOMER',
-            tenantFormType: nextType,
-          }
-        : current,
-    )
     setMessages([])
   }
 
@@ -845,6 +829,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderWarrantyHeaderStatus() {
+    if (formType !== 'CUSTOMER') return ''
     return (
       <WarrantyStatusPresentation
         status={committedWarrantyHeaderStatus.visualStatus}
@@ -855,19 +840,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderTenantTypeField() {
-    return (
-      <FormField label="Tenant Type" controlWidthClassName="w-44">
-        <select
-          className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
-          value={formType}
-          onChange={(event) => updateTenantType(event.target.value as TenantFormType)}
-        >
-          <option value="POC">POC</option>
-          <option value="CUSTOMER">Customer</option>
-          <option value="INTERNAL">Internal</option>
-        </select>
-      </FormField>
-    )
+    return renderHeaderField('Tenant Type', formType === 'CUSTOMER' ? 'Customer' : formType === 'INTERNAL' ? 'Internal' : 'POC', 'w-44')
   }
 
   function renderCurrentSidField() {
@@ -916,6 +889,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderOperationalModeField()}
           {renderHeaderField('License Number', formType === 'CUSTOMER' ? licenseNumber(headerDeliveryPid, hosting.sid, tenantDraft.tid) : '', 'w-64')}
           {renderHeaderField('Delivery Date', <DateTimeValue value={headerProject?.deliveryDate} semanticType="date" fallback="-" />)}
+          {headerPocProject ? renderHeaderField('POC Start Date', <DateTimeValue value={headerPocProject.pocStartDate} semanticType="date" fallback="-" />) : null}
+          {headerPocProject ? renderHeaderField('POC End Date', <DateTimeValue value={headerPocProject.pocEndDate} semanticType="date" fallback="-" />) : null}
           {renderHeaderField('Warranty Status', renderWarrantyHeaderStatus())}
           {renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : '')}
         </div>
@@ -1553,7 +1528,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderActiveTab()}
         </div>
       </section>
-      {formType === 'POC' ? null : renderWarranties()}
+      {showWarrantySection ? renderWarranties() : null}
       {renderRemarks()}
       {renderConfigurationHistory()}
       </WorkspaceScrollContent>

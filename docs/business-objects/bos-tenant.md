@@ -251,6 +251,7 @@ TenantOperations-owned validations may include:
 - TID is required and unique.
 - Tenant name is required where business process requires it.
 - Tenant type must be valid.
+- Tenant type is determined at creation by the existing authoritative Project mapping or explicit Internal creation flow and is immutable afterward; Tenant edit and hosting-move transactions must preserve it.
 - Operational status/mode must be valid.
 - Manual operational override values must be valid.
 - Current System reference must resolve unless tenant is in an allowed detached/deleted state.
@@ -262,6 +263,9 @@ TenantOperations-owned validations may include:
 - Tenant move must target a valid System.
 - Tenant delete/remove must preserve historical references safely.
 - Tenant warranty header display must be sourced from WarrantyCollection, not persisted stale header status if canonical read model exists.
+- Tenant warranty header status is presented only for Customer Tenants and is visually empty for non-Customer Tenants.
+- An active POC Tenant relationship derives header POC Start Date and POC End Date from the active linked POC Project; Tenant does not separately own or persist those presentation values.
+- The Warranty section is composed only for a Customer Tenant with an active relationship to an active Delivery or Renewal Project, regardless of Project subtype.
 
 SystemInventory-owned validations may apply to system existence/readiness.
 
