@@ -956,11 +956,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderApplicationConfigurationTab() {
     function optionsFor(field: TenantConfigurationFieldMetadata): string[] {
-      if (field.configKey === 'product') return PRODUCT_OPTIONS
+      if (field.configKey === 'product') return field.options ?? PRODUCT_OPTIONS
       if (field.configKey === 'mapCenter') return Array.from(new Set(accounts.map((account) => account.country).filter(Boolean))).sort()
-      if (field.configKey === 'crossSystemFeatures') return CROSS_SYSTEM_OPTIONS
-      if (field.configKey === 'aiFeatures') return AI_OPTIONS
-      if (field.configKey === 'additionalFeatures') return ADDITIONAL_FEATURE_OPTIONS
+      if (field.configKey === 'crossSystemFeatures') return field.options ?? CROSS_SYSTEM_OPTIONS
+      if (field.configKey === 'aiFeatures') return field.options ?? AI_OPTIONS
+      if (field.configKey === 'additionalFeatures') return field.options ?? ADDITIONAL_FEATURE_OPTIONS
       return field.options ?? YES_NO_OPTIONS
     }
 

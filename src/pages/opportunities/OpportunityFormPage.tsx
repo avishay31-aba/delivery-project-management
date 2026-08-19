@@ -768,7 +768,7 @@ function RequirementGrid({
           : column.key === 'cloudPlatform'
             ? cloudPlatformOptionsForHosting(currentHosting)
             : column.key === 'productType'
-              ? PRODUCT_OPTIONS
+              ? column.options ?? PRODUCT_OPTIONS
               : column.key === 'mapCenter'
                 ? [...countryOptions, 'Add new...']
                 : YES_NO_OPTIONS
@@ -795,11 +795,12 @@ function RequirementGrid({
 
     if (column.inputType === 'multiselect') {
       const options =
-        column.key === 'crossSystemFeatures'
+        column.options ??
+        (column.key === 'crossSystemFeatures'
           ? CROSS_SYSTEM_OPTIONS
           : column.key === 'aiFeatures'
             ? AI_OPTIONS
-            : ADDITIONAL_FEATURE_OPTIONS
+            : ADDITIONAL_FEATURE_OPTIONS)
       return renderMultiSelect(row, column, options)
     }
 

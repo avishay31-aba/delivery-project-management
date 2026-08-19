@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "verify:configuration-schema": "node scripts/verify-shared-application-configuration-schema.mjs",
     "preview": "vite preview",
     "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build-release.ps1"
   },
