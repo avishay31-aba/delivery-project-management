@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Globe2 } from 'lucide-react'
 import type { System, Tenant } from '@/data/seed.types'
 import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
-import { TENANT_REQUIREMENT_CONFIGURATION_FIELDS } from '@/domain/tenant-requirement'
+import { TENANT_CONFIGURATION_FIELDS } from '@/domain/application-configuration'
 import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
 import { BusinessIdLink, BusinessObjectLink, OperationalStatusIcon, RecordChangeBadge } from '@/components/ui'
@@ -62,7 +62,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                 {label}
               </th>
             ))}
-            <ConfigurationColumnHeaders fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
+            <ConfigurationColumnHeaders fields={TENANT_CONFIGURATION_FIELDS} />
           </tr>
         </thead>
         <tbody>
@@ -108,7 +108,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
-                <ConfigurationValueCells record={configurationRecord as unknown as Record<string, unknown>} fields={TENANT_REQUIREMENT_CONFIGURATION_FIELDS} />
+                <ConfigurationValueCells record={configurationRecord as unknown as Record<string, unknown>} fields={TENANT_CONFIGURATION_FIELDS} />
               </tr>
             )
           })}

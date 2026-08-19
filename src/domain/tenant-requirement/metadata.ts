@@ -23,7 +23,7 @@ export const TENANT_REQUIREMENT_ENVIRONMENT_FIELDS: SharedFieldMetadata[] = [
 
 export const TENANT_REQUIREMENT_CONFIGURATION_FIELDS: SharedFieldMetadata[] = [
   ...TENANT_REQUIREMENT_ENVIRONMENT_FIELDS,
-  ...APPLICATION_CONFIGURATION_FIELDS.map(({ configKey: _configKey, ...field }) => field),
+  ...APPLICATION_CONFIGURATION_FIELDS,
 ]
 
 export const NEW_TENANT_REQUIREMENT_FIELDS: SharedFieldMetadata[] = [

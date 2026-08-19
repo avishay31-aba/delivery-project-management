@@ -223,7 +223,7 @@ No new lifecycle states are introduced by this BOS.
 
 ## 12. Business Rules
 
-- Tenant Application Configuration is Tenant-owned delivered-runtime configuration. Its editor uses the authoritative Application Configuration metadata, field order, and shared controls, is read-only in view mode, and persists only through the Tenant save transaction.
+- Tenant Application Configuration is Tenant-owned delivered-runtime configuration. Its editor uses the single authoritative shared Application Configuration Product-to-final-column metadata structure also consumed by Opportunity New Tenant Requirements, System Tenant tables, and System Application Configuration Summary. Field IDs/keys, order, labels, field types, option metadata, validation metadata, and product-dependent applicability are not Tenant-page-owned. Tenant Configuration is read-only in view mode, editable in edit mode, and persists only through the Tenant save transaction.
 - Tenant is Delivery-owned.
 - Tenant executes inside System.
 - Tenant may move between Systems.
@@ -511,7 +511,7 @@ Do not include in V1:
 
 ## V1.2 Geography, Configuration, and Hosting
 
-Tenant geography follows its Project/Customer context. Country/State derives Time Zone and active Time Group Settings resolves Time Group; absent Time Zone produces no Time Group and Region is not a fallback. Tenant Configuration is Tenant-owned and editable through its existing save/history boundary. The hosted System Application Configuration Summary is a distinct read-only System-owned aggregation.
+Tenant geography follows its Project/Customer context. Country/State derives Time Zone and active Time Group Settings resolves Time Group; absent Time Zone produces no Time Group and Region is not a fallback. Tenant Configuration is Tenant-owned and editable through its existing save/history boundary, while its Product-to-final-column structure comes from the shared Application Configuration metadata. The hosted System Application Configuration Summary is a distinct read-only System-owned aggregation over the same shared configuration structure.
 
 Tenant Type is not manually editable after creation. The only lifecycle-controlled exception is POC-to-Customer conversion through fulfillment of a Delivery-Upsell or Renewal-Upsell Change Request for a surviving POC Tenant already hosted on a Production System. The same Tenant and System are retained; historical POC Project/Requirement relationships remain intact; the new Upsell Project/Requirement relationships are additional and Activity records the transition. Customer warranty rules apply only after conversion.
 

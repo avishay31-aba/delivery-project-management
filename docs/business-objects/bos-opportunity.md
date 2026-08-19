@@ -98,7 +98,7 @@ Do not introduce new opportunity lifecycle states in BOS without approval.
 
 OpportunityLifecycle owns stage transitions, stage-driven POC behavior, Opportunity Type values, Opportunity Sub Type options, type/subtype compatibility, financial profile behavior for Stage = POC, POC project sync confirmation, WON transition confirmation, Project creation/update decision logic, Opportunity validation, visible requirement grids by opportunity type/stage, and the relationship between commercial opportunity and project generation intent.
 
-TenantRequirement owns requirement row identity, requirement metadata, defaults, configuration fields, and grid definitions.
+TenantRequirement owns requirement row identity, requirement metadata, defaults, and grid definitions. From `Product` through the final Application Configuration column, Opportunity New Tenant Requirements consume the shared Application Configuration metadata structure rather than defining a requirement-local copy.
 
 Opportunity may define delivery intent, but Delivery owns fulfillment.
 

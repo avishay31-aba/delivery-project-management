@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import type { SharedFieldMetadata } from '@/domain/application-configuration'
 import {
   applicationConfigurationCategoryLabel,
-  applicationConfigurationFieldOrder,
   applicationConfigurationRecordValue,
 } from '@/domain/application-configuration'
 
@@ -14,7 +13,7 @@ export function formatConfigurationCellValue(value: unknown): string {
 }
 
 export function createConfigurationColumnsFromMetadata(fields: SharedFieldMetadata[]): SharedFieldMetadata[] {
-  return applicationConfigurationFieldOrder(fields)
+  return fields
 }
 
 export function configurationColumnGroupLabel(field: Pick<SharedFieldMetadata, 'key' | 'group'>): string {

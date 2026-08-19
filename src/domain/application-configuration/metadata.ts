@@ -1,7 +1,18 @@
 import type { ApplicationConfigurationFieldMetadata } from './types'
 
-export const APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFieldMetadata[] = [
-  { key: 'productType', configKey: 'product', label: 'Product', group: 'Core Details', editable: true, inputType: 'picklist', required: true },
+const YES_NO_OPTIONS = ['', 'YES', 'NO']
+
+export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFieldMetadata[] = [
+  {
+    key: 'productType',
+    configKey: 'product',
+    label: 'Product',
+    group: 'Core Details',
+    editable: true,
+    inputType: 'picklist',
+    options: ['Tangles', 'Tangles Light', 'Webloc', 'Weaver', 'Trapdoor', 'Lynx', 'DataAPI'],
+    required: true,
+  },
   { key: 'licenses', configKey: 'licenses', label: 'License', group: 'Core Details', editable: true, inputType: 'integer', required: true },
   { key: 'users', configKey: 'users', label: 'Users', group: 'Core Details', editable: true, inputType: 'integer', required: true },
   { key: 'concurrentSearches', configKey: 'concurrentSearches', label: 'Concurrent Searches', group: 'Core Details', editable: true, inputType: 'integer', required: true },
@@ -20,14 +31,39 @@ export const APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFieldMeta
   { key: 'webloc', configKey: 'webloc', label: 'Webloc', group: 'Modules / #users', editable: true, inputType: 'integer' },
   { key: 'webeye', configKey: 'webeye', label: 'Webeye', group: 'Modules / #users', editable: true, inputType: 'integer' },
   { key: 'ingest', configKey: 'ingest', label: 'Ingest', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'blockchain', configKey: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist' },
-  { key: 'crossSystemFeatures', configKey: 'crossSystemFeatures', label: 'Additional Sources', group: 'Additional Sources', editable: true, inputType: 'multiselect' },
-  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist' },
+  { key: 'blockchain', configKey: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
+  {
+    key: 'crossSystemFeatures',
+    configKey: 'crossSystemFeatures',
+    label: 'Additional Sources',
+    group: 'Additional Sources',
+    editable: true,
+    inputType: 'multiselect',
+    options: ['Weaver', 'Dark web', 'Lynx'],
+  },
+  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
   { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
   { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'aiFeatures', configKey: 'aiFeatures', label: 'AI', group: 'AI', editable: true, inputType: 'multiselect' },
-  { key: 'additionalFeatures', configKey: 'additionalFeatures', label: 'Additional Features', group: 'Additional features', editable: true, inputType: 'multiselect' },
+  {
+    key: 'aiFeatures',
+    configKey: 'aiFeatures',
+    label: 'AI',
+    group: 'AI',
+    editable: true,
+    inputType: 'multiselect',
+    options: ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst'],
+  },
+  {
+    key: 'additionalFeatures',
+    configKey: 'additionalFeatures',
+    label: 'Additional Features',
+    group: 'Additional features',
+    editable: true,
+    inputType: 'multiselect',
+    options: ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation', 'Advanced Search'],
+  },
 ]
 
-export const TENANT_CONFIGURATION_FIELDS = APPLICATION_CONFIGURATION_FIELDS
-export const APPLICATION_CONFIGURATION_SUMMARY_FIELDS = APPLICATION_CONFIGURATION_FIELDS
+export const APPLICATION_CONFIGURATION_FIELDS = TENANT_APPLICATION_CONFIGURATION_FIELDS
+export const TENANT_CONFIGURATION_FIELDS = TENANT_APPLICATION_CONFIGURATION_FIELDS
+export const APPLICATION_CONFIGURATION_SUMMARY_FIELDS = TENANT_APPLICATION_CONFIGURATION_FIELDS
