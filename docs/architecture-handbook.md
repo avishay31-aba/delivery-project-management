@@ -385,7 +385,7 @@ Every business mutation must be initiated only by the Business Object that owns 
 
 Ownership is determined by business responsibility, not UI location. The UI exposes mutations from the owning Business Object; button placement is a consequence of ownership, not the definition of ownership.
 
-Derived states are computed from the authoritative owner and must not be edited independently by consumers. For Tenant hosting lifecycle, System owns Move Tenant, Delete Tenant, and Cancel Tenant because those actions change or terminate hosting relationships. Tenant owns Tenant-specific commercial and operational information, but it must not expose hosting lifecycle mutations.
+Derived states are computed from the authoritative owner and must not be edited independently by consumers. For Tenant hosting lifecycle, System owns the supported hosted-Tenant deletion relationship action because it changes or terminates hosting participation. Tenant cancellation and Tenant restore are not active V1.2 workflows. Tenant owns Tenant-specific commercial and operational information, but it must not expose hosting lifecycle mutations.
 
 ### UI Preservation Principle
 
@@ -436,6 +436,14 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Read-only summaries, child tables, configuration history, and historical/activity tables follow the same rule when the displayed ID is a current navigable Business Object reference. Empty values, self identity labels, non-business technical keys, and historical snapshots without a valid target remain plain text through the established fallback presentation.
 - Empty IDs display the shared empty value. IDs without a supported route may render as read-only text through the shared fallback.
 - Export and persistence paths keep plain ID text only; presentation components must not enter domain/read-model values.
+
+### Business ID Generation Standard
+
+- Application-owned Business IDs are allocated by the store/domain save transaction from the authoritative namespace for that ID type. Create forms initialize unsaved drafts without committing, reserving, or advancing those IDs. When the established UI shows an ID before Save, it must use a non-mutating read-only preview; the Save transaction must either commit that preview if still unique or replace it with the next valid ID.
+- ID allocators must consider retained, cancelled, deleted, historical, and otherwise dashboard-filtered records. They must not derive a next ID from visible row count, array length, or form-local row count.
+- When one save transaction creates multiple same-namespace IDs, the allocator advances within that transaction so every generated ID is distinct.
+- MID is user-supplied and uniqueness-validated; it is not part of the automatic application-owned ID generators.
+- System identity has two different business meanings. MID identifies a reusable internal resource; SID identifies an allocated System instance. Reused Internal System allocation must retain the MID and allocate a new globally sequential SID for the allocation instance. Shared references, dashboards, saved views, and navigation must route allocated Systems by SID and reused-internal inventory resources by MID; source alone is not sufficient to determine route identity.
 
 ### Operational Status Presentation Standard
 
@@ -507,8 +515,8 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 ### Tenant Operational Status Standard
 
 - Tenant Operational Status has separate stored manual state and derived effective presentation. `lastManualOperationalStatus` may only be `Active` or `Access Blocked - Password Reset`.
-- Tenant effective Operational Status is resolved by the shared TenantOperations precedence model: Tenant action terminal states (`Deleted - By System`, `Cancelled - By System`), then hosted System-derived overrides (`Access Blocked - System Level`, `Service Blocked - System Level`, `Deleted - System Level`, `Cancelled - System Level`, `Off - System Level`), then the last saved manual Tenant status when the hosted System is `On`.
-- System-level overrides must not overwrite `lastManualOperationalStatus`; when a temporary System `Off` state returns to `On`, the Tenant restores the exact last manual status.
+- Tenant effective Operational Status is resolved by the shared TenantOperations precedence model: individual Tenant lifecycle terminal states, then persisted System-forced lifecycle state, then hosted System-derived read-only state, then the last saved manual Tenant status when the hosted System is `On`.
+- System-forced statuses must store their own previous Tenant Operational Status and forcing System ID. They must not overwrite `lastManualOperationalStatus` or the individual Delete/Cancel previous-status field; when the System returns to `On`, only Tenants forced by that System restore the exact stored previous status.
 - Tenant form manual status pick lists must expose only the two manual values. System-derived and action-derived values are read-only effective states and must not be manually selectable.
 - Tenant status presentation must use the shared Operational Status presenter everywhere Tenant effective status is shown.
 
@@ -519,28 +527,39 @@ These standards apply to approved Version 1.0 business forms and dashboards unle
 - Equivalent status values must never use different labels, icons, colors, badge treatment, spacing, typography, tooltip, or accessibility behavior across the application.
 - Status presentation is visual only. Sorting, filtering, searching, export, and business logic must continue to use the raw status value or approved status label text, never React markup or icon content.
 
-### Project Delete Lifecycle Standard
+### Project Cancellation Lifecycle Standard
 
-- Project Delete is a lifecycle transition to `Project Status = Deleted`.
-- Delete preserves the Project record, PID, relationships, tasks, documents, Activity, Configuration History, and other historical/business data.
-- Delete is not archive, hiding, unlinking, or physical removal.
-- Deleted Projects remain persisted, navigable, dashboard-visible, and audit-visible.
-- Project deletion is initiated from the Active Projects dashboard, not from the individual Project form.
-- Each Project Delete creates a persisted deletion-history entry containing timestamp, deleting user, and reason. Current deleted Projects expose the latest reason as editable header metadata while preserving the original deleting user on that event; restored Projects retain all deletion-history entries as read-only header metadata, newest first.
-- Restore is a Project store/domain lifecycle transaction. It returns the Project to Active Projects and restores the previous legitimate `Open`/`Done` lifecycle status while preserving task-completion invariants and deletion history.
-- Deletion Reason is a shared rich-text business field. Delete confirmation, current deleted header metadata, historical header entries, and deleted-object dashboard cells must reuse the product rich-text editor/read-only renderer rather than plain text controls.
+- Project cancellation is a lifecycle transition to `Project Status = Cancelled`.
+- Cancellation preserves the Project record, PID, relationships, tasks, documents, Activity, Configuration History, and other historical/business data.
+- Cancellation is not archive, hiding, unlinking, or physical removal.
+- Cancelled Projects remain persisted, navigable from explicit history/audit contexts, visible in dedicated cancelled/history dashboards, and audit-visible.
+- Project cancellation is initiated from the individual Project form header, not from the Active Projects dashboard.
+- Project cancellation is blocked while any active Project-System allocation remains. The user must explicitly deallocate all Systems first; cancellation must not automatically release or rewrite allocation relationships.
+- Each Project cancellation creates a persisted cancellation-history entry containing timestamp, cancelling user, and reason. Current cancelled Projects expose the latest reason as header metadata while preserving the original cancelling user on that event; restored Projects retain all cancellation-history entries as read-only header metadata, newest first.
+- Restore is a Project store/domain lifecycle transaction. It returns the Project to Active Projects and restores the previous legitimate `Open`/`Done` lifecycle status while preserving task-completion invariants and cancellation history.
+- Cancellation Reason is a shared rich-text business field. Header cancellation metadata, historical header entries, and cancelled-object dashboard cells must reuse the product rich-text editor/read-only renderer rather than plain text controls.
+- Project, System, and Infrastructure Item cancellation controls live on a separate final header row so cancellation/audit fields do not interrupt the normal business header layout.
+- Cancelled object dashboards reuse the shared `DataDashboard` architecture with independent saved-view scopes. Search/filter/grouping/sorting behavior belongs to `DataDashboard`; grouped dashboards preserve group structure while sorting leaf records within each group.
 - A recoverable Delete/Restore implementation may reuse the Project pattern only when that Business Object has an explicit approved lifecycle requirement. Recoverable deletion never implies eligibility for irreversible Permanent Delete.
-- Infrastructure Item Delete/Restore was superseded during V1.2 Final QA. The current Infrastructure workspace has no Delete action or Deleted Items dashboard. `Obsolete` remains an independent valid operational status. See the [V1.2 standing product rules](v1.2-standing-product-rules.md#i-infrastructure-lifecycle).
+- Infrastructure Item Delete/Restore was superseded during V1.2 Final QA. The current Infrastructure workspace has no Delete action or Deleted Items dashboard. `Obsolete` remains an independent valid operational status. Infrastructure Item cancellation is blocked while linked to any System; the user must explicitly unlink first. See the [V1.2 standing product rules](v1.2-standing-product-rules.md#i-infrastructure-lifecycle).
 
 ### Tenant Lifecycle And Hosting Standard
 
 - Tenant is a virtual commercial and configuration Business Object. System is the physical infrastructure Business Object.
 - System Application Configuration Summary represents the accumulated configuration contribution of currently active Tenants hosted on that System.
 - Tenant Application Configuration has one authoritative Product-to-final-column metadata structure owned by the shared Application Configuration domain. Opportunity New Tenant Requirements, Tenant Configuration, System Tenant tables, System Application Configuration Summary, and configuration history consumers must reference that same metadata for field IDs/keys, order, labels, field types, option metadata, validation metadata, and product-dependent applicability. Consumers may differ only in value semantics: Opportunity captures editable requirement intent, Tenant captures editable delivered Tenant values, System Tenant tables present read-only individual Tenant values, and System Application Configuration Summary presents read-only aggregated values.
-- Move changes only the Tenant's active hosted System relationship. The Tenant ID, Tenant-owned scalar fields, Tenant-owned child records, Warranty records, configuration requirements, and Project relationships must be preserved.
-- Delete is commercial termination. It sets Tenant Operational Status to `Deleted - By System`, ends active hosting, excludes the Tenant from active System Tenant tables and active System Application Configuration Summary, and preserves Project relationships plus historical System hosting.
-- Cancel represents creation by mistake. It sets Tenant Operational Status to `Cancelled - By System`, ends active hosting, excludes the Tenant from active System Tenant tables and active System Application Configuration Summary, and removes active Project-Tenant relationships while preserving technical audit/history.
-- Delete and Cancel are lifecycle transitions, never hard deletion. Historical retention, operational visibility, and configuration contribution eligibility are separate concerns owned by TenantOperations/SystemInventory read models.
+- Opportunity requirement operational consumers must use the shared currently-applicable requirement read model. Persisted hidden rows from prior Opportunity configurations are historical/restoration data and must not be reinterpreted independently by validation, Project generation, System allocation, Tenant creation, Requirement Coverage, or summaries.
+- The selected PID/Project ID is the authoritative Tenant Origin Project relationship and is retained for Tenant lifetime/history. Current Tenant Project membership is allocation-backed and must not be reconstructed solely from Origin Project history.
+- Requirement ID is globally unique. Tenant Requirement history stores PID-qualified same-Project Requirement relationships for Customer/POC Tenants where applicable; Internal Tenants may have a PID without Requirement ID. A Requirement may be associated with more than one Tenant and must not become unavailable merely because a Tenant already references it.
+- Tenant continuation on another System is represented by the approved Tenant lifecycle and creation/predecessor workflows rather than a generic active move mutation. Tenant ID, Tenant-owned scalar fields, Tenant-owned child records, Warranty records, configuration requirements, and historical Project relationships must be preserved.
+- Delete is commercial termination. It sets Tenant Operational Status to `Deleted - By System`, preserves the Tenant's System, Project, Tenant Requirement, and relationship-history links, and excludes the Tenant only from active System counts, active System Tenant tables, active System Application Configuration Summary, and other projections where Deleted Tenants are explicitly ineligible.
+- Tenant cancellation and Tenant restore are not active V1.2 lifecycle transactions. Retained legacy Cancelled Tenant records remain visible only through explicit historical/audit/provenance contexts with existing audit fields where present; normal operational Tenant dashboards, relationship tables, selectors, summaries, and lookup sources exclude them. The UI must not expose Cancel or Restore Tenant actions.
+- System-forced Deleted/Cancelled is not an individual Tenant lifecycle action. It is restored only by returning the forcing System to `On`; no Tenant `Restore` action may override it.
+- Active hosting calculations and Project history are separate concepts. Move, Delete, Project completion, and reused internal System reuse must not rewrite completed/historical Project-System-Tenant relationship snapshots. Explicit Deallocate actions may remove active allocation relationships according to their approved lifecycle semantics.
+- Delete is a lifecycle transition, never hard deletion. Historical retention, operational visibility, and configuration contribution eligibility are separate concerns owned by TenantOperations/SystemInventory read models. Legacy Cancelled records are retained for history, excluded from normal operational read models, and are not created by active V1.2 workflows.
+- System inventory existence is independent from Project allocation and Tenant hosting. Standalone Production or Reused Internal Systems with no Tenant, no Project allocation, or neither are valid inventory states. Integrity checks must classify those as valid standalone Systems while still enforcing Tenant PID -> Project resolution, required same-Project Tenant Requirement resolution for Customer/POC Tenants, and active Tenant -> current hosting System resolution.
+- Tenant-related Project read models must distinguish current membership from historical provenance. Current Project membership uses active ProjectTenant links backed by active System allocation; historical visibility may use retained Origin Project/PID and Requirement history. Pages must not infer Tenant Project relationships from unrelated hosting System allocation links.
+- Tenant Move is not a supported lifecycle mutation. Cross-System continuation is modeled by lifecycle termination of the old Tenant plus creation of a new Tenant and optional Warranty predecessor linkage.
 
 ## Reusable Child Object Principle
 

@@ -5,7 +5,7 @@ import {
   reusedInternalSystemMetadata,
 } from '@/config/system-inventory-metadata'
 import type { ProductionSystemInventoryItem, System } from '@/data/seed.types'
-import { reusedInternalMachineIdRouteKey, reusedInternalMachineIdsEqual, SYSTEM_SOURCE_REUSED_INTERNAL } from '@/domain/system-inventory'
+import { SYSTEM_SOURCE_REUSED_INTERNAL } from '@/domain/system-inventory'
 import { useAppStore } from '@/store/useAppStore'
 import { InventoryForm } from './SystemInventoryFormPages'
 
@@ -16,10 +16,7 @@ export function SystemFormPage() {
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
   const record = useMemo(
-    () => {
-      const routeMachineId = reusedInternalMachineIdRouteKey(sid)
-      return systems.find((system) => system.sid === sid || reusedInternalMachineIdsEqual(system.machineId, routeMachineId))
-    },
+    () => systems.find((system) => system.sid === sid || system.id === sid),
     [systems, sid],
   )
   const isReused = record?.source === SYSTEM_SOURCE_REUSED_INTERNAL
@@ -34,7 +31,7 @@ export function SystemFormPage() {
         records={records}
         metadata={reusedInternalSystemMetadata}
         onSave={(id, patch, options, tenantRemovalIds) => {
-          saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
+          return saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
         }}
         dashboardPath="/systems/reused-internal"
       />
@@ -47,12 +44,11 @@ export function SystemFormPage() {
       record={record}
       records={records}
       metadata={productionSystemMetadata}
-      onSave={(id, patch, options, tenantRemovalIds) => {
-        if (productionSystemInventory.some((system) => system.id === id)) {
-          saveSystemFormTransaction('production', id, patch as Partial<ProductionSystemInventoryItem>, tenantRemovalIds, options)
-          return
+        onSave={(id, patch, options, tenantRemovalIds) => {
+          if (productionSystemInventory.some((system) => system.id === id)) {
+          return saveSystemFormTransaction('production', id, patch as Partial<ProductionSystemInventoryItem>, tenantRemovalIds, options)
         }
-        saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
+        return saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
       }}
       dashboardPath="/systems/production-inventory"
     />

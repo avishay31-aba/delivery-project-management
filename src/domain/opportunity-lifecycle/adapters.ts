@@ -1,7 +1,7 @@
-import { incrementCounter } from '@/data/id-generator'
-import { ensureBusinessId } from '@/domain/business-identity'
+import { ensureBusinessId, generateBusinessIdFromCounter } from '@/domain/business-identity'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeOpportunityEngagementCircles } from '@/domain/engagement-circle'
+import { buildProjectMilestonesAndTasks, projectMilestonePlanMatchesTemplate, resolveProjectMilestoneTemplate } from '@/config/project-milestone-templates'
 import {
   activePocProjectForOpportunity,
   finalProjectForOpportunity,
@@ -25,6 +25,48 @@ export function cloneOpportunityDraft(opportunity: Opportunity): Opportunity {
     pocProjectIds: clone.pocProjectIds ?? [],
     finalProjectId: clone.finalProjectId ?? null,
     wonAt: clone.wonAt ?? null,
+  }
+}
+
+export function createOpportunityDraft(
+  accounts: OpportunityProjectSyncContext['account'][],
+  salesManagers: OpportunityProjectSyncContext['salesManager'][],
+  now: string,
+  type: Opportunity['type'] = 'DELIVERY',
+  subType: Opportunity['subType'] = 'NEW',
+): Opportunity {
+  const defaultAccount = accounts[0]
+  const defaultSalesManagerId = defaultAccount?.salesManagerId ?? salesManagers[0]?.id ?? ''
+  return {
+    id: `opp-${crypto.randomUUID()}`,
+    opportunityId: '',
+    opportunityName: '',
+    stage: 'OPEN',
+    accountId: defaultAccount?.id ?? '',
+    salesManagerId: defaultSalesManagerId,
+    type,
+    subType,
+    dealPackage: 'Silver',
+    deliveryDate: null,
+    pocStartDate: null,
+    pocEndDate: null,
+    warrantyServiceMonths: null,
+    warrantyRecordId: '',
+    region: defaultAccount?.region ?? '',
+    country: defaultAccount?.country ?? '',
+    state: defaultAccount?.state ?? '',
+    timeZone: '',
+    timeGroup: defaultAccount?.timeGroup ?? '',
+    currentMilestone: 'Not started',
+    projectAlerts: [],
+    newTenantRequirements: [],
+    changeRequestRequirements: [],
+    standardRenewalRequirements: [],
+    pocProjectIds: [],
+    finalProjectId: null,
+    wonAt: null,
+    createdAt: now,
+    updatedAt: now,
   }
 }
 
@@ -64,7 +106,7 @@ export function syncOpportunityProjectsFromOpportunity(
   })
 
   const updateProjectFromOpportunity = (existingProject: Project, projectSource: Project['projectSource']): Project => {
-    const project = {
+    const projectPatch = {
       ...existingProject,
       ...buildProjectPatch(projectSource),
       ...(projectSource === 'POC'
@@ -74,15 +116,29 @@ export function syncOpportunityProjectsFromOpportunity(
           }
         : {}),
     }
+    const resolution = resolveProjectMilestoneTemplate(projectPatch, nextOpportunity)
+    const templateData = buildProjectMilestonesAndTasks(resolution.templateId)
+    const project = existingProject.milestoneTemplateId === resolution.templateId && projectMilestonePlanMatchesTemplate(existingProject, resolution.templateId)
+      ? projectPatch
+      : {
+          ...projectPatch,
+          milestoneTemplateId: resolution.templateId,
+          milestones: templateData.milestones,
+          tasks: templateData.tasks,
+        }
     projects = projects.map((candidate) => (candidate.id === existingProject.id ? project : candidate))
     projectChanges.push({ projectId: project.id, changeStatus: 'Updated' })
     return project
   }
 
   const createProjectFromOpportunity = (projectSource: Project['projectSource']): Project => {
-    const nextProjectId = incrementCounter(idCounters, 'pid')
+    const nextProjectId = generateBusinessIdFromCounter(
+      'project',
+      idCounters,
+      projects.map((project) => project.pid),
+    )
     idCounters = nextProjectId.counters
-    const project: Project = {
+    const projectPatch: Project = {
       id: `proj-${crypto.randomUUID()}`,
       pid: nextProjectId.id,
       ...buildProjectPatch(projectSource),
@@ -96,6 +152,14 @@ export function syncOpportunityProjectsFromOpportunity(
       documents: [],
       createdAt: context.now,
       updatedAt: context.now,
+    }
+    const resolution = resolveProjectMilestoneTemplate(projectPatch, nextOpportunity)
+    const templateData = buildProjectMilestonesAndTasks(resolution.templateId)
+    const project: Project = {
+      ...projectPatch,
+      milestoneTemplateId: resolution.templateId,
+      milestones: templateData.milestones,
+      tasks: templateData.tasks,
     }
     projects = [project, ...projects]
     projectChanges.push({ projectId: project.id, changeStatus: 'New' })

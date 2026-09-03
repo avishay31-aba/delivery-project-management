@@ -133,7 +133,7 @@ export function tenantReference(tenant: Tenant, lookup: Partial<BusinessReferenc
     objectType: 'TENANT',
     internalId: tenant.id,
     businessId: tenant.tid,
-    displayLabel: tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid,
+    displayLabel: tenant.tid,
     routePath: routePathForBusinessReference('TENANT', tenant.tid),
     isMissing: false,
     isStale: isStaleReference(tenant.id, tenant.tid, { objectType: 'TENANT', ...lookup }),
@@ -230,6 +230,7 @@ function systemBusinessIdForObjectType(
 }
 
 function systemObjectType(system: System | ProductionSystemInventoryItem | ReusedInternalSystem): BusinessObjectType {
+  if ('sid' in system && system.sid && ('deliveryPid' in system || 'linkedProjectIds' in system || 'tenantIds' in system)) return 'SYSTEM'
   if ('source' in system && system.source === 'Production' && 'sid' in system && system.sid) return 'PRODUCTION_SYSTEM'
   if ('source' in system && system.source === 'Reused Internal Systems' && 'machineId' in system) return 'INTERNAL_REUSED_SYSTEM'
   if ('machineId' in system && system.machineId && (!('sid' in system) || !system.sid)) return 'INTERNAL_REUSED_SYSTEM'

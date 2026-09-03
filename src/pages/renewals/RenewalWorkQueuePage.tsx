@@ -7,7 +7,6 @@ import type { Tenant } from '@/data/seed.types'
 import {
   accountManagerDisplayName,
   customerDisplayName,
-  customerTenantDisplayName,
 } from '@/domain/customer-account'
 import { systemIdentity } from '@/domain/system-inventory'
 import {
@@ -48,7 +47,6 @@ export function RenewalWorkQueuePage() {
           const account = accounts.find((candidate) => candidate.id === tenant.accountId)
           return accountManagerDisplayName(account?.salesManagerId, salesManagers)
         },
-        tenantNameForTenant: customerTenantDisplayName,
         sidForTenant: (tenant: Tenant) => {
           const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
           return system ? systemIdentity(system) : ''

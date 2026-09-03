@@ -231,6 +231,9 @@ Project lifecycle must not infer unapproved states or introduce new workflow sta
 - Project owns delivery execution and delivery lifecycle.
 - Project Requirements define delivery intent.
 - Project coordinates the approved delivery workflow from requirement review through System allocation, Tenant creation, Warranty follow-up, and ongoing Task execution.
+- Standard Project milestone/task template resolution is owned by the shared MilestonePlan/template resolver and follows the nine-template workbook lookup matrix. Project creation/update paths must store the resolved template and workbook-defined milestone/task rows rather than relying on page-only lazy repair.
+- Retained Project-System and Project-Tenant relationships are historical delivery facts. The Tenant's selected PID/Project ID is the authoritative Origin Project relationship, while current Project-Tenant membership is governed by active ProjectTenant attachment plus active hosting System allocation. Project completion, later Tenant operational status changes, later live Tenant deletion/cancellation, and later reused internal System reuse must not erase or rewrite Origin Project/Requirement history. Requirement ID provides same-Project requirement origin for Customer/POC Tenants, not universal Project ownership. Deallocate remains the explicit lifecycle action that can remove active System allocation and current Tenant membership according to its approved semantics.
+- Moving a Tenant changes active hosting for active work only and must not rewrite completed/historical Project-System-Tenant relationship snapshots.
 - Project may coordinate Systems, Tenants, Milestones, Tasks, RequirementCoverage validation context, Warranty context, Documents, and Activity.
 - Project does not own Application Configuration Summary.
 - Project must not duplicate SystemInventory rules.
@@ -387,6 +390,8 @@ Examples:
 - Project created.
 - System allocated to project.
 - System deallocated from project.
+- Manual System deallocation releases the current Project-to-System allocation and the same-Project Tenant attachments hosted through that System. Project current Systems/Tenants tables must not retain Tenants solely because of historical PID/provenance after the hosting System has been deallocated. Deleted Tenants and retained legacy Cancelled Tenant records with a current allocation plus attachment remain in the normal Tenant Warranty Status sections, with Operational Status carrying the lifecycle state.
+- Project cancellation is blocked while any System remains actively allocated to the Project. The user must explicitly deallocate all Systems first; Project cancellation must not automatically deallocate Systems, release Tenants, or rewrite Project-System history.
 - Existing system linked.
 - Tenant created from requirement.
 - Tenant moved to system.

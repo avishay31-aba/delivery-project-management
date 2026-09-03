@@ -5,8 +5,13 @@ import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import { isReusedInternalSystem, systemApplicationConfigurationSummary, SYSTEM_CLASS_POC_DEMO_TRAINING } from '@/domain/system-inventory'
 import {
   activeHostedSystemIdForTenant,
+  isTenantCancelled,
   isTenantLifecycleInactive,
+  isTenantSystemForced,
   tenantLatestHistoricalSystemId,
+  TENANT_SYSTEM_FORCED_STATUS_ACCESS_BLOCKED,
+  TENANT_SYSTEM_FORCED_STATUS_OFF,
+  TENANT_SYSTEM_FORCED_STATUS_SERVICE_BLOCKED,
   TENANT_OPERATIONAL_STATUS_CANCELLED,
   TENANT_OPERATIONAL_STATUS_DELETED,
   TENANT_LEGACY_OPERATIONAL_STATUS_CANCELLED,
@@ -42,6 +47,9 @@ export type TenantOperationalMode =
   | 'Cancelled - By System'
   | 'Deleted'
   | 'Cancelled'
+  | 'System is Off'
+  | 'System-Access Blocked'
+  | 'System-Service Blocked'
 
 export const TENANT_LIFECYCLE_OPERATIONAL_MODES: TenantOperationalMode[] = [
   TENANT_OPERATIONAL_STATUS_DELETED,
@@ -62,6 +70,14 @@ export function tenantFormTypeForSystem(system: System): TenantFormType {
   return 'CUSTOMER'
 }
 
+export function isEligiblePocTenantForCustomerExistingContext(tenant: Tenant, systems: System[]): boolean {
+  if (tenantFormType(tenant) !== 'POC' || isTenantLifecycleInactive(tenant)) return false
+  const activeSystemId = activeHostedSystemIdForTenant(tenant)
+  if (!activeSystemId) return false
+  const hostingSystem = systems.find((system) => system.id === activeSystemId)
+  return hostingSystem?.source === 'Production' && hostingSystem.systemClass === 'CUSTOMER'
+}
+
 export function derivedTenantOperationalMode(system?: System): TenantOperationalMode {
   const status = system?.operationalStatus?.toLocaleLowerCase() ?? ''
   if (status.includes('access blocked')) return 'Access Blocked - System Level'
@@ -77,6 +93,13 @@ export function isManualTenantOperationalMode(value: string | undefined | null):
 }
 
 export function effectiveTenantOperationalMode(tenant: Tenant, system?: System): TenantOperationalMode {
+  if (isTenantSystemForced(tenant)) {
+    if (tenant.operationalStatus === TENANT_SYSTEM_FORCED_STATUS_OFF) return TENANT_SYSTEM_FORCED_STATUS_OFF
+    if (tenant.operationalStatus === TENANT_SYSTEM_FORCED_STATUS_ACCESS_BLOCKED) return TENANT_SYSTEM_FORCED_STATUS_ACCESS_BLOCKED
+    if (tenant.operationalStatus === TENANT_SYSTEM_FORCED_STATUS_SERVICE_BLOCKED) return TENANT_SYSTEM_FORCED_STATUS_SERVICE_BLOCKED
+    if (tenant.operationalStatus === TENANT_LEGACY_OPERATIONAL_STATUS_DELETED) return TENANT_LEGACY_OPERATIONAL_STATUS_DELETED
+    if (tenant.operationalStatus === TENANT_LEGACY_OPERATIONAL_STATUS_CANCELLED) return TENANT_LEGACY_OPERATIONAL_STATUS_CANCELLED
+  }
   if (tenant.operationalStatus === TENANT_OPERATIONAL_STATUS_DELETED || tenant.operationalStatus === TENANT_LEGACY_OPERATIONAL_STATUS_DELETED) {
     return TENANT_OPERATIONAL_STATUS_DELETED
   }
@@ -188,11 +211,15 @@ export function tenantDashboardProjectPids(
   projects: Project[],
   projectTenants: ProjectTenantLink[] = [],
 ): string {
-  return tenantCurrentActiveProjects(tenant, projects, projectTenants)
+  return tenantActiveProjects(tenant, projects, projectTenants)
     .map((project) => project.pid)
     .filter(Boolean)
     .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
-    .join('; ')
+    .join(';')
+}
+
+export function tenantOriginProjectPid(tenant: Tenant): string {
+  return tenant.deliveryPid ?? ''
 }
 
 export function tenantDashboardRequirementIds(
@@ -201,7 +228,14 @@ export function tenantDashboardRequirementIds(
   projectTenants: ProjectTenantLink[] = [],
   opportunities: Opportunity[] = [],
 ): string {
-  const requirementIds = tenantCurrentActiveProjects(tenant, projects, projectTenants).flatMap((project) => {
+  if (tenant.requirementHistory?.length) {
+    return tenant.requirementHistory
+      .filter((relationship) => relationship.pid && relationship.requirementId)
+      .map((relationship) => `${relationship.pid}-${relationship.requirementId}`)
+      .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+      .join('; ')
+  }
+  const requirementIds = tenantRelatedProjects(tenant, projects, projectTenants).flatMap((project) => {
     const opportunity = opportunities.find(
       (candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId,
     )
@@ -213,11 +247,11 @@ export function tenantDashboardRequirementIds(
         (requirement) => requirement.requirementId === tenant.sourceRequirementId || requirement.id === tenant.sourceRequirementId,
       ),
     ]
-    return relationshipRequirements.map((requirement) => requirement.requirementId).filter(Boolean)
+    return relationshipRequirements.map((requirement) => requirement.requirementId ? `${project.pid}-${requirement.requirementId}` : '').filter(Boolean)
   })
   return Array.from(new Set(requirementIds))
     .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
-    .join('; ')
+    .join(';')
 }
 
 export function tenantActivePocProject(
@@ -237,9 +271,28 @@ export function tenantHasActiveWarrantyProject(
   projectTenants: ProjectTenantLink[] = [],
 ): boolean {
   if (tenantFormType(tenant) !== 'CUSTOMER') return false
-  return tenantCurrentActiveProjects(tenant, projects, projectTenants).some(
+  if ((tenant.warranties ?? []).length > 0) return true
+  return tenantRelatedProjects(tenant, projects, projectTenants).some(
     (project) => project.mainType === 'DELIVERY' || project.mainType === 'RENEWAL',
   )
+}
+
+export function tenantOccupiesRequirement(tenant: Tenant): boolean {
+  return (Boolean(tenant.sourceRequirementId) || Boolean(tenant.requirementHistory?.some((relationship) => relationship.status === 'CURRENT'))) && !isTenantCancelled(tenant)
+}
+
+export function requirementOccupancyByRequirementId(tenants: Tenant[]): Map<string, Tenant> {
+  const occupancy = new Map<string, Tenant>()
+  tenants.forEach((tenant) => {
+    if (!tenantOccupiesRequirement(tenant)) return
+    const requirementIds = tenant.requirementHistory?.length
+      ? tenant.requirementHistory.filter((relationship) => relationship.status === 'CURRENT').map((relationship) => relationship.requirementId)
+      : [tenant.sourceRequirementId].filter((requirementId): requirementId is string => Boolean(requirementId))
+    requirementIds.forEach((requirementId) => {
+      if (!occupancy.has(requirementId)) occupancy.set(requirementId, tenant)
+    })
+  })
+  return occupancy
 }
 
 export function tenantRelatedProjects(
@@ -248,8 +301,11 @@ export function tenantRelatedProjects(
   projectTenants: ProjectTenantLink[] = [],
   systems: System[] = [],
   projectSystems: ProjectSystemLink[] = [],
-  opportunities: Opportunity[] = [],
+  _opportunities: Opportunity[] = [],
 ): Project[] {
+  void _opportunities
+  void systems
+  void projectSystems
   const projectIds = new Set<string>()
   const addProject = (project: Project | undefined) => {
     if (project) projectIds.add(project.id)
@@ -262,30 +318,15 @@ export function tenantRelatedProjects(
     .filter((link) => link.tenantId === tenant.id)
     .forEach((link) => addProjectId(link.projectId))
 
-  projectSystems
-    .filter((link) => (link.tenantIds ?? []).includes(tenant.id))
-    .forEach((link) => addProjectId(link.projectId))
+  ;(tenant.requirementHistory ?? []).forEach((relationship) => {
+    addProjectId(relationship.projectId)
+    addProject(projects.find((project) => project.pid === relationship.pid))
+  })
 
   const tenantPocPid = (tenant as Tenant & { pocPid?: string }).pocPid
   projects
     .filter((project) => project.pid === tenant.deliveryPid || project.pid === tenantPocPid)
     .forEach(addProject)
-
-  const tenantSystemIds = new Set([tenant.systemId, tenant.hostedSystemId].filter((value): value is string => Boolean(value)))
-  systems
-    .filter((system) => tenantSystemIds.has(system.id))
-    .flatMap((system) => system.linkedProjectIds ?? [])
-    .forEach(addProjectId)
-
-  opportunities.forEach((opportunity) => {
-    const hasTenantRequirement = [
-      ...(opportunity.changeRequestRequirements ?? []),
-      ...(opportunity.standardRenewalRequirements ?? []),
-    ].some((requirement) => requirement.tenantId === tenant.id)
-    if (!hasTenantRequirement) return
-    const opportunityProjectIds = [...(opportunity.pocProjectIds ?? []), opportunity.finalProjectId]
-    opportunityProjectIds.forEach(addProjectId)
-  })
 
   return projects
     .filter((project) => projectIds.has(project.id))
@@ -406,7 +447,7 @@ export function tenantDeliveryPidDisplay(
     .filter((project) => project.mainType !== 'POC')
     .map((project) => project.pid)
   const hasProjectTenantLink = projectTenants.some((link) => link.tenantId === tenant.id)
-  return pids.length > 0 ? pids.join('; ') : hasProjectTenantLink ? '' : tenant.deliveryPid ?? ''
+  return pids.length > 0 ? pids.join(';') : hasProjectTenantLink ? '' : tenant.deliveryPid ?? ''
 }
 
 export function tenantPocPidDisplay(
@@ -417,7 +458,7 @@ export function tenantPocPidDisplay(
   return tenantActiveProjects(tenant, projects, projectTenants)
     .filter((project) => project.mainType === 'POC')
     .map((project) => project.pid)
-    .join('; ')
+    .join(';')
 }
 
 export function tenantRequirementIdDisplay(tenant: Tenant): string {

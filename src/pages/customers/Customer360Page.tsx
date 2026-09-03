@@ -143,7 +143,6 @@ export function Customer360Page() {
           const tenantAccount = accounts.find((candidate) => candidate.id === tenant.accountId)
           return salesManagers.find((manager) => manager.id === tenantAccount?.salesManagerId)?.name ?? ''
         },
-        tenantNameForTenant: (tenant: Tenant) => tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim(),
         sidForTenant: (tenant: Tenant) => {
           const system = systems.find((candidate) => candidate.id === (tenant.hostedSystemId ?? tenant.systemId))
           return system ? systemBusinessId(system) : ''
@@ -293,10 +292,9 @@ export function Customer360Page() {
 
     if (activeTab === 'tenants') {
       return readOnlyTable(
-        ['TID', 'Tenant Name', 'SID', 'PID', 'Requirement ID', 'Product', 'Operational Status', 'Country'],
+        ['TID', 'SID', 'PID', 'Requirement ID', 'Product', 'Operational Status', 'Country'],
         customer.tenants.map((tenant) => [
           <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>,
-          tenant.tenantName ?? '',
           tenant.hostingSid ? <BusinessIdLink objectType="SYSTEM" businessId={tenant.hostingSid}>{tenant.hostingSid}</BusinessIdLink> : '',
           tenant.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={tenant.deliveryPid}>{tenant.deliveryPid}</BusinessIdLink> : '-',
           tenantRequirementIdDisplay(tenant) || '-',
@@ -310,11 +308,10 @@ export function Customer360Page() {
 
     if (activeTab === 'warranties') {
       return readOnlyTable(
-        ['ID', 'Tenant TID', 'Tenant Name', 'SID', 'Related Project ID', 'Project Name', 'Sub Type', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
+        ['ID', 'Tenant TID', 'SID', 'Related Project ID', 'Project Name', 'Sub Type', 'End Date', 'Days To Expiration', 'Warranty Status', 'Tenant Header Status', 'Alerts'],
         customer.warrantyRows.map((row) => [
           row.warrantyId,
           <BusinessIdLink objectType="TENANT" businessId={row.tenantTid}>{row.tenantTid}</BusinessIdLink>,
-          row.tenantName,
           row.sid ? <BusinessIdLink objectType="SYSTEM" businessId={row.sid}>{row.sid}</BusinessIdLink> : '',
           row.relatedProjectId ? <BusinessIdLink objectType="PROJECT" businessId={row.relatedProjectId}>{row.relatedProjectId}</BusinessIdLink> : '',
           row.projectName,

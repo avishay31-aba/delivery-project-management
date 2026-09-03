@@ -20,7 +20,7 @@ import type {
   ReusedInternalSystem,
 } from '@/data/seed.types'
 import { normalizeReferenceLabel, referenceDataLabel } from '@/domain/reference-data'
-import { reserveBusinessId } from '@/domain/business-identity'
+import { generateBusinessId, reserveBusinessId } from '@/domain/business-identity'
 import { systemBusinessId, systemReference } from '@/domain/business-reference'
 import { daysBeforeExpiration, daysBetween, warrantyAlertForStatus, warrantyCollectionReadModel, warrantyHeaderStatusReadModel } from '@/domain/warranty-collection'
 import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
@@ -39,10 +39,11 @@ export const ADD_NEW_REFERENCE_OPTION = '__ADD_NEW__'
 
 export const INFRASTRUCTURE_OWNER_OPTIONS: InfrastructureOwner[] = ['Penlink', 'Agent', 'Customer']
 export const INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS: InfrastructureOperationalStatus[] = ['Active', 'Obsolete', 'Will Not Renew']
-export const INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES: InfrastructureOperationalStatus[] = [...INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS, 'Deleted']
+export const INFRASTRUCTURE_OPERATIONAL_STATUS_VALUES: InfrastructureOperationalStatus[] = [...INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS, 'Deleted', 'Cancelled']
 export const INFRASTRUCTURE_MAINTENANCE_STATUS_OPTIONS: InfrastructureMaintenanceStatus[] = ['None', 'Planned', 'Pending', 'Overdue', 'Delayed', 'Not Set Yet', 'Current', 'Expired', 'No Warranty', 'Obsolete']
 export const INFRASTRUCTURE_MAINTENANCE_TASK_STATUS_OPTIONS: InfrastructureMaintenanceTaskStatus[] = ['Open', 'In Progress', 'Done']
 export const INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS: InfrastructureOperationalStatus = 'Deleted'
+export const INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS: InfrastructureOperationalStatus = 'Cancelled'
 export const MAINTENANCE_RECURRENCE_NUMBER_MIN = 1
 export const MAINTENANCE_RECURRENCE_NUMBER_MAX = 99
 
@@ -232,7 +233,7 @@ function normalizeInfrastructureMaintenanceTaskId(
       : ''
   const used = new Set(existingTaskIds.map((id) => text(id).trim()).filter(Boolean))
   if (candidate && !used.has(candidate)) return candidate
-  return reserveBusinessId('infrastructureMaintenanceTask', existingTaskIds, index)
+  return generateBusinessId('infrastructureMaintenanceTask', [...existingTaskIds, `IMT${String(index).padStart(6, '0')}`])
 }
 
 function dateTimestamp(value: string | null | undefined): number | null {
@@ -402,6 +403,8 @@ export function linkedDomainItemsForSsl(
   _currentSslItemId: string,
   _currentLinkedDomainId = '',
 ): InfrastructureItem[] {
+  void _currentSslItemId
+  void _currentLinkedDomainId
   return items
     .filter((item) => isInfrastructureItemType(item, referenceData, 'Domain'))
     .sort((first, second) => first.infrastructureId.localeCompare(second.infrastructureId, undefined, { numeric: true, sensitivity: 'base' }))
@@ -713,7 +716,7 @@ export function normalizeInfrastructureMaintenanceTasks(
 export function createInfrastructureMaintenanceTask(tasks: InfrastructureMaintenanceTask[], now = new Date().toISOString()): InfrastructureMaintenanceTask {
   return normalizeMaintenanceTask({
     id: `infrastructure-maintenance-${crypto.randomUUID()}`,
-    taskId: reserveBusinessId('infrastructureMaintenanceTask', tasks.map((task) => task.taskId)),
+    taskId: generateBusinessId('infrastructureMaintenanceTask', tasks.map((task) => task.taskId)),
     taskTypeRefId: '',
     task: '',
     startDate: null,
@@ -970,7 +973,7 @@ export function generateInfrastructureMaintenanceOccurrences(
     const occurrenceDateText = dateOnly(occurrenceDate)
     const key = `${seriesId}:${occurrenceDateText}`
     if (!existingKeys.has(key) || occurrenceDateText === draft.recurrenceOccurrenceDate || draft.recurrenceOccurrenceDate == null) {
-      const taskId = occurrenceCount === 0 ? draft.taskId : reserveBusinessId('infrastructureMaintenanceTask', [...usedIds, ...generated.map((task) => task.taskId)])
+      const taskId = occurrenceCount === 0 ? draft.taskId : generateBusinessId('infrastructureMaintenanceTask', [...usedIds, ...generated.map((task) => task.taskId)])
       generated.push(normalizeMaintenanceTask({
         ...draft,
         id: occurrenceCount === 0 ? draft.id : `infrastructure-maintenance-${crypto.randomUUID()}`,
@@ -1392,6 +1395,10 @@ export function createInfrastructureDraft(now = new Date().toISOString(), infras
     deletionReason: '',
     deletionHistory: [],
     deletionPreviousOperationalStatus: null,
+    cancellationRequested: 'NO',
+    cancellationReason: '',
+    cancellationHistory: [],
+    cancellationPreviousOperationalStatus: null,
     maintenanceStatus: 'None',
     linkedSystemIds: [],
     initialWarrantyStartDate: null,
@@ -1467,6 +1474,14 @@ export function normalizeInfrastructureItem(
     deletionReason: text(item.deletionReason),
     deletionHistory: infrastructureDeletionHistory(item as InfrastructureItem),
     deletionPreviousOperationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.deletionPreviousOperationalStatus as InfrastructureOperationalStatus) ? item.deletionPreviousOperationalStatus as InfrastructureOperationalStatus : null,
+    cancellationRequested: 'NO',
+    cancellationReason: text(item.cancellationReason),
+    cancellationHistory: infrastructureDeletionHistory({
+      deletionHistory: item.cancellationHistory,
+      deletionReason: item.cancellationReason,
+      updatedAt: text(item.cancellationAt) || text(item.updatedAt) || now,
+    } as InfrastructureItem),
+    cancellationPreviousOperationalStatus: INFRASTRUCTURE_OPERATIONAL_STATUS_OPTIONS.includes(item.cancellationPreviousOperationalStatus as InfrastructureOperationalStatus) ? item.cancellationPreviousOperationalStatus as InfrastructureOperationalStatus : null,
     maintenanceStatus: infrastructureMaintenanceStatusFromTasks({ maintenanceTasks }),
     linkedSystemIds: Array.isArray(item.linkedSystemIds) ? item.linkedSystemIds.map(text).filter(Boolean) : [],
     initialWarrantyStartDate: text(item.initialWarrantyStartDate) || currentWarranty?.startDate || null,
@@ -1700,7 +1715,9 @@ export function infrastructureMaintenanceDashboardRows(
   accounts: Account[] = [],
   today = new Date(),
 ): InfrastructureMaintenanceDashboardRow[] {
-  return items.flatMap((item) => {
+  return items
+    .filter((item) => item.operationalStatus !== INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS)
+    .flatMap((item) => {
     const linkedSystems = linkedSystemsForInfrastructureItem(item, systems)
     const linkedTenants = linkedTenantsForInfrastructureItem(item, systems, tenants)
     const accountNameById = new Map(accounts.map((account) => [account.id, account.accountName]))
@@ -1807,7 +1824,12 @@ export function infrastructureItemsForSystem(
   systems: Array<System | ProductionSystemInventoryItem | ReusedInternalSystem>,
   tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
-  return infrastructureDashboardRows(items.filter((item) => item.linkedSystemIds.includes(systemId)), referenceData, systems, tenants)
+  return infrastructureDashboardRows(
+    items.filter((item) => item.operationalStatus !== INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS && item.linkedSystemIds.includes(systemId)),
+    referenceData,
+    systems,
+    tenants,
+  )
 }
 
 export function eligibleInfrastructureItemsForSystemLink(
@@ -1817,7 +1839,7 @@ export function eligibleInfrastructureItemsForSystemLink(
   tenants: Tenant[] = [],
 ): InfrastructureDashboardRow[] {
   return infrastructureDashboardRows(
-    items.filter((item) => item.operationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS),
+    items.filter((item) => item.operationalStatus !== INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS && item.operationalStatus !== INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS),
     referenceData,
     systems,
     tenants,

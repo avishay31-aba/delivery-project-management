@@ -1,5 +1,6 @@
 import type { ProjectSystemLink } from '@/data/seed.types'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
+import { applicableOpportunityRequirementSources } from '@/domain/opportunity-lifecycle'
 import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
 import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE, reusedInternalMachineIdsEqual } from '@/domain/system-inventory'
 import { activeProjectSystemLinks } from './service'
@@ -127,13 +128,19 @@ export function validateExistingSystemLink(
   if (regionConflict) return regionConflict
   if (project.mainType === 'POC') {
     const opportunity = context.opportunities?.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
-    const requestedSystemIds = new Set([
-      ...(opportunity?.newTenantRequirements ?? [])
-        .filter((requirement) => requirement.deployTarget === 'EXISTING_SID')
-        .map((requirement) => requirement.existingSystemId),
-      ...(opportunity?.changeRequestRequirements ?? []).map((requirement) => requirement.systemId),
-      ...(opportunity?.standardRenewalRequirements ?? []).map((requirement) => requirement.systemId),
-    ].filter(Boolean))
+    const requestedSystemIds = new Set(
+      opportunity
+        ? applicableOpportunityRequirementSources(opportunity)
+            .map((source) => {
+              const requirement = source.requirement
+              if ('deployTarget' in requirement) {
+                return requirement.deployTarget === 'EXISTING_SID' ? requirement.existingSystemId : ''
+              }
+              return 'systemId' in requirement ? requirement.systemId : ''
+            })
+            .filter(Boolean)
+        : [],
+    )
     if (!requestedSystemIds.has(input.systemId)) {
       return failed('POC projects can only link existing systems specified in the Opportunity tenant requirements.')
     }

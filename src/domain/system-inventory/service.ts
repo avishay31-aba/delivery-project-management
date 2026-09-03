@@ -5,7 +5,13 @@ import {
   applicationConfigurationValue,
   APPLICATION_CONFIGURATION_SUMMARY_FIELDS,
 } from '@/domain/application-configuration'
-import { tenantIsActivelyHostedBySystem } from '@/domain/tenant-operations/lifecycle'
+import {
+  isTenantIndividuallyLifecycleInactive,
+  isTenantLifecycleInactive,
+  isTenantOperationallyVisible,
+  tenantIsActivelyHostedBySystem,
+  tenantLatestHistoricalSystemId,
+} from '@/domain/tenant-operations/lifecycle'
 import type { ConfigurationHistoryRecord, TenantConfiguration, TimeGroupLookupRecord } from '@/data/seed.types'
 import { systemTimeGroupSource } from '@/domain/time-groups'
 import type { AllocatedSystemDashboardRow, Project, ProjectSystemLink, ReusedInternalSystem, System, SystemInventoryRecord, Tenant } from './types'
@@ -31,6 +37,14 @@ export function isProductionInventorySystem(record: SystemInventoryRecord): bool
 
 export function isAllocatedSystem(record: SystemInventoryRecord): record is System {
   return 'systemClass' in record && 'availability' in record
+}
+
+export function isSystemCancelled(record: Pick<SystemInventoryRecord, 'operationalStatus'>): boolean {
+  return String(record.operationalStatus ?? '').toLocaleLowerCase().includes('cancel')
+}
+
+export function isSystemOperationallyVisible(record: Pick<SystemInventoryRecord, 'operationalStatus'>): boolean {
+  return !isSystemCancelled(record)
 }
 
 export function isReusedInternalOccupied(status: string | undefined): boolean {
@@ -230,7 +244,19 @@ export function joinUniqueValues(values: Array<string | null | undefined>, separ
 }
 
 export function hostedTenantsForSystem(systemId: string, tenants: Tenant[]): Tenant[] {
-  return tenants.filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId))
+  return tenants.filter((tenant) => isTenantOperationallyVisible(tenant) && tenantIsActivelyHostedBySystem(tenant, systemId))
+}
+
+export function currentTenantPopulationForSystem(systemId: string, tenants: Tenant[]): Tenant[] {
+  return tenants.filter((tenant) =>
+    tenantLatestHistoricalSystemId(tenant) === systemId && !isTenantIndividuallyLifecycleInactive(tenant),
+  )
+}
+
+export function historicalInactiveTenantsForSystem(systemId: string, tenants: Tenant[]): Tenant[] {
+  return tenants.filter((tenant) =>
+    isTenantLifecycleInactive(tenant) && tenantLatestHistoricalSystemId(tenant) === systemId,
+  )
 }
 
 const INTEGER_SUMMARY_KEYS = new Set([
@@ -344,7 +370,7 @@ export function tenantCountForSystem(record: SystemInventoryRecord, tenants: Ten
   if ('sid' in record) {
     // Hosting lifecycle is the authoritative System↔Tenant relationship. Use
     // the complete collection so table filtering and pagination cannot alter it.
-    return hostedTenantsForSystem(record.id, tenants).length
+    return currentTenantPopulationForSystem(record.id, tenants).length
   }
   return record.tenantCount || 0
 }
@@ -410,6 +436,7 @@ export function allocatedSystemDashboardRows(
 
   return systems
     .filter((system) => activeLinksBySystemId.has(system.id))
+    .filter(isSystemOperationallyVisible)
     .filter(isAllocationEligibleSystem)
     .map((system) => {
       const links = activeLinksBySystemId.get(system.id) ?? []

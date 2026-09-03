@@ -1,4 +1,4 @@
-import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import { systemApplicationConfigurationSummary } from '@/domain/system-inventory'
 import { validateRequirementA } from '@/domain/tenant-requirement'
 import type { Account, Opportunity, System, Tenant, TenantConfiguration } from '@/data/seed.types'
@@ -34,23 +34,17 @@ export function resolveTenantCreationSource(
       candidate.pocProjectIds.includes(project.id) ||
       candidate.finalProjectId === project.id,
   )
-  const requirement = opportunity?.newTenantRequirements.find((candidate) => candidate.id === input.requirementId)
+  const requirement = opportunity?.newTenantRequirements.find(
+    (candidate) => candidate.id === input.requirementId || candidate.requirementId === input.requirementId,
+  )
   if (!opportunity || !requirement) {
     return { error: tenantOperationError('New tenant requirement not found for this project.') }
   }
 
-  const activeTenantLinks = activeProjectTenantLinks(context.projectTenants)
-  const alreadyLinkedToRequirement = context.tenants.some((tenant) => {
-    const linkedToProject = activeTenantLinks.some(
-      (link) => link.projectId === input.projectId && link.tenantId === tenant.id,
-    )
-    return linkedToProject && tenant.sourceRequirementId === requirement.requirementId
-  })
-  if (alreadyLinkedToRequirement) return { error: tenantOperationError('A tenant already exists for this requirement.') }
-
   return {
     source: {
       account: context.accounts.find((candidate) => candidate.id === opportunity.accountId),
+      existingTenantIds: context.tenants.map((tenant) => tenant.tid),
       idCounters: context.idCounters,
       opportunity,
       project,

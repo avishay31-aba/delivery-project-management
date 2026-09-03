@@ -1,20 +1,12 @@
 import type {
-  ChangeRequestRequirement,
-  NewTenantRequirement,
-  StandardRenewalRequirement,
-} from '@/data/seed.types'
-import type {
   Opportunity,
   OpportunitySubType,
   OpportunityType,
   Project,
   ProjectMainType,
   ProjectSubType,
-  RequirementType,
 } from './types'
 import { OPPORTUNITY_SUB_TYPE_OPTIONS } from './metadata'
-
-export type OpportunityRequirementRow = NewTenantRequirement | ChangeRequestRequirement | StandardRenewalRequirement
 
 export function opportunitySubTypeOptions(type: OpportunityType): OpportunitySubType[] {
   return OPPORTUNITY_SUB_TYPE_OPTIONS[type]
@@ -120,16 +112,6 @@ export function linkedOpportunityForProject(project: Project, opportunities: Opp
       opportunity.pocProjectIds.includes(project.id) ||
       opportunity.finalProjectId === project.id,
   )
-}
-
-export function opportunityRowsForRequirementSection(
-  opportunity: Opportunity | undefined,
-  kind: RequirementType,
-): OpportunityRequirementRow[] {
-  if (!opportunity) return []
-  if (kind === 'A') return opportunity.newTenantRequirements
-  if (kind === 'B') return opportunity.changeRequestRequirements
-  return opportunity.standardRenewalRequirements
 }
 
 export function activePocProjectForOpportunity(opportunity: Opportunity, savedOpportunity: Opportunity, projects: Project[]): Project | undefined {

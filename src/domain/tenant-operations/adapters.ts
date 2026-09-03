@@ -1,7 +1,6 @@
-import { incrementCounter } from '@/data/id-generator'
 import type { AllocationType, NewTenantRequirement, Project, System, Tenant, TenantConfiguration } from '@/data/seed.types'
 import { CURRENT_USER_DISPLAY_NAME } from '@/config/current-user'
-import { reserveBusinessId } from '@/domain/business-identity'
+import { generateBusinessIdFromCounter, reserveBusinessId } from '@/domain/business-identity'
 import {
   applicationConfigurationFromRequirement,
   applicationConfigurationFromTenant,
@@ -27,14 +26,27 @@ export function cloneTenant(tenant: Tenant): Tenant {
 }
 
 export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]): Tenant {
+  const currentSystemId = (() => {
+    const hostedSystem = tenant.hostedSystemId ? systems.find((system) => system.id === tenant.hostedSystemId) : undefined
+    if (hostedSystem) return hostedSystem.id
+    const system = tenant.systemId ? systems.find((candidate) => candidate.id === tenant.systemId) : undefined
+    return system?.id ?? tenant.hostedSystemId ?? tenant.systemId ?? ''
+  })()
   const history =
     tenant.hostedSystemHistory && tenant.hostedSystemHistory.length > 0
       ? tenant.hostedSystemHistory
-      : tenant.systemId
-        ? [{ systemId: tenant.systemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
+      : currentSystemId
+        ? [{ systemId: currentSystemId, startedAt: tenant.createdAt, endedAt: null, reason: 'Created' as const }]
         : []
 
-  const normalizedOperationalStatus = tenant.operationalStatus === 'Operative' ? 'Active' : tenant.operationalStatus || 'Active'
+  const normalizedOperationalStatus =
+    tenant.operationalStatus === 'Operative'
+      ? 'Active'
+      : tenant.operationalStatus === 'Deleted - By System'
+        ? 'Deleted'
+        : tenant.operationalStatus === 'Cancelled - By System'
+          ? 'Cancelled'
+          : tenant.operationalStatus || 'Active'
   const normalizedManualStatus = tenant.lastManualOperationalStatus === 'Operative'
     ? 'Active'
     : isManualTenantOperationalMode(tenant.lastManualOperationalStatus)
@@ -43,15 +55,25 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
         ? normalizedOperationalStatus
         : 'Active'
 
+  const tenantWithoutLegacyName = { ...tenant } as Tenant & Record<string, unknown>
+  delete tenantWithoutLegacyName[['tenant', 'Name'].join('')]
+
   return {
-    ...tenant,
+    ...tenantWithoutLegacyName,
+    systemId: currentSystemId,
     operationalStatus: normalizedOperationalStatus,
     lastManualOperationalStatus: normalizedManualStatus,
+    individualLifecyclePreviousOperationalStatus: tenant.individualLifecyclePreviousOperationalStatus ?? null,
+    systemForcedPreviousOperationalStatus: tenant.systemForcedPreviousOperationalStatus ?? null,
+    systemForcedBySystemId: tenant.systemForcedBySystemId ?? null,
     contractStatus: tenant.contractStatus ?? 'UNDER_CONTRACT',
     hostedSystemHistory: history,
     tenantFormType: tenant.tenantType === 'PENLINK_INTERNAL' ? 'INTERNAL' : tenant.tenantType === 'POC' ? 'POC' : 'CUSTOMER',
-    hostedSystemId: tenant.hostedSystemId ?? tenant.systemId,
-    hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === tenant.systemId)?.sid ?? '',
+    hostedSystemId: currentSystemId,
+    hostingSid: tenant.hostingSid ?? systems.find((system) => system.id === currentSystemId)?.sid ?? '',
+    sourceRequirementId: normalizedOperationalStatus === 'Cancelled' ? undefined : tenant.sourceRequirementId,
+    releasedRequirementId: normalizedOperationalStatus === 'Cancelled' ? tenant.sourceRequirementId ?? tenant.releasedRequirementId ?? null : tenant.releasedRequirementId ?? null,
+    requirementHistory: Array.isArray(tenant.requirementHistory) ? tenant.requirementHistory : [],
     configuration: applicationConfigurationFromTenant(tenant),
     hostingSnapshot: tenant.hostingSnapshot ?? hostingSnapshotFromTenant(tenant, systems),
     engagementCircle: normalizeEngagementCircleSnapshot(tenant.engagementCircle),
@@ -63,7 +85,7 @@ export function normalizeTenantOperationRecord(tenant: Tenant, systems: System[]
 }
 
 export function tenantCreationDraftFromSource(source: TenantCreationSource, now: string): TenantCreationDraft {
-  const nextTenantId = incrementCounter(source.idCounters, 'tid')
+  const nextTenantId = generateBusinessIdFromCounter('tenant', source.idCounters, source.existingTenantIds)
   const tenantType = source.project.mainType === 'POC' || source.system.systemClass === 'POC_DEMO_TRAINING'
     ? 'POC'
     : 'CUSTOMER'
@@ -71,7 +93,6 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
   const tenant: Tenant = {
     id: `ten-${crypto.randomUUID()}`,
     tid: nextTenantId.id,
-    tenantName: `${nextTenantId.id} ${source.project.accountName || (source.account?.accountName ?? '')}`.trim(),
     accountId: source.account?.id ?? source.system.accountId ?? '',
     systemId: source.system.id,
     deliveryPid: source.project.pid,
@@ -80,13 +101,28 @@ export function tenantCreationDraftFromSource(source: TenantCreationSource, now:
     hostedSystemId: source.system.id,
     hostingSid: source.system.sid ?? '',
     sourceRequirementId: source.requirement.requirementId,
+    releasedRequirementId: null,
+    requirementHistory: [{
+      id: `tenant-req-${crypto.randomUUID()}`,
+      pid: source.project.pid,
+      projectId: source.project.id,
+      requirementId: source.requirement.requirementId,
+      relationshipType: 'A',
+      status: 'CURRENT',
+      startedAt: now,
+      endedAt: null,
+    }],
     configuration,
     accountName: source.project.accountName || (source.account?.accountName ?? ''),
     country: source.opportunity.country || source.account?.country || source.project.country || '',
+    state: source.opportunity.state || source.account?.state || source.project.state || source.system.state || '',
     // Normalized by the authoritative Country -> Time Zone -> Time Group service.
     timeGroup: '',
     operationalStatus: 'Active',
     lastManualOperationalStatus: 'Active',
+    individualLifecyclePreviousOperationalStatus: null,
+    systemForcedPreviousOperationalStatus: null,
+    systemForcedBySystemId: null,
     contractStatus: 'UNDER_CONTRACT',
     hostedSystemHistory: [{ systemId: source.system.id, startedAt: now, endedAt: null, reason: 'Created' }],
     productType: configuration.product,

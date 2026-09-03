@@ -229,12 +229,12 @@ export interface SystemTimeGroupSourceReadModel {
   timeZone: string
   governorTenantId?: string
   tenant?: Tenant
-  source: 'EXPLICIT' | 'VETERAN' | 'NONE'
+  source: 'EXPLICIT' | 'VETERAN' | 'INVENTORY' | 'NONE'
 }
 
 /** The single authoritative source selection for System Time Group governance. */
 export function systemTimeGroupSource(
-  system: Pick<System, 'id' | 'timeGroupGovernanceTenantId'>,
+  system: Pick<System, 'id' | 'timeGroup' | 'timeGroupGovernanceTenantId'>,
   tenants: Tenant[],
   records: TimeGroupLookupRecord[],
 ): SystemTimeGroupSourceReadModel {
@@ -246,7 +246,11 @@ export function systemTimeGroupSource(
       )
     : undefined
   const tenant = explicitGovernor ?? mostVeteranActiveTenantForSystem(system.id, tenants)
-  if (!tenant) return { timeGroup: '', timeZone: '', source: 'NONE' }
+  if (!tenant) {
+    return system.timeGroup
+      ? { timeGroup: system.timeGroup, timeZone: '', source: 'INVENTORY' }
+      : { timeGroup: '', timeZone: '', source: 'NONE' }
+  }
   const derived = tenantTimeGroupFromLocation(tenant, records)
   return {
     timeGroup: derived.timeGroup,

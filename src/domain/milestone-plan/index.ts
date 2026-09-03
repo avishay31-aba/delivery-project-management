@@ -2,10 +2,11 @@ import type { Project, WorkItemStatus } from '@/data/seed.types'
 import {
   PROJECT_MILESTONE_TASK_TEMPLATES,
   buildProjectMilestonesAndTasks,
+  projectMilestonePlanMatchesTemplate,
   resolveProjectMilestoneTemplate,
 } from '@/config/project-milestone-templates'
 
-export { PROJECT_MILESTONE_TASK_TEMPLATES, buildProjectMilestonesAndTasks, resolveProjectMilestoneTemplate }
+export { PROJECT_MILESTONE_TASK_TEMPLATES, buildProjectMilestonesAndTasks, projectMilestonePlanMatchesTemplate, resolveProjectMilestoneTemplate }
 
 export type MilestonePlan = Pick<Project, 'milestones' | 'tasks'>
 export type ProjectMilestone = NonNullable<Project['milestones']>[number]

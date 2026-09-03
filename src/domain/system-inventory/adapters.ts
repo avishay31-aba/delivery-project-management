@@ -45,6 +45,11 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     remarks: normalizeRemarks(record.remarks),
     owners: normalizeOwners(record.owners),
     configurationHistory: Array.isArray(record.configurationHistory) ? record.configurationHistory : [],
+    cancellationRequested: record.cancellationRequested ?? 'NO',
+    cancellationReason: record.cancellationReason ?? '',
+    cancellationAt: record.cancellationAt ?? null,
+    cancelledBy: record.cancelledBy ?? null,
+    cancellationPreviousOperationalStatus: record.cancellationPreviousOperationalStatus ?? null,
     ...('externalInterface' in record || 'vpnEnabled' in record ? { externalInterface: Boolean(record.externalInterface) } : {}),
     ...('currentProjectIds' in record ? {
       purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory),
@@ -83,6 +88,11 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     owners: [],
     configurationHistory: [],
     documents: [],
+    cancellationRequested: 'NO',
+    cancellationReason: '',
+    cancellationAt: null,
+    cancelledBy: null,
+    cancellationPreviousOperationalStatus: null,
     createdAt: now,
     updatedAt: now,
   }
@@ -229,7 +239,7 @@ export function releaseReusedInternalSystem(
   }
 }
 
-export function createReusedInternalInventorySystem(machineId: string, now: string): ReusedInternalSystem {
+export function createReusedInternalInventorySystem(machineId: string, now: string, options: { includePurposeHistory?: boolean } = {}): ReusedInternalSystem {
   const normalizedMachineId = reusedInternalMachineIdRouteKey(machineId)
   return {
     id: `reused-sys-${crypto.randomUUID()}`,
@@ -254,7 +264,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     occupationStartDate: null,
     occupationEndDate: null,
     currentProjectIds: [],
-    purposeHistory: [createPurposeHistoryRecord([], now, REUSED_INTERNAL_PURPOSE_AVAILABLE)],
+    purposeHistory: options.includePurposeHistory === false ? [] : [createPurposeHistoryRecord([], now, REUSED_INTERNAL_PURPOSE_AVAILABLE)],
     tenantCount: 0,
     alerts: [],
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
@@ -262,6 +272,11 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     owners: [],
     configurationHistory: [],
     documents: [],
+    cancellationRequested: 'NO',
+    cancellationReason: '',
+    cancellationAt: null,
+    cancelledBy: null,
+    cancellationPreviousOperationalStatus: null,
     createdAt: now,
     updatedAt: now,
   }
@@ -290,6 +305,11 @@ export function createStandaloneSystem(sid: string, now: string): System {
     owners: [],
     configurationHistory: [],
     documents: [],
+    cancellationRequested: 'NO',
+    cancellationReason: '',
+    cancellationAt: null,
+    cancelledBy: null,
+    cancellationPreviousOperationalStatus: null,
     createdAt: now,
     updatedAt: now,
   }

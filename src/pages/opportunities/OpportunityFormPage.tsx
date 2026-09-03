@@ -58,15 +58,16 @@ import { ActivityTimeline } from '@/components/activity'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import { type PocProjectSyncAction, type ProjectLifecycleChange, useAppStore } from '@/store/useAppStore'
+import { previewBusinessIdFromCounter } from '@/domain/business-identity'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
-import { isRouteViewMode } from '@/utils/route-mode'
+import { isCreateRoute, isRouteViewMode } from '@/utils/route-mode'
 import {
-  getAccountSystems,
-  getAccountTenants,
+  getEligibleCustomerExistingTenants,
   getOpportunityExistingSidSystems,
+  opportunityExistingSystemGroups,
   resolveTenantSid,
 } from '@/utils/opportunity-validation'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
@@ -75,12 +76,15 @@ import {
   createChangeRequestRequirement,
   createNewTenantRequirement,
   createStandardRenewalRequirement,
+  activeTenantSystemId,
   changeRequestRequirementWithTenantBaseline,
+  nextTenantRequirementIdForContext,
   newTenantRequirementWithDealPackage,
 } from '@/domain/tenant-requirement'
 import {
   activePocProjectForOpportunity,
   cloneOpportunityDraft,
+  createOpportunityDraft,
   createdProjectsForOpportunity,
   isSameOpportunityTypeChange,
   opportunitySubTypeOptions,
@@ -98,9 +102,9 @@ import {
   warrantyRecordPatch,
   warrantyRecordsForTenant,
 } from '@/domain/warranty-collection'
-import { tenantFormType, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
-import { accountReference, projectReference, systemBusinessId, systemReference, tenantReference } from '@/domain/business-reference'
+import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
@@ -249,10 +253,6 @@ function findRequirement(saved: Opportunity, kind: RequirementGridKind, rowId: s
   return saved.standardRenewalRequirements.find((row) => row.id === rowId)
 }
 
-function tenantDisplayName(tenant: Tenant): string {
-  return tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim()
-}
-
 function tenantConfigurationSummary(tenant: Tenant): string {
   return [
     tenant.productType,
@@ -271,7 +271,6 @@ function tenantConfigurationSummary(tenant: Tenant): string {
 
 function tenantOptionText(tenant: Tenant, accountTenants: Tenant[], sidSystems: System[]): string {
   return [
-    tenantDisplayName(tenant),
     `TID ${tenant.tid}`,
     `SID ${resolveTenantSid(tenant.id, accountTenants, sidSystems) || '-'}`,
     `PID ${tenant.deliveryPid || '-'}`,
@@ -347,6 +346,7 @@ function RequirementGrid({
   saved,
   accountTenants,
   sidSystems,
+  existingSystemGroups,
   warrantyRecords,
   countryOptions,
   saveMessages,
@@ -367,6 +367,7 @@ function RequirementGrid({
   saved: Opportunity
   accountTenants: Tenant[]
   sidSystems: System[]
+  existingSystemGroups: { accountSystems: System[]; dealOwnerSystems: System[]; allSystems: System[] }
   warrantyRecords: WarrantyRecord[]
   countryOptions: string[]
   saveMessages: string[]
@@ -614,10 +615,10 @@ function RequirementGrid({
     const isChanged = cellChanged(row, column.key)
     const isMissing = cellMissing(rowIndex, column)
 
-    if ((column.key === 'tenantName' || column.key === 'deliveryPid') && (kind === 'B' || kind === 'C')) {
+    if (column.key === 'deliveryPid' && (kind === 'B' || kind === 'C')) {
       const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
       const tenant = accountTenants.find((candidate) => candidate.id === tenantId)
-      const value = column.key === 'tenantName' ? (tenant ? tenantDisplayName(tenant) : '') : tenant?.deliveryPid ?? ''
+      const value = tenant?.deliveryPid ?? ''
       return <span className="text-sm text-sf-text-muted">{value}</span>
     }
 
@@ -642,8 +643,9 @@ function RequirementGrid({
       }
       const availableSystems = sidSystems.filter((system) => !isSystemOptionDisabled(row.id, system.id))
       const alreadySelectedSystems = sidSystems.filter((system) => isSystemOptionDisabled(row.id, system.id))
-      const sameAccountSystems = availableSystems.filter((system) => system.accountId && system.accountId === draft.accountId)
-      const dealOwnerSystems = availableSystems.filter((system) => !system.accountId || system.accountId !== draft.accountId)
+      const availableSystemIds = new Set(availableSystems.map((system) => system.id))
+      const sameAccountSystems = existingSystemGroups.accountSystems.filter((system) => availableSystemIds.has(system.id))
+      const dealOwnerSystems = existingSystemGroups.dealOwnerSystems.filter((system) => availableSystemIds.has(system.id))
 
       return (
         <>
@@ -950,6 +952,7 @@ export function OpportunityFormPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = isRouteViewMode(location)
+  const isNewRoute = isCreateRoute(location, opportunityId)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
@@ -958,15 +961,27 @@ export function OpportunityFormPage() {
   const tenants = useAppStore((state) => state.tenants)
   const warrantyRecords = useAppStore((state) => state.warrantyRecords)
   const projects = useAppStore((state) => state.projects)
+  const projectSystems = useAppStore((state) => state.projectSystems)
+  const projectTenants = useAppStore((state) => state.projectTenants)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const idCounters = useAppStore((state) => state.idCounters)
   const saveOpportunityWithProjectSync = useAppStore((state) => state.saveOpportunityWithProjectSync)
   const storedProjectChanges = useAppStore((state) => {
     const opportunity = state.opportunities.find((candidate) => candidate.opportunityId === opportunityId)
     return opportunity ? state.projectLifecycleChangesByOpportunityId[opportunity.id] ?? EMPTY_PROJECT_CHANGES : EMPTY_PROJECT_CHANGES
   })
   const savedOpportunity = useMemo(
-    () => opportunities.find((candidate) => candidate.opportunityId === opportunityId),
-    [opportunities, opportunityId],
+    () => isNewRoute ? undefined : opportunities.find((candidate) => candidate.opportunityId === opportunityId),
+    [isNewRoute, opportunities, opportunityId],
+  )
+  const newOpportunityDraft = useMemo(
+    () => isNewRoute
+      ? {
+          ...createOpportunityDraft(accounts, salesManagers, new Date().toISOString(), 'DELIVERY', 'NEW'),
+          opportunityId: previewBusinessIdFromCounter('opportunity', idCounters, opportunities.map((candidate) => candidate.opportunityId)),
+        }
+      : null,
+    [accounts, idCounters, isNewRoute, opportunities, salesManagers],
   )
   const {
     value: draft,
@@ -974,7 +989,7 @@ export function OpportunityFormPage() {
     reset: resetDraft,
     undo,
     canUndo,
-  } = useUndoHistory<Opportunity | null>(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null, {
+  } = useUndoHistory<Opportunity | null>(savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : newOpportunityDraft, {
     clone: (value) => (value ? cloneOpportunityDraft(value) : value),
     isEqual: valuesEqual,
   })
@@ -991,7 +1006,7 @@ export function OpportunityFormPage() {
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
   useReactiveDraftSync({
-    source: savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : null,
+    source: savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : newOpportunityDraft,
     draft,
     resetDraft,
     clone: (value) => (value ? cloneOpportunityDraft(value) : value),
@@ -1011,21 +1026,16 @@ export function OpportunityFormPage() {
     () => (draft ? accounts.find((candidate) => candidate.id === draft.accountId) : undefined),
     [accounts, draft],
   )
-  const sidSystems = useMemo(
-    () => (draft ? getOpportunityExistingSidSystems(draft, accounts, systems) : []),
-    [accounts, draft, systems],
+  const existingSystemGroups = useMemo(
+    () => (draft ? opportunityExistingSystemGroups(draft, accounts, tenants, systems) : { accountSystems: [], dealOwnerSystems: [], allSystems: [] }),
+    [accounts, draft, systems, tenants],
   )
-  const accountSystems = useMemo(
-    () => (draft ? getAccountSystems(draft.accountId, systems) : []),
-    [draft, systems],
+  const sidSystems = useMemo(
+    () => (draft ? getOpportunityExistingSidSystems(draft, accounts, systems, tenants) : []),
+    [accounts, draft, systems, tenants],
   )
   const accountTenants = useMemo(
-    () => (draft ? getAccountTenants(draft.accountId, tenants).filter((tenant) => {
-      if (tenantFormType(tenant) === 'CUSTOMER') return true
-      if (tenantFormType(tenant) !== 'POC') return false
-      const hostingSystem = systems.find((system) => system.id === (tenant.hostedSystemId || tenant.systemId))
-      return hostingSystem?.systemClass === 'CUSTOMER' && tenant.operationalStatus !== 'Deleted' && tenant.operationalStatus !== 'Cancelled'
-    }) : []),
+    () => (draft ? getEligibleCustomerExistingTenants(draft.accountId, tenants, systems) : []),
     [draft, systems, tenants],
   )
   const createdProjects = useMemo(
@@ -1045,15 +1055,19 @@ export function OpportunityFormPage() {
   )
   const validationErrors = validationMessages.filter((message) => message.level === 'error')
   const validationWarnings = validationMessages.filter((message) => message.level === 'warning')
+  const requirementIdentityContext = useMemo(
+    () => ({ opportunities, tenants, projects, projectSystems, projectTenants }),
+    [opportunities, projectSystems, projectTenants, projects, tenants],
+  )
   const countryOptions = useMemo(
     () => Array.from(new Set(accounts.map((candidate) => candidate.country).filter(Boolean))).sort(),
     [accounts],
   )
-  const isDirty = Boolean(savedOpportunity && draft && !valuesEqual(savedOpportunity, draft))
+  const isDirty = Boolean(draft && (isNewRoute || (savedOpportunity && !valuesEqual(savedOpportunity, draft))))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
-  if (!savedOpportunity || !draft || !metadata) {
+  if (!draft || !metadata || (!savedOpportunity && !isNewRoute)) {
     return (
       <PlaceholderCard
         title="Opportunity not found"
@@ -1063,7 +1077,7 @@ export function OpportunityFormPage() {
   }
 
   const currentDraft = draft
-  const currentSavedOpportunity = savedOpportunity
+  const currentSavedOpportunity = savedOpportunity ?? newOpportunityDraft ?? currentDraft
 
   function opportunityProjectMilestoneSummary() {
     const activeProject = createdProjects.find((project) => project.progressStatus === 'OPEN' && !project.archivedAt) ?? createdProjects[0]
@@ -1108,15 +1122,6 @@ export function OpportunityFormPage() {
     if (hasChange) return changeActionLabel(currentDraft)
     if (hasRenewal) return 'Standard renewal'
     return 'Not selected'
-  }
-
-  function systemAction(systemId: string): ExistingActionValue {
-    return visibleRequirementTypes.includes('A') &&
-      currentDraft.newTenantRequirements.some(
-        (requirement) => requirement.deployTarget === 'EXISTING_SID' && requirement.existingSystemId === systemId,
-      )
-      ? 'New tenant'
-      : 'Not selected'
   }
 
   function systemSelectionDisabled(rowId: string, systemId: string): boolean {
@@ -1165,7 +1170,6 @@ export function OpportunityFormPage() {
 
   function headerMissing(fieldKey: OpportunityHeaderField['key'] | 'stage'): boolean {
     const labels: Partial<Record<OpportunityHeaderField['key'] | 'stage', string[]>> = {
-      opportunityId: ['Opportunity ID is required.'],
       opportunityName: ['Opportunity name is required.'],
       accountId: ['Account is required.'],
       salesManagerId: ['Sales Manager / Deal Owner is required.'],
@@ -1178,7 +1182,7 @@ export function OpportunityFormPage() {
   }
 
   function headerRequired(fieldKey: OpportunityHeaderField['key']): boolean {
-    if (['opportunityId', 'opportunityName', 'accountId', 'salesManagerId'].includes(fieldKey)) return true
+    if (['opportunityName', 'accountId', 'salesManagerId'].includes(fieldKey)) return true
     if (fieldKey === 'deliveryDate') return metadata?.headerFields.some((field) => field.key === 'deliveryDate') ?? false
     if (fieldKey === 'pocStartDate') return metadata?.headerFields.some((field) => field.key === 'pocStartDate') ?? false
     if (fieldKey === 'pocEndDate') return metadata?.headerFields.some((field) => field.key === 'pocEndDate') ?? false
@@ -1239,6 +1243,7 @@ export function OpportunityFormPage() {
 
   function addRequirement(kind: RequirementGridKind) {
     if (isViewMode) return
+    const requirementId = nextTenantRequirementIdForContext(requirementIdentityContext, currentDraft)
     const firstTenant = kind === 'B' || kind === 'C' ? firstAvailableTenant(kind) : accountTenants[0]
     const firstWarranty = firstTenant
       ? warrantyRecordForTenant(firstTenant.id, warrantyRecords)
@@ -1252,6 +1257,7 @@ export function OpportunityFormPage() {
             currentDraft.newTenantRequirements.length,
             currentDraft.country,
             currentDraft.dealPackage ?? 'Silver',
+            requirementId,
           ),
         ],
       })
@@ -1263,7 +1269,7 @@ export function OpportunityFormPage() {
       patchDraft({
         changeRequestRequirements: [
           ...currentDraft.changeRequestRequirements,
-          createChangeRequestRequirement(currentDraft.changeRequestRequirements.length, firstTenant, currentDraft.country),
+          createChangeRequestRequirement(currentDraft.changeRequestRequirements.length, firstTenant, currentDraft.country, requirementId),
         ],
       })
       return
@@ -1273,7 +1279,7 @@ export function OpportunityFormPage() {
     patchDraft({
       standardRenewalRequirements: [
         ...currentDraft.standardRenewalRequirements,
-        createStandardRenewalRequirement(currentDraft.standardRenewalRequirements.length, firstTenant, firstWarranty),
+        createStandardRenewalRequirement(currentDraft.standardRenewalRequirements.length, firstTenant, firstWarranty, requirementId),
       ],
     })
   }
@@ -1334,7 +1340,7 @@ export function OpportunityFormPage() {
               ...(key === 'tenantId' && selectedTenant
                 ? {
                     ...applicationConfigurationPatchFromTenant(selectedTenant),
-                    systemId: selectedTenant.systemId,
+                    systemId: activeTenantSystemId(selectedTenant),
                     baselineConfiguration: changeRequestRequirementWithTenantBaseline(row, selectedTenant, { replaceExisting: true }).baselineConfiguration,
                   }
                 : {}),
@@ -1358,7 +1364,7 @@ export function OpportunityFormPage() {
             ...(key === 'tenantId' && selectedTenant
               ? {
                   ...applicationConfigurationPatchFromTenant(selectedTenant),
-                  systemId: selectedTenant.systemId,
+                  systemId: activeTenantSystemId(selectedTenant),
                   warrantyRecordId:
                     warrantyRecordForTenant(selectedTenant.id, warrantyRecords)?.warrantyRecordId ?? '',
                   warrantyStatus: selectedTenant.warrantyStatus,
@@ -1373,6 +1379,12 @@ export function OpportunityFormPage() {
   }
 
   function discardChanges() {
+    if (isNewRoute) {
+      resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
+      setSaveMessages([])
+      setHasAttemptedSave(false)
+      return
+    }
     resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
     setHasAttemptedSave(false)
@@ -1401,7 +1413,7 @@ export function OpportunityFormPage() {
     if (isViewMode) return
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    const result = saveOpportunityWithProjectSync(currentDraft, currentSavedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
+    const result = saveOpportunityWithProjectSync(currentDraft, savedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
     if (result.messages && result.messages.length > 0) {
       setSaveMessages(result.messages)
       setPendingPocSave(null)
@@ -1417,6 +1429,11 @@ export function OpportunityFormPage() {
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
+    if (isNewRoute) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(`/opportunities/${result.opportunity.opportunityId}`, { replace: true, state: { mode: 'edit', returnTo } }), 0)
+      return
+    }
     if (!options.stayOnPage && returnTo) {
       setBypassUnsavedPrompt(true)
       window.setTimeout(() => navigate(returnTo), 0)
@@ -1430,31 +1447,49 @@ export function OpportunityFormPage() {
     if (tenantsToAdd.length === 0) return
 
     if (kind === 'B') {
+      let sequenceDraft = currentDraft
+      const requirementsToAdd = tenantsToAdd.map((tenant, index) => {
+        const requirementId = nextTenantRequirementIdForContext(requirementIdentityContext, sequenceDraft)
+        const requirement = createChangeRequestRequirement(
+          currentDraft.changeRequestRequirements.length + index,
+          tenant,
+          currentDraft.country,
+          requirementId,
+        )
+        sequenceDraft = {
+          ...sequenceDraft,
+          changeRequestRequirements: [...sequenceDraft.changeRequestRequirements, requirement],
+        }
+        return requirement
+      })
       patchDraft({
         changeRequestRequirements: [
           ...currentDraft.changeRequestRequirements,
-          ...tenantsToAdd.map((tenant, index) =>
-            createChangeRequestRequirement(
-              currentDraft.changeRequestRequirements.length + index,
-              tenant,
-              currentDraft.country,
-            ),
-          ),
+          ...requirementsToAdd,
         ],
       })
       return
     }
 
+    let sequenceDraft = currentDraft
+    const requirementsToAdd = tenantsToAdd.map((tenant, index) => {
+      const requirementId = nextTenantRequirementIdForContext(requirementIdentityContext, sequenceDraft)
+      const requirement = createStandardRenewalRequirement(
+        currentDraft.standardRenewalRequirements.length + index,
+        tenant,
+        warrantyRecordForTenant(tenant.id, warrantyRecords),
+        requirementId,
+      )
+      sequenceDraft = {
+        ...sequenceDraft,
+        standardRenewalRequirements: [...sequenceDraft.standardRenewalRequirements, requirement],
+      }
+      return requirement
+    })
     patchDraft({
       standardRenewalRequirements: [
         ...currentDraft.standardRenewalRequirements,
-        ...tenantsToAdd.map((tenant, index) =>
-            createStandardRenewalRequirement(
-              currentDraft.standardRenewalRequirements.length + index,
-              tenant,
-              warrantyRecordForTenant(tenant.id, warrantyRecords),
-            ),
-        ),
+        ...requirementsToAdd,
       ],
     })
   }
@@ -1834,9 +1869,7 @@ export function OpportunityFormPage() {
   }
 
   function renderExistingTenantsAndSystemsSection() {
-    const tenantSystemIds = new Set(accountTenants.map((tenant) => tenant.systemId))
-    const systemOnlyRows = accountSystems.filter((system) => !tenantSystemIds.has(system.id))
-    const colSpan = 10
+    const colSpan = 9
 
     return (
       <CollapsibleSection
@@ -1852,7 +1885,6 @@ export function OpportunityFormPage() {
               <tr>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Action Chosen</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">TID</th>
-                <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Tenant Name</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">SID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Delivery PID</th>
                 <th className="border border-sf-border px-2 py-1 text-sm font-semibold">Project Type</th>
@@ -1872,7 +1904,6 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">
                       <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
                     </td>
-                    <td className="border border-sf-border px-2 py-1">{tenantDisplayName(tenant)}</td>
                     <td className="border border-sf-border px-2 py-1">
                       {tenantSid ? <BusinessIdLink objectType="SYSTEM" businessId={tenantSid}>{tenantSid}</BusinessIdLink> : ''}
                     </td>
@@ -1889,30 +1920,7 @@ export function OpportunityFormPage() {
                   </tr>
                 )
               })}
-              {systemOnlyRows.map((system) => {
-                const action = systemAction(system.id)
-                return (
-                  <tr key={`system-${system.id}`}>
-                    <td className="border border-sf-border px-2 py-1">{renderActionBadge(action)}</td>
-                    <td className="border border-sf-border px-2 py-1" />
-                    <td className="border border-sf-border px-2 py-1" />
-                    <td className="border border-sf-border px-2 py-1">
-                      <BusinessObjectLink reference={systemReference(system)}>{systemBusinessId(system) || system.id}</BusinessObjectLink>
-                    </td>
-                    <td className="border border-sf-border px-2 py-1">
-                      {system.deliveryPid ? <BusinessIdLink objectType="PROJECT" businessId={system.deliveryPid}>{system.deliveryPid}</BusinessIdLink> : ''}
-                    </td>
-                    <td className="border border-sf-border px-2 py-1">{projects.find((project) => project.pid === system.deliveryPid)?.mainType ?? ''}</td>
-                    <td className="border border-sf-border px-2 py-1" />
-                    <td className="border border-sf-border px-2 py-1">
-                      {[system.productType, system.hostingType, system.cloudPlatform].filter(Boolean).join(' | ')}
-                    </td>
-                    <td className="border border-sf-border px-2 py-1" />
-                    <td className="border border-sf-border px-2 py-1" />
-                  </tr>
-                )
-              })}
-              {accountTenants.length === 0 && systemOnlyRows.length === 0 ? (
+              {accountTenants.length === 0 ? (
                 <tr>
                   <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={colSpan}>
                     No existing tenants or systems for this customer.
@@ -1939,6 +1947,7 @@ export function OpportunityFormPage() {
           saved={currentSavedOpportunity}
           accountTenants={accountTenants}
           sidSystems={sidSystems}
+          existingSystemGroups={existingSystemGroups}
           warrantyRecords={warrantyRecords}
           countryOptions={countryOptions}
           saveMessages={saveMessages}
@@ -1965,6 +1974,7 @@ export function OpportunityFormPage() {
           saved={currentSavedOpportunity}
           accountTenants={accountTenants}
           sidSystems={sidSystems}
+          existingSystemGroups={existingSystemGroups}
           warrantyRecords={warrantyRecords}
           countryOptions={countryOptions}
           saveMessages={saveMessages}
@@ -1990,6 +2000,7 @@ export function OpportunityFormPage() {
         saved={currentSavedOpportunity}
         accountTenants={accountTenants}
         sidSystems={sidSystems}
+        existingSystemGroups={existingSystemGroups}
         warrantyRecords={warrantyRecords}
         countryOptions={countryOptions}
         saveMessages={saveMessages}
@@ -2014,7 +2025,7 @@ export function OpportunityFormPage() {
         />
       ) : null}
       <PageHeader
-        title="Opportunity Workspace"
+        title={`Opportunity ${currentDraft.opportunityId || '-'}`}
         subtitle={`${currentDraft.opportunityId} - ${currentDraft.opportunityName || 'Unnamed opportunity'} - ${metadata.sourceSheet} - ${visibleRequirementTypes.join('+') || 'No'} visible requirement grids`}
         actions={
           <button

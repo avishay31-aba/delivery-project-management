@@ -3,6 +3,7 @@ import { errorMessageClassName, successMessageClassName } from '@/domain/status-
 const ERROR_PATTERNS = [
   'required',
   'cannot',
+  "can't",
   'invalid',
   'missing',
   'must',
@@ -10,6 +11,15 @@ const ERROR_PATTERNS = [
   'unique',
   'blocked',
   'error',
+  'failed',
+  'unable',
+  'unavailable',
+  'not available',
+  'already',
+  'select ',
+  'deallocate',
+  'before ',
+  'prerequisite',
 ]
 
 export function isValidationErrorMessage(message: string): boolean {
@@ -19,6 +29,18 @@ export function isValidationErrorMessage(message: string): boolean {
 
 export function formMessageClassName(messages: string[]): string {
   return messages.some(isValidationErrorMessage) ? errorMessageClassName() : successMessageClassName()
+}
+
+export function hasCancellationValidationError(messages: string[]): boolean {
+  return messages.some((message) => {
+    const normalized = message.trim().toLocaleLowerCase()
+    return isValidationErrorMessage(message) && (
+      normalized.includes('cancellation') ||
+      normalized.includes('cancelling') ||
+      normalized.includes('cancel') ||
+      normalized.includes('deallocate')
+    )
+  })
 }
 
 export function validationControlClassName(isInvalid: boolean): string {

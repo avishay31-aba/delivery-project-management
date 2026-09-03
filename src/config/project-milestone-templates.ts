@@ -1,7 +1,7 @@
 import type { Opportunity, Project, ProjectMilestone, ProjectTask } from '@/data/seed.types'
 import { isServerHosting } from '@/domain/hosting-context'
 
-export type ProjectMilestoneTemplateId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8'
+export type ProjectMilestoneTemplateId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 
 export interface ProjectTemplateRow {
   milestoneOrder: number
@@ -25,6 +25,8 @@ export interface ProjectTemplateResolution {
 }
 
 export const PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS = {
+  pocNewTenantPreferred: 'POC with Grid A only or Grid A plus Grid B selects POC Template #1.',
+  pocChangeOnly: 'POC with Grid B only selects POC Template #2.',
   mixedDeliveryHosting: 'Any on-prem/hybrid new tenant requirement selects the on-prem/hybrid delivery template.',
   deliveryUpsellChangeOnly: 'Delivery upsell with change requests and no new tenant requirements selects the change-request-only template.',
   renewalChangeOnly: 'Renewal upsell/down sell without new tenant requirements selects the renewal change-only template.',
@@ -34,8 +36,8 @@ export const PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS = {
 export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId, ProjectMilestoneTaskTemplate> = {
   "1": {
     "id": "1",
-    "name": "POC",
-    "description": "Project type: POC",
+    "name": "POC - New Tenant or New Tenant plus Change Request",
+    "description": "POC with Grid A only or Grid A plus Grid B",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -194,13 +196,34 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       },
       {
         "milestoneOrder": 6,
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 6,
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 6,
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 7,
         "milestone": "Sending End User License",
         "task": "Sending End User License to customer/sales",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 7,
+        "milestoneOrder": 8,
         "milestone": "End of POC",
         "task": "POC completed",
         "department": "Projects",
@@ -210,8 +233,65 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
   },
   "2": {
     "id": "2",
-    "name": "Delivery new - Cloud",
-    "description": "Delivery new or upsell with new tenant / Cloud",
+    "name": "POC - Change Request only",
+    "description": "POC with Grid B only",
+    "sourceSheet": "Milestones and Tasks Template",
+    "rows": [
+      {
+        "milestoneOrder": 1,
+        "milestone": "Environment configuration",
+        "task": "Verifying system requirments are clear",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 1,
+        "milestone": "Environment configuration",
+        "task": "Verifying start and end date are clear",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 2,
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 2,
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 2,
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 3,
+        "milestone": "Sending End User License",
+        "task": "Sending End User License to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 4,
+        "milestone": "End of POC",
+        "task": "POC completed",
+        "department": "Projects",
+        "resource": "Moshe"
+      }
+    ]
+  },
+  "3": {
+    "id": "3",
+    "name": "Delivery New/Upsell - Cloud",
+    "description": "Delivery New or Upsell with new tenant requirements and all Cloud hosting",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -384,22 +464,22 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       },
       {
         "milestoneOrder": 6,
-        "milestone": "Sending End User License",
-        "task": "Sending End User License to customer/sales",
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 6,
-        "milestone": "Sending End User License",
-        "task": "Ask for warranty dates",
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 6,
-        "milestone": "Sending End User License",
-        "task": "Ask for Freshdesk account(s) details",
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
         "department": "Projects",
         "resource": "Moshe"
       },
@@ -444,13 +524,55 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
         "task": "Issue 3",
         "department": "R&D",
         "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 9,
+        "milestone": "Access control",
+        "task": "System -Update VPN type",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 9,
+        "milestone": "Access control",
+        "task": "System - update IP restriction",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 9,
+        "milestone": "Access control",
+        "task": "System - Update External interface",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Sending End User License",
+        "task": "Sending End User License to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Sending End User License",
+        "task": "Ask for warranty dates",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Sending End User License",
+        "task": "Ask for Freshdesk account(s) details",
+        "department": "Projects",
+        "resource": "Moshe"
       }
     ]
   },
-  "3": {
-    "id": "3",
-    "name": "Delivery new - On-prem/Hybrid",
-    "description": "Delivery new or upsell with new tenant / On-prem or Hybrid",
+  "4": {
+    "id": "4",
+    "name": "Delivery New/Upsell - On-prem/Hybrid",
+    "description": "Delivery New or Upsell with at least one Server/on-prem/hybrid new tenant requirement",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -889,114 +1011,120 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       },
       {
         "milestoneOrder": 11,
-        "milestone": "On site project documents",
-        "task": "System - Upload VPN client file with site IP address",
+        "milestone": "Access control",
+        "task": "System -Update VPN type",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 11,
+        "milestone": "Access control",
+        "task": "System - update IP restriction",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 11,
+        "milestone": "Access control",
+        "task": "System - Update External interface",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 12,
-        "milestone": "Sending End User License",
-        "task": "Sending End User License to customer/sales",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 12,
-        "milestone": "Sending End User License",
-        "task": "Sending FW settings to customer/sales",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 13,
-        "milestone": "SAT",
-        "task": "SAT execution",
-        "department": "Sales",
-        "resource": "<Opportunity owner>"
-      },
-      {
-        "milestoneOrder": 13,
-        "milestone": "SAT",
-        "task": "Ask for warranty dates",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 13,
-        "milestone": "SAT",
-        "task": "Ask for Freshdesk account(s) details",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 14,
-        "milestone": "Features obligations",
-        "task": "Feature1",
-        "department": "R&D",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 14,
-        "milestone": "Features obligations",
-        "task": "Feature 2",
-        "department": "R&D",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 14,
-        "milestone": "Features obligations",
-        "task": "Feature 3",
-        "department": "R&D",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 15,
-        "milestone": "R&D open issues",
-        "task": "Issue 1",
-        "department": "R&D",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 15,
-        "milestone": "R&D open issues",
-        "task": "Issue 2",
-        "department": "R&D",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 15,
-        "milestone": "R&D open issues",
-        "task": "Issue 3",
-        "department": "R&D",
-        "resource": "Moshe"
-      }
-    ]
-  },
-  "4": {
-    "id": "4",
-    "name": "Change Request only",
-    "description": "Delivery upsell change request only",
-    "sourceSheet": "Milestones and Tasks Template",
-    "rows": [
-      {
-        "milestoneOrder": 1,
         "milestone": "Configuration changes",
         "task": "Activity 1",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 1,
+        "milestoneOrder": 12,
         "milestone": "Configuration changes",
         "task": "Activity 2",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 1,
+        "milestoneOrder": 12,
         "milestone": "Configuration changes",
         "task": "Activity 3",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 13,
+        "milestone": "Features obligations",
+        "task": "Feature1",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 13,
+        "milestone": "Features obligations",
+        "task": "Feature 2",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 13,
+        "milestone": "Features obligations",
+        "task": "Feature 3",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 14,
+        "milestone": "R&D open issues",
+        "task": "Issue 1",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 14,
+        "milestone": "R&D open issues",
+        "task": "Issue 2",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 14,
+        "milestone": "R&D open issues",
+        "task": "Issue 3",
+        "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 15,
+        "milestone": "Sending End User License",
+        "task": "Sending End User License to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 15,
+        "milestone": "Sending End User License",
+        "task": "Sending FW settings to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 16,
+        "milestone": "SAT",
+        "task": "SAT execution",
+        "department": "Sales",
+        "resource": "<Opportunity owner>"
+      },
+      {
+        "milestoneOrder": 16,
+        "milestone": "SAT",
+        "task": "Ask for warranty dates",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 16,
+        "milestone": "SAT",
+        "task": "Ask for Freshdesk account(s) details",
         "department": "Projects",
         "resource": "Moshe"
       }
@@ -1004,8 +1132,44 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
   },
   "5": {
     "id": "5",
-    "name": "Renewal standard",
-    "description": "Renewal standard",
+    "name": "Delivery Upsell - Change Request only",
+    "description": "Delivery Upsell with Grid B only",
+    "sourceSheet": "Milestones and Tasks Template",
+    "rows": [
+      {
+        "milestoneOrder": 1,
+        "milestone": "Environment configuration",
+        "task": "Verifying system requirments are clear",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 1,
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 1,
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 1,
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
+        "department": "Projects",
+        "resource": "Moshe"
+      }
+    ]
+  },
+  "6": {
+    "id": "6",
+    "name": "Renewal Standard",
+    "description": "Renewal Standard with warranty extension requirements",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -1017,10 +1181,10 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       }
     ]
   },
-  "6": {
-    "id": "6",
-    "name": "Renewal change only",
-    "description": "Renewal upsell/down sell change request only",
+  "7": {
+    "id": "7",
+    "name": "Renewal Upsell/Down Sell - Change Request only",
+    "description": "Renewal Upsell or Down Sell with Grid B and Grid C only",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -1053,10 +1217,10 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       }
     ]
   },
-  "7": {
-    "id": "7",
-    "name": "Renewal with new tenant - Cloud",
-    "description": "Renewal upsell with new tenant / Cloud",
+  "8": {
+    "id": "8",
+    "name": "Renewal Upsell - Cloud New Tenant",
+    "description": "Renewal Upsell with new tenant requirements and all Cloud hosting",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -1236,22 +1400,22 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       },
       {
         "milestoneOrder": 7,
-        "milestone": "Sending End User License",
-        "task": "Sending End User License to customer/sales",
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 7,
-        "milestone": "Sending End User License",
-        "task": "Ask for warranty dates",
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 7,
-        "milestone": "Sending End User License",
-        "task": "Ask for Freshdesk account(s) details",
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
         "department": "Projects",
         "resource": "Moshe"
       },
@@ -1296,13 +1460,55 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
         "task": "Issue 3",
         "department": "R&D",
         "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Access control",
+        "task": "System -Update VPN type",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Access control",
+        "task": "System - update IP restriction",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 10,
+        "milestone": "Access control",
+        "task": "System - Update External interface",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 11,
+        "milestone": "Sending End User License",
+        "task": "Sending End User License to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 11,
+        "milestone": "Sending End User License",
+        "task": "Ask for warranty dates",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 11,
+        "milestone": "Sending End User License",
+        "task": "Ask for Freshdesk account(s) details",
+        "department": "Projects",
+        "resource": "Moshe"
       }
     ]
   },
-  "8": {
-    "id": "8",
-    "name": "Renewal with new tenant - On-prem/Hybrid",
-    "description": "Renewal upsell with new tenant / On-prem or Hybrid",
+  "9": {
+    "id": "9",
+    "name": "Renewal Upsell - On-prem/Hybrid New Tenant",
+    "description": "Renewal Upsell with at least one Server/on-prem/hybrid new tenant requirement",
     "sourceSheet": "Milestones and Tasks Template",
     "rows": [
       {
@@ -1748,86 +1954,121 @@ export const PROJECT_MILESTONE_TASK_TEMPLATES: Record<ProjectMilestoneTemplateId
       },
       {
         "milestoneOrder": 12,
-        "milestone": "On site project documents",
-        "task": "System - Upload VPN client file with site IP address",
+        "milestone": "Access control",
+        "task": "System -Update VPN type",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 12,
+        "milestone": "Access control",
+        "task": "System - update IP restriction",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 12,
+        "milestone": "Access control",
+        "task": "System - Update External interface",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 13,
-        "milestone": "Sending End User License",
-        "task": "Sending End User License to customer/sales",
+        "milestone": "Configuration changes",
+        "task": "Activity 1",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 13,
-        "milestone": "Sending End User License",
-        "task": "Sending FW settings to customer/sales",
+        "milestone": "Configuration changes",
+        "task": "Activity 2",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 13,
+        "milestone": "Configuration changes",
+        "task": "Activity 3",
         "department": "Projects",
         "resource": "Moshe"
       },
       {
         "milestoneOrder": 14,
-        "milestone": "SAT",
-        "task": "SAT execution",
-        "department": "Sales",
-        "resource": "<Opportunity owner>"
-      },
-      {
-        "milestoneOrder": 14,
-        "milestone": "SAT",
-        "task": "Ask for warranty dates",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 14,
-        "milestone": "SAT",
-        "task": "Ask for Freshdesk account(s) details",
-        "department": "Projects",
-        "resource": "Moshe"
-      },
-      {
-        "milestoneOrder": 15,
         "milestone": "Features obligations",
         "task": "Feature1",
         "department": "R&D",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 15,
+        "milestoneOrder": 14,
         "milestone": "Features obligations",
         "task": "Feature 2",
         "department": "R&D",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 15,
+        "milestoneOrder": 14,
         "milestone": "Features obligations",
         "task": "Feature 3",
         "department": "R&D",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 16,
+        "milestoneOrder": 15,
         "milestone": "R&D open issues",
         "task": "Issue 1",
         "department": "R&D",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 16,
+        "milestoneOrder": 15,
         "milestone": "R&D open issues",
         "task": "Issue 2",
         "department": "R&D",
         "resource": "Moshe"
       },
       {
-        "milestoneOrder": 16,
+        "milestoneOrder": 15,
         "milestone": "R&D open issues",
         "task": "Issue 3",
         "department": "R&D",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 16,
+        "milestone": "Sending End User License",
+        "task": "Sending End User License to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 16,
+        "milestone": "Sending End User License",
+        "task": "Sending FW settings to customer/sales",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 17,
+        "milestone": "SAT",
+        "task": "SAT execution",
+        "department": "Sales",
+        "resource": "<Opportunity owner>"
+      },
+      {
+        "milestoneOrder": 17,
+        "milestone": "SAT",
+        "task": "Ask for warranty dates",
+        "department": "Projects",
+        "resource": "Moshe"
+      },
+      {
+        "milestoneOrder": 17,
+        "milestone": "SAT",
+        "task": "Ask for Freshdesk account(s) details",
+        "department": "Projects",
         "resource": "Moshe"
       }
     ]
@@ -1847,33 +2088,35 @@ function hasChangeRequest(opportunity: Opportunity | undefined): boolean {
 }
 
 export function resolveProjectMilestoneTemplate(project: Project, opportunity: Opportunity | undefined): ProjectTemplateResolution {
-  if (project.mainType === 'POC') return { templateId: '1', reason: 'POC project' }
-
   const serverHostedNewTenant = hasServerHostedNewTenant(opportunity)
   const includesNewTenant = hasNewTenant(opportunity)
   const includesChangeRequest = hasChangeRequest(opportunity)
 
+  if (project.mainType === 'POC') {
+    return includesChangeRequest && !includesNewTenant
+      ? { templateId: '2', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.pocChangeOnly }
+      : { templateId: '1', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.pocNewTenantPreferred }
+  }
+
   if (project.mainType === 'DELIVERY') {
     if (project.subType === 'UPSELL' && includesChangeRequest && !includesNewTenant) {
-      return { templateId: '4', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.deliveryUpsellChangeOnly }
+      return { templateId: '5', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.deliveryUpsellChangeOnly }
     }
-    // Mixed cloud/on-prem Delivery cases currently follow the workbook's "at least one server" row.
     return serverHostedNewTenant
-      ? { templateId: '3', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedDeliveryHosting }
-      : { templateId: '2', reason: 'Delivery new tenant flow defaults to Cloud template' }
+      ? { templateId: '4', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedDeliveryHosting }
+      : { templateId: '3', reason: 'Delivery new tenant flow defaults to Cloud template' }
   }
 
   if (project.mainType === 'RENEWAL') {
-    if (project.subType === 'STANDARD') return { templateId: '5', reason: 'Renewal standard' }
-    if (project.subType === 'DOWN_SELL') return { templateId: '6', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
-    if (!includesNewTenant) return { templateId: '6', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
-    // Mixed cloud/on-prem Renewal cases currently follow the workbook's "at least one server" row.
+    if (project.subType === 'STANDARD') return { templateId: '6', reason: 'Renewal standard' }
+    if (project.subType === 'DOWN_SELL') return { templateId: '7', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
+    if (!includesNewTenant) return { templateId: '7', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.renewalChangeOnly }
     return serverHostedNewTenant
-      ? { templateId: '8', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedRenewalHosting }
-      : { templateId: '7', reason: 'Renewal upsell with cloud new tenant requirements' }
+      ? { templateId: '9', reason: PROJECT_TEMPLATE_RESOLVER_ASSUMPTIONS.mixedRenewalHosting }
+      : { templateId: '8', reason: 'Renewal upsell with cloud new tenant requirements' }
   }
 
-  return { templateId: '2', reason: 'Default delivery template' }
+  return { templateId: '3', reason: 'Default delivery template' }
 }
 
 export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTemplateId): { milestones: ProjectMilestone[]; tasks: ProjectTask[] } {
@@ -1910,4 +2153,20 @@ export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTempl
     milestones: Array.from(milestoneMap.values()).sort((first, second) => first.order - second.order),
     tasks,
   }
+}
+
+export function projectMilestonePlanMatchesTemplate(project: Project, templateId: ProjectMilestoneTemplateId): boolean {
+  const templateData = buildProjectMilestonesAndTasks(templateId)
+  const milestones = [...(project.milestones ?? [])].sort((first, second) => first.order - second.order)
+  const tasks = [...(project.tasks ?? [])].sort((first, second) => first.order - second.order)
+  if (milestones.length !== templateData.milestones.length || tasks.length !== templateData.tasks.length) return false
+  return templateData.milestones.every((expected, index) => {
+    const actual = milestones[index]
+    return actual?.order === expected.order && actual.name === expected.name
+  }) && templateData.tasks.every((expected, index) => {
+    const actual = tasks[index]
+    return actual?.name === expected.name &&
+      actual.department === expected.department &&
+      actual.resource === expected.resource
+  })
 }

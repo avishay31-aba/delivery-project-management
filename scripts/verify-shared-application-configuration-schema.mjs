@@ -22,6 +22,9 @@ const systemDeliveryTable = read('src/components/systems/SystemDeliveryTable.tsx
 const applicationSummaryTable = read('src/components/application-configuration/ApplicationConfigurationSummaryTable.tsx')
 const systemInventoryService = read('src/domain/system-inventory/service.ts')
 const configurationColumnRenderer = read('src/components/configuration/ConfigurationColumnRenderer.tsx')
+const applicationValidation = read('src/domain/application-configuration/validation.ts')
+const tenantColumns = read('src/config/tenant-columns.ts')
+const seed = JSON.parse(read('src/data/seed.json'))
 
 assert(
   /export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFieldMetadata\[\] = \[/.test(applicationMetadata),
@@ -73,6 +76,56 @@ assert(
   /createConfigurationColumnsFromMetadata\(fields: SharedFieldMetadata\[\]\): SharedFieldMetadata\[\] \{\s*return fields\s*\}/m.test(configurationColumnRenderer),
   'Configuration renderers must preserve authoritative metadata order.',
 )
+
+assert(
+  applicationMetadata.indexOf("key: 'aiFeatures'") > -1 &&
+    applicationMetadata.indexOf("key: 'apiEnabled'") > -1 &&
+    applicationMetadata.indexOf("key: 'aiFeatures'") < applicationMetadata.indexOf("key: 'apiEnabled'"),
+  'AI fields must precede API fields in the shared application configuration metadata.',
+)
+assert(
+  tenantColumns.indexOf("id: 'aiFeatures'") > -1 &&
+    tenantColumns.indexOf("id: 'apiEnabled'") > -1 &&
+    tenantColumns.indexOf("id: 'aiFeatures'") < tenantColumns.indexOf("id: 'apiEnabled'"),
+  'Tenant dashboard configuration columns must present AI before API.',
+)
+assert(
+  /key: 'blockchain'[^}]*inputType: 'integer'/.test(applicationMetadata),
+  'Blockchain must use the shared integer module-quantity field presentation.',
+)
+assert(
+  /\['blockchain', 'Blockchain'\]/.test(applicationValidation),
+  'Blockchain must participate in shared integer and module quantity validation.',
+)
+
+function configurationRecords() {
+  const records = []
+  for (const opportunity of seed.opportunities ?? []) {
+    records.push(...(opportunity.newTenantRequirements ?? []))
+    records.push(...(opportunity.changeRequestRequirements ?? []))
+    records.push(...(opportunity.standardRenewalRequirements ?? []))
+  }
+  records.push(...(seed.tenants ?? []))
+  records.push(...(seed.tenants ?? []).map((tenant) => tenant.configuration).filter(Boolean))
+  records.push(...(seed.systems ?? []))
+  records.push(...(seed.productionSystemInventory ?? []))
+  records.push(...(seed.reusedInternalSystems ?? []))
+  return records
+}
+
+configurationRecords().forEach((record, index) => {
+  const value = record.blockchain
+  assert(
+    value == null || (typeof value === 'number' && Number.isInteger(value) && value >= 0),
+    `Configuration record ${index + 1} has a non-integer Blockchain value.`,
+  )
+  if (typeof value === 'number' && typeof record.users === 'number') {
+    assert(
+      value <= record.users,
+      `Configuration record ${index + 1} has Blockchain greater than Users.`,
+    )
+  }
+})
 
 if (!process.exitCode) {
   console.log('Shared application configuration schema verified.')

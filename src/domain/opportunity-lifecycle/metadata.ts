@@ -5,6 +5,7 @@ import {
   requirementCColumns,
 } from '@/domain/tenant-requirement'
 import type { Opportunity, OpportunitySubType, OpportunityType, RequirementType } from './types'
+import { getVisibleRequirementTypes } from './applicability'
 
 export const OPPORTUNITY_SUB_TYPE_OPTIONS: Record<OpportunityType, OpportunitySubType[]> = {
   POC: ['FREE', 'PAID'],
@@ -123,7 +124,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project Form - POC',
       headerFields: POC_HEADER_FIELDS,
-      visibleRequirementTypes: ['A'],
+      visibleRequirementTypes: getVisibleRequirementTypes('POC', 'FREE'),
     },
   ],
   [
@@ -131,7 +132,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project Form - POC',
       headerFields: POC_HEADER_FIELDS,
-      visibleRequirementTypes: ['A'],
+      visibleRequirementTypes: getVisibleRequirementTypes('POC', 'PAID'),
     },
   ],
   [
@@ -139,7 +140,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project Form-Delivery-New',
       headerFields: DELIVERY_HEADER_FIELDS,
-      visibleRequirementTypes: ['A'],
+      visibleRequirementTypes: getVisibleRequirementTypes('DELIVERY', 'NEW'),
     },
   ],
   [
@@ -147,7 +148,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Delivery-Upsell',
       headerFields: DELIVERY_HEADER_FIELDS,
-      visibleRequirementTypes: ['A', 'B'],
+      visibleRequirementTypes: getVisibleRequirementTypes('DELIVERY', 'UPSELL'),
     },
   ],
   [
@@ -155,7 +156,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Standard',
       headerFields: RENEWAL_STANDARD_HEADER_FIELDS,
-      visibleRequirementTypes: ['C'],
+      visibleRequirementTypes: getVisibleRequirementTypes('RENEWAL', 'STANDARD'),
     },
   ],
   [
@@ -163,7 +164,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Upsell',
       headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
-      visibleRequirementTypes: ['C', 'B', 'A'],
+      visibleRequirementTypes: getVisibleRequirementTypes('RENEWAL', 'UPSELL'),
     },
   ],
   [
@@ -171,7 +172,7 @@ const METADATA_BY_TYPE = new Map<string, OpportunityMetadata>([
     {
       sourceSheet: 'Project form-Renewal-Down Sell',
       headerFields: RENEWAL_CHANGE_HEADER_FIELDS,
-      visibleRequirementTypes: ['C', 'B'],
+      visibleRequirementTypes: getVisibleRequirementTypes('RENEWAL', 'DOWN_SELL'),
     },
   ],
 ])
@@ -191,12 +192,4 @@ export function getOpportunityMetadataForOpportunity(opportunity: Opportunity): 
     return getOpportunityMetadata('POC', opportunity.financialProfile ?? (opportunity.subType === 'PAID' ? 'PAID' : 'FREE'))
   }
   return getOpportunityMetadata(opportunity.type, opportunity.subType)
-}
-
-export function getVisibleRequirementTypes(type: OpportunityType, subType: OpportunitySubType): RequirementType[] {
-  return getOpportunityMetadata(type, subType).visibleRequirementTypes
-}
-
-export function getVisibleRequirementTypesForOpportunity(opportunity: Opportunity): RequirementType[] {
-  return getOpportunityMetadataForOpportunity(opportunity).visibleRequirementTypes
 }

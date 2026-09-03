@@ -9,9 +9,9 @@ import {
 } from '@/domain/tenant-requirement'
 import {
   getOpportunityMetadataForOpportunity,
-  getVisibleRequirementTypesForOpportunity,
   WON_IRREVERSIBLE_MESSAGE,
 } from './metadata'
+import { applicableOpportunityRequirementCount, getVisibleRequirementTypesForOpportunity, opportunityWithApplicableRequirements } from './applicability'
 import type { Opportunity, OpportunityValidationContext, Project, RequirementType } from './types'
 
 export type OpportunityContext = TenantRequirementContext
@@ -31,7 +31,6 @@ export function validateOpportunityHeader(opportunity: Opportunity, context: Opp
   const metadata = getOpportunityMetadataForOpportunity(opportunity)
   const visibleHeaderKeys = new Set(metadata.headerFields.map((field) => field.key))
   const messages: ValidationMessage[] = [
-    ...requiredText(opportunity.opportunityId, 'Opportunity ID'),
     ...requiredText(opportunity.opportunityName, 'Opportunity name'),
     ...requiredText(opportunity.accountId, 'Account'),
     ...requiredText(opportunity.salesManagerId, 'Sales Manager / Deal Owner'),
@@ -83,41 +82,31 @@ export function validateOpportunityRequirements(
   context: OpportunityContext,
 ): ValidationMessage[] {
   const visibleTypes = getVisibleRequirementTypesForOpportunity(opportunity)
-  const visibleRows = visibleTypes.reduce((count, requirementType) => {
-    if (requirementType === 'A') return count + opportunity.newTenantRequirements.length
-    if (requirementType === 'B') return count + opportunity.changeRequestRequirements.length
-    return count + opportunity.standardRenewalRequirements.length
-  }, 0)
+  const visibleRows = applicableOpportunityRequirementCount(opportunity)
+  const applicableOpportunity = opportunityWithApplicableRequirements(opportunity)
   const messages: ValidationMessage[] = []
 
   if (opportunity.stage === 'WON' && visibleRows === 0) {
     messages.push({ level: 'error', message: 'At least one visible tenant requirement row is required.' })
   }
 
-  getHiddenRequirementTypesWithRows(opportunity).forEach((requirementType) => {
-    messages.push({
-      level: 'warning',
-      message: `Grid ${requirementType} has stored rows that are hidden for the selected Opportunity Type/Subtype.`,
-    })
-  })
-
   if (visibleTypes.includes('A')) {
-    opportunity.newTenantRequirements.forEach((row, index) => {
+    applicableOpportunity.newTenantRequirements.forEach((row, index) => {
       validateRequirementA(row, opportunity, context, index).forEach((message) => messages.push(message))
     })
   }
   if (visibleTypes.includes('B')) {
-    opportunity.changeRequestRequirements.forEach((row, index) => {
+    applicableOpportunity.changeRequestRequirements.forEach((row, index) => {
       validateRequirementB(row, opportunity, context, index).forEach((message) => messages.push(message))
     })
   }
   if (visibleTypes.includes('C')) {
-    opportunity.standardRenewalRequirements.forEach((row, index) => {
+    applicableOpportunity.standardRenewalRequirements.forEach((row, index) => {
       validateRequirementC(row, opportunity, context, index).forEach((message) => messages.push(message))
     })
   }
 
-  validateRequirementTenantUniqueness(opportunity).forEach((message) => messages.push(message))
+  validateRequirementTenantUniqueness(applicableOpportunity).forEach((message) => messages.push(message))
 
   return messages
 }
@@ -141,6 +130,8 @@ export function shouldConfirmWonTransition(opportunity: Opportunity, savedOpport
 }
 
 export function shouldConfirmPocProjectSync(opportunity: Opportunity, _savedOpportunity: Opportunity, _projects: Project[]): boolean {
+  void _savedOpportunity
+  void _projects
   return opportunity.stage === 'POC'
 }
 

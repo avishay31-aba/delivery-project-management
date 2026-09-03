@@ -31,7 +31,7 @@ export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFi
   { key: 'webloc', configKey: 'webloc', label: 'Webloc', group: 'Modules / #users', editable: true, inputType: 'integer' },
   { key: 'webeye', configKey: 'webeye', label: 'Webeye', group: 'Modules / #users', editable: true, inputType: 'integer' },
   { key: 'ingest', configKey: 'ingest', label: 'Ingest', group: 'Modules / #users', editable: true, inputType: 'integer' },
-  { key: 'blockchain', configKey: 'blockchain', label: 'Blockchain', group: 'Modules', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
+  { key: 'blockchain', configKey: 'blockchain', label: 'Blockchain', group: 'Modules / #users', editable: true, inputType: 'integer' },
   {
     key: 'crossSystemFeatures',
     configKey: 'crossSystemFeatures',
@@ -41,9 +41,6 @@ export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFi
     inputType: 'multiselect',
     options: ['Weaver', 'Dark web', 'Lynx'],
   },
-  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
-  { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
   {
     key: 'aiFeatures',
     configKey: 'aiFeatures',
@@ -53,6 +50,9 @@ export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFi
     inputType: 'multiselect',
     options: ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst'],
   },
+  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
+  { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
   {
     key: 'additionalFeatures',
     configKey: 'additionalFeatures',

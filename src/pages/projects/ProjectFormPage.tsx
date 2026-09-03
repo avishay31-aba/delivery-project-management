@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
   projectHeaderFieldRows,
@@ -18,7 +18,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
-import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, formMessageClassName } from '@/components/ui'
+import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, SearchableReferenceLookup, formMessageClassName, hasCancellationValidationError, validationControlClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { DeletionHistoryField } from '@/components/lifecycle'
@@ -42,11 +42,13 @@ import {
 import { EditableChildObjectActionButton } from '@/components/child-objects'
 import { configurationColumnGroupLabel } from '@/components/configuration'
 import { useAppStore } from '@/store/useAppStore'
+import { previewBusinessIdFromCounter } from '@/domain/business-identity'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
-import { isRouteViewMode } from '@/utils/route-mode'
+import { isCreateRoute, isRouteViewMode } from '@/utils/route-mode'
+import { richTextIsEmpty } from '@/domain/rich-text'
 import {
   allocationModeLabelForProject,
   allowedAllocationModes,
@@ -72,6 +74,7 @@ import {
   activeSystemLinksForProject,
   cloneProjectDraft,
   completeProjectRequirementSections,
+  createStandaloneProject,
   isProjectHeaderFieldChanged,
   linkedSystemsForProject,
   linkedTenantsForProject,
@@ -101,6 +104,7 @@ import {
   milestoneDeadlineAlertStatus,
   orderedProjectMilestones,
   orderedProjectTasks,
+  projectMilestonePlanMatchesTemplate,
   projectMilestoneStatus,
   projectMilestoneTaskProgress,
   resolveProjectMilestoneTemplate,
@@ -137,11 +141,9 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function projectParentSaveScope(project: Project): Partial<Project> {
-  const {
-    documents: _documents,
-    updatedAt: _updatedAt,
-    ...parentScope
-  } = project
+  const parentScope = { ...project } as Partial<Project>
+  delete parentScope.documents
+  delete parentScope.updatedAt
   return parentScope
 }
 
@@ -291,6 +293,7 @@ export function ProjectFormPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = isRouteViewMode(location)
+  const isNewRoute = isCreateRoute(location, pid)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
@@ -305,19 +308,31 @@ export function ProjectFormPage() {
   const reusedInternalSystems = useAppStore((state) => state.reusedInternalSystems)
   const projectSystems = useAppStore((state) => state.projectSystems)
   const projectTenants = useAppStore((state) => state.projectTenants)
+  const idCounters = useAppStore((state) => state.idCounters)
   const updateProject = useAppStore((state) => state.updateProject)
+  const createProjectFromDraft = useAppStore((state) => state.createProjectFromDraft)
+  const restoreProject = useAppStore((state) => state.restoreProject)
   const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
   const allocateReusedInternalSystemToProject = useAppStore((state) => state.allocateReusedInternalSystemToProject)
   const linkExistingSystemToProject = useAppStore((state) => state.linkExistingSystemToProject)
   const deallocateProjectSystem = useAppStore((state) => state.deallocateProjectSystem)
-  const savedProject = useMemo(() => projects.find((project) => project.pid === pid), [pid, projects])
+  const savedProject = useMemo(() => isNewRoute ? undefined : projects.find((project) => project.pid === pid), [isNewRoute, pid, projects])
+  const newProjectDraft = useMemo(
+    () => isNewRoute
+      ? createStandaloneProject(
+          previewBusinessIdFromCounter('project', idCounters, projects.map((project) => project.pid)),
+          new Date().toISOString(),
+        )
+      : null,
+    [idCounters, isNewRoute, projects],
+  )
   const {
     value: draft,
     setValue: setDraft,
     reset: resetDraft,
     undo: undoDraft,
     canUndo,
-  } = useUndoHistory<Project | null>(savedProject ? cloneProjectDraft(savedProject) : null, {
+  } = useUndoHistory<Project | null>(savedProject ? cloneProjectDraft(savedProject) : newProjectDraft, {
     clone: (value) => (value ? cloneProjectDraft(value) : value),
     isEqual: valuesEqual,
   })
@@ -354,7 +369,7 @@ export function ProjectFormPage() {
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
 
   useReactiveDraftSync({
-    source: savedProject ? cloneProjectDraft(savedProject) : null,
+    source: savedProject ? cloneProjectDraft(savedProject) : newProjectDraft,
     draft,
     resetDraft,
     clone: (value) => (value ? cloneProjectDraft(value) : value),
@@ -367,6 +382,19 @@ export function ProjectFormPage() {
     if (!currentDraft) return undefined
     return linkedOpportunityForProject(currentDraft, opportunities)
   }, [currentDraft, opportunities])
+  const opportunityLookupOptions = useMemo(() => {
+    return [...opportunities]
+      .sort((first, second) => {
+        const nameOrder = first.opportunityName.localeCompare(second.opportunityName, undefined, { sensitivity: 'base' })
+        return nameOrder !== 0 ? nameOrder : first.opportunityId.localeCompare(second.opportunityId, undefined, { numeric: true })
+      })
+      .map((opportunity) => ({
+        id: opportunity.id,
+        value: opportunity.opportunityId,
+        primaryLabel: opportunity.opportunityName,
+        secondaryLabel: opportunity.opportunityId,
+      }))
+  }, [opportunities])
   const account = linkedOpportunity ? accounts.find((candidate) => candidate.id === linkedOpportunity.accountId) : undefined
   const salesManager = linkedOpportunity ? salesManagers.find((candidate) => candidate.id === linkedOpportunity.salesManagerId) : undefined
   const activeSystemLinks = useMemo(() => {
@@ -376,14 +404,20 @@ export function ProjectFormPage() {
   const linkedSystems = useMemo(() => {
     return linkedSystemsForProject(currentDraft, systems, activeSystemLinks, linkedOpportunity, tenants, projectSystems)
   }, [activeSystemLinks, currentDraft, linkedOpportunity, projectSystems, systems, tenants])
+  const activeLinkedSystems = useMemo(() => {
+    return linkedSystems.filter((system) => {
+      const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
+      return !status.includes('deleted') && !status.includes('cancel')
+    })
+  }, [linkedSystems])
   const linkedTenants = useMemo(() => {
-    return linkedTenantsForProject(currentDraft, projectTenants, tenants, linkedOpportunity)
-  }, [currentDraft, linkedOpportunity, projectTenants, tenants])
+    return linkedTenantsForProject(currentDraft, projectTenants, tenants, linkedOpportunity, projectSystems)
+  }, [currentDraft, linkedOpportunity, projectSystems, projectTenants, tenants])
   const projectActivityEvents = useMemo(() => {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
-  const isDirty = Boolean(savedProject && currentDraft && (!valuesEqual(projectParentSaveScope(savedProject), projectParentSaveScope(currentDraft)) || pendingAllocationIds.length > 0))
+  const isDirty = Boolean(currentDraft && (isNewRoute || (savedProject && (!valuesEqual(projectParentSaveScope(savedProject), projectParentSaveScope(currentDraft)) || pendingAllocationIds.length > 0))))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
@@ -401,7 +435,7 @@ export function ProjectFormPage() {
     setDraft((current) => {
       if (!current) return current
       const resolution = resolveProjectMilestoneTemplate(current, linkedOpportunity)
-      if (current.milestoneTemplateId === resolution.templateId && current.milestones?.length && current.tasks?.length) {
+      if (current.milestoneTemplateId === resolution.templateId && projectMilestonePlanMatchesTemplate(current, resolution.templateId)) {
         return current
       }
       const templateData = buildProjectMilestonesAndTasks(resolution.templateId)
@@ -420,7 +454,7 @@ export function ProjectFormPage() {
     currentDraft?.opportunityId,
   ])
 
-  if (!currentDraft || !metadata || !savedProject) {
+  if (!currentDraft || !metadata || (!savedProject && !isNewRoute)) {
     return (
       <PlaceholderCard
         title="Project not found"
@@ -430,7 +464,7 @@ export function ProjectFormPage() {
   }
 
   const projectDraft = currentDraft
-  const persistedProject = savedProject
+  const persistedProject = savedProject ?? newProjectDraft ?? currentDraft
   const formMetadata = metadata
   const visibleTabs = formMetadata.tabs
   const permittedAllocationModes = allowedAllocationModes(projectDraft)
@@ -455,6 +489,10 @@ export function ProjectFormPage() {
 
   function openAllocationDialog() {
     if (isViewMode) return
+    if (isNewRoute) {
+      setAllocationResult({ ok: false, message: 'Save the Project before allocating Systems.' })
+      return
+    }
     const initialMode = permittedAllocationModes[0]
     const projectRegion = projectHeaderFieldValue(projectDraft, 'region', { linkedOpportunity, account })
     setAllocationMode(initialMode)
@@ -535,6 +573,18 @@ export function ProjectFormPage() {
   function deallocateSystem(link: ProjectSystemLink) {
     if (isViewMode) return
     const result = deallocateProjectSystem(link.id)
+    if (result.requiresConfirmation) {
+      const tids = result.affectedTids?.length ? `\n\n${result.affectedTids.join(', ')}` : ''
+      const confirmed = window.confirm(`The following tenant Project attachment(s) will be cancelled and released; Requirement IDs become available where cancellation releases them. Continue?${tids}`)
+      if (!confirmed) {
+        setAllocationResult({ ok: false, message: 'System deallocation cancelled.' })
+        return
+      }
+      const confirmedResult = deallocateProjectSystem(link.id, { confirmedTenantCancellation: true })
+      setPendingAllocationIds((current) => current.filter((allocationId) => allocationId !== link.id))
+      setAllocationResult(confirmedResult)
+      return
+    }
     setPendingAllocationIds((current) => current.filter((allocationId) => allocationId !== link.id))
     setAllocationResult(result)
   }
@@ -572,6 +622,21 @@ export function ProjectFormPage() {
   function saveProject(stayOnPage: boolean, onSaved?: () => void) {
     if (isViewMode) return
     const messages = validateProjectSave(projectDraft, { linkedOpportunity, account, salesManager })
+    const cancellationRequested = projectDraft.cancellationRequested === 'YES'
+    if (cancellationRequested) {
+      const activeLinks = activeSystemLinksForProject(projectDraft.id, projectSystems)
+      if (activeLinks.length > 0) {
+        const sidList = Array.from(new Set(activeLinks.map((link) => systems.find((system) => system.id === link.systemId)?.sid ?? link.systemId))).join('; ')
+        setSaveMessages([`Systems are currently allocated to project ${projectDraft.pid}: ${sidList}. Deallocate all systems from the project before cancelling it.`])
+        navigationBlocker.reset?.()
+        return
+      }
+    }
+    if (cancellationRequested && richTextIsEmpty(projectDraft.cancellationReason ?? '')) {
+      setSaveMessages(['Cancellation Reason is required.'])
+      navigationBlocker.reset?.()
+      return
+    }
     if (messages.length > 0) {
       setSaveMessages(messages)
       navigationBlocker.reset?.()
@@ -583,7 +648,7 @@ export function ProjectFormPage() {
       : ''
     const savePatch = projectSavePatch(projectDraft)
     const nextCommittedProject = { ...persistedProject, ...savePatch }
-    const hasBusinessChanges = !valuesEqual(projectParentSaveScope(persistedProject), projectParentSaveScope(nextCommittedProject)) || pendingAllocationIds.length > 0
+    const hasBusinessChanges = isNewRoute || !valuesEqual(projectParentSaveScope(persistedProject), projectParentSaveScope(nextCommittedProject)) || pendingAllocationIds.length > 0
     if (!hasBusinessChanges) {
       setSaveMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -596,7 +661,9 @@ export function ProjectFormPage() {
     }
 
     startSaveIndicator()
-    const committedProject = updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
+    const committedProject = isNewRoute
+      ? createProjectFromDraft({ ...projectDraft, ...savePatch })
+      : updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
     if (committedProject) {
       resetDraft(cloneProjectDraft(committedProject))
     }
@@ -604,6 +671,11 @@ export function ProjectFormPage() {
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
     onSaved?.()
+    if (isNewRoute && committedProject && stayOnPage) {
+      setBypassUnsavedPrompt(true)
+      window.setTimeout(() => navigate(`/projects/${committedProject.pid}`, { replace: true, state: { mode: 'edit', returnTo } }), 0)
+      return
+    }
     if (!stayOnPage && returnTo) {
       setBypassUnsavedPrompt(true)
       window.setTimeout(() => navigate(returnTo), 0)
@@ -611,6 +683,11 @@ export function ProjectFormPage() {
   }
 
   function revertProject() {
+    if (isNewRoute) {
+      resetDraft(cloneProjectDraft(persistedProject))
+      setSaveMessages([])
+      return
+    }
     resetDraft(cloneProjectDraft(persistedProject))
     setSaveMessages([])
   }
@@ -691,29 +768,22 @@ export function ProjectFormPage() {
 
     if (field.key === 'opportunityId') {
       return (
-        <FormField key={field.key} label={label} controlWidthClassName="w-72" renderAs="div">
-          <span className="flex items-center gap-2">
-            <input
-              aria-label={field.label}
-              className={fieldClassName(isChanged, isMissing, 'h-8 min-w-0 flex-1 text-sm')}
-              value={value}
-              list="project-opportunity-options"
-              onInput={(event) => updateDraftField('opportunityId', event.currentTarget.value)}
-              onChange={(event) => updateDraftField('opportunityId', event.target.value)}
-            />
-            {linkedOpportunity ? (
-              <BusinessObjectLink reference={opportunityReference(linkedOpportunity)} className="max-w-64 truncate text-sm">
-                {linkedOpportunity.opportunityName}
-              </BusinessObjectLink>
-            ) : null}
-          </span>
-          <datalist id="project-opportunity-options">
-            {opportunities.map((opportunity) => (
-              <option key={opportunity.id} value={opportunity.opportunityId}>
-                {opportunity.opportunityName}
-              </option>
-            ))}
-          </datalist>
+        <FormField key={field.key} label={label} controlWidthClassName="w-64" renderAs="div">
+          <SearchableReferenceLookup
+            ariaLabel={field.label}
+            className={fieldClassName(isChanged, isMissing, 'h-8 w-full text-sm')}
+            disabled={isViewMode}
+            options={opportunityLookupOptions}
+            value={value}
+            onChange={(nextValue) => updateDraftField('opportunityId', nextValue)}
+            searchTitle="Search Opportunities"
+            searchPlaceholder="Search by Opportunity Name or Opportunity ID"
+          />
+          {linkedOpportunity ? (
+            <BusinessObjectLink reference={opportunityReference(linkedOpportunity)} className="mt-1 block truncate text-sm">
+              {linkedOpportunity.opportunityName}
+            </BusinessObjectLink>
+          ) : null}
         </FormField>
       )
     }
@@ -983,6 +1053,83 @@ export function ProjectFormPage() {
         canEditLatestReason={!isViewMode && projectDraft.progressStatus === 'DELETED'}
         onCurrentReasonChange={(value) => updateDraftField('deletionReason', value)}
       />
+    )
+  }
+
+  function renderCancellationHeaderFields() {
+    const cancellationHistory = projectDraft.cancellationHistory ?? []
+    const latestCancellation = cancellationHistory.at(-1)
+    const isCancelled = projectDraft.progressStatus === 'CANCELLED'
+    const cancellationReasonError = saveMessages.find((message) => message.includes('Cancellation Reason'))
+    const cancellationInvalid = projectDraft.cancellationRequested === 'YES' && hasCancellationValidationError(saveMessages)
+
+    if (isCancelled) {
+      return (
+        <div className="flex flex-wrap items-start gap-3">
+          <MetadataHeaderField
+            label="Cancellation Timestamp"
+            controlWidthClassName="w-56"
+            businessEditable={false}
+            editor={null}
+            readOnlyValue={<DateTimeValue value={latestCancellation?.timestamp ?? projectDraft.updatedAt} semanticType="datetime" />}
+          />
+          <MetadataHeaderField
+            label="Cancelled By"
+            controlWidthClassName="w-56"
+            businessEditable={false}
+            editor={null}
+            readOnlyValue={latestCancellation?.deletedBy ?? '-'}
+          />
+          <MetadataHeaderField
+            label="Cancellation Reason"
+            controlWidthClassName="w-[32rem] max-w-full"
+            businessEditable={false}
+            editor={null}
+            readOnlyValue={<RichTextContent value={latestCancellation?.reason ?? projectDraft.cancellationReason ?? ''} />}
+          />
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+            onClick={() => {
+              const restored = restoreProject(projectDraft.id)
+              if (restored) {
+                resetDraft(cloneProjectDraft(restored))
+                setSaveMessages([`Project ${restored.pid} restored with status ${restored.progressStatus === 'DONE' ? 'Done' : 'Open'}.`])
+              }
+            }}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Restore
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField label="Cancel Project" controlWidthClassName="w-36">
+          <select
+            className={['h-8 w-full rounded border border-sf-border px-2 py-1 text-sm', validationControlClassName(cancellationInvalid)].filter(Boolean).join(' ')}
+            disabled={isViewMode}
+            value={projectDraft.cancellationRequested ?? 'NO'}
+            onChange={(event) => updateDraftField('cancellationRequested', event.target.value)}
+          >
+            <option value="NO">No</option>
+            <option value="YES">Yes</option>
+          </select>
+        </FormField>
+        {projectDraft.cancellationRequested === 'YES' ? (
+          <>
+            <MetadataHeaderField label="Cancellation Timestamp" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue={<DateTimeValue value={new Date().toISOString()} semanticType="datetime" />} />
+            <MetadataHeaderField label="Cancelled By" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue="Current User" />
+            <FormField label="Cancellation Reason" controlWidthClassName="w-[32rem] max-w-full" required error={cancellationReasonError}>
+              <div className={['rounded', validationControlClassName(cancellationInvalid || Boolean(cancellationReasonError))].filter(Boolean).join(' ')}>
+                <RichTextEditor value={projectDraft.cancellationReason ?? ''} onChange={(value) => updateDraftField('cancellationReason', value)} minHeightClassName="min-h-16" toolbarMode="focus" />
+              </div>
+            </FormField>
+          </>
+        ) : null}
+      </div>
     )
   }
 
@@ -1861,7 +2008,7 @@ export function ProjectFormPage() {
           className="space-y-2"
         >
           <SystemDeliveryTable
-            systems={linkedSystems}
+            systems={activeLinkedSystems}
             tenants={tenants}
             projects={projects}
             fallbackProjectId={projectDraft.id}
@@ -1960,6 +2107,7 @@ export function ProjectFormPage() {
               {row.some((field) => field.key === 'projectComments') ? renderDeletionHistoryHeaderField() : null}
             </div>
           ))}
+          {renderCancellationHeaderFields()}
         </div>
       </CollapsibleSection>
 

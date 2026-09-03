@@ -53,7 +53,7 @@ Project fields include PID, project name, status, health, completion, current mi
 
 System fields include SID/MID, product, hosting, operational status, and region/country.
 
-Tenant fields include TID, tenant name, product, environment, operational status, and warranty header status.
+Tenant fields include TID, product, environment, operational status, and warranty header status. There is no Tenant Name business field.
 
 Warranty fields include Warranty ID, status, tenant header warranty status, expiration, and renewal candidate status.
 

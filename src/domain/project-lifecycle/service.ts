@@ -1,10 +1,10 @@
 import { deriveProjectProgress, projectDeadlineSummary } from '@/domain/milestone-plan'
-import { getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
+import { applicableOpportunityRequirementSources, getVisibleRequirementTypesForOpportunity, opportunityRowsForRequirementSection } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
-import { tenantVisibleInProjectTenantCollections } from '@/domain/tenant-operations/lifecycle'
 import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
 import { projectTimeZoneDisplayValue, resolveGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry } from '@/domain/business-region'
+import { isTenantCancelled } from '@/domain/tenant-operations/lifecycle'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
 import type { ProjectRequirementSectionKind, ProjectRequirementSectionMetadata } from './metadata'
@@ -115,17 +115,13 @@ function joinUniqueText(values: unknown[]): string {
 
 function opportunityRequirementRows(opportunity: Opportunity | undefined): ProjectRequirementRow[] {
   if (!opportunity) return []
-  return [
-    ...(opportunity.newTenantRequirements ?? []),
-    ...(opportunity.changeRequestRequirements ?? []),
-    ...(opportunity.standardRenewalRequirements ?? []),
-  ]
+  return applicableOpportunityRequirementSources(opportunity).map((source) => source.requirement)
 }
 
 function projectConfigurationSources(context: ProjectDeliveryDashboardContext, opportunity: Opportunity | undefined) {
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
   const systems = linkedSystemsForProject(context.project, context.systems, activeSystemLinks)
-  const tenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
+  const tenants = activeLinkedTenantsForProject(context.project, context.projectTenants, context.tenants, context.projectSystems)
   return {
     systems,
     tenants,
@@ -319,6 +315,7 @@ export function projectMainTypeLabel(type: ProjectMainType | string | undefined)
 
 export function projectStatusLabel(status: string): string {
   if (status === 'DELETED') return 'Deleted'
+  if (status === 'CANCELLED') return 'Cancelled'
   if (status === 'DONE') return 'Done'
   return 'Open'
 }
@@ -376,7 +373,7 @@ export function projectHealthReadModel(
   const completed = context.project.progressStatus === 'DONE' || context.project.progressStatus === 'DELETED'
   const deadlineSummary = completed ? EMPTY_PROJECT_DEADLINE_SUMMARY : projectDeadlineSummary(context.project, today)
   const activeSystemLinks = activeSystemLinksForProject(context.project.id, context.projectSystems)
-  const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
+  const linkedTenants = activeLinkedTenantsForProject(context.project, context.projectTenants, context.tenants, context.projectSystems)
   const taskCounts = projectTaskCounts(context.project)
   const deliveryDateStatus = projectDeliveryDateStatus(context.project, completed, today)
   const missingSystems = activeSystemLinks.length === 0
@@ -477,7 +474,7 @@ export function projectWorkspaceSystemSummary(context: ProjectSystemsTenantsCont
 }
 
 export function projectWorkspaceTenantSummary(context: ProjectSystemsTenantsContext): ProjectWorkspaceTenantSummary {
-  const linkedTenants = linkedTenantsForProject(context.project, context.projectTenants, context.tenants)
+  const linkedTenants = activeLinkedTenantsForProject(context.project, context.projectTenants, context.tenants, context.projectSystems)
 
   return {
     linkedTenants: linkedTenants.length,
@@ -625,7 +622,7 @@ function rowValue(row: ProjectRequirementRow, key: string): unknown {
 }
 
 export function projectTenantDisplayName(tenant: Tenant): string {
-  return tenant.tenantName ? `${tenant.tid} - ${tenant.tenantName}` : tenant.tid
+  return tenant.tid
 }
 
 export function resolveProjectSystemSid(systemId: string | null | undefined, systems: System[]): string {
@@ -655,14 +652,9 @@ export function projectRequirementReadonlyCellValue(
     return tenant ? projectTenantDisplayName(tenant) : ''
   }
 
-  if ((kind === 'B' || kind === 'C') && column.key === 'tenantName') {
-    const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return tenant?.tenantName ?? ''
-  }
-
   if ((kind === 'B' || kind === 'C') && column.key === 'systemId') {
     const tenant = resolveProjectTenant((row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId, tenants)
-    return resolveProjectSystemSid(tenant?.systemId ?? rowValue(row, column.key) as string, systems)
+    return resolveProjectSystemSid(tenant?.hostedSystemId ?? tenant?.systemId ?? rowValue(row, column.key) as string, systems)
   }
 
   if ((kind === 'B' || kind === 'C') && column.key === 'deliveryPid') {
@@ -679,11 +671,7 @@ export function activeSystemLinksForProject(projectId: string, projectSystems: P
 
 export function systemProductMismatchForProject(system: System, opportunity: Opportunity | undefined): boolean {
   const requestedProducts = new Set(
-    [
-      ...(opportunity?.newTenantRequirements ?? []),
-      ...(opportunity?.changeRequestRequirements ?? []),
-      ...(opportunity?.standardRenewalRequirements ?? []),
-    ]
+    (opportunity ? applicableOpportunityRequirementSources(opportunity).map((source) => source.requirement) : [])
       .map((requirement) => requirement.productType)
       .filter((product): product is string => Boolean(product)),
   )
@@ -698,9 +686,28 @@ export function linkedSystemsForProject(
   _tenants: Tenant[] = [],
   _projectSystems: ProjectSystemLink[] = activeSystemLinks,
 ): System[] {
+  void _opportunity
+  void _tenants
+  void _projectSystems
   if (!project) return []
   const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
-  return systems.filter((system) => linkedSystemIds.has(system.id))
+  return systems.filter((system) => {
+    const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
+    return linkedSystemIds.has(system.id) && !status.includes('cancel')
+  })
+}
+
+function tenantBelongsToCurrentProjectSystem(
+  tenant: Tenant,
+  projectId: string,
+  projectSystems: ProjectSystemLink[],
+): boolean {
+  const systemId = tenant.hostedSystemId || tenant.systemId
+  return Boolean(systemId) && activeProjectSystemLinks(projectSystems).some((link) => link.projectId === projectId && link.systemId === systemId)
+}
+
+function tenantLifecycleInactiveForProjectMembership(tenant: Tenant): boolean {
+  return ['Deleted', 'Cancelled', 'Deleted - By System', 'Cancelled - By System'].includes(tenant.operationalStatus)
 }
 
 export function linkedTenantsForProject(
@@ -708,14 +715,57 @@ export function linkedTenantsForProject(
   projectTenants: ProjectTenantLink[],
   tenants: Tenant[],
   _opportunity?: Opportunity,
+  projectSystems: ProjectSystemLink[] = [],
+): Tenant[] {
+  void _opportunity
+  if (!project) return []
+  const projectTenantLinksForProject = activeProjectTenantLinks(projectTenants).filter((link) => link.projectId === project.id)
+  const linkedTenantIds = new Set(
+    projectTenantLinksForProject.map((link) => link.tenantId),
+  )
+  return tenants.filter((tenant) =>
+    linkedTenantIds.has(tenant.id) &&
+    tenantBelongsToCurrentProjectSystem(tenant, project.id, projectSystems) &&
+    !isTenantCancelled(tenant),
+  )
+}
+
+export function activeLinkedTenantsForProject(
+  project: Project | undefined,
+  projectTenants: ProjectTenantLink[],
+  tenants: Tenant[],
+  projectSystems: ProjectSystemLink[] = [],
 ): Tenant[] {
   if (!project) return []
-  const projectTenantLinksForProject = projectTenants.filter((link) => link.projectId === project.id)
-  const linkedTenantIds = new Set(
-    activeProjectTenantLinks(projectTenantLinksForProject)
+  const activeTenantIds = new Set(
+    activeProjectTenantLinks(projectTenants)
+      .filter((link) => link.projectId === project.id)
       .map((link) => link.tenantId),
   )
-  return tenants.filter((tenant) => linkedTenantIds.has(tenant.id) && tenantVisibleInProjectTenantCollections(tenant))
+  return tenants.filter((tenant) => activeTenantIds.has(tenant.id) && tenantBelongsToCurrentProjectSystem(tenant, project.id, projectSystems) && !tenantLifecycleInactiveForProjectMembership(tenant))
+}
+
+export function historicalInactiveTenantsForProject(
+  project: Project | undefined,
+  projectTenants: ProjectTenantLink[],
+  tenants: Tenant[],
+  projectSystems: ProjectSystemLink[] = [],
+): Tenant[] {
+  if (!project) return []
+  return linkedTenantsForProject(project, projectTenants, tenants, undefined, projectSystems).filter(tenantLifecycleInactiveForProjectMembership)
+}
+
+export function historicalInactiveSystemsForProject(
+  project: Project | undefined,
+  systems: System[],
+  activeSystemLinks: ProjectSystemLink[],
+): System[] {
+  if (!project) return []
+  const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
+  return systems.filter((system) => {
+    const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
+    return linkedSystemIds.has(system.id) && (status.includes('deleted') || status.includes('cancel'))
+  })
 }
 
 export function activeSystemLinkMapBySystemId(activeSystemLinks: ProjectSystemLink[]): Map<string, ProjectSystemLink> {

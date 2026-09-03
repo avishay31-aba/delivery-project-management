@@ -18,7 +18,6 @@ export const CUSTOMER_ACCOUNT_FIELD_LABELS = {
   tenantCount: 'Number of Tenants',
   sids: 'SIDs',
   tids: 'TIDs',
-  tenantNames: 'Tenant Names',
   warrantySummary: 'Warranty Summary',
   updatedAt: 'Updated At',
 } as const

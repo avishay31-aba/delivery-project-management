@@ -1,6 +1,7 @@
 import { createdProjectsForOpportunity } from '@/domain/opportunity-lifecycle'
 import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/allocation-context'
-import { formattedReusedInternalMachineId, systemIdentity, systemSource } from '@/domain/system-inventory'
+import { formattedReusedInternalMachineId, isSystemOperationallyVisible, systemIdentity, systemSource } from '@/domain/system-inventory'
+import { isTenantOperationallyVisible } from '@/domain/tenant-operations/lifecycle'
 import {
   REQUIREMENT_COVERAGE_MISSING_STEP_LABELS,
   REQUIREMENT_COVERAGE_STATUS_LABELS,
@@ -71,7 +72,7 @@ function activeSystemLinksForProjects(projects: Project[], projectSystems: Proje
 
 function systemsForLinks(links: ProjectSystemLink[], systems: System[]): System[] {
   const systemIds = new Set(links.map((link) => link.systemId))
-  return systems.filter((system) => systemIds.has(system.id))
+  return systems.filter((system) => systemIds.has(system.id) && isSystemOperationallyVisible(system))
 }
 
 function tenantsForActiveLinks(projects: Project[], tenants: Tenant[], context: RequirementCoverageContext): Tenant[] {
@@ -81,7 +82,7 @@ function tenantsForActiveLinks(projects: Project[], tenants: Tenant[], context: 
       .filter((link) => projectIds.has(link.projectId))
       .map((link) => link.tenantId),
   )
-  return tenants.filter((tenant) => tenantIds.has(tenant.id))
+  return tenants.filter((tenant) => tenantIds.has(tenant.id) && isTenantOperationallyVisible(tenant))
 }
 
 function tenantSystemId(tenant: Tenant): string {
@@ -211,6 +212,7 @@ function deriveNewTenantCoverageRow(
   const linkedSystemIds = new Set(linkedSystems.map((system) => system.id))
   const requirementTenants = context.tenants.filter(
     (tenant) =>
+      isTenantOperationallyVisible(tenant) &&
       tenant.sourceRequirementId === source.requirement.requirementId &&
       linkedSystemIds.has(tenantSystemId(tenant)) &&
       (projectLinkedTenants.length === 0 || projectLinkedTenants.some((linkedTenant) => linkedTenant.id === tenant.id)),
@@ -233,8 +235,8 @@ function deriveExistingTenantCoverageRow(
   }
 
   const requirement = source.requirement as { tenantId: string; systemId: string; warrantyRecordId?: string }
-  const tenant = context.tenants.find((candidate) => candidate.id === requirement.tenantId)
-  const system = context.systems.find((candidate) => candidate.id === requirement.systemId)
+  const tenant = context.tenants.find((candidate) => candidate.id === requirement.tenantId && isTenantOperationallyVisible(candidate))
+  const system = context.systems.find((candidate) => candidate.id === requirement.systemId && isSystemOperationallyVisible(candidate))
   const warrantyExists =
     source.requirementType !== 'C' ||
     (Boolean(requirement.warrantyRecordId) && context.warrantyRecords.some((warranty) => warranty.warrantyRecordId === requirement.warrantyRecordId))

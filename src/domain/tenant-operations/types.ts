@@ -37,6 +37,7 @@ export interface TenantCreationInput {
 
 export interface TenantCreationSource {
   account?: Account
+  existingTenantIds: Array<string | null | undefined>
   idCounters: AppDataState['idCounters']
   opportunity: Opportunity
   project: Project

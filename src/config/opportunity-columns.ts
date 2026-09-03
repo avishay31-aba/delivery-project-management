@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink } from '@/components/ui'
-import { getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
+import { applicableOpportunityRequirementCount, getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
 import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, Opportunity, SalesManager, System, Tenant } from '@/data/seed.types'
 import { getHiddenRequirementTypesWithRows, validateOpportunity } from '@/utils/opportunity-validation'
@@ -49,11 +49,8 @@ export function createOpportunityColumns(
     },
     {
       id: 'requirementRowCount',
-      label: 'Requirement Rows',
-      getValue: (row) =>
-        row.newTenantRequirements.length +
-        row.changeRequestRequirements.length +
-        row.standardRenewalRequirements.length,
+      label: 'Applicable Requirement Rows',
+      getValue: (row) => applicableOpportunityRequirementCount(row),
     },
     {
       id: 'hiddenRequirementRowCount',

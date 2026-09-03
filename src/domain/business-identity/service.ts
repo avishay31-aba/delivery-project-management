@@ -151,8 +151,15 @@ export function generateBusinessIdFromCounter(
   existingIds: Array<string | null | undefined> = [],
 ): { counters: IdCounters; id: string } {
   const policy = businessIdentityPolicy(entityType)
-  const nextId = reserveBusinessId(entityType, existingIds, counters[entityType] ?? policy.minimumCounter)
-  const nextCounter = numericSuffix(nextId, policy.prefix) ?? counters[entityType] ?? policy.minimumCounter
+  const normalizedExistingIds = new Set(existingIds.map(normalizeBusinessId).filter(Boolean))
+  const baseCounter = Math.max(counters[entityType] ?? policy.minimumCounter, maxExistingCounter(entityType, existingIds))
+  let nextCounter = baseCounter + 1
+  let nextId = formatBusinessId(policy, nextCounter)
+
+  while (normalizedExistingIds.has(nextId)) {
+    nextCounter += 1
+    nextId = formatBusinessId(policy, nextCounter)
+  }
 
   return {
     counters: {
@@ -164,6 +171,32 @@ export function generateBusinessIdFromCounter(
     },
     id: nextId,
   }
+}
+
+export function previewBusinessIdFromCounter(
+  entityType: BusinessEntityType,
+  counters: IdCounters,
+  existingIds: Array<string | null | undefined> = [],
+): string {
+  const policy = businessIdentityPolicy(entityType)
+  const baseCounter = Math.max(counters[entityType] ?? policy.minimumCounter, maxExistingCounter(entityType, existingIds))
+  return generateBusinessId(entityType, [...existingIds, formatBusinessId(policy, baseCounter)])
+}
+
+export function commitBusinessIdFromCounter(
+  entityType: BusinessEntityType,
+  counters: IdCounters,
+  value: string | null | undefined,
+  existingIds: Array<string | null | undefined> = [],
+): { counters: IdCounters; id: string } {
+  const normalized = normalizeBusinessId(value)
+  if (normalized && isBusinessIdUnique(normalized, existingIds)) {
+    return {
+      counters: idCountersWithBusinessId(entityType, counters, normalized),
+      id: normalized,
+    }
+  }
+  return generateBusinessIdFromCounter(entityType, counters, existingIds)
 }
 
 export function idCountersWithBusinessId(

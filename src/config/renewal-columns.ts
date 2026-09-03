@@ -19,7 +19,6 @@ export function createRenewalColumns(): DashboardColumn<RenewalCandidateRow>[] {
       getValue: (row) => row.tenantTid,
       render: (row) => createElement(BusinessIdLink, { objectType: 'TENANT', businessId: row.tenantTid }, row.tenantTid),
     },
-    { id: 'tenantName', label: 'Tenant Name', getValue: (row) => row.tenantName },
     {
       id: 'sid',
       label: 'SID',

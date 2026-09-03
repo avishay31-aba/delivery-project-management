@@ -17,9 +17,11 @@ import {
 } from './metadata'
 import {
   accountOwnsTenant,
+  activeTenantSystemId,
   findDuplicateValue,
   isEmpty,
   opportunityCanUseSystem,
+  tenantIsEligibleCustomerExistingAsset,
 } from './service'
 import type { RequirementColumnMetadata, TenantRequirementContext, ValidationMessage } from './types'
 
@@ -55,7 +57,7 @@ export function validateRequirementA(
   if (row.deployTarget === 'EXISTING_SID') {
     if (!row.existingSystemId) {
       messages.push({ level: 'error', message: 'Existing System SID is required when System New/Existing? is Existing System.' })
-    } else if (!opportunityCanUseSystem(opportunity, row.existingSystemId, context.accounts, context.systems)) {
+    } else if (!opportunityCanUseSystem(opportunity, row.existingSystemId, context.accounts, context.systems, context.tenants)) {
       messages.push({
         level: 'error',
         message: "Existing System SID must belong to one of the selected deal owner's accounts.",
@@ -94,7 +96,10 @@ export function validateRequirementB(
   }
 
   const tenant = context.tenants.find((candidate) => candidate.id === row.tenantId)
-  if (tenant && row.systemId !== tenant.systemId) {
+  if (tenant && !tenantIsEligibleCustomerExistingAsset(tenant, context.systems)) {
+    messages.push({ level: 'error', message: 'Selected tenant must be an eligible Customer Tenant.' })
+  }
+  if (tenant && row.systemId !== activeTenantSystemId(tenant)) {
     messages.push({ level: 'warning', message: 'SID will be reset from the selected tenant.' })
   }
 
@@ -126,6 +131,13 @@ export function validateRequirementC(
     messages.push({ level: 'error', message: 'Existing tenant is required.' })
   } else if (!accountOwnsTenant(opportunity.accountId, row.tenantId, context.tenants)) {
     messages.push({ level: 'error', message: 'Selected tenant must belong to the selected account.' })
+  }
+  const tenant = context.tenants.find((candidate) => candidate.id === row.tenantId)
+  if (tenant && !tenantIsEligibleCustomerExistingAsset(tenant, context.systems)) {
+    messages.push({ level: 'error', message: 'Selected tenant must be an eligible Customer Tenant.' })
+  }
+  if (tenant && row.systemId !== activeTenantSystemId(tenant)) {
+    messages.push({ level: 'warning', message: 'SID will be reset from the selected tenant.' })
   }
 
   return messages

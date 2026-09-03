@@ -116,7 +116,7 @@ function config(overrides = {}) {
     webloc: 0,
     webeye: 0,
     ingest: 2,
-    blockchain: 'NO',
+    blockchain: 0,
     crossSystemFeatures: ['Open Sources'],
     apiEnabled: 'YES',
     apiDailyQty: 1000,
@@ -313,10 +313,10 @@ function hostingFields(country, overrides = {}) {
 }
 
 function summarize(tenantRows) {
-  const summary = config({ licenses: 0, users: 0, concurrentSearches: 0, dailySearches: 0, monthlySearches: 0, concurrentAnalyses: 0, dailyAnalyses: 0, monthlyAnalyses: 0, topicAnalyses: 0, standardMonitors: 0, fullMonitors: 0, topicMonitors: 0, tangles: 0, tanglesGo: 0, webloc: 0, webeye: 0, ingest: 0, apiDailyQty: 0, apiMonthlyQty: 0, crossSystemFeatures: [], aiFeatures: [], additionalFeatures: [] })
+  const summary = config({ licenses: 0, users: 0, concurrentSearches: 0, dailySearches: 0, monthlySearches: 0, concurrentAnalyses: 0, dailyAnalyses: 0, monthlyAnalyses: 0, topicAnalyses: 0, standardMonitors: 0, fullMonitors: 0, topicMonitors: 0, tangles: 0, tanglesGo: 0, webloc: 0, webeye: 0, ingest: 0, blockchain: 0, apiDailyQty: 0, apiMonthlyQty: 0, crossSystemFeatures: [], aiFeatures: [], additionalFeatures: [] })
   for (const tenant of tenantRows) {
     const cfg = tenant.configuration
-    for (const key of ['licenses','users','concurrentSearches','dailySearches','monthlySearches','concurrentAnalyses','dailyAnalyses','monthlyAnalyses','topicAnalyses','standardMonitors','fullMonitors','topicMonitors','tangles','tanglesGo','webloc','webeye','ingest','apiDailyQty','apiMonthlyQty']) {
+    for (const key of ['licenses','users','concurrentSearches','dailySearches','monthlySearches','concurrentAnalyses','dailyAnalyses','monthlyAnalyses','topicAnalyses','standardMonitors','fullMonitors','topicMonitors','tangles','tanglesGo','webloc','webeye','ingest','blockchain','apiDailyQty','apiMonthlyQty']) {
       summary[key] = (summary[key] ?? 0) + (cfg[key] ?? 0)
     }
     for (const key of ['crossSystemFeatures','aiFeatures','additionalFeatures']) {
@@ -324,7 +324,6 @@ function summarize(tenantRows) {
     }
     summary.product = cfg.product
     summary.mapCenter = cfg.mapCenter
-    summary.blockchain = summary.blockchain === 'YES' || cfg.blockchain === 'YES' ? 'YES' : 'NO'
     summary.apiEnabled = summary.apiEnabled === 'YES' || cfg.apiEnabled === 'YES' ? 'YES' : 'NO'
   }
   return summary

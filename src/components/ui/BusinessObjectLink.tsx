@@ -78,7 +78,7 @@ export function BusinessIdListLinks({ objectType, businessIds, className }: Busi
     <>
       {ids.map((businessId, index) => (
         <span key={`${businessId}-${index}`}>
-          {index > 0 ? '; ' : null}
+          {index > 0 ? ';' : null}
           <BusinessIdLink objectType={objectType} businessId={businessId} className={className}>
             {businessId}
           </BusinessIdLink>

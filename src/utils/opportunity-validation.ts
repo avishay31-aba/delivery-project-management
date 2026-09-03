@@ -1,7 +1,9 @@
 export {
-  getAccountSystems,
   getAccountTenants,
+  getEligibleCustomerExistingTenants,
   getOpportunityExistingSidSystems,
+  opportunityExistingAssetTenants,
+  opportunityExistingSystemGroups,
   getSalesManagerAccounts,
   resolveTenantSid,
   validateRequirementA,

@@ -96,6 +96,7 @@ import {
   derivedTenantOperationalMode,
   effectiveTenantOperationalMode,
   isManualTenantOperationalMode,
+  isTenantCancelled,
   isTenantLifecycleInactive,
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
@@ -165,13 +166,11 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function tenantParentSaveScope(tenant: Tenant): Partial<Tenant> {
-  const {
-    documents: _documents,
-    remarks: _remarks,
-    warranties: _warranties,
-    updatedAt: _updatedAt,
-    ...parentScope
-  } = tenant
+  const parentScope = { ...tenant } as Partial<Tenant>
+  delete parentScope.documents
+  delete parentScope.remarks
+  delete parentScope.warranties
+  delete parentScope.updatedAt
   return parentScope
 }
 
@@ -211,10 +210,10 @@ function licenseNumber(pid: string, sid: string, tid: string): string {
 }
 
 function resolveProject(tenant: Tenant, projects: Project[], projectTenants: Array<{ tenantId: string; projectId: string; allocationStatus?: string }>, systems: System[]): Project | undefined {
+  void systems
   const activeLinkedProjectId = projectTenants.find((link) => link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED')?.projectId
   if (activeLinkedProjectId) return projects.find((project) => project.id === activeLinkedProjectId)
-  const system = systems.find((candidate) => candidate.id === tenant.systemId)
-  return projects.find((project) => project.pid === tenant.deliveryPid || system?.linkedProjectIds?.includes(project.id))
+  return projects.find((project) => project.pid === tenant.deliveryPid)
 }
 
 function normalizeReference(value: string | undefined | null): string {
@@ -321,6 +320,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [advancedWarrantyId, setAdvancedWarrantyId] = useState<string | null>(null)
   const [advancedWarrantySnapshot, setAdvancedWarrantySnapshot] = useState<TenantWarranty | null>(null)
   const [predecessorSelections, setPredecessorSelections] = useState<Record<string, { tenantId: string; warrantyId: string }>>({})
+  const [predecessorSearch, setPredecessorSearch] = useState('')
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(tenantParentSaveScope(savedTenant), tenantParentSaveScope(draft)))
@@ -334,6 +334,11 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     clone: (value) => (value ? cloneTenant(value) : value),
     isEqual: valuesEqual,
   })
+
+  const committedWarrantyIdsForReset = (draft?.warranties ?? []).map((warranty) => warranty.id).join('|')
+  useEffect(() => {
+    warrantyEditor.reset()
+  }, [draft?.id, committedWarrantyIdsForReset])
 
   if (!savedTenant || !draft) {
     return (
@@ -350,11 +355,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const activeTenantProjects = tenantActiveProjects(tenantDraft, projects, projectTenants)
   const linkedProjects = activeTenantProjects.length > 0
     ? activeTenantProjects
-    : projects.filter(
-        (candidate) =>
-          candidate.pid === tenantDraft.deliveryPid ||
-          Boolean(activeSystem?.linkedProjectIds?.includes(candidate.id)),
-      )
+    : projects.filter((candidate) => candidate.pid === tenantDraft.deliveryPid)
   const project = resolveProject(tenantDraft, projects, projectTenants, systems) ?? linkedProjects[0]
   const opportunity = resolveOpportunity(project, opportunities)
   const linkedOpportunityId = opportunity?.opportunityId ?? projectOpportunityReference(project)
@@ -381,11 +382,6 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       .map((warranty, index) => ({ ...warranty, firstWarranty: index === 0 }))
   const computedWarranties = (source: TenantWarranty[]): TenantWarranty[] => computedWarrantiesForTenant(tenantDraft, source)
   const committedWarrantyHeaderStatus = tenantWarrantyHeaderStatusReadModel(persistedTenant.warranties ?? [], persistedTenant.tid)
-  const committedWarrantyIds = (tenantDraft.warranties ?? []).map((warranty) => warranty.id).join('|')
-
-  useEffect(() => {
-    warrantyEditor.reset()
-  }, [tenantDraft.id, committedWarrantyIds])
 
   function warrantyRowsWithActiveDrafts(): TenantWarranty[] {
     const source = tenantDraft.warranties ?? []
@@ -417,7 +413,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return opportunity ?? {
       id: `tenant-config-opportunity-${tenantDraft.id}`,
       opportunityId: linkedOpportunityId,
-      opportunityName: project?.opportunityName ?? tenantDraft.tenantName ?? tenantDraft.tid,
+      opportunityName: project?.opportunityName ?? tenantDraft.tid,
       stage: 'OPEN',
       accountId: tenantDraft.accountId,
       salesManagerId: '',
@@ -548,6 +544,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       ...current,
       [warranty.id]: current[warranty.id] ?? { tenantId: tenantDraft.id, warrantyId: '' },
     }))
+    setPredecessorSearch('')
   }
 
   function closeAdvancedWarrantyDialog() {
@@ -579,13 +576,16 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (isViewMode) return
     if (!advancedWarrantyId || !advancedWarrantyDraft) return
     const selection = predecessorSelections[advancedWarrantyId]
-    if (!selection?.tenantId || !selection.warrantyId) return
+    if (!selection?.tenantId) return
+    const selectedOptions = warrantyOptionsForTenant(selection.tenantId, advancedWarrantyId)
+    const selectedWarrantyId = selection.warrantyId || selectedOptions[0]?.warranty.warrantyId
+    if (!selectedWarrantyId) return
     const dialogWarranties = warrantyRowsWithActiveDrafts()
     const currentWarranty = dialogWarranties.find((warranty) => warranty.id === advancedWarrantyId)
-    if (currentWarranty && isSelfWarrantyPredecessorSelection(currentWarranty, tenantDraft.id, selection.tenantId, selection.warrantyId)) return
+    if (currentWarranty && isSelfWarrantyPredecessorSelection(currentWarranty, tenantDraft.id, selection.tenantId, selectedWarrantyId)) return
     const selectedTenant = selection.tenantId === tenantDraft.id ? tenantDraft : tenants.find((candidate) => candidate.id === selection.tenantId)
     if (!selectedTenant) return
-    const predecessorValue = predecessorReference(selection.warrantyId, selectedTenant.tid)
+    const predecessorValue = predecessorReference(selectedWarrantyId, selectedTenant.tid)
     const currentValues = splitWarrantyPredecessors(advancedWarrantyDraft.predecessor)
     if (currentValues.includes(predecessorValue)) return
     warrantyEditor.updateDraft(advancedWarrantyId, {
@@ -843,6 +843,21 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return renderHeaderField('Tenant Type', formType === 'CUSTOMER' ? 'Customer' : formType === 'INTERNAL' ? 'Internal' : 'POC', 'w-44')
   }
 
+  function renderCancellationAuditHeaderRow() {
+    if (!isTenantCancelled(tenantDraft)) return null
+    return (
+      <div className="flex flex-wrap items-start gap-3">
+        {renderHeaderField('Cancelled By', tenantDraft.cancelledBy ?? '-', 'w-56')}
+        {renderHeaderField(
+          'Cancellation Timestamp',
+          tenantDraft.cancellationAt ? <DateTimeValue value={tenantDraft.cancellationAt} semanticType="datetime" /> : '-',
+          'w-56',
+        )}
+        {renderHeaderField('Cancellation Reason', <RichTextContent value={tenantDraft.cancellationReason ?? ''} />, 'w-[32rem] max-w-full')}
+      </div>
+    )
+  }
+
   function renderCurrentSidField() {
     if (activeSystem) {
       return renderHeaderField(
@@ -910,6 +925,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('Time Zone', tenantTimeZoneDisplayValue(tenantDraft, opportunity, activeSystem))}
           {renderHeaderField('Time Group', tenantTimeGroupFromLocation({ ...tenantDraft, state: opportunity?.state ?? activeSystem?.state ?? '' }, timeGroupLookups).timeGroup || '')}
         </div>
+        {renderCancellationAuditHeaderRow()}
       </section>
     )
   }
@@ -1316,7 +1332,9 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     const warranty = dialogWarranties.find((candidate) => candidate.id === advancedWarrantyId)
     if (!warranty) return null
     const selectedPredecessorTenantId = predecessorSelections[warranty.id]?.tenantId ?? tenantDraft.id
-    const predecessorOptions = warrantyOptionsForTenant(selectedPredecessorTenantId, warranty.id)
+    const eligiblePredecessorTenants = tenants
+      .filter((tenant) => !isTenantCancelled(tenant))
+      .filter((tenant) => tenant.tid.toLocaleLowerCase().includes(predecessorSearch.trim().toLocaleLowerCase()))
     const predecessorValues = splitWarrantyPredecessors(advancedWarrantyDraft.predecessor)
     const hasSuccessors = successorRefsForWarranty(warranty, dialogWarranties, tenantDraft.tid).length > 0
     const advancedWarrantyErrors = warrantyEditor.errorsFor(warranty.id)
@@ -1394,6 +1412,12 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
             <div className="space-y-2 md:col-span-2">
               <span className="block text-xs font-semibold uppercase text-sf-text-muted">Predecessors</span>
               <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="h-9 rounded border border-sf-border px-2 py-1"
+                  placeholder="Search TID"
+                  value={predecessorSearch}
+                  onChange={(event) => setPredecessorSearch(event.target.value)}
+                />
                 <select
                   className="h-9 rounded border border-sf-border px-2 py-1"
                   value={selectedPredecessorTenantId}
@@ -1404,28 +1428,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                     }))
                   }
                 >
-                  {tenants.map((tenant) => (
+                  {eligiblePredecessorTenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>{tenant.tid}</option>
-                  ))}
-                </select>
-                <select
-                  className="h-9 rounded border border-sf-border px-2 py-1"
-                  value={predecessorSelections[warranty.id]?.warrantyId ?? ''}
-                  onChange={(event) =>
-                    setPredecessorSelections((current) => ({
-                      ...current,
-                      [warranty.id]: {
-                        tenantId: current[warranty.id]?.tenantId ?? tenantDraft.id,
-                        warrantyId: event.target.value,
-                      },
-                    }))
-                  }
-                >
-                  <option value="">ID</option>
-                  {predecessorOptions.map(({ tenant, warranty: option }) => (
-                    <option key={`${tenant.id}-${option.warrantyId}`} value={option.warrantyId}>
-                      {option.warrantyId}
-                    </option>
                   ))}
                 </select>
                 <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarrantyDialogPredecessor}>

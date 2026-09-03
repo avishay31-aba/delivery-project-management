@@ -3,9 +3,9 @@ import { Globe2 } from 'lucide-react'
 import type { System, Tenant } from '@/data/seed.types'
 import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
 import { TENANT_CONFIGURATION_FIELDS } from '@/domain/application-configuration'
-import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, tenantConfigurationPresentationRecord, tenantDerivedWarrantyContractStatus, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { systemReference, tenantReference } from '@/domain/business-reference'
-import { BusinessIdLink, BusinessObjectLink, OperationalStatusIcon, RecordChangeBadge } from '@/components/ui'
+import { BusinessIdLink, BusinessObjectLink, OperationalStatusIcon, RecordChangeBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 
 function OperationalStatusBadge({ value }: { value: string }) {
@@ -22,9 +22,10 @@ interface TenantDeliveryTableProps {
   emptyText: string
   actions?: (tenant: Tenant, system: System | undefined) => ReactNode
   systemTimeGroupGovernorTenantId?: string
+  showWarrantyStatusColumn?: boolean
 }
 
-export function TenantDeliveryTable({ tenants, systems, emptyText, actions, systemTimeGroupGovernorTenantId }: TenantDeliveryTableProps) {
+export function TenantDeliveryTable({ tenants, systems, emptyText, actions, systemTimeGroupGovernorTenantId, showWarrantyStatusColumn = false }: TenantDeliveryTableProps) {
   if (tenants.length === 0) {
     return (
       <div className="rounded border border-dashed border-sf-border bg-white p-4 text-sm text-sf-text-muted">
@@ -44,6 +45,11 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
             {actions ? (
               <th className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                 Actions
+              </th>
+            ) : null}
+            {showWarrantyStatusColumn ? (
+              <th className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
+                Warranty Status
               </th>
             ) : null}
             {[
@@ -77,6 +83,11 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                 {actions ? (
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                     {actions(tenant, system)}
+                  </td>
+                ) : null}
+                {showWarrantyStatusColumn ? (
+                  <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
+                    <WarrantyStatusPresentation status={tenantDerivedWarrantyContractStatus(tenant).visualStatus} />
                   </td>
                 ) : null}
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">

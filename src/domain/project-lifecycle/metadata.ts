@@ -160,9 +160,9 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
     {
       sourceSheet: 'Project Form - POC',
       headerFields: POC_HEADER_FIELDS,
-      requirementSections: [NEW_TENANT_PROJECT_SECTION],
+      requirementSections: [NEW_TENANT_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Template #1 - POC',
+      milestoneTemplate: 'Template #1/#2 - POC by requirement mix',
     },
   ],
   [
@@ -172,7 +172,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
       requirementSections: [NEW_TENANT_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Template #2/#3 - Delivery new by hosting context',
+      milestoneTemplate: 'Template #3/#4 - Delivery new by hosting context',
     },
   ],
   [
@@ -182,7 +182,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
       requirementSections: [NEW_TENANT_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Template #2/#3/#4 - Delivery upsell by requirement mix',
+      milestoneTemplate: 'Template #3/#4/#5 - Delivery upsell by requirement mix',
     },
   ],
   [
@@ -192,7 +192,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
       requirementSections: [STANDARD_RENEWAL_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Renewal standard template',
+      milestoneTemplate: 'Template #6 - Renewal standard',
     },
   ],
   [
@@ -202,7 +202,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
       requirementSections: [STANDARD_RENEWAL_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION, NEW_TENANT_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Renewal upsell template by requirement mix',
+      milestoneTemplate: 'Template #7/#8/#9 - Renewal upsell by requirement mix',
     },
   ],
   [
@@ -212,7 +212,7 @@ const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
       headerFields: DELIVERY_RENEWAL_HEADER_FIELDS,
       requirementSections: [STANDARD_RENEWAL_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION],
       tabs: PROJECT_TABS,
-      milestoneTemplate: 'Renewal downsell template',
+      milestoneTemplate: 'Template #7 - Renewal downsell',
     },
   ],
 ])

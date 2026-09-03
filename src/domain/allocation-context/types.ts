@@ -22,6 +22,9 @@ export interface AllocationActionResult {
   requiresTimeGroupOverride?: boolean
   currentSystemTimeGroup?: string
   incomingTenantTimeGroup?: string
+  requiresConfirmation?: boolean
+  affectedTenantIds?: string[]
+  affectedTids?: string[]
 }
 
 export interface AllocationValidationContext {

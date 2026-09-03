@@ -266,5 +266,12 @@ export function formatConfigurationSummaryForRecords(records: Array<Record<strin
 }
 
 export function numericOrNull(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    if (value === 'YES') return 1
+    if (value === 'NO' || value.trim() === '') return 0
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
 }

@@ -32,15 +32,17 @@ import {
   type SystemCandidateFilters,
   type SystemCandidateSortKey,
 } from '@/components/systems'
+import { TenantDeliveryTable } from '@/components/tenants/TenantDeliveryTable'
 import { TenantWarrantyContractSections } from '@/components/tenants/TenantWarrantyContractSections'
 import { TenantTimeGroupMismatchDialog, type TenantTimeGroupMismatchAction } from '@/components/tenants/TenantTimeGroupMismatchDialog'
-import { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, ProductSubTabs, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, BusinessObjectLink, FormField, MaintenanceStatusPresentation, MetadataHeaderField, OperationalStatusIcon, OperationalStatusSelect as SharedOperationalStatusSelect, PlaceholderCard, ProductSubTabs, RichTextContent, RichTextEditor, SaveButtonLabel, TableSection, WarrantyStatusPresentation, formMessageClassName, hasCancellationValidationError, validationControlClassName } from '@/components/ui'
 import { EditableChildObjectActionButton } from '@/components/child-objects'
+import { previewBusinessIdFromCounter } from '@/domain/business-identity'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
-import { isRouteViewMode } from '@/utils/route-mode'
+import { isCreateRoute, isRouteViewMode } from '@/utils/route-mode'
 import {
   HOSTING_OPTIONS,
   cloudPlatformOptionsForHosting,
@@ -66,12 +68,10 @@ import {
   type SystemInventoryHeaderField,
   type SystemInventoryMetadata,
 } from '@/config/system-inventory-metadata'
-import type { NewTenantRequirement, Opportunity, ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
+import type { NewTenantRequirement, ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
-import {
-  activeProjectTenantLinks,
-} from '@/domain/allocation-context'
+import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import { infrastructureItemReference, projectReference, tenantReference } from '@/domain/business-reference'
 import {
   hostingContextPatchForFieldChange,
@@ -80,7 +80,10 @@ import {
 } from '@/domain/hosting-context'
 import {
   hostedTenantsForSystem,
+  historicalInactiveTenantsForSystem,
   ACTIVE_POC_PURPOSE_LOCK_MESSAGE,
+  createProductionInventorySystem,
+  createReusedInternalInventorySystem,
   currentProjectPidsForSystem,
   deriveReusedSystemOccupationWindow,
   formattedReusedInternalMachineId,
@@ -89,7 +92,6 @@ import {
   isOccupationDateRequiredForPurpose,
   isValidReusedInternalMachineId,
   linkedProjectDisplay,
-  linkedProjectIdsForSystem,
   normalizeReusedInternalMachineId,
   reusedInternalAvailabilityStatus,
   reusedInternalAvailabilityStatusForPurpose,
@@ -97,6 +99,12 @@ import {
   reusedInternalMachineIdsEqual,
   reusedInternalPurposeHistory,
   shouldConfirmEarlyNonPocPurposeChange,
+  SYSTEM_OPERATIONAL_STATUS_ACCESS_BLOCKED,
+  SYSTEM_OPERATIONAL_STATUS_CANCELED,
+  SYSTEM_OPERATIONAL_STATUS_DELETED,
+  SYSTEM_OPERATIONAL_STATUS_OFF,
+  SYSTEM_OPERATIONAL_STATUS_ON,
+  SYSTEM_OPERATIONAL_STATUS_SERVICE_BLOCKED,
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
   systemIdentity,
@@ -119,14 +127,21 @@ import {
 import type { OwnerRecord } from '@/domain/owners'
 import { activityEventsForSystem } from '@/domain/activity-log'
 import {
-  tenantMoveDefaultMode,
   tenantMoveDefaultRegion,
   tenantMoveDestinationCandidates,
   validateTenantMoveDestination,
+  isTenantDeleted,
+  isTenantLifecycleInactive,
+  tenantOccupiesRequirement,
   type TenantMoveMode,
 } from '@/domain/tenant-operations'
+import {
+  requirementAttachmentOptionsForProject,
+  type RequirementAttachmentOption,
+} from '@/domain/tenant-requirement'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { systemTimeGroupSource } from '@/domain/time-groups'
+import { richTextIsEmpty } from '@/domain/rich-text'
 
 type InventoryRecord = ProductionSystemInventoryItem | ReusedInternalSystem | System
 type SaveTimestampOptions = { preserveNewState?: boolean }
@@ -206,13 +221,11 @@ function valuesEqual(first: unknown, second: unknown): boolean {
 }
 
 function systemParentSaveScope<T extends InventoryRecord>(record: T): Partial<T> {
-  const {
-    documents: _documents,
-    owners: _owners,
-    remarks: _remarks,
-    updatedAt: _updatedAt,
-    ...parentScope
-  } = record
+  const parentScope = { ...record } as Partial<T> & Record<string, unknown>
+  delete parentScope.documents
+  delete parentScope.owners
+  delete parentScope.remarks
+  delete parentScope.updatedAt
   return parentScope as Partial<T>
 }
 
@@ -333,18 +346,20 @@ export function InventoryForm<T extends InventoryRecord>({
   metadata,
   onSave,
   dashboardPath,
+  isCreateMode = false,
 }: {
   record: T | undefined
   records: T[]
   metadata: SystemInventoryMetadata
-  onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions, tenantRemovalIds?: string[]) => void
+  onSave: (id: string, patch: Partial<T>, options?: SaveTimestampOptions, tenantRemovalIds?: string[]) => InventoryRecord | undefined
   dashboardPath: string
+  isCreateMode?: boolean
 }) {
   useDateTimePresentationPreference()
   const navigate = useNavigate()
   const location = useLocation()
   const isViewMode = isRouteViewMode(location)
-  const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
+  const isNewRecordSession = isCreateMode || (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
   const accounts = useAppStore((state) => state.accounts)
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
@@ -363,7 +378,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const createInternalTenantForSystem = useAppStore((state) => state.createInternalTenantForSystem)
   const rollbackSystemFormTenantCreation = useAppStore((state) => state.rollbackSystemFormTenantCreation)
   const deleteTenantFromSystem = useAppStore((state) => state.deleteTenantFromSystem)
-  const cancelTenantFromSystem = useAppStore((state) => state.cancelTenantFromSystem)
+  const attachTenantToProjectRequirement = useAppStore((state) => state.attachTenantToProjectRequirement)
   const moveTenantToSystem = useAppStore((state) => state.moveTenantToSystem)
   const linkInfrastructureItemToSystem = useAppStore((state) => state.linkInfrastructureItemToSystem)
   const unlinkInfrastructureItemFromSystem = useAppStore((state) => state.unlinkInfrastructureItemFromSystem)
@@ -385,6 +400,8 @@ export function InventoryForm<T extends InventoryRecord>({
   const [addTenantOpen, setAddTenantOpen] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedRequirementId, setSelectedRequirementId] = useState('')
+  const [attachTenantId, setAttachTenantId] = useState('')
+  const [attachRequirementId, setAttachRequirementId] = useState('')
   const [timeGroupMismatch, setTimeGroupMismatch] = useState<null | {
     kind: 'internal' | 'requirement'
     projectId: string
@@ -414,7 +431,7 @@ export function InventoryForm<T extends InventoryRecord>({
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
   const [pendingTenantCreationIds, setPendingTenantCreationIds] = useState<string[]>([])
   const [pendingTenantRemovalIds, setPendingTenantRemovalIds] = useState<string[]>([])
-  const isDirty = Boolean(record && draft && (isNewRecordSession || !valuesEqual(systemParentSaveScope(record), systemParentSaveScope(draft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
+  const isDirty = Boolean(record && draft && (isCreateMode || isNewRecordSession || !valuesEqual(systemParentSaveScope(record), systemParentSaveScope(draft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0))
   const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
   useBeforeUnloadWarning(isDirty && !isViewMode)
 
@@ -599,6 +616,10 @@ export function InventoryForm<T extends InventoryRecord>({
       if (message.field) invalidFields.add(message.field)
       nextMessages.push(message.message)
     })
+    if ((activeDraft as { cancellationRequested?: string }).cancellationRequested === 'YES' && richTextIsEmpty(textValue(readRecordValue(activeDraft, 'cancellationReason')))) {
+      invalidFields.add('cancellationReason')
+      nextMessages.push('Cancellation Reason is required.')
+    }
 
     return nextMessages
   }
@@ -643,6 +664,65 @@ export function InventoryForm<T extends InventoryRecord>({
     return false
   }
 
+  function systemCancellationEligibilityMessages(): string[] {
+    const activeLinks = activeProjectSystemLinks(projectSystems).filter((link) =>
+      link.systemId === activeRecord.id ||
+      (metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL && 'machineId' in activeRecord && reusedInternalMachineIdsEqual(link.sourceMachineId, activeRecord.machineId)),
+    )
+    const messages: string[] = []
+    if (activeLinks.length > 0) {
+      const pidList = Array.from(new Set(activeLinks
+        .map((link) => projects.find((project) => project.id === link.projectId)?.pid ?? link.projectId)
+        .filter(Boolean)))
+      messages.push(
+        pidList.length === 1
+          ? `System is currently allocated to project ${pidList[0]}. Deallocate the system from the project before cancelling it.`
+          : `System is currently allocated to projects: ${pidList.join('; ')}. Deallocate the system from all projects before cancelling it.`,
+      )
+    }
+    if (metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
+      const availabilityStatus = reusedInternalAvailabilityStatus(activeRecord as ReusedInternalSystem, activeProjectSystemLinks(projectSystems), projects)
+      if (isReusedInternalOccupied(availabilityStatus)) {
+        messages.push('This Reused Internal System is currently occupied. Release it through the normal operational workflow before cancelling it.')
+      }
+    }
+    return messages
+  }
+
+  function confirmSystemOperationalStatusChange(record: T): boolean {
+    if (!('systemClass' in activeRecord)) return true
+    const previousStatus = textValue(readRecordValue(activeRecord, 'operationalStatus'))
+    const nextStatus = textValue(readRecordValue(record, 'operationalStatus'))
+    if (previousStatus === nextStatus) return true
+    if (nextStatus === SYSTEM_OPERATIONAL_STATUS_DELETED || nextStatus === SYSTEM_OPERATIONAL_STATUS_CANCELED) {
+      const activeLinks = activeProjectSystemLinks(projectSystems).filter((link) => link.systemId === activeRecord.id)
+      if (activeLinks.length > 0) {
+        const pidList = activeLinks
+          .map((link) => projects.find((project) => project.id === link.projectId)?.pid ?? link.projectId)
+          .filter(Boolean)
+          .join(', ')
+        window.alert(`This System is already allocated to Project(s): ${pidList}. Deallocate the System from all Projects before changing its Operational Status to ${nextStatus}.`)
+        return false
+      }
+    }
+    const message =
+      nextStatus === SYSTEM_OPERATIONAL_STATUS_OFF
+        ? "All existing tenants' status will turn to System is Off. Continue?"
+        : nextStatus === SYSTEM_OPERATIONAL_STATUS_ACCESS_BLOCKED
+          ? 'All existing tenants will not have access to the system. Continue?'
+          : nextStatus === SYSTEM_OPERATIONAL_STATUS_SERVICE_BLOCKED
+            ? 'All existing tenants will not be able to run queries. Continue?'
+            : nextStatus === SYSTEM_OPERATIONAL_STATUS_DELETED
+              ? 'Change this unallocated System Operational Status to Deleted?'
+              : nextStatus === SYSTEM_OPERATIONAL_STATUS_CANCELED
+                ? 'Change this unallocated System Operational Status to Cancelled?'
+                : nextStatus === SYSTEM_OPERATIONAL_STATUS_ON
+                  ? 'All existing tenants will be restored to their previous Operational Status.'
+                  : ''
+    if (!message) return true
+    return window.confirm(message)
+  }
+
   validate()
   const lines = new Map<number, SystemInventoryHeaderField[]>()
   metadata.headerFields.forEach((field) => {
@@ -664,10 +744,18 @@ export function InventoryForm<T extends InventoryRecord>({
     const nextDraft = sanitizedDraftForSave()
     if (!confirmRegionWarnings(nextDraft)) return
     if (!confirmPurposeChangeIfRequired(nextDraft)) return
+    if ((nextDraft as { cancellationRequested?: string }).cancellationRequested === 'YES') {
+      const eligibilityMessages = systemCancellationEligibilityMessages()
+      if (eligibilityMessages.length > 0) {
+        setMessages(eligibilityMessages)
+        return
+      }
+    }
+    if (!confirmSystemOperationalStatusChange(nextDraft)) return
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    const hasBusinessChanges = !valuesEqual(systemParentSaveScope(activeRecord), systemParentSaveScope(nextDraft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
+    const hasBusinessChanges = isCreateMode || !valuesEqual(systemParentSaveScope(activeRecord), systemParentSaveScope(nextDraft)) || pendingTenantCreationIds.length > 0 || pendingTenantRemovalIds.length > 0
     if (!hasBusinessChanges) {
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
@@ -680,11 +768,19 @@ export function InventoryForm<T extends InventoryRecord>({
 
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
+    const committedRecord = onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
     setPendingTenantCreationIds([])
     setPendingTenantRemovalIds([])
     setMessages(['System inventory record saved.'])
     setSaveMenuOpen(false)
+    if (isCreateMode && committedRecord && stayOnPage) {
+      setBypassUnsavedPrompt(true)
+      const routePath = metadata.source === SYSTEM_SOURCE_REUSED_INTERNAL
+        ? `/systems/reused-internal/${'machineId' in committedRecord && committedRecord.machineId ? formattedReusedInternalMachineId(reusedInternalMachineIdRouteKey(committedRecord.machineId)) : committedRecord.id}`
+        : `/systems/production-inventory/${'sid' in committedRecord ? committedRecord.sid : committedRecord.id}`
+      window.setTimeout(() => navigate(routePath, { replace: true, state: { mode: 'edit', returnTo } }), 0)
+      return
+    }
     if (!stayOnPage && returnTo) {
       setBypassUnsavedPrompt(true)
       window.setTimeout(() => navigate(returnTo), 0)
@@ -709,6 +805,14 @@ export function InventoryForm<T extends InventoryRecord>({
       navigationBlocker.reset?.()
       return
     }
+    if ((nextDraft as { cancellationRequested?: string }).cancellationRequested === 'YES') {
+      const eligibilityMessages = systemCancellationEligibilityMessages()
+      if (eligibilityMessages.length > 0) {
+        setMessages(eligibilityMessages)
+        navigationBlocker.reset?.()
+        return
+      }
+    }
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
     onSave(nextDraft.id, nextDraft as Partial<T>, { preserveNewState: isNewRecordSession }, pendingTenantRemovalIds)
@@ -725,6 +829,76 @@ export function InventoryForm<T extends InventoryRecord>({
     resetDraft(cloneRecord(activeRecord))
     setBypassUnsavedPrompt(true)
     window.setTimeout(() => navigate(dashboardPath), 0)
+  }
+
+  function restoreCancelledSystem() {
+    const previousStatus = (activeRecord as { cancellationPreviousOperationalStatus?: string | null }).cancellationPreviousOperationalStatus || SYSTEM_OPERATIONAL_STATUS_ON
+    const committedRecord = onSave(activeRecord.id, {
+      operationalStatus: previousStatus,
+      cancellationRequested: 'NO',
+    } as Partial<T>, { preserveNewState: false }, [])
+    if (committedRecord) {
+      resetDraft(cloneRecord(committedRecord as T))
+      setMessages([`System restored to ${previousStatus}.`])
+    }
+  }
+
+  function renderCancellationHeaderFields() {
+    const cancellationAt = textValue(readRecordValue(activeDraft, 'cancellationAt'))
+    const cancelledBy = textValue(readRecordValue(activeDraft, 'cancelledBy'))
+    const cancellationReason = textValue(readRecordValue(activeDraft, 'cancellationReason'))
+    const cancellationReasonError = messages.find((message) => message.includes('Cancellation Reason'))
+    const cancellationInvalid =
+      (activeDraft as { cancellationRequested?: string }).cancellationRequested === 'YES' &&
+      hasCancellationValidationError(messages)
+    const isCancelled = textValue(readRecordValue(activeDraft, 'operationalStatus')) === SYSTEM_OPERATIONAL_STATUS_CANCELED
+    if (isCancelled) {
+      return (
+        <div className="flex flex-wrap items-start gap-3">
+          <MetadataHeaderField label="Cancellation Timestamp" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue={cancellationAt ? <DateTimeValue value={cancellationAt} semanticType="datetime" /> : '-'} />
+          <MetadataHeaderField label="Cancelled By" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue={cancelledBy || '-'} />
+          <MetadataHeaderField label="Cancellation Reason" controlWidthClassName="w-[32rem] max-w-full" businessEditable={false} editor={null} readOnlyValue={<RichTextContent value={cancellationReason} />} />
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+            onClick={restoreCancelledSystem}
+          >
+            Restore
+          </button>
+        </div>
+      )
+    }
+    return (
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField label="Cancel System" controlWidthClassName="w-36">
+          <select
+            className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm', validationControlClassName(cancellationInvalid)].filter(Boolean).join(' ')}
+            disabled={isViewMode}
+            value={(activeDraft as { cancellationRequested?: string }).cancellationRequested ?? 'NO'}
+            onChange={(event) => updateField('cancellationRequested', event.target.value)}
+          >
+            <option value="NO">No</option>
+            <option value="YES">Yes</option>
+          </select>
+        </FormField>
+        {(activeDraft as { cancellationRequested?: string }).cancellationRequested === 'YES' ? (
+          <>
+            <MetadataHeaderField label="Cancellation Timestamp" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue={<DateTimeValue value={new Date().toISOString()} semanticType="datetime" />} />
+            <MetadataHeaderField label="Cancelled By" controlWidthClassName="w-56" businessEditable={false} editor={null} readOnlyValue="Current User" />
+            <FormField label="Cancellation Reason" controlWidthClassName="w-[32rem] max-w-full" required error={cancellationReasonError}>
+              <div className={['rounded', validationControlClassName(cancellationInvalid || Boolean(cancellationReasonError))].filter(Boolean).join(' ')}>
+                <RichTextEditor
+                  value={textValue(readRecordValue(activeDraft, 'cancellationReason'))}
+                  onChange={(value) => updateField('cancellationReason', value)}
+                  minHeightClassName="min-h-16"
+                  toolbarMode="focus"
+                />
+              </div>
+            </FormField>
+          </>
+        ) : null}
+      </div>
+    )
   }
 
   function discardSystemChangesAndProceed() {
@@ -1014,7 +1188,7 @@ export function InventoryForm<T extends InventoryRecord>({
     return textValue(readRecordValue(activeDraft, 'productType')) || (hostedTenantsForDraft().find((tenant) => textValue(tenant.configuration?.product ?? tenant.productType))?.productType ?? '')
   }
 
-  function tenantRequirementOptionLabel(requirement: NewTenantRequirement): string {
+  function tenantRequirementOptionLabel(requirement: NewTenantRequirement, occupyingTenant?: Tenant): string {
     const moduleKeys: Array<keyof NewTenantRequirement> = ['tangles', 'tanglesGo', 'webloc', 'webeye', 'ingest', 'blockchain']
     const moduleCount = moduleKeys.reduce((count, key) => {
       const value = requirement[key]
@@ -1022,49 +1196,31 @@ export function InventoryForm<T extends InventoryRecord>({
       return value === 'YES' ? count + 1 : count
     }, 0)
     const aiCount = requirement.aiFeatures?.length ?? 0
-    return `${requirement.requirementId} | Users: ${requirement.users ?? '-'} | Licenses: ${requirement.licenses ?? '-'} | Modules: ${moduleCount} | AI: ${aiCount}`
-  }
-
-  function projectOpportunity(project: Project): Opportunity | undefined {
-    return opportunities.find(
-      (opportunity) =>
-        opportunity.opportunityId === project.opportunityId ||
-        opportunity.id === project.opportunityId ||
-        opportunity.pocProjectIds.includes(project.id) ||
-        opportunity.finalProjectId === project.id,
-    )
+    const occupancy = occupyingTenant ? ` | Also used by ${occupyingTenant.tid}` : ''
+    return `${requirement.requirementId}${occupancy} | Users: ${requirement.users ?? '-'} | Licenses: ${requirement.licenses ?? '-'} | Modules: ${moduleCount} | AI: ${aiCount}`
   }
 
   function linkedProjectsForSystem(): Project[] {
     const linkRecord = allocatedSystemForTenantCreation() ?? activeRecord
     const projectIds = new Set(
-      linkedProjectIdsForSystem(linkRecord, projectSystems),
+      activeProjectSystemLinks(projectSystems)
+        .filter((link) => link.systemId === linkRecord.id)
+        .map((link) => link.projectId),
     )
     return projects.filter((project) => projectIds.has(project.id))
   }
 
-  function newTenantRequirementsForProject(projectId: string): NewTenantRequirement[] {
-    const project = projects.find((candidate) => candidate.id === projectId)
-    if (!project) return []
-    return projectOpportunity(project)?.newTenantRequirements ?? []
+  function requirementOptionsForProject(projectId: string): RequirementAttachmentOption[] {
+    return requirementAttachmentOptionsForProject(projectId, projects, opportunities, tenants)
   }
 
-  function usedRequirementIdsForProject(projectId: string): Set<string> {
-    const activeTenantLinks = activeProjectTenantLinks(projectTenants)
-    const linkedTenantIds = new Set(
-      activeTenantLinks.filter((link) => link.projectId === projectId).map((link) => link.tenantId),
-    )
-    return new Set(
-      tenants
-        .filter((tenant) => linkedTenantIds.has(tenant.id) && tenant.sourceRequirementId)
-        .map((tenant) => tenant.sourceRequirementId as string),
-    )
+  function newTenantRequirementsForProject(projectId: string): NewTenantRequirement[] {
+    return requirementOptionsForProject(projectId).map((option) => option.requirement)
   }
 
   function firstAvailableRequirementId(projectId: string): string {
-    const usedRequirementIds = usedRequirementIdsForProject(projectId)
-    return newTenantRequirementsForProject(projectId)
-      .find((requirement) => !usedRequirementIds.has(requirement.requirementId))?.id ?? ''
+    return requirementOptionsForProject(projectId)
+      .find((option) => !option.disabled)?.requirement.requirementId ?? ''
   }
 
   function openAddTenantDialog() {
@@ -1103,7 +1259,7 @@ export function InventoryForm<T extends InventoryRecord>({
       return
     }
     const selectedRequirement = newTenantRequirementsForProject(selectedProjectId).find(
-      (requirement) => requirement.id === selectedRequirementId,
+      (requirement) => requirement.id === selectedRequirementId || requirement.requirementId === selectedRequirementId,
     )
     const systemProduct = normalizeProduct(readRecordValue(systemForTenant, 'productType'))
     const requirementProduct = normalizeProduct(selectedRequirement?.productType)
@@ -1150,43 +1306,35 @@ export function InventoryForm<T extends InventoryRecord>({
 
   function deleteHostedTenant(tenant: Tenant) {
     if (isViewMode) return
-    if (!window.confirm(`Delete Tenant ${tenant.tid}?\n\nThe Tenant will be removed from active System hosting and configuration, but will remain in its linked Projects and historical records.\n\nThis change will be saved immediately.`)) return
+    if (!window.confirm(`Delete Tenant ${tenant.tid}?\n\nThe Tenant will remain linked for history, but will no longer count as an active hosted Tenant or contribute to the System Application Summary.\n\nThis change will be saved immediately.`)) return
     deleteTenantFromSystem(tenant.id)
     const routePath = tenantReference(tenant).routePath
     const opened = routePath ? window.open(`${window.location.origin}${window.location.pathname}#${routePath}`, '_blank', 'noopener,noreferrer') : null
     setMessages([
       opened
-        ? `Tenant ${tenant.tid} deleted and removed from active System hosting.`
-        : `Tenant ${tenant.tid} deleted and removed from active System hosting. Open Tenant ${tenant.tid} from the Tenant dashboard to review it.`,
+        ? `Tenant ${tenant.tid} marked Deleted.`
+        : `Tenant ${tenant.tid} marked Deleted. Open Tenant ${tenant.tid} from the Tenant dashboard to review it.`,
     ])
   }
 
-  function cancelHostedTenant(tenant: Tenant) {
-    if (isViewMode) return
-    if (!window.confirm(`Cancel Tenant ${tenant.tid}?\n\nThe Tenant will be removed from active System hosting and from all linked Projects because it was created by mistake.\n\nThe historical audit record will be preserved.\n\nThis change will be saved immediately.`)) return
-    cancelTenantFromSystem(tenant.id)
-    const routePath = tenantReference(tenant).routePath
-    const opened = routePath ? window.open(`${window.location.origin}${window.location.pathname}#${routePath}`, '_blank', 'noopener,noreferrer') : null
-    setMessages([
-      opened
-        ? `Tenant ${tenant.tid} cancelled and removed from active System hosting.`
-        : `Tenant ${tenant.tid} cancelled and removed from active System hosting. Open Tenant ${tenant.tid} from the Tenant dashboard to review it.`,
-    ])
+  function attachRequirementOptionsForTenant(tenant: Tenant): RequirementAttachmentOption[] {
+    const systemId = tenant.hostedSystemId || tenant.systemId
+    const activeProjectIds = new Set(activeProjectSystemLinks(projectSystems).filter((link) => link.systemId === systemId).map((link) => link.projectId))
+    return projects
+      .filter((project) => activeProjectIds.has(project.id))
+      .flatMap((project) => requirementOptionsForProject(project.id))
   }
 
-  function moveHostedTenant(tenant: Tenant) {
-    if (isViewMode) return
-    const defaultMode = tenantMoveDefaultMode(tenant, projects, projectTenants)
-    const defaultRegion = tenantMoveDefaultRegion({ tenant, projects, projectTenants, opportunities, accounts })
-    setMoveTenantId(tenant.id)
-    setMoveMode(defaultMode)
-    setSelectedMoveDestinationIds([])
-    setMoveCandidateSearch('')
-    setMoveCandidateFilters({ ...EMPTY_SYSTEM_CANDIDATE_FILTERS, regionTimeGroup: defaultRegion })
-    setMoveCandidateSortKey('id')
-    setMoveCandidateSortDirection('asc')
-    setMoveResult(null)
-    setMoveConfirmation(null)
+  function confirmAttachTenantRequirement() {
+    const tenant = tenants.find((candidate) => candidate.id === attachTenantId)
+    if (!tenant || !attachRequirementId) return
+    const selectedOption = attachRequirementOptionsForTenant(tenant).find((option) => option.requirement.requirementId === attachRequirementId)
+    const result = attachTenantToProjectRequirement(tenant.id, selectedOption?.project.id ?? '', attachRequirementId)
+    setMessages([result.message])
+    if (result.ok) {
+      setAttachTenantId('')
+      setAttachRequirementId('')
+    }
   }
 
   function changeMoveMode(mode: TenantMoveMode) {
@@ -1261,9 +1409,60 @@ export function InventoryForm<T extends InventoryRecord>({
     setMoveResult(null)
   }
 
-  function renderHostedTenantActions(tenant: Tenant) {
+  function tenantHasAttachableProject(tenant: Tenant): boolean {
+    const systemId = tenant.hostedSystemId || tenant.systemId
+    if (!systemId || tenant.operationalStatus === 'Deleted') return false
+    const activeProjectIds = activeProjectSystemLinks(projectSystems)
+      .filter((link) => link.systemId === systemId)
+      .map((link) => link.projectId)
+    return activeProjectIds.some((projectId) => {
+      const alreadyLinked = projectTenants.some(
+        (link) => link.projectId === projectId && link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED',
+      )
+      return !alreadyLinked && requirementOptionsForProject(projectId).length > 0
+    })
+  }
+
+  function attachHostedTenant(tenant: Tenant) {
+    const options = attachRequirementOptionsForTenant(tenant)
+    const firstRequirement = options[0]
+    if (!firstRequirement) {
+      window.alert('No tenant requirements are available for this Project.')
+      return
+    }
+    setAttachTenantId(tenant.id)
+    setAttachRequirementId(firstRequirement.requirement.requirementId)
+  }
+
+  function renderHostedTenantActions(tenant: Tenant, system: System | undefined) {
+    void system
+    if (isTenantLifecycleInactive(tenant)) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+            onClick={() => {
+              const routePath = tenantReference(tenant).routePath
+              if (routePath) navigate(routePath)
+            }}
+          >
+            Edit
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-wrap gap-1">
+        {tenantHasAttachableProject(tenant) ? (
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
+            onClick={() => attachHostedTenant(tenant)}
+          >
+            {tenantOccupiesRequirement(tenant) ? 'Replace REQ-ID' : 'Attach REQ-ID'}
+          </button>
+        ) : null}
         <button
           type="button"
           className="rounded border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50"
@@ -1281,26 +1480,14 @@ export function InventoryForm<T extends InventoryRecord>({
         >
           Edit
         </button>
-        <button
-          type="button"
-          className="rounded border border-sf-border bg-white px-2 py-1 text-xs text-sf-text hover:bg-sf-surface-alt"
-          onClick={() => moveHostedTenant(tenant)}
-        >
-          Move
-        </button>
-        <button
-          type="button"
-          className="rounded border border-purple-200 bg-white px-2 py-1 text-xs text-purple-700 hover:bg-purple-50"
-          onClick={() => cancelHostedTenant(tenant)}
-        >
-          Cancel
-        </button>
       </div>
     )
   }
 
   function renderTenantTab() {
-    const hostedTenants = hostedTenantsForDraft().filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
+    const activeSystemId = (allocatedSystemForTenantCreation() ?? activeRecord).id
+    const hostedTenants = hostedTenantsForSystem(activeSystemId, tenants)
+      .filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
     const governingTenantId = systemTimeGroupSource(
       (allocatedSystemForTenantCreation() ?? activeRecord) as System,
       tenants,
@@ -1332,17 +1519,45 @@ export function InventoryForm<T extends InventoryRecord>({
             tenants={hostedTenants}
             systems={allocatedSystems}
             emptyTextForSection={() => 'No hosted tenants in this section.'}
-            actions={isViewMode ? undefined : (tenant) => renderHostedTenantActions(tenant)}
+            actions={isViewMode ? undefined : (tenant, system) => renderHostedTenantActions(tenant, system)}
             systemTimeGroupGovernorTenantId={governingTenantId}
           />
         </section>
         {renderApplicationConfigurationSummarySection()}
+        {renderDeletedTenantsSection()}
       </div>
     )
   }
 
   function renderApplicationConfigurationSummarySection() {
-    return <ApplicationConfigurationSummaryTable system={(allocatedSystemForTenantCreation() ?? activeRecord) as System} tenants={tenants} />
+    const system = (allocatedSystemForTenantCreation() ?? activeRecord) as System
+    return (
+      <div className="space-y-4">
+        <ApplicationConfigurationSummaryTable system={system} tenants={tenants} />
+      </div>
+    )
+  }
+
+  function renderDeletedTenantsSection() {
+    const system = (allocatedSystemForTenantCreation() ?? activeRecord) as System
+    const deletedTenants = historicalInactiveTenantsForSystem(system.id, tenants)
+      .filter((tenant) => isTenantDeleted(tenant))
+      .filter((tenant) => !pendingTenantRemovalIds.includes(tenant.id))
+
+    return (
+      <section className="space-y-2" aria-labelledby="system-deleted-tenants-section-title">
+        <h3 id="system-deleted-tenants-section-title" className="text-lg font-semibold text-sf-text">
+          Deleted Tenants
+          <span className="ml-1 text-xs font-normal text-sf-text-muted">({deletedTenants.length})</span>
+        </h3>
+        <TenantDeliveryTable
+          tenants={deletedTenants}
+          systems={allocatedSystems}
+          emptyText="No deleted tenants retained for this system."
+          showWarrantyStatusColumn
+        />
+      </section>
+    )
   }
 
   function renderInfrastructureTab() {
@@ -1867,9 +2082,8 @@ export function InventoryForm<T extends InventoryRecord>({
   function renderAddTenantDialog() {
     if (!addTenantOpen) return null
     const linkedProjects = linkedProjectsForSystem()
-    const selectedRequirements = newTenantRequirementsForProject(selectedProjectId)
+    const selectedRequirementOptions = requirementOptionsForProject(selectedProjectId)
     const selectedProject = linkedProjects.find((project) => project.id === selectedProjectId)
-    const usedRequirementIds = usedRequirementIdsForProject(selectedProjectId)
     const addTenantMessages = messages.filter((message) =>
       message.includes('tenant') ||
       message.includes('Tenant') ||
@@ -1917,14 +2131,12 @@ export function InventoryForm<T extends InventoryRecord>({
                 onChange={(event) => setSelectedRequirementId(event.target.value)}
               >
                 <option value="INTERNAL">Internal</option>
-                {selectedRequirements.map((requirement) => (
+                {selectedRequirementOptions.map(({ requirement, occupyingTenant }) => (
                   <option
                     key={requirement.id}
-                    value={requirement.id}
-                    disabled={usedRequirementIds.has(requirement.requirementId)}
+                    value={requirement.requirementId}
                   >
-                    {tenantRequirementOptionLabel(requirement)}
-                    {usedRequirementIds.has(requirement.requirementId) ? ' - Already used' : ''}
+                    {tenantRequirementOptionLabel(requirement, occupyingTenant)}
                   </option>
                 ))}
               </select>
@@ -1949,6 +2161,52 @@ export function InventoryForm<T extends InventoryRecord>({
             >
               Create Tenant
             </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderAttachTenantRequirementDialog() {
+    const tenant = tenants.find((candidate) => candidate.id === attachTenantId)
+    if (!tenant) return null
+    const options = attachRequirementOptionsForTenant(tenant)
+    const requirementActionLabel = tenantOccupiesRequirement(tenant) ? 'Replace REQ-ID' : 'Attach REQ-ID'
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
+        <div className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded border border-sf-border bg-white shadow-xl" role="dialog" aria-modal="false" aria-labelledby="attach-tenant-title">
+          <div className="flex items-start justify-between gap-3 border-b border-sf-border p-4">
+            <div>
+              <h2 id="attach-tenant-title" className="text-lg font-semibold text-sf-text">{requirementActionLabel} for tenant {tenant.tid}</h2>
+            </div>
+            <button type="button" className="rounded border border-sf-border bg-white p-1.5 hover:bg-sf-surface-alt" aria-label="Close attach tenant dialog" onClick={() => setAttachTenantId('')}>
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="space-y-3 overflow-auto p-4">
+            {options.length === 0 ? (
+              <div className="rounded border border-sf-border bg-sf-surface-alt p-3 text-sm text-sf-text">No tenant requirements are available for this Project.</div>
+            ) : (
+              <FormField label="Requirement ID" controlWidthClassName="w-full">
+                <select className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm" value={attachRequirementId} onChange={(event) => setAttachRequirementId(event.target.value)}>
+                  {options.map(({ project, requirement, occupyingTenant }) => (
+                    <option key={`${project.id}-${requirement.id}`} value={requirement.requirementId}>
+                      {project.pid} - {tenantRequirementOptionLabel(requirement, occupyingTenant)}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-sf-border p-4">
+            <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setAttachTenantId('')}>
+              {options.length === 0 ? 'OK' : 'Cancel'}
+            </button>
+            {options.length > 0 ? (
+              <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" disabled={!attachRequirementId} onClick={confirmAttachTenantRequirement}>
+                {requirementActionLabel}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2086,7 +2344,9 @@ export function InventoryForm<T extends InventoryRecord>({
           <span className="inline-flex items-center gap-2">
             <OperationalStatusIcon status={textValue(readRecordValue(activeDraft, 'operationalStatus'))} />
             <span>
-              {metadata.titleLabel === 'MID'
+              {metadata.titleLabel === 'MID' && textValue(readRecordValue(activeDraft, 'sid'))
+                ? `SID ${textValue(readRecordValue(activeDraft, 'sid'))}`
+                : metadata.titleLabel === 'MID'
                 ? ['MID', formattedReusedInternalMachineId(textValue(readRecordValue(activeDraft, 'machineId')))].filter(Boolean).join(' ')
                 : `${metadata.titleLabel} ${
                     metadata.titleLabel === 'SID'
@@ -2127,6 +2387,7 @@ export function InventoryForm<T extends InventoryRecord>({
               {fields.map(renderHeaderField)}
             </div>
           ))}
+          {renderCancellationHeaderFields()}
         </div>
       </CollapsibleSection>
 
@@ -2200,6 +2461,7 @@ export function InventoryForm<T extends InventoryRecord>({
         </div>
       ) : null}
       {renderAddTenantDialog()}
+      {renderAttachTenantRequirementDialog()}
       {renderMoveTenantDialog()}
       {timeGroupMismatch ? (
         <TenantTimeGroupMismatchDialog
@@ -2214,12 +2476,24 @@ export function InventoryForm<T extends InventoryRecord>({
 
 export function ProductionSystemInventoryFormPage() {
   const { sid } = useParams<{ sid: string }>()
+  const location = useLocation()
   const inventoryRecords = useAppStore((state) => state.productionSystemInventory)
   const systems = useAppStore((state) => state.systems)
+  const idCounters = useAppStore((state) => state.idCounters)
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
+  const isNewRoute = isCreateRoute(location, sid)
+  const newRecord = useMemo(
+    () => isNewRoute
+      ? createProductionInventorySystem(
+          previewBusinessIdFromCounter('productionSystem', idCounters, [...systems, ...inventoryRecords].map((system) => system.sid)),
+          new Date().toISOString(),
+        )
+      : undefined,
+    [idCounters, inventoryRecords, isNewRoute, systems],
+  )
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source !== SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
-  const record = useMemo(() => records.find((system) => system.sid === sid), [records, sid])
+  const record = useMemo(() => isNewRoute ? newRecord : records.find((system) => system.sid === sid), [isNewRoute, newRecord, records, sid])
 
   return (
     <InventoryForm
@@ -2227,28 +2501,34 @@ export function ProductionSystemInventoryFormPage() {
       records={records}
       metadata={productionSystemMetadata}
       onSave={(id, patch, options, tenantRemovalIds) => {
-        if (inventoryRecords.some((system) => system.id === id)) {
-          saveSystemFormTransaction('production', id, patch as Partial<ProductionSystemInventoryItem>, tenantRemovalIds, options)
-          return
+        if (isNewRoute || inventoryRecords.some((system) => system.id === id)) {
+          return saveSystemFormTransaction('production', id, patch as Partial<ProductionSystemInventoryItem>, tenantRemovalIds, options)
         }
-        saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
+        return saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
       }}
       dashboardPath="/systems/production-inventory"
+      isCreateMode={isNewRoute}
     />
   )
 }
 
 export function ReusedInternalSystemFormPage() {
   const { mid } = useParams<{ mid: string }>()
+  const location = useLocation()
   const inventoryRecords = useAppStore((state) => state.reusedInternalSystems)
   const systems = useAppStore((state) => state.systems)
   const saveSystemFormTransaction = useAppStore((state) => state.saveSystemFormTransaction)
+  const isNewRoute = isCreateRoute(location, mid)
+  const newRecord = useMemo(
+    () => isNewRoute ? createReusedInternalInventorySystem('', new Date().toISOString(), { includePurposeHistory: false }) : undefined,
+    [isNewRoute],
+  )
   const allocatedRecords = useMemo(() => systems.filter((system) => system.source === SYSTEM_SOURCE_REUSED_INTERNAL), [systems])
   const records = useMemo(() => [...inventoryRecords, ...allocatedRecords], [inventoryRecords, allocatedRecords])
   const routeMachineId = reusedInternalMachineIdRouteKey(mid)
   const record = useMemo(
-    () => records.find((system) => reusedInternalMachineIdsEqual(system.machineId, routeMachineId) || system.id === mid),
-    [records, routeMachineId, mid],
+    () => isNewRoute ? newRecord : records.find((system) => reusedInternalMachineIdsEqual(system.machineId, routeMachineId) || system.id === mid),
+    [isNewRoute, newRecord, records, routeMachineId, mid],
   )
 
   return (
@@ -2257,13 +2537,13 @@ export function ReusedInternalSystemFormPage() {
       records={records}
       metadata={reusedInternalSystemMetadata}
       onSave={(id, patch, options, tenantRemovalIds) => {
-        if (inventoryRecords.some((system) => system.id === id)) {
-          saveSystemFormTransaction('reused', id, patch as Partial<ReusedInternalSystem>, tenantRemovalIds, options)
-          return
+        if (isNewRoute || inventoryRecords.some((system) => system.id === id)) {
+          return saveSystemFormTransaction('reused', id, patch as Partial<ReusedInternalSystem>, tenantRemovalIds, options)
         }
-        saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
+        return saveSystemFormTransaction('allocated', id, patch as Partial<System>, tenantRemovalIds, options)
       }}
       dashboardPath="/systems/reused-internal"
+      isCreateMode={isNewRoute}
     />
   )
 }

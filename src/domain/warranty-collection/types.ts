@@ -47,7 +47,6 @@ export interface WarrantyDashboardRow {
   accountManager: string
   tenantId: string
   tenantTid: string
-  tenantName: string
   sid: string
   product: string
   relatedProjectId: string
@@ -74,7 +73,6 @@ export interface WarrantyDashboardContext {
   tenants: Tenant[]
   accountNameForTenant: (tenant: Tenant) => string
   accountManagerForTenant: (tenant: Tenant) => string
-  tenantNameForTenant: (tenant: Tenant) => string
   sidForTenant: (tenant: Tenant) => string
   productForTenant: (tenant: Tenant) => string
   projectNameForProjectId: (projectId: string) => string
@@ -106,7 +104,6 @@ export interface RenewalCandidateRow {
   accountManager: string
   tenantId: string
   tenantTid: string
-  tenantName: string
   sid: string
   product: string
   relatedProjectId: string

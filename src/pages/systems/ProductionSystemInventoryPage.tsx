@@ -5,7 +5,7 @@ import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/compone
 import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
-import { systemDashboardRowClassName } from '@/domain/system-inventory'
+import { SYSTEM_OPERATIONAL_STATUS_CANCELED, systemDashboardRowClassName } from '@/domain/system-inventory'
 
 export function ProductionSystemInventoryPage() {
   const navigate = useNavigate()
@@ -13,10 +13,11 @@ export function ProductionSystemInventoryPage() {
   const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.productionSystemInventory)
   const sortedSystems = useMemo(
-    () => [...systems].sort((first, second) => String(second.sid).localeCompare(String(first.sid), undefined, { numeric: true })),
+    () => [...systems]
+      .filter((system) => system.operationalStatus !== SYSTEM_OPERATIONAL_STATUS_CANCELED)
+      .sort((first, second) => String(second.sid).localeCompare(String(first.sid), undefined, { numeric: true })),
     [systems],
   )
-  const createSystem = useAppStore((state) => state.createProductionSystemInventoryItem)
   const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
 
   return (
@@ -37,9 +38,7 @@ export function ProductionSystemInventoryPage() {
             type="button"
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
-              const system = createSystem()
-              const routePath = systemReference(system).routePath
-              if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
+              navigate('/systems/production-inventory/new', { state: { returnTo, mode: 'edit', newRecordSession: true } })
             }}
           >
             + New Production System

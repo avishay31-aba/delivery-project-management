@@ -270,10 +270,18 @@ function formattedDashboardCellValue<T>(column: DashboardColumn<T>, raw: string)
   return raw
 }
 
+function splitDashboardFilterValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).map((part) => part.trim()).filter(Boolean)
+  return String(value ?? '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
 function uniqueColumnOptions<T>(rows: T[], sourceColumn?: DashboardColumn<T>): string[] {
   if (!sourceColumn) return []
 
-  return Array.from(new Set(rows.map((row) => String(sourceColumn.getValue(row) ?? ''))))
+  return Array.from(new Set(rows.flatMap((row) => splitDashboardFilterValues(sourceColumn.getValue(row)))))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b))
 }
@@ -1164,22 +1172,25 @@ export function DataDashboard<T extends { id: string }>({
         enableGrouping: column.groupable !== false,
         enableColumnFilter: column.filterable !== false,
         enableHiding: undefined,
-        ...(column.sortValue
-          ? {
-              sortingFn: (firstRow, secondRow) => {
-                const firstValue = column.sortValue?.(firstRow.original)
-                const secondValue = column.sortValue?.(secondRow.original)
-                return String(firstValue ?? '').localeCompare(String(secondValue ?? ''), undefined, { numeric: true })
-              },
+        sortingFn: (firstRow, secondRow, columnId) => {
+          if (firstRow.getIsGrouped() || secondRow.getIsGrouped()) {
+            if (firstRow.groupingColumnId === columnId && secondRow.groupingColumnId === columnId) {
+              return String(firstRow.groupingValue ?? '').localeCompare(String(secondRow.groupingValue ?? ''), undefined, { numeric: true })
             }
-          : {}),
+            return 0
+          }
+          const firstValue = column.sortValue?.(firstRow.original) ?? firstRow.getValue(columnId)
+          const secondValue = column.sortValue?.(secondRow.original) ?? secondRow.getValue(columnId)
+          return String(firstValue ?? '').localeCompare(String(secondValue ?? ''), undefined, { numeric: true })
+        },
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true
-          const rowValue = String(row.getValue(columnId) ?? '')
+          const rowValues = splitDashboardFilterValues(row.getValue(columnId))
           if (Array.isArray(filterValue)) {
-            return filterValue.length === 0 || filterValue.map(String).includes(rowValue)
+            const selectedValues = filterValue.map(String)
+            return selectedValues.length === 0 || rowValues.some((rowValue) => selectedValues.includes(rowValue))
           }
-          return rowValue === String(filterValue)
+          return rowValues.includes(String(filterValue))
         },
         cell: ({ row }) => {
           const raw = String(column.getValue(row.original) ?? '')
@@ -1714,7 +1725,10 @@ const hiddenFilteredColumns = table
 const hiddenFilteredColumnNames = hiddenFilteredColumns.map((column) =>
   String(column.columnDef.header),
 )
-const alternateRows = useMemo(() => table.getSortedRowModel().rows.map((row) => row.original), [table, rows, sorting, columnFilters, globalFilter])
+const alternateRows = useMemo(
+  () => table.getSortedRowModel().flatRows.filter((row) => row.subRows.length === 0).map((row) => row.original),
+  [table],
+)
 
   function clearAllFiltersAndSearch() {
     recordDashboardUndoSnapshot()

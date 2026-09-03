@@ -17,6 +17,7 @@ const INTEGER_FIELD_LABELS: Array<[string, string]> = [
   ['webloc', 'Webloc'],
   ['webeye', 'Webeye'],
   ['ingest', 'Ingest'],
+  ['blockchain', 'Blockchain'],
   ['standardMonitors', 'Standard monitors'],
   ['fullMonitors', 'Full monitors'],
   ['topicMonitors', 'Topic monitors'],
@@ -30,6 +31,7 @@ const MODULE_QUANTITY_FIELD_LABELS: Array<[string, string]> = [
   ['webloc', 'Webloc'],
   ['webeye', 'Webeye'],
   ['ingest', 'Ingest'],
+  ['blockchain', 'Blockchain'],
 ]
 
 export function validateApplicationConfigurationIntegerFields(

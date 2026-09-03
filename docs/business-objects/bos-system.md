@@ -167,6 +167,12 @@ System-owned derived/read-model fields include:
 - Hosted tenant count
 - Allocation availability/readiness summary
 
+System identity separates reusable-resource identity from allocated-instance identity:
+
+- `machineId` / MID identifies a Reused Internal System resource. It is fixed for that reusable resource, manually supplied, uniqueness-validated in the reused-internal namespace, and may be reused across multiple Project allocations over time.
+- `sid` / SID identifies an allocated System instance. Every System allocated to a Project has an SID, including allocation instances created from a Reused Internal System. A new RIS allocation retains the MID and creates a new globally sequential SID for that Project allocation instance.
+- Allocated Systems is keyed by SID and must not deduplicate by MID. Reused Internal Systems is keyed by MID and represents the reusable resource inventory.
+
 ## 9. Referenced Fields
 
 Project fields:
@@ -266,6 +272,8 @@ No new lifecycle states are introduced by this BOS.
 - Tenant runs inside Systems; Tenant does not own System configuration.
 - System may host many Tenants.
 - System may participate in many Projects over its lifetime.
+- A reused internal System identified by MID may be released and reused after POC completion without mutating previous Project history. Completed Projects retain the System and Tenant relationships that participated in them even if the live reusable System is later reused or the live POC Tenant is operationally removed.
+- When an eligible POC Tenant hosted on a customer Production System is retained through an approved Upsell, the Production System remains the Tenant's hosting System and gains the additional Upsell Project relationship for visibility without duplicating the System or rewriting the original POC Project history.
 - Application Configuration Summary belongs to System and aggregates active hosted Tenant configuration values, but its Product-to-final-column structure comes from the shared Application Configuration metadata used by Opportunity New Tenant Requirements, Tenant Configuration, and System Tenant tables.
 - System is configured according to its own Application Configuration Summary.
 - SystemInventory owns system identity, configuration, operational state, and readiness facts.
@@ -303,6 +311,10 @@ SystemInventory-owned validations may include:
 - Capacity/resource values must be numeric where modeled as numeric.
 - Version/product values must be valid where constrained by metadata.
 - Deleted/Cancelled states must preserve historical links safely.
+- Individually Deleted Tenants and retained legacy Cancelled Tenant records remain linked to the System for historical visibility. Active System Tenant Warranty Status sections show operationally visible hosted Tenants. The System form displays individually Deleted Tenants in a dedicated `Deleted Tenants` table below Application Configuration Summary, with Warranty Status and without operational Actions. Deleted Tenants do not contribute to current Tenant count or System Application Configuration Summary. Retained legacy Cancelled Tenants do not appear in normal System Tenant tables and remain available only through explicit history/audit/provenance surfaces. System Tenant sections must not expose Tenant Cancel or Restore actions.
+- System Operational Status transitions to `Off`, `Access blocked`, or `Service blocked` temporarily force only currently hosted Tenants that were not already individually Deleted/Cancelled. The System transition stores each Tenant's previous Operational Status separately from individual Delete/Cancel restore state. Returning the System to `On` restores only those system-forced Tenants.
+- System `Canceled` and `Deleted` are independent lifecycle states. `Deleted` remains the legitimate end-of-life operational workflow. `Canceled` is reached only through the System form header cancellation workflow and is not a shortcut for deallocation or occupation release. A System cannot be cancelled while any active Project allocation exists, regardless of Project status. An occupied Reused Internal System cannot be cancelled until released through its normal operational workflow. Only an unallocated Production System or available/unoccupied Reused Internal System may be cancelled. Restore returns only the System to inventory/available state and never reconstructs Project allocation or occupation.
+- Cancelled Systems are shown in the Systems Workspace `Cancelled Systems` dashboard, which includes cancelled allocated Systems, Production inventory Systems, and Reused Internal Systems while active inventory dashboards exclude cancelled records.
 - Remark type must be a valid picklist value where constrained.
 - Remark due date must be a valid date where supplied.
 - Remark content may use shared rich text value format.
@@ -588,8 +600,8 @@ Do not include in V1:
 
 ## V1.2 Time Group Hosting Governance
 
-System Time Group represents the external Customer/POC working-hours context used to schedule maintenance outside customer working hours. Only active Customer and POC Tenants are eligible sources. A valid active explicit governor selected by Change has precedence; otherwise the most veteran active Customer/POC Tenant governs. Internal Tenants never govern, establish, or replace System Time Group and never trigger the mismatch workflow.
+System Time Group represents the external Customer/POC working-hours context used to schedule maintenance outside customer working hours. Only active Customer and POC Tenants are eligible sources when a System has active hosted Customer/POC Tenants. A tenant-less standalone inventory System may display its own inventory/location Time Group. A valid active explicit governor selected by Change has precedence; otherwise the most veteran active Customer/POC Tenant governs. Internal Tenants never govern, establish, or replace System Time Group and never trigger the mismatch workflow.
 
-A mismatch on later eligible creation/allocation pauses before mutation: Continue adds the Tenant and preserves System governance, Cancel performs no mutation, and Change atomically adds the Tenant and makes it the explicit governor. When a governor leaves active hosting through Delete, Cancel, Move, deallocation, or an equivalent lifecycle, the most veteran remaining active Customer/POC Tenant governs; if none remains, System Time Group is empty. An Internal-only or tenant-less System therefore has an empty Time Group. Project Time Group, Project age, and Region are never fallbacks.
+A mismatch on later eligible creation/allocation pauses before mutation: Continue adds the Tenant and preserves System governance, Cancel performs no mutation, and Change atomically adds the Tenant and makes it the explicit governor. When a governor leaves active hosting through Delete, Cancel, Move, deallocation, or an equivalent lifecycle, the most veteran remaining active Customer/POC Tenant governs; if none remains, tenant-derived System Time Group is empty and a tenant-less standalone inventory System falls back only to its own inventory/location Time Group. Project Time Group, Project age, and Region are never fallbacks.
 
 The three contract-status Tenant tables retain visible Time Group text and display a compact accessible globe on the row identified by the authoritative System Time Group source read model. The globe means `System Time Group source`. Number of Tenants still derives from the complete active hosting relationship, while the System Tenant tables present read-only individual Tenant configuration values and the System Application Configuration Summary remains the shared read-only aggregation of all active hosted Tenant configuration. Both use the shared Application Configuration Product-to-final-column metadata structure.

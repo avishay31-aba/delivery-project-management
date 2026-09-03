@@ -6,6 +6,7 @@ import { InfrastructureMaintenanceCalendar } from '@/components/maintenance/Infr
 import { PageHeader, WorkspaceFrame, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
 import {
+  INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS,
   allSystemRecords,
   infrastructureDashboardRows,
   infrastructureMaintenanceDashboardRows,
@@ -13,17 +14,22 @@ import {
 import { infrastructureItemReference } from '@/domain/business-reference'
 import { useAppStore } from '@/store/useAppStore'
 
-type InfrastructureDashboardTab = 'allItems' | 'maintenance'
+type InfrastructureDashboardTab = 'allItems' | 'cancelledItems' | 'maintenance'
 
 const INFRASTRUCTURE_DASHBOARD_TABS: Array<{ id: InfrastructureDashboardTab; label: string }> = [
-  { id: 'allItems', label: 'All Items' },
+  { id: 'allItems', label: 'Active Items' },
   { id: 'maintenance', label: 'Maintenance Tasks' },
+  { id: 'cancelledItems', label: 'Cancelled Infrastructure Items' },
 ]
 
 const INFRASTRUCTURE_DASHBOARD_TAB_DETAILS: Record<InfrastructureDashboardTab, { title: string; description: string }> = {
   allItems: {
-    title: 'All Items',
-    description: 'All Infrastructure Items supporting Systems.',
+    title: 'Active Infrastructure Items',
+    description: 'Infrastructure Items supporting Systems, excluding cancelled lifecycle records.',
+  },
+  cancelledItems: {
+    title: 'Cancelled Infrastructure Items',
+    description: 'Infrastructure Items cancelled through the lifecycle workflow and retained for audit and restore.',
   },
   maintenance: {
     title: 'Maintenance Tasks',
@@ -53,6 +59,14 @@ export function InfrastructureListPage() {
   const rows = useMemo(
     () => infrastructureDashboardRows(infrastructureItems, referenceData, allSystemRecords(systems, productionSystemInventory, reusedInternalSystems), tenants),
     [infrastructureItems, productionSystemInventory, referenceData, reusedInternalSystems, systems, tenants],
+  )
+  const activeRows = useMemo(
+    () => rows.filter((row) => row.operationalStatus !== INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS),
+    [rows],
+  )
+  const cancelledRows = useMemo(
+    () => rows.filter((row) => row.operationalStatus === INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS),
+    [rows],
   )
   const maintenanceRows = useMemo(
     () => infrastructureMaintenanceDashboardRows(infrastructureItems, referenceData, allSystemRecords(systems, productionSystemInventory, reusedInternalSystems), tenants, accounts),
@@ -87,9 +101,9 @@ export function InfrastructureListPage() {
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {activeTab === 'allItems' ? (
             <DataDashboard
-              title="All Items"
+              title="Active Infrastructure Items"
               dashboardScope="infrastructure"
-              rows={rows}
+              rows={activeRows}
               columns={columns}
               initialSorting={[{ id: 'infrastructureId', desc: false }]}
               toolbar={
@@ -103,6 +117,23 @@ export function InfrastructureListPage() {
                   + Add Item
                 </button>
               }
+              onView={(row) => {
+                const routePath = infrastructureItemReference(row).routePath
+                if (routePath) navigate(routePath, { state: { returnTo, mode: 'view' } })
+              }}
+              onEditRecord={(row) => {
+                const routePath = infrastructureItemReference(row).routePath
+                if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit' } })
+              }}
+            />
+          ) : null}
+          {activeTab === 'cancelledItems' ? (
+            <DataDashboard
+              title="Cancelled Infrastructure Items"
+              dashboardScope="cancelledInfrastructure"
+              rows={cancelledRows}
+              columns={columns}
+              initialSorting={[{ id: 'infrastructureId', desc: false }]}
               onView={(row) => {
                 const routePath = infrastructureItemReference(row).routePath
                 if (routePath) navigate(routePath, { state: { returnTo, mode: 'view' } })

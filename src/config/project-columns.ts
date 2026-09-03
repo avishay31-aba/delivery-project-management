@@ -16,7 +16,6 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import {
-  latestProjectDeletionEntry,
   projectDeliveryDashboardReadModel,
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
@@ -68,6 +67,10 @@ function splitDashboardValues(value: string): string[] {
   return value.split(';').map((part) => part.trim()).filter(Boolean)
 }
 
+function latestProjectCancellationEntry(project: Project) {
+  return (project.cancellationHistory ?? []).at(-1)
+}
+
 export function createProjectListColumns(context: ProjectDashboardColumnContext): DashboardColumn<Project>[] {
   const projectRowCache = new WeakMap<Project, ProjectDeliveryDashboardReadModel>()
   const projectRow = (project: Project): ProjectDeliveryDashboardReadModel => {
@@ -80,14 +83,14 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
 
   return [
     ...(context.includeDeletionReason ? [{
-      id: 'deletedBy',
-      label: 'Deleted By',
-      getValue: (project: Project) => latestProjectDeletionEntry(project)?.deletedBy ?? '',
+      id: 'cancelledBy',
+      label: 'Cancelled By',
+      getValue: (project: Project) => latestProjectCancellationEntry(project)?.deletedBy ?? '',
     } satisfies DashboardColumn<Project>, {
-      id: 'deletionReason',
-      label: 'Deletion Reason',
-      getValue: (project: Project) => richTextPlainText(latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? ''),
-      render: (project: Project) => createElement(DeletionReasonCell, { value: latestProjectDeletionEntry(project)?.reason ?? project.deletionReason ?? '' }),
+      id: 'cancellationReason',
+      label: 'Cancellation Reason',
+      getValue: (project: Project) => richTextPlainText(latestProjectCancellationEntry(project)?.reason ?? project.cancellationReason ?? ''),
+      render: (project: Project) => createElement(DeletionReasonCell, { value: latestProjectCancellationEntry(project)?.reason ?? project.cancellationReason ?? '' }),
     } satisfies DashboardColumn<Project>] : []),
     { id: 'pid', label: 'PID', getValue: (project) => projectRow(project).pid, render: (project) => createElement(BusinessObjectLink, { reference: projectReference(project) }, project.pid) },
     { id: 'projectName', label: 'Project Name', getValue: (project) => projectRow(project).projectName, editable: true, editKey: 'opportunityName' },

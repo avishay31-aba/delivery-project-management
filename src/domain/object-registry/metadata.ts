@@ -498,14 +498,6 @@ const tenantFields: ObjectFieldDefinition[] = [
     source: { domain: 'TenantRequirement', exportName: 'createTenantRequirementId', fieldKey: 'tid' },
   },
   {
-    key: 'tenantName',
-    label: 'Tenant Name',
-    type: 'text',
-    section: 'identity',
-    editable: true,
-    source: { domain: 'TenantRequirement', exportName: 'tenantRequirementReadModel', fieldKey: 'tenantName' },
-  },
-  {
     key: 'tenantType',
     label: 'Tenant Type',
     type: 'readonly',

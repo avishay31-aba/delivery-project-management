@@ -9,3 +9,13 @@ export function routeMode(location: Location): string | null {
 export function isRouteViewMode(location: Location): boolean {
   return routeMode(location) === 'view'
 }
+
+export function isCreateRouteParam(value: string | null | undefined): boolean {
+  return String(value ?? '').trim().toLocaleLowerCase() === 'new'
+}
+
+export function isCreateRoute(location: Location, value?: string | null): boolean {
+  if (isCreateRouteParam(value)) return true
+  const segments = location.pathname.split('/').filter(Boolean)
+  return segments.at(-1)?.toLocaleLowerCase() === 'new'
+}

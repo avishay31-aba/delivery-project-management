@@ -1,8 +1,10 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
-import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon } from '@/components/ui'
+import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon, RichTextContent } from '@/components/ui'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
-import type { AllocatedSystemDashboardRow } from '@/domain/system-inventory'
+import type { AllocatedSystemDashboardRow, SystemInventoryRecord } from '@/domain/system-inventory'
+import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { richTextPlainText } from '@/domain/rich-text'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
 import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS } from '@/config/picklist-options'
@@ -131,6 +133,60 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
     render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
   },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
+  ]
+}
+
+export function createCancelledSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[], tenants: Tenant[]): DashboardColumn<SystemInventoryRecord>[] {
+  return [
+    {
+      id: 'systemIdentity',
+      label: 'System ID',
+      getValue: (row) => ('sid' in row && row.sid) || ('machineId' in row && row.machineId) || row.id,
+      render: (row) => {
+        const objectType = row.id.startsWith('reused-sys-') ? 'INTERNAL_REUSED_SYSTEM' : row.id.startsWith('prod-sys-') ? 'PRODUCTION_SYSTEM' : 'SYSTEM'
+        const businessId = ('sid' in row && row.sid) || ('machineId' in row && row.machineId) || row.id
+        return createElement(BusinessIdLink, { objectType, businessId }, businessId)
+      },
+    },
+    { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
+    { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
+    { id: 'productType', label: 'Product', getValue: (row) => row.productType },
+    systemVersionColumn<SystemInventoryRecord>(),
+    systemUrlColumn<SystemInventoryRecord>(),
+    { id: 'tenantCount', label: '# Tenants', getValue: (row) => tenantCountForSystem(row, tenants) },
+    { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType },
+    { id: 'region', label: 'Region', getValue: (row) => ('region' in row ? row.region ?? '' : 'usedInRegion' in row ? row.usedInRegion ?? '' : '') },
+    { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup ?? '' },
+    {
+      id: 'currentProjects',
+      label: 'Linked Projects',
+      getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
+      render: (row) =>
+        createElement(BusinessIdListLinks, {
+          objectType: 'PROJECT',
+          businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
+        }),
+    },
+    {
+      id: 'operationalStatus',
+      label: 'Operational Status',
+      getValue: (row) => row.operationalStatus,
+      render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
+    },
+    {
+      id: 'cancellationAt',
+      label: 'Cancellation Timestamp',
+      getValue: (row) => row.cancellationAt ?? '',
+      semanticType: 'datetime',
+      render: (row) => row.cancellationAt ? createElement(DateTimeValue, { value: row.cancellationAt, semanticType: 'datetime' }) : '',
+    },
+    { id: 'cancelledBy', label: 'Cancelled By', getValue: (row) => row.cancelledBy ?? '' },
+    {
+      id: 'cancellationReason',
+      label: 'Cancellation Reason',
+      getValue: (row) => richTextPlainText(row.cancellationReason ?? ''),
+      render: (row) => createElement(RichTextContent, { value: row.cancellationReason ?? '' }),
+    },
   ]
 }
 

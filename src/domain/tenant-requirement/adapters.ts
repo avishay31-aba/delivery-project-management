@@ -11,6 +11,11 @@ import { ADDITIONAL_FEATURE_OPTIONS, AI_OPTIONS } from '@/config/picklist-option
 import { applicationConfigurationFromTenant, applicationConfigurationPatchFromTenant } from '@/domain/application-configuration'
 import { defaultHostingIntent, requiresCloudPlatform } from '@/domain/hosting-context'
 import { warrantyRecordPatch } from '@/domain/warranty-collection'
+import { activeTenantSystemId } from './service'
+
+function generatedRequirementId(index: number): string {
+  return `A-${String(index + 1).padStart(3, '0')}`
+}
 
 export function createBaseRequirement(requirementId: string): Omit<
   NewTenantRequirement,
@@ -36,7 +41,7 @@ export function createBaseRequirement(requirementId: string): Omit<
     webloc: null,
     webeye: null,
     ingest: null,
-    blockchain: '',
+    blockchain: null,
     crossSystemFeatures: [],
     apiEnabled: '',
     apiDailyQty: null,
@@ -107,9 +112,10 @@ export function createNewTenantRequirement(
   index: number,
   mapCenter = '',
   dealPackage: OpportunityDealPackage = 'Silver',
+  requirementId = generatedRequirementId(index),
 ): NewTenantRequirement {
   return {
-    ...createBaseRequirement(`A-${String(index + 1).padStart(3, '0')}`),
+    ...createBaseRequirement(requirementId),
     ...dealPackagePatch(dealPackage, mapCenter),
     deployTarget: 'NEW_SYSTEM',
     existingSystemId: null,
@@ -127,13 +133,13 @@ export function newTenantRequirementWithDealPackage(
   }
 }
 
-export function createChangeRequestRequirement(index: number, tenant?: Tenant, mapCenter = ''): ChangeRequestRequirement {
+export function createChangeRequestRequirement(index: number, tenant?: Tenant, mapCenter = '', requirementId = generatedRequirementId(index)): ChangeRequestRequirement {
   return {
-    ...createBaseRequirement(`B-${String(index + 1).padStart(3, '0')}`),
+    ...createBaseRequirement(requirementId),
     mapCenter,
     ...applicationConfigurationPatchFromTenant(tenant),
     tenantId: tenant?.id ?? '',
-    systemId: tenant?.systemId ?? '',
+    systemId: tenant ? activeTenantSystemId(tenant) : '',
     baselineConfiguration: changeRequestBaselineConfigurationFromTenant(tenant),
   }
 }
@@ -161,13 +167,13 @@ export function changeRequestRequirementWithTenantBaseline(
   }
 }
 
-export function createStandardRenewalRequirement(index: number, tenant?: Tenant, warrantyRecord?: WarrantyRecord): StandardRenewalRequirement {
+export function createStandardRenewalRequirement(index: number, tenant?: Tenant, warrantyRecord?: WarrantyRecord, requirementId = generatedRequirementId(index)): StandardRenewalRequirement {
   return {
     id: `req-${crypto.randomUUID()}`,
-    requirementId: `C-${String(index + 1).padStart(3, '0')}`,
+    requirementId,
     ...applicationConfigurationPatchFromTenant(tenant),
     tenantId: tenant?.id ?? '',
-    systemId: tenant?.systemId ?? '',
+    systemId: tenant ? activeTenantSystemId(tenant) : '',
     warrantyRecordId: warrantyRecord?.warrantyRecordId ?? '',
     warrantyStatus: warrantyRecordPatch(warrantyRecord).warrantyStatus ?? tenant?.warrantyStatus ?? 'NOT_SET',
     warrantyEndDate: warrantyRecordPatch(warrantyRecord).warrantyEndDate ?? tenant?.warrantyEndDate ?? null,

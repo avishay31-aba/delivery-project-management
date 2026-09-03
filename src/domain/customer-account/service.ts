@@ -1,6 +1,7 @@
 import { projectDashboardPercent, projectHealthReadModel, projectPortfolioHealthSummary } from '@/domain/project-lifecycle'
 import { requirementCoverageRowsForAccount, requirementCoverageRowsForProject, requirementCoverageSummary, type RequirementCoverageRow } from '@/domain/requirement-coverage'
 import { systemIdentity } from '@/domain/system-inventory'
+import { isTenantOperationallyVisible } from '@/domain/tenant-operations/lifecycle'
 import type { Account, Opportunity, Project, ProjectSystemLink, ProjectTenantLink, SalesManager, System, Tenant } from '@/data/seed.types'
 import { warrantyDashboardSummary, type WarrantyDashboardRow } from '@/domain/warranty-collection'
 import { CUSTOMER_TYPE_LABELS } from './metadata'
@@ -32,15 +33,18 @@ export function accountManagerDisplayName(
 }
 
 export function customerTenantDisplayName(tenant: Tenant): string {
-  return tenant.tenantName || `${tenant.tid} ${tenant.accountName}`.trim()
+  return tenant.tid
 }
 
 export function customerSystems(accountId: string, systems: System[]): System[] {
-  return systems.filter((system) => system.accountId === accountId)
+  return systems.filter((system) => {
+    const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
+    return system.accountId === accountId && !status.includes('cancel')
+  })
 }
 
 export function customerTenants(accountId: string, tenants: Tenant[]): Tenant[] {
-  return tenants.filter((tenant) => tenant.accountId === accountId)
+  return tenants.filter((tenant) => tenant.accountId === accountId && isTenantOperationallyVisible(tenant))
 }
 
 export function customerSystemCount(accountId: string, systems: System[]): number {
@@ -59,10 +63,6 @@ export function customerTidList(accountId: string, tenants: Tenant[]): string {
   return joinCustomerPortfolioValues(customerTenants(accountId, tenants).map((tenant) => tenant.tid))
 }
 
-export function customerTenantNameList(accountId: string, tenants: Tenant[]): string {
-  return joinCustomerPortfolioValues(customerTenants(accountId, tenants).map(customerTenantDisplayName))
-}
-
 export function customerOpportunities(accountId: string, opportunities: Opportunity[]): Opportunity[] {
   return opportunities.filter((opportunity) => opportunity.accountId === accountId)
 }
@@ -70,6 +70,7 @@ export function customerOpportunities(accountId: string, opportunities: Opportun
 export function customerProjects(account: Account, opportunities: Opportunity[], projects: Project[]): Project[] {
   const opportunityIds = new Set(customerOpportunities(account.id, opportunities).map((opportunity) => opportunity.opportunityId))
   return projects.filter((project) => {
+    if (project.progressStatus === 'CANCELLED') return false
     if (project.opportunityId && opportunityIds.has(project.opportunityId)) return true
     return project.accountName === account.accountName
   })

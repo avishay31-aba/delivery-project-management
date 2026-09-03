@@ -28,6 +28,8 @@ Systems Workspace uses tabs/views for:
 
 These are views of System, not separate Business Objects or separate sidebar workspaces.
 
+Allocated Systems is a current Project-allocation view keyed by SID. It shows each allocated System instance, including Reused Internal System allocations, and must not collapse rows by MID. Production Inventory is the non-Cancelled, currently unallocated Production System inventory view. Reused Internal Systems is the MID/resource inventory view and includes every non-Cancelled reusable internal resource regardless of whether it is available, occupied, Demo, Training, Support, or otherwise in use.
+
 Existing approved System form layout, spacing, field placement, table density, and workflow are product assets and must be preserved unless explicitly changed by the Product Owner.
 
 ## 4. Form Mode Behavior

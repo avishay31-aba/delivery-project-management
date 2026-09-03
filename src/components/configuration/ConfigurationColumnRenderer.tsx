@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { RequiredFieldMarker } from '@/components/ui/FormField'
 import type { SharedFieldMetadata } from '@/domain/application-configuration'
 import {
   applicationConfigurationCategoryLabel,
@@ -27,7 +28,7 @@ export function configurationCellValue(record: Record<string, unknown>, field: S
 export function renderConfigurationColumnHeader(field: SharedFieldMetadata): ReactNode {
   return (
     <>
-      <span>{field.label}</span>
+      <span>{field.label}{field.required ? <RequiredFieldMarker /> : null}</span>
       <span className="block text-xs font-normal text-sf-text-muted">{configurationColumnGroupLabel(field)}</span>
     </>
   )

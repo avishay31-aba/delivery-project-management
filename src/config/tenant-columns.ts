@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon, WarrantyStatusPresentation } from '@/components/ui'
 import type { Account, Opportunity, Project, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
-import { effectiveTenantOperationalMode, tenantActivePocProject, tenantDashboardProjectPids, tenantDashboardRequirementIds, tenantDerivedWarrantyContractStatus } from '@/domain/tenant-operations'
+import { effectiveTenantOperationalMode, tenantActivePocProject, tenantDashboardProjectPids, tenantDashboardRequirementIds, tenantDerivedWarrantyContractStatus, tenantOriginProjectPid, tenantOriginalProject } from '@/domain/tenant-operations'
 import { warrantyCollectionReadModel } from '@/domain/warranty-collection'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
@@ -69,12 +69,20 @@ export function createTenantColumns(
       render: (row) => createElement(BusinessIdLink, { objectType: 'SYSTEM', businessId: sidForTenant(row, systems) }, sidForTenant(row, systems)),
     },
     {
+      id: 'originProject',
+      label: 'Origin Project',
+      getValue: tenantOriginProjectPid,
+      render: (row) => createElement(BusinessIdLink, { objectType: 'PROJECT', businessId: tenantOriginProjectPid(row) }, tenantOriginProjectPid(row)),
+    },
+    {
       id: 'pid',
-      label: 'PID',
+      label: 'PIDs',
       getValue: (row) => tenantDashboardProjectPids(row, projects, projectTenants),
       render: (row) => createElement(BusinessIdListLinks, { objectType: 'PROJECT', businessIds: tenantDashboardProjectPids(row, projects, projectTenants) }),
     },
     { id: 'tenantType', label: 'Tenant Type', getValue: (row) => row.tenantType === 'PENLINK_INTERNAL' ? 'Internal' : row.tenantType === 'POC' ? 'POC' : 'Customer' },
+    { id: 'originalProjectType', label: 'Project Type', getValue: (row) => tenantOriginalProject(row, projects, projectTenants)?.mainType ?? '' },
+    { id: 'originalProjectSubType', label: 'Project Sub Type', getValue: (row) => tenantOriginalProject(row, projects, projectTenants)?.subType ?? '' },
     { id: 'accountName', label: 'Account Name', getValue: (row) => accountForTenant(row)?.accountName ?? row.accountName },
     { id: 'region', label: 'Region', getValue: regionForTenant },
     {
@@ -92,7 +100,7 @@ export function createTenantColumns(
         tooltip: `Tenant warranty status: ${tenantDerivedWarrantyContractStatus(row).label}`,
       }) : '',
     },
-    { id: 'requirementId', label: 'Requirement ID', getValue: (row) => tenantDashboardRequirementIds(row, projects, projectTenants, opportunities) },
+    { id: 'requirementId', label: 'Requirement IDs', getValue: (row) => tenantDashboardRequirementIds(row, projects, projectTenants, opportunities) },
     tenantRuntimeColumn('productType', { id: 'product', label: 'Product', editable: true, editKey: 'productType' }),
     {
       id: 'systemUrl',
@@ -129,10 +137,10 @@ export function createTenantColumns(
     { id: 'standardMonitors', label: 'Std. Monitors', getValue: (row) => row.standardMonitors ?? '' },
     { id: 'fullMonitors', label: 'Full Monitors', getValue: (row) => row.fullMonitors ?? '' },
     { id: 'topicMonitors', label: 'Topic Monitors', getValue: (row) => row.topicMonitors ?? '' },
+    { id: 'aiFeatures', label: 'AI Features', getValue: (row) => joinValues(row.aiFeatures) },
     { id: 'apiEnabled', label: 'API Enabled', getValue: (row) => row.apiEnabled ?? '' },
     { id: 'apiDailyQty', label: 'API Daily Qty', getValue: (row) => row.apiDailyQty ?? '' },
     { id: 'apiMonthlyQty', label: 'API Monthly Qty', getValue: (row) => row.apiMonthlyQty ?? '' },
-    { id: 'aiFeatures', label: 'AI Features', getValue: (row) => joinValues(row.aiFeatures) },
     { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
     { id: 'warrantyInitialDate', label: 'Warranty Initial Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? initialWarranty(row)?.initialWarrantyDate ?? '' : '', semanticType: 'date' },

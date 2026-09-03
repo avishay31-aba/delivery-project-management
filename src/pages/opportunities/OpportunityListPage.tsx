@@ -4,8 +4,8 @@ import { DataDashboard } from '@/components/dashboard'
 import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/components/record'
 import { createOpportunityColumns } from '@/config/opportunity-columns'
 import { useAppStore } from '@/store/useAppStore'
-import { opportunityReference } from '@/domain/business-reference'
 import { OPPORTUNITY_DASHBOARD_COLOR_LEGEND, opportunityDashboardRowClassName } from '@/domain/opportunity-lifecycle'
+import { opportunityReference } from '@/domain/business-reference'
 
 export function OpportunityListPage() {
   const navigate = useNavigate()
@@ -16,7 +16,6 @@ export function OpportunityListPage() {
   const salesManagers = useAppStore((state) => state.salesManagers)
   const systems = useAppStore((state) => state.systems)
   const tenants = useAppStore((state) => state.tenants)
-  const createOpportunity = useAppStore((state) => state.createOpportunity)
   const updateOpportunity = useAppStore((state) => state.updateOpportunity)
   const columns = useMemo(
     () => createOpportunityColumns(accounts, salesManagers, systems, tenants),
@@ -39,9 +38,7 @@ export function OpportunityListPage() {
             type="button"
             className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
             onClick={() => {
-              const opportunity = createOpportunity('DELIVERY', 'NEW')
-              const routePath = opportunityReference(opportunity).routePath
-              if (routePath) navigate(routePath, { state: { returnTo, mode: 'edit', newRecordSession: true } })
+              navigate('/opportunities/new', { state: { returnTo, mode: 'edit', newRecordSession: true } })
             }}
           >
             + New Opportunity

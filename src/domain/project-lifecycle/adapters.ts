@@ -27,6 +27,8 @@ export function projectSavePatch(project: Project): Partial<Project> {
     documents: project.documents ?? [],
     projectComments: project.projectComments ?? '',
     deletionReason: project.deletionReason ?? '',
+    cancellationRequested: project.cancellationRequested ?? 'NO',
+    cancellationReason: project.cancellationReason ?? '',
   }
 }
 
@@ -62,7 +64,7 @@ export function projectStatusFromTaskCompletion(project: Pick<Project, 'tasks'>)
 }
 
 export function applyProjectLifecycleStatus(project: Project): Project {
-  if (project.progressStatus === 'DELETED') return project
+  if (project.progressStatus === 'DELETED' || project.progressStatus === 'CANCELLED') return project
   const progressStatus = projectStatusFromTaskCompletion(project)
   return progressStatus === project.progressStatus ? project : { ...project, progressStatus }
 }
@@ -80,7 +82,13 @@ export function normalizeProjectLifecycleProject(project: Project): Project {
     pocEndDate: project.pocEndDate ?? null,
     region,
     timeGroup: project.timeGroup ?? '',
-    progressStatus: project.progressStatus === 'DELETED' ? 'DELETED' : projectStatusFromTaskCompletion(project),
+    progressStatus: project.progressStatus === 'DELETED' || project.progressStatus === 'CANCELLED'
+      ? project.progressStatus
+      : projectStatusFromTaskCompletion(project),
+    cancellationRequested: 'NO',
+    cancellationReason: project.cancellationReason ?? '',
+    cancellationHistory: project.cancellationHistory ?? [],
+    cancellationPreviousProgressStatus: project.cancellationPreviousProgressStatus ?? null,
   }
 }
 
@@ -108,6 +116,10 @@ export function createStandaloneProject(nextPid: string, now: string): Project {
     deletionReason: '',
     deletionHistory: [],
     deletionPreviousProgressStatus: null,
+    cancellationRequested: 'NO',
+    cancellationReason: '',
+    cancellationHistory: [],
+    cancellationPreviousProgressStatus: null,
     projectComments: '',
     documents: [],
     createdAt: now,

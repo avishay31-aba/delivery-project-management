@@ -15,15 +15,20 @@ import {
   OperationalStatusIcon,
   OperationalStatusSelect,
   PlaceholderCard,
+  RichTextContent,
+  RichTextEditor,
   SaveButtonLabel,
   StatusBadge,
   WarrantyStatusPresentation,
   formMessageClassName,
+  hasCancellationValidationError,
+  validationControlClassName,
 } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import type { InfrastructureItem, InfrastructureItemProperties, InfrastructureTokenProperty, InfrastructureVmProperty, ReferenceDataRecord, ReferenceDataType, YesNo } from '@/data/seed.types'
+import type { InfrastructureItem, InfrastructureItemProperties, InfrastructureTokenProperty, InfrastructureVmProperty, ReferenceDataRecord, ReferenceDataType, System, YesNo } from '@/data/seed.types'
 import {
   ADD_NEW_REFERENCE_OPTION,
+  INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS,
   INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS,
   INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE,
   INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE,
@@ -60,13 +65,14 @@ import {
   validateInfrastructureItemDraft,
 } from '@/domain/infrastructure-item'
 import { activityEventsForObject } from '@/domain/activity-log'
-import { reserveBusinessId } from '@/domain/business-identity'
-import { infrastructureItemReference } from '@/domain/business-reference'
+import { previewBusinessIdFromCounter } from '@/domain/business-identity'
+import { infrastructureItemReference, systemBusinessId } from '@/domain/business-reference'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { routeMode } from '@/utils/route-mode'
+import { richTextIsEmpty } from '@/domain/rich-text'
 import { useAppStore } from '@/store/useAppStore'
 
 type InfrastructureTab = 'properties' | 'linkedSystems' | 'documents' | 'activity'
@@ -173,9 +179,11 @@ export function InfrastructureFormPage() {
   const projects = useAppStore((state) => state.projects)
   const tenants = useAppStore((state) => state.tenants)
   const activityEvents = useAppStore((state) => state.activityEvents)
+  const idCounters = useAppStore((state) => state.idCounters)
   const createReferenceDataRecord = useAppStore((state) => state.createReferenceDataRecord)
   const createInfrastructureItem = useAppStore((state) => state.createInfrastructureItem)
   const updateInfrastructureItem = useAppStore((state) => state.updateInfrastructureItem)
+  const unlinkInfrastructureItemFromSystem = useAppStore((state) => state.unlinkInfrastructureItemFromSystem)
 
   const ownerOptions = infrastructureOwners(referenceData)
   const savedItem = useMemo(
@@ -184,8 +192,11 @@ export function InfrastructureFormPage() {
   )
   const newInfrastructureDraft = useMemo(() => {
     if (!isNew) return null
-    return createInfrastructureDraft(undefined, reserveBusinessId('infrastructureItem', infrastructureItems.map((item) => item.infrastructureId)))
-  }, [infrastructureItems, isNew])
+    return createInfrastructureDraft(
+      undefined,
+      previewBusinessIdFromCounter('infrastructureItem', idCounters, infrastructureItems.map((item) => item.infrastructureId)),
+    )
+  }, [idCounters, infrastructureItems, isNew])
   const initialDraft = useMemo(
     () => draftWithDefaultOwner(savedItem ? cloneInfrastructureItem(savedItem) : newInfrastructureDraft ?? createInfrastructureDraft(), ownerOptions),
     [newInfrastructureDraft, ownerOptions, savedItem],
@@ -249,6 +260,19 @@ export function InfrastructureFormPage() {
     const nextDraft = { ...draft, ...patch }
     setDraft(nextDraft)
     if (hasAttemptedSave) setMessages(validateInfrastructureItemDraft(nextDraft, infrastructureItems, referenceData))
+  }
+
+  function unlinkLinkedSystem(system: System) {
+    if (isViewMode || isNew) return
+    const systemId = systemBusinessId(system)
+    if (!window.confirm(`Unlink Infrastructure Item ${draft.infrastructureId} from System ${systemId}?`)) return
+    const result = unlinkInfrastructureItemFromSystem(draft.id, system.id)
+    if (!result.ok) {
+      setMessages([result.message])
+      return
+    }
+    updateDraft({ linkedSystemIds: draft.linkedSystemIds.filter((id) => id !== system.id) })
+    setMessages([`Infrastructure Item ${draft.infrastructureId} unlinked from System ${systemId}.`])
   }
 
   function updateProperties(patch: Partial<InfrastructureItemProperties>) {
@@ -330,9 +354,24 @@ export function InfrastructureFormPage() {
   function save() {
     setHasAttemptedSave(true)
     const errors = validateInfrastructureItemDraft(draft, infrastructureItems, referenceData)
+    if (draft.cancellationRequested === 'YES' && linkedSystems.length > 0) {
+      const linkedSystemIds = linkedSystems.map((system) => ('sid' in system && system.sid) || ('machineId' in system && system.machineId) || system.id)
+      errors.push(
+        linkedSystemIds.length === 1
+          ? `Infrastructure Item is currently linked to system ${linkedSystemIds[0]}. Unlink the Infrastructure Item from the system before cancelling it.`
+          : `Infrastructure Item is currently linked to systems: ${linkedSystemIds.join('; ')}. Unlink the Infrastructure Item from all systems before cancelling it.`,
+      )
+    }
+    if (draft.cancellationRequested === 'YES' && richTextIsEmpty(draft.cancellationReason ?? '')) {
+      errors.push('Cancellation Reason is required.')
+    }
     if (errors.length > 0) {
       setMessages(errors)
       return
+    }
+    if (draft.cancellationRequested === 'YES' && (draft.maintenanceTasks ?? []).length > 0) {
+      const accepted = window.confirm(`Cancelling this Infrastructure Item will remove all Maintenance Tasks associated with this item from the Maintenance Calendar and Maintenance Task Dashboard.\n\nAffected tasks: ${draft.maintenanceTasks.length}\n\nContinue?`)
+      if (!accepted) return
     }
     setIsSaving(true)
     const result = isNew ? createInfrastructureItem(draft) : updateInfrastructureItem(draft.id, draft)
@@ -346,6 +385,24 @@ export function InfrastructureFormPage() {
     setMessages([result.message])
     const routePath = infrastructureItemReference(result.record).routePath
     if (routePath) navigate(routePath, { replace: true, state: { mode: 'view', returnTo } })
+  }
+
+  function restoreCancelledInfrastructureItem() {
+    if (!savedItem) return
+    const previousStatus = savedItem.cancellationPreviousOperationalStatus ?? 'Active'
+    const result = updateInfrastructureItem(savedItem.id, {
+      ...savedItem,
+      operationalStatus: previousStatus,
+      cancellationRequested: 'NO',
+      cancellationReason: '',
+      cancellationPreviousOperationalStatus: null,
+    })
+    if (!result.ok || !result.record) {
+      setMessages([result.message])
+      return
+    }
+    resetDraft(cloneInfrastructureItem(result.record))
+    setMessages([`Infrastructure Item ${result.record.identifier} restored to ${previousStatus}.`])
   }
 
   function cancel() {
@@ -465,6 +522,8 @@ export function InfrastructureFormPage() {
   function renderHeader() {
     const deletionHistory = infrastructureDeletionHistory(draft)
     const isDeletedLifecycleState = draft.operationalStatus === INFRASTRUCTURE_DELETED_OPERATIONAL_STATUS
+    const isCancelledLifecycleState = draft.operationalStatus === INFRASTRUCTURE_CANCELLED_OPERATIONAL_STATUS
+    const latestCancellation = (draft.cancellationHistory ?? []).at(-1)
     return (
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Header</h2>
@@ -479,7 +538,7 @@ export function InfrastructureFormPage() {
             </div>
           </FormField>
           <FormField label="Operational Status" required controlWidthClassName={WIDE_FIELD_WIDTH}>
-            {isDeletedLifecycleState ? (
+            {isDeletedLifecycleState || isCancelledLifecycleState ? (
               <HeaderReadonlyValue>
                 <OperationalStatusIcon status={draft.operationalStatus} showLabel />
               </HeaderReadonlyValue>
@@ -507,6 +566,61 @@ export function InfrastructureFormPage() {
               <MaintenanceStatusPresentation status={infrastructureMaintenanceStatusesFromTasks(draft)} />
             </div>
           </FormField>
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {isCancelledLifecycleState ? (
+            <button
+              type="button"
+              className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt disabled:opacity-50"
+              onClick={restoreCancelledInfrastructureItem}
+            >
+              Restore
+            </button>
+          ) : (
+            <FormField label="Cancel Infrastructure Item" controlWidthClassName={WIDE_FIELD_WIDTH}>
+              <select
+                className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm', validationControlClassName(draft.cancellationRequested === 'YES' && hasCancellationValidationError(messages))].filter(Boolean).join(' ')}
+                value={draft.cancellationRequested ?? 'NO'}
+                disabled={isViewMode}
+                onChange={(event) => updateDraft({ cancellationRequested: event.target.value as InfrastructureItem['cancellationRequested'] })}
+              >
+                <option value="NO">No</option>
+                <option value="YES">Yes</option>
+              </select>
+            </FormField>
+          )}
+          {isCancelledLifecycleState ? (
+            <>
+              <FormField label="Cancellation Timestamp" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+                <HeaderReadonlyValue><DateTimeValue value={latestCancellation?.timestamp ?? draft.updatedAt} semanticType="datetime" /></HeaderReadonlyValue>
+              </FormField>
+              <FormField label="Cancelled By" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+                <HeaderReadonlyValue>{latestCancellation?.deletedBy ?? '-'}</HeaderReadonlyValue>
+              </FormField>
+              <FormField label="Cancellation Reason" controlWidthClassName={WIDE_FIELD_WIDTH}>
+                <HeaderReadonlyValue><RichTextContent value={latestCancellation?.reason ?? draft.cancellationReason ?? ''} /></HeaderReadonlyValue>
+              </FormField>
+            </>
+          ) : draft.cancellationRequested === 'YES' ? (
+            <>
+              <FormField label="Cancellation Timestamp" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+                <HeaderReadonlyValue><DateTimeValue value={new Date().toISOString()} semanticType="datetime" /></HeaderReadonlyValue>
+              </FormField>
+              <FormField label="Cancelled By" controlWidthClassName={STANDARD_FIELD_WIDTH}>
+                <HeaderReadonlyValue>Current User</HeaderReadonlyValue>
+              </FormField>
+              <FormField label="Cancellation Reason" controlWidthClassName={WIDE_FIELD_WIDTH} required error={messages.find((message) => message.includes('Cancellation Reason'))}>
+                <div className={['rounded', validationControlClassName(draft.cancellationRequested === 'YES' && hasCancellationValidationError(messages))].filter(Boolean).join(' ')}>
+                  <RichTextEditor
+                    value={draft.cancellationReason ?? ''}
+                    onChange={(value) => updateDraft({ cancellationReason: value })}
+                    minHeightClassName="min-h-16"
+                    toolbarMode="focus"
+                  />
+                </div>
+              </FormField>
+            </>
+          ) : null}
         </div>
         <div className="flex flex-nowrap items-start gap-3">
           <DeletionHistoryField
@@ -783,6 +897,15 @@ export function InfrastructureFormPage() {
             {status || '-'}
           </span>
         )}
+        actions={(system) => !isViewMode ? (
+          <button
+            type="button"
+            className="rounded border border-sf-border bg-white px-2 py-1 text-xs font-semibold hover:bg-sf-surface-alt"
+            onClick={() => unlinkLinkedSystem(system)}
+          >
+            Unlink
+          </button>
+        ) : null}
       />
     )
   }

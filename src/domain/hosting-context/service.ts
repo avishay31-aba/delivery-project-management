@@ -63,7 +63,7 @@ export function usedRegionForCloudRegion(cloudRegion: string | null | undefined)
   const normalized = String(cloudRegion ?? '').trim().toLocaleLowerCase()
   if (!normalized) return ''
   if (normalized.startsWith('us-') || normalized.startsWith('ca-') || normalized.startsWith('usgov') || normalized.includes(' us') || normalized.includes('canada')) return 'NA'
-  if (normalized.startsWith('sa-') || normalized.includes('brazil')) return 'NA'
+  if (normalized.startsWith('sa-') || normalized.includes('brazil')) return 'LATAM'
   if (
     normalized.startsWith('eu-') ||
     normalized.startsWith('af-') ||

@@ -9,7 +9,6 @@ import {
   customerSidList,
   customerSystemCount,
   customerTenantCount,
-  customerTenantNameList,
   customerTidList,
   customerTypeLabel,
   customerWarrantySummary,
@@ -61,11 +60,6 @@ export function createCustomerColumns(
       label: CUSTOMER_ACCOUNT_FIELD_LABELS.tids,
       getValue: (row) => customerTidList(row.id, tenants),
       render: (row) => createElement(BusinessIdListLinks, { objectType: 'TENANT', businessIds: customerTidList(row.id, tenants) }),
-    },
-    {
-      id: 'tenantNames',
-      label: CUSTOMER_ACCOUNT_FIELD_LABELS.tenantNames,
-      getValue: (row) => customerTenantNameList(row.id, tenants),
     },
     {
       id: 'warrantySummary',

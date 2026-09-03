@@ -5,7 +5,7 @@ import type { ActivityEvent } from '@/domain/activity-log'
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
 export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL'
 export type WorkItemStatus = 'OPEN' | 'DONE'
-export type ProgressStatus = WorkItemStatus | 'DELETED'
+export type ProgressStatus = WorkItemStatus | 'DELETED' | 'CANCELLED'
 export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
 export type OpportunityType = ProjectMainType
 export type OpportunitySubType = ProjectSubType | 'FREE' | 'PAID'
@@ -160,6 +160,10 @@ export interface Project {
   deletionReason?: string
   deletionHistory?: ProjectDeletionHistoryEntry[]
   deletionPreviousProgressStatus?: WorkItemStatus | null
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationHistory?: ProjectDeletionHistoryEntry[]
+  cancellationPreviousProgressStatus?: WorkItemStatus | null
   projectComments?: string
   milestoneTemplateId?: string
   milestones?: ProjectMilestone[]
@@ -253,7 +257,7 @@ export interface OpportunityRequirementBase {
   webloc: number | null
   webeye: number | null
   ingest: number | null
-  blockchain: YesNo
+  blockchain: number | null
   crossSystemFeatures: string[]
   apiEnabled: YesNo
   apiDailyQty: number | null
@@ -368,6 +372,11 @@ export interface System {
   timeGroupGovernanceTenantId?: string
   timeGroupAlert?: string
   operationalStatus: string
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationAt?: string | null
+  cancelledBy?: string | null
+  cancellationPreviousOperationalStatus?: string | null
   remarks?: RemarkRecord[]
   owners?: OwnerRecord[]
   configurationHistory?: ConfigurationHistoryRecord[]
@@ -382,22 +391,30 @@ export interface System {
 export interface Tenant {
   id: string
   tid: string
-  tenantName?: string
   accountId: string
   systemId: string
   deliveryPid?: string
   tenantType: TenantType
   accountName: string
   country: string
+  state?: string
   timeGroup: string
   operationalStatus: string
   lastManualOperationalStatus?: string
+  individualLifecyclePreviousOperationalStatus?: string | null
+  systemForcedPreviousOperationalStatus?: string | null
+  systemForcedBySystemId?: string | null
+  cancellationReason?: string
+  cancellationAt?: string | null
+  cancelledBy?: string | null
   contractStatus?: TenantContractStatus
   hostedSystemHistory?: TenantHostedSystemHistory[]
   tenantFormType?: TenantFormType
   hostedSystemId?: string
   hostingSid?: string
   sourceRequirementId?: string
+  releasedRequirementId?: string | null
+  requirementHistory?: TenantRequirementHistoryRecord[]
   configuration?: TenantConfiguration
   hostingSnapshot?: TenantHostingSnapshot
   engagementCircle?: EngagementCircleContact[]
@@ -433,7 +450,7 @@ export interface Tenant {
   webloc?: number | null
   webeye?: number | null
   ingest?: number | null
-  blockchain?: YesNo
+  blockchain?: number | null
   crossSystemFeatures?: string[]
   apiEnabled?: YesNo
   apiDailyQty?: number | null
@@ -472,7 +489,7 @@ export interface TenantConfiguration {
   webloc: number | null
   webeye: number | null
   ingest: number | null
-  blockchain: YesNo
+  blockchain: number | null
   crossSystemFeatures: string[]
   apiEnabled: YesNo
   apiDailyQty: number | null
@@ -498,6 +515,17 @@ export interface TenantHostingSnapshot {
   csp: string
   awsRegion: string
   azureRegion: string
+}
+
+export interface TenantRequirementHistoryRecord {
+  id: string
+  pid: string
+  projectId: string
+  requirementId: string
+  relationshipType: RequirementType
+  status: 'CURRENT' | 'RELEASED' | 'HISTORICAL'
+  startedAt: string
+  endedAt?: string | null
 }
 
 export interface TenantRemark {
@@ -610,7 +638,7 @@ export interface ReferenceDataRecord {
 }
 
 export type InfrastructureOwner = 'Penlink' | 'Agent' | 'Customer'
-export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew' | 'Deleted'
+export type InfrastructureOperationalStatus = 'Active' | 'Obsolete' | 'Will Not Renew' | 'Deleted' | 'Cancelled'
 export type InfrastructureMaintenanceStatus = 'None' | 'Planned' | 'Pending' | 'Overdue' | 'Delayed' | 'Not Set Yet' | 'Current' | 'Expired' | 'No Warranty' | 'Obsolete'
 export type InfrastructureManualWarrantyStatus = 'NO_WARRANTY' | 'OBSOLETE'
 export type InfrastructureWarrantyStatus = 'NOT_SET' | 'PLANNED' | 'VALID' | 'PENDING' | 'EXPIRED' | InfrastructureManualWarrantyStatus
@@ -749,6 +777,10 @@ export interface InfrastructureItem {
   deletionReason?: string
   deletionHistory?: InfrastructureDeletionHistoryEntry[]
   deletionPreviousOperationalStatus?: InfrastructureOperationalStatus | null
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationHistory?: InfrastructureDeletionHistoryEntry[]
+  cancellationPreviousOperationalStatus?: InfrastructureOperationalStatus | null
   maintenanceStatus: InfrastructureMaintenanceStatus
   linkedSystemIds: string[]
   initialWarrantyStartDate: string | null
@@ -845,6 +877,11 @@ export interface ProductionSystemInventoryItem {
   timeGroupAlert?: string
   linkedProjects?: string[]
   operationalStatus: string
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationAt?: string | null
+  cancelledBy?: string | null
+  cancellationPreviousOperationalStatus?: string | null
   tenantCount: number
   documents?: DocumentRecord[]
   currentVersionUpdateId?: string | null
@@ -867,7 +904,7 @@ export interface ProductionSystemInventoryItem {
   webloc?: number | null
   webeye?: number | null
   ingest?: number | null
-  blockchain?: YesNo
+  blockchain?: number | null
   crossSystemFeatures?: string[]
   apiEnabled?: YesNo
   apiDailyQty?: number | null
@@ -927,7 +964,7 @@ export interface ReusedInternalSystem {
   webloc?: number | null
   webeye?: number | null
   ingest?: number | null
-  blockchain?: YesNo
+  blockchain?: number | null
   crossSystemFeatures?: string[]
   apiEnabled?: YesNo
   apiDailyQty?: number | null
@@ -936,6 +973,11 @@ export interface ReusedInternalSystem {
   additionalFeatures?: string[]
   alerts: string[]
   operationalStatus: string
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationAt?: string | null
+  cancelledBy?: string | null
+  cancellationPreviousOperationalStatus?: string | null
   remarks?: RemarkRecord[]
   owners?: OwnerRecord[]
   configurationHistory?: ConfigurationHistoryRecord[]

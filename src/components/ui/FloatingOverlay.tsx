@@ -16,6 +16,7 @@ export interface FloatingOverlayPosition {
   top: number
   width: number
   maxHeight: number
+  clipped: boolean
   placement: 'top' | 'bottom'
 }
 
@@ -38,7 +39,8 @@ export function calculateFloatingOverlayPosition(
   const placement: FloatingOverlayPosition['placement'] =
     spaceBelow >= preferredHeight || spaceBelow >= spaceAbove ? 'bottom' : 'top'
   const availableHeight = Math.max(MIN_POPUP_HEIGHT, placement === 'bottom' ? spaceBelow : spaceAbove)
-  const maxHeight = Math.min(preferredHeight, availableHeight)
+  const clipped = preferredHeight > availableHeight
+  const maxHeight = Math.ceil(Math.min(preferredHeight, availableHeight))
   const preferredTop = placement === 'bottom'
     ? triggerRect.bottom + offset
     : triggerRect.top - offset - maxHeight
@@ -51,7 +53,7 @@ export function calculateFloatingOverlayPosition(
     Math.max(VIEWPORT_PADDING, viewportWidth - VIEWPORT_PADDING - width),
   )
 
-  return { left, top, width, maxHeight, placement }
+  return { left, top, width, maxHeight, clipped, placement }
 }
 
 export function useFloatingOverlay<TTrigger extends HTMLElement, TOverlay extends HTMLElement>(
@@ -98,6 +100,7 @@ export function useFloatingOverlay<TTrigger extends HTMLElement, TOverlay extend
         current.top === nextPosition.top &&
         current.width === nextPosition.width &&
         current.maxHeight === nextPosition.maxHeight &&
+        current.clipped === nextPosition.clipped &&
         current.placement === nextPosition.placement
       ) {
         return current
@@ -140,7 +143,7 @@ export function useFloatingOverlay<TTrigger extends HTMLElement, TOverlay extend
         left: position.left,
         top: position.top,
         width: position.width,
-        maxHeight: position.maxHeight,
+        maxHeight: position.clipped ? position.maxHeight : undefined,
       }
     : {
         left: 0,

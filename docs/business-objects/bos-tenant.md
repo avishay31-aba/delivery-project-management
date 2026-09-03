@@ -44,6 +44,12 @@ Tenant Workspace
 
 Tenant Workspace is the complete working environment for the Tenant Business Object.
 
+Tenant Workspace has one dashboard view:
+
+- Tenant Dashboard: all Tenants, including Deleted Tenants and retained legacy Cancelled Tenant records.
+
+Warranty Status values such as `Not Set Yet`, `Under Contract`, and `Out of Contract` are Tenant data/filter/grouping values, not Tenant Workspace dashboard partitions.
+
 Project Workspace and Systems Workspace may show tenant context, but do not own Tenant lifecycle.
 
 ## 7. Data Ownership
@@ -78,11 +84,15 @@ Tenant-owned fields include:
 
 - `id`
 - `tid`
-- `tenantName`
+- There is no Tenant Name business field; Tenant identity is TID plus related Account/System/Project context.
 - `tenantType`
 - `environment`
 - `operationalMode`
 - `operationalStatus`
+- `lastManualOperationalStatus`
+- `individualLifecyclePreviousOperationalStatus`
+- `systemForcedPreviousOperationalStatus`
+- `systemForcedBySystemId`
 - `accountId`
 - `accountName`
 - `country`
@@ -188,7 +198,13 @@ Document fields:
 - Tenant executes inside one current System.
 - Tenant may move between Systems over time where supported.
 - System may host many Tenants.
-- Tenant may be linked to one or more Projects through delivery/project tenant context.
+- Tenant's selected PID/Project ID is the authoritative Origin Project relationship. It is established at creation and retained for Tenant lifetime/history regardless of Operational Status.
+- Individual Tenant Delete stores the exact previous Operational Status for historical audit. System-forced statuses store a separate previous Operational Status and forcing System ID, and are restored only by returning that System to `On`.
+- Tenant manual Operational Status choices are only `Active` and `Access Blocked - Password Reset`; System-derived/forced statuses are read-only.
+- Requirement history records the same-Project Requirement relationships for Customer/POC Tenants. A Requirement may be associated with more than one Tenant; released/historical rows remain visible as history.
+- Requirement IDs are generated from the shared application-wide human-readable sequence (`A-001`, `A-002`, ...). Tenant Requirement pickers for Create and Attach show the same Requirement rows, and rows are not disabled merely because another Tenant already references them.
+- A Tenant's current Project membership is established by active ProjectTenant attachment plus active allocation of the Tenant's hosting System to that Project. Historical Origin Project/PID and Requirement provenance are retained but must not reattach the Tenant to a deallocated Project.
+- Warranty predecessor selection is by searchable TID; retained legacy Cancelled Tenants are excluded and Deleted Tenants remain eligible historical predecessors.
 - Project may create or link Tenant context, but does not own Tenant lifecycle.
 - Tenant may originate from an Opportunity requirement.
 - Tenant may satisfy RequirementCoverage validation output through source requirement linkage and system/project context.
@@ -265,7 +281,8 @@ TenantOperations-owned validations may include:
 - Tenant warranty header display must be sourced from WarrantyCollection, not persisted stale header status if canonical read model exists.
 - Tenant warranty header status is presented only for Customer Tenants and is visually empty for non-Customer Tenants.
 - An active POC Tenant relationship derives header POC Start Date and POC End Date from the active linked POC Project; Tenant does not separately own or persist those presentation values.
-- The Warranty section is composed only for a Customer Tenant with an active relationship to an active Delivery or Renewal Project, regardless of Project subtype.
+- The Warranty section is composed for a Customer Tenant with Tenant-owned Delivery or Renewal Project context, including retained Origin PID/Project, Requirement history, current ProjectTenant membership, or existing Warranty records. The section must remain available for valid Customer Tenants with no Warranty rows yet and must continue to display existing Warranty records even when the Tenant/Project relationship is historical; Add/Edit manageability may still require resolvable Project/Opportunity context. POC, Internal, and other non-Customer Tenants do not qualify.
+- Tenant cancellation is no longer an active Tenant lifecycle workflow. The Tenant form does not expose a `Cancel Tenant` header control, and System/Tenant relationship sections must not expose Cancel or Restore Tenant actions. Retained legacy Cancelled Tenants display read-only `Cancelled By`, `Cancellation Timestamp`, and rich-text `Cancellation Reason` where those historical audit fields exist.
 
 SystemInventory-owned validations may apply to system existence/readiness.
 
@@ -513,6 +530,6 @@ Do not include in V1:
 
 Tenant geography follows its Project/Customer context. Country/State derives Time Zone and active Time Group Settings resolves Time Group; absent Time Zone produces no Time Group and Region is not a fallback. Tenant Configuration is Tenant-owned and editable through its existing save/history boundary, while its Product-to-final-column structure comes from the shared Application Configuration metadata. The hosted System Application Configuration Summary is a distinct read-only System-owned aggregation over the same shared configuration structure.
 
-Tenant Type is not manually editable after creation. The only lifecycle-controlled exception is POC-to-Customer conversion through fulfillment of a Delivery-Upsell or Renewal-Upsell Change Request for a surviving POC Tenant already hosted on a Production System. The same Tenant and System are retained; historical POC Project/Requirement relationships remain intact; the new Upsell Project/Requirement relationships are additional and Activity records the transition. Customer warranty rules apply only after conversion.
+Tenant Type is not manually editable after creation. The only lifecycle-controlled exception is POC-to-Customer conversion through fulfillment of a Delivery-Upsell or Renewal-Upsell Change Request for a surviving POC Tenant already hosted on a customer Production System. The same Tenant and System are retained; historical POC Project/Requirement relationships remain intact; the new Upsell Project/Requirement relationships are additional; Warranty Status becomes `Not Set Yet`; and Activity records the transition. Customer warranty rules apply only after conversion.
 
-The Tenant Dashboard uses one multi-value PID column and one relationship-aware multi-value Requirement ID column, each derived from all currently active Project-Tenant relationships without artificial precedence. Account Name and Region remain Tenant Customer/Account-context values. Its approved default order ends with Warranty Initial/Start/End Date, active POC Project Start/End Date, Update Date, and Creation Date; Creation Date is last.
+The Tenant Dashboard uses `Origin Project` for the Tenant's authoritative selected creation PID/Project and `PIDs` for current Project membership only. `Requirement IDs` displays PID-qualified Requirement history/current rows for Customer/POC Tenants created from Project Tenant Requirements; Requirement ID is not the universal Project owner. Internal Tenants may have a PID with no Requirement ID. Multi-value cells use semicolon-delimited display when multiple values are explicitly modeled. Account Name and Region remain Tenant Customer/Account-context values. Project Type and Project Sub Type immediately follow Tenant Type and describe the Project in which the Tenant was originally created; later Project participation does not overwrite them. Its approved default order ends with Warranty Initial/Start/End Date, active POC Project Start/End Date, Update Date, and Creation Date; Creation Date is last. The Tenant Dashboard includes all Tenants regardless of Warranty Status or Operational Status, including Deleted Tenants and retained legacy Cancelled Tenant records.
