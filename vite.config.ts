@@ -84,9 +84,9 @@ function formatUtcBuildDate(date: Date): string {
   return `${year}-${month}-${day} ${hour}:${minute}:${second} UTC`
 }
 
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [react(), command === 'serve' ? devRuntimeDateFormatPlugin() : undefined].filter(Boolean),
+  plugins: [react(), devRuntimeDateFormatPlugin()],
   define: {
     __DELIVERY_ERP_BUILD_INFO__: JSON.stringify({
       application: 'Delivery ERP',
