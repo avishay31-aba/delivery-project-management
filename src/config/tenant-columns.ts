@@ -5,6 +5,7 @@ import type { Account, Opportunity, Project, ProjectTenantLink, System, Tenant }
 import { effectiveTenantOperationalMode, tenantActivePocProject, tenantDashboardProjectPids, tenantDashboardRequirementIds, tenantDerivedWarrantyContractStatus, tenantOriginProjectPid, tenantOriginalProject } from '@/domain/tenant-operations'
 import { warrantyCollectionReadModel } from '@/domain/warranty-collection'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { useAppStore } from '@/store/useAppStore'
 import { TENANT_OBJECT_DEFINITION } from '@/domain/object-registry'
 import {
@@ -85,6 +86,7 @@ export function createTenantColumns(
     { id: 'originalProjectSubType', label: 'Project Sub Type', getValue: (row) => tenantOriginalProject(row, projects, projectTenants)?.subType ?? '' },
     { id: 'accountName', label: 'Account Name', getValue: (row) => accountForTenant(row)?.accountName ?? row.accountName },
     { id: 'region', label: 'Region', getValue: regionForTenant },
+    { id: 'country', label: 'Country', getValue: (row) => countryDisplayName(row.country) },
     {
       id: 'tenantStatus',
       label: 'Operational Status',
@@ -137,12 +139,12 @@ export function createTenantColumns(
     { id: 'standardMonitors', label: 'Std. Monitors', getValue: (row) => row.standardMonitors ?? '' },
     { id: 'fullMonitors', label: 'Full Monitors', getValue: (row) => row.fullMonitors ?? '' },
     { id: 'topicMonitors', label: 'Topic Monitors', getValue: (row) => row.topicMonitors ?? '' },
+    { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
     { id: 'aiFeatures', label: 'AI Features', getValue: (row) => joinValues(row.aiFeatures) },
+    { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
     { id: 'apiEnabled', label: 'API Enabled', getValue: (row) => row.apiEnabled ?? '' },
     { id: 'apiDailyQty', label: 'API Daily Qty', getValue: (row) => row.apiDailyQty ?? '' },
     { id: 'apiMonthlyQty', label: 'API Monthly Qty', getValue: (row) => row.apiMonthlyQty ?? '' },
-    { id: 'additionalFeatures', label: 'Additional Features', getValue: (row) => joinValues(row.additionalFeatures) },
-    { id: 'additionalSources', label: 'Additional Sources', getValue: (row) => joinValues(row.crossSystemFeatures) },
     { id: 'warrantyInitialDate', label: 'Warranty Initial Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? initialWarranty(row)?.initialWarrantyDate ?? '' : '', semanticType: 'date' },
     { id: 'warrantyStartDate', label: 'Warranty Start Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? currentWarranty(row)?.startDate ?? '' : '', semanticType: 'date' },
     { id: 'warrantyEndDate', label: 'Warranty End Date', getValue: (row) => row.tenantType === 'CUSTOMER' ? currentWarranty(row)?.endDate ?? '' : '', semanticType: 'date' },

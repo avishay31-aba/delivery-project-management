@@ -6,9 +6,10 @@ import {
 import { normalizeBusinessRegion } from '@/domain/business-region'
 import { normalizeOwners } from '@/domain/owners'
 import { normalizeRemarks } from '@/domain/remarks'
+import type { OwnerRecord } from '@/data/seed.types'
 import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalPurposeHistoryRecord, ReusedInternalSystem, System, SystemInventoryRecord } from './types'
 import {
-  REUSED_INTERNAL_PURPOSE_AVAILABLE,
+  REUSED_INTERNAL_PURPOSE_NONE,
   REUSED_INTERNAL_STATUS_AVAILABLE,
   REUSED_INTERNAL_STATUS_OCCUPIED,
   SYSTEM_AVAILABILITY_AVAILABLE,
@@ -22,8 +23,14 @@ import {
   SYSTEM_SOURCE_PRODUCTION,
   SYSTEM_SOURCE_REUSED_INTERNAL,
 } from './metadata'
-import { applyReusedSystemOccupationWindow, reusedInternalMachineIdRouteKey, reusedInternalStatusForPurpose, systemIdentity, systemSource } from './service'
+import { applyReusedSystemOccupationWindow, isReusedInternalManualOccupationPurpose, reusedInternalMachineIdRouteKey, reusedInternalStatusForPurpose, systemIdentity, systemSource } from './service'
 import { reserveBusinessId } from '@/domain/business-identity'
+
+export function normalizeReusedInternalPurpose(value: unknown): ReusedInternalSystem['purpose'] {
+  return value === 'Available' || value === undefined || value === null || value === ''
+    ? REUSED_INTERNAL_PURPOSE_NONE
+    : String(value) as ReusedInternalSystem['purpose']
+}
 
 export function systemDisplayName(record: SystemInventoryRecord): string {
   return `${systemIdentity(record)} - ${record.productType || 'System'}`
@@ -51,9 +58,14 @@ export function normalizeSystemInventoryRecord<T extends SystemInventoryRecord>(
     cancelledBy: record.cancelledBy ?? null,
     cancellationPreviousOperationalStatus: record.cancellationPreviousOperationalStatus ?? null,
     ...('externalInterface' in record || 'vpnEnabled' in record ? { externalInterface: Boolean(record.externalInterface) } : {}),
+    ...(record.source === SYSTEM_SOURCE_PRODUCTION ? { availability: record.availability ?? SYSTEM_AVAILABILITY_AVAILABLE } : {}),
     ...('currentProjectIds' in record ? {
+      purpose: normalizeReusedInternalPurpose(record.purpose),
       purposeHistory: normalizeReusedInternalPurposeHistory(record.purposeHistory),
-      status: reusedInternalStatusForPurpose(record.purpose),
+      status: reusedInternalStatusForPurpose(normalizeReusedInternalPurpose(record.purpose)),
+      occupationStartDate: isReusedInternalManualOccupationPurpose(normalizeReusedInternalPurpose(record.purpose)) && !record.occupationStartDate
+        ? String(record.updatedAt ?? record.createdAt ?? '').slice(0, 10)
+        : record.occupationStartDate ?? null,
     } : {}),
   }
 }
@@ -81,6 +93,7 @@ export function createProductionInventorySystem(sid: string, now: string): Produ
     timeGroup: '',
     timeGroupAlert: '',
     linkedProjects: [],
+    availability: SYSTEM_AVAILABILITY_AVAILABLE,
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
     tenantCount: 0,
     alerts: [],
@@ -115,7 +128,22 @@ function closeOpenPurposeHistory(
     .filter((record) => !record.endDate)
     .sort((a, b) => startedAtValue(b) - startedAtValue(a))[0]
   if (!openRecord) return records
-  return records.map((record) => (record.id === openRecord.id ? { ...record, ...context, endDate } : record))
+  return records.map((record) =>
+    record.id === openRecord.id
+      ? {
+          ...context,
+          ...record,
+          owner: record.owner || context.owner || '',
+          pid: record.pid || context.pid || '',
+          sid: record.sid || context.sid || '',
+          projectName: record.projectName || context.projectName || '',
+          accountName: record.accountName || context.accountName || '',
+          product: record.product || context.product || '',
+          projectStatus: record.projectStatus || context.projectStatus || '',
+          endDate,
+        }
+      : record,
+  )
 }
 
 function createPurposeHistoryRecord(
@@ -129,6 +157,7 @@ function createPurposeHistoryRecord(
     recordId: nextPurposeHistoryRecordId(existingRecords),
     startDate,
     endDate: null,
+    owner: '',
     purposeType,
     pid: '',
     sid: '',
@@ -149,7 +178,8 @@ export function normalizeReusedInternalPurposeHistory(value: unknown): ReusedInt
       recordId: String(record.recordId ?? reserveBusinessId('purposeHistory', value.slice(0, index).map((candidate) => String((candidate as Record<string, unknown>)?.recordId ?? '')))),
       startDate: String(record.startDate ?? record.allocatedAt ?? ''),
       endDate: record.endDate == null ? null : String(record.endDate),
-      purposeType: String(record.purposeType ?? record.purpose ?? ''),
+      owner: String(record.owner ?? ''),
+      purposeType: normalizeReusedInternalPurpose(record.purposeType ?? record.purpose),
       pid: String(record.pid ?? ''),
       sid: String(record.sid ?? ''),
       projectName: String(record.projectName ?? ''),
@@ -176,6 +206,7 @@ export function appendReusedInternalPurposeHistory(
 
 export function purposeHistoryContextFromProject(project: Project, allocatedSystem: System): Partial<ReusedInternalPurposeHistoryRecord> {
   return {
+    owner: purposeHistoryOwnerSnapshot(allocatedSystem.owners),
     pid: project.pid,
     sid: allocatedSystem.sid ?? '',
     projectName: project.opportunityName,
@@ -185,12 +216,37 @@ export function purposeHistoryContextFromProject(project: Project, allocatedSyst
   }
 }
 
-export function updateReusedInternalPurpose(system: ReusedInternalSystem, purpose: ReusedInternalSystem['purpose'], updatedAt: string): ReusedInternalSystem {
-  if (system.purpose === purpose) return { ...system, status: reusedInternalStatusForPurpose(purpose), updatedAt }
+export function purposeHistoryOwnerSnapshot(owners: OwnerRecord[] | undefined): string {
+  const owner = normalizeOwners(owners)[0]
+  if (!owner) return ''
+  return owner.fullName || owner.userName || owner.email || owner.userId || ''
+}
+
+export function updateReusedInternalPurpose(
+  system: ReusedInternalSystem,
+  purpose: ReusedInternalSystem['purpose'],
+  updatedAt: string,
+  context: Partial<ReusedInternalPurposeHistoryRecord> = {},
+): ReusedInternalSystem {
+  const occupationStartDate = isReusedInternalManualOccupationPurpose(purpose) && !system.occupationStartDate
+    ? updatedAt.slice(0, 10)
+    : system.occupationStartDate ?? null
+  if (system.purpose === purpose) {
+    return {
+      ...system,
+      status: reusedInternalStatusForPurpose(purpose),
+      occupationStartDate,
+      updatedAt,
+    }
+  }
   return {
-    ...appendReusedInternalPurposeHistory(system, purpose, updatedAt),
+    ...appendReusedInternalPurposeHistory(system, purpose, updatedAt, {
+      owner: purposeHistoryOwnerSnapshot(system.owners),
+      ...context,
+    }),
     purpose,
     status: reusedInternalStatusForPurpose(purpose),
+    occupationStartDate,
     updatedAt,
   }
 }
@@ -204,7 +260,7 @@ export function occupyReusedInternalSystem(
   projects: Project[] = [],
 ): ReusedInternalSystem {
   const currentProjectIds = Array.from(new Set([...system.currentProjectIds, projectId]))
-  const shouldStartPocOccupation = system.purpose !== SYSTEM_PURPOSE_POC || !system.currentProjectIds.includes(projectId)
+  const shouldStartPocOccupation = system.purpose !== SYSTEM_PURPOSE_POC
   const baseSystem = shouldStartPocOccupation
     ? appendReusedInternalPurposeHistory(system, SYSTEM_PURPOSE_POC, updatedAt, context)
     : system
@@ -226,12 +282,12 @@ export function releaseReusedInternalSystem(
 ): ReusedInternalSystem {
   const currentProjectIds = system.currentProjectIds.filter((candidateProjectId) => candidateProjectId !== projectId)
   const releasedSystem = currentProjectIds.length === 0
-    ? appendReusedInternalPurposeHistory(system, REUSED_INTERNAL_PURPOSE_AVAILABLE, updatedAt, {}, context)
+    ? appendReusedInternalPurposeHistory(system, REUSED_INTERNAL_PURPOSE_NONE, updatedAt, {}, context)
     : system
   return {
     ...releasedSystem,
-    purpose: currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose,
-    status: reusedInternalStatusForPurpose(currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_AVAILABLE : system.purpose),
+    purpose: currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_NONE : system.purpose,
+    status: reusedInternalStatusForPurpose(currentProjectIds.length === 0 ? REUSED_INTERNAL_PURPOSE_NONE : system.purpose),
     currentProjectIds,
     occupationStartDate: currentProjectIds.length === 0 ? null : system.occupationStartDate ?? null,
     occupationEndDate: currentProjectIds.length === 0 ? null : system.occupationEndDate ?? null,
@@ -245,7 +301,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     id: `reused-sys-${crypto.randomUUID()}`,
     machineId: normalizedMachineId,
     source: SYSTEM_SOURCE_REUSED_INTERNAL,
-    purpose: REUSED_INTERNAL_PURPOSE_AVAILABLE,
+    purpose: REUSED_INTERNAL_PURPOSE_NONE,
     status: REUSED_INTERNAL_STATUS_AVAILABLE,
     logo: 'T',
     url: `https://${normalizedMachineId}.example.internal`,
@@ -264,7 +320,7 @@ export function createReusedInternalInventorySystem(machineId: string, now: stri
     occupationStartDate: null,
     occupationEndDate: null,
     currentProjectIds: [],
-    purposeHistory: options.includePurposeHistory === false ? [] : [createPurposeHistoryRecord([], now, REUSED_INTERNAL_PURPOSE_AVAILABLE)],
+    purposeHistory: options.includePurposeHistory === false ? [] : [createPurposeHistoryRecord([], now, REUSED_INTERNAL_PURPOSE_NONE)],
     tenantCount: 0,
     alerts: [],
     operationalStatus: SYSTEM_OPERATIONAL_STATUS_ON,
@@ -352,6 +408,8 @@ export function systemFromReusedInternalAllocation(
   deliveryPid: string,
   tenantIds: string[],
   createdAt: string,
+  occupationStartDate: string | null = null,
+  occupationEndDate: string | null = null,
 ): System {
   return {
     id: systemId,
@@ -377,11 +435,13 @@ export function systemFromReusedInternalAllocation(
     state: '',
     timeGroup: '',
     timeGroupAlert: reusedSystem.timeGroupAlert,
+    occupationStartDate,
+    occupationEndDate,
     operationalStatus: reusedSystem.operationalStatus,
     remarks: [],
     owners: [],
     configurationHistory: [],
-    documents: reusedSystem.documents ?? [],
+    documents: [],
     createdAt,
     updatedAt: createdAt,
   }

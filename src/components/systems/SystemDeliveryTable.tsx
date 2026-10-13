@@ -4,7 +4,7 @@ import type { ProductionSystemInventoryItem, Project, ReusedInternalSystem, Syst
 import { APPLICATION_CONFIGURATION_SUMMARY_FIELDS } from '@/config/application-configuration-fields'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
 import { AlertStatusIcon, BusinessObjectLink, RecordChangeBadge } from '@/components/ui'
-import { projectReference, systemBusinessId, systemReference } from '@/domain/business-reference'
+import { projectReference, routePathForBusinessReference, systemBusinessId, systemReference } from '@/domain/business-reference'
 import { productMismatchPresentation } from '@/domain/status-presentation'
 import { formattedReusedInternalMachineId, systemApplicationConfigurationSummary, tenantCountForSystem } from '@/domain/system-inventory'
 
@@ -88,6 +88,20 @@ function systemRecordRegion(system: SystemDeliveryTableRecord): string {
   return system.timeGroup
 }
 
+function reusedInternalMidReference(system: SystemDeliveryTableRecord) {
+  if (!('machineId' in system) || !system.machineId) return null
+  const businessId = formattedReusedInternalMachineId(system.machineId)
+  return {
+    objectType: 'INTERNAL_REUSED_SYSTEM' as const,
+    internalId: null,
+    businessId,
+    displayLabel: businessId,
+    routePath: routePathForBusinessReference('INTERNAL_REUSED_SYSTEM', businessId),
+    isMissing: false,
+    isStale: false,
+  }
+}
+
 interface SystemDeliveryTableProps {
   systems: SystemDeliveryTableRecord[]
   tenants: Tenant[]
@@ -137,7 +151,7 @@ export function SystemDeliveryTable({
               'Time Group',
               'Used In Region',
               'Operational Status',
-              'Delivery',
+              'Purpose',
               'Product Mismatch',
             ].map((label) => (
               <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
@@ -156,6 +170,7 @@ export function SystemDeliveryTable({
               .map((projectId) => projects.find((candidate) => candidate.id === projectId || candidate.pid === projectId)?.pid)
               .filter((pid): pid is string => Boolean(pid))
             const applicationConfigurationSummary = systemApplicationConfigurationSummary(system as System, tenants) as unknown as Record<string, unknown>
+            const midReference = reusedInternalMidReference(system)
             return [
               <tr key={system.id} className="hover:bg-sf-surface-alt">
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -183,7 +198,11 @@ export function SystemDeliveryTable({
                   </BusinessObjectLink>
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                  {'machineId' in system && system.machineId ? <BusinessObjectLink reference={systemReference(system)}>{formattedReusedInternalMachineId(system.machineId)}</BusinessObjectLink> : ''}
+                  {midReference ? (
+                    <BusinessObjectLink reference={midReference}>
+                      {midReference.businessId}
+                    </BusinessObjectLink>
+                  ) : ''}
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text" title={projectLabels.join('; ')}>
                   <span>

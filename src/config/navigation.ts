@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, FolderKanban, HardDrive, History, Server, Timer, Users } from 'lucide-react'
+import { Bell, BriefcaseBusiness, Building2, CalendarCheck, Database, Flag, FolderKanban, HardDrive, History, MapPinned, Rocket, ShieldCheck, Server, Timer, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export interface NavItem {
@@ -61,6 +61,24 @@ export const consoleNavigation: NavConsoleGroup[] = [
         icon: HardDrive,
         description: 'Global infrastructure item inventory',
       },
+      {
+        label: 'Notifications & Alerts',
+        path: '/notifications-alerts',
+        icon: Bell,
+        description: 'Recipient notifications and current business alerts',
+      },
+      {
+        label: 'Reminders',
+        path: '/reminders',
+        icon: CalendarCheck,
+        description: 'Due-date reminders from remarks and tasks',
+      },
+      {
+        label: 'Version Upgrade Scheduler',
+        path: '/version-upgrades',
+        icon: Rocket,
+        description: 'Coordinate Production System Version and Build upgrades',
+      },
     ],
   },
   {
@@ -73,10 +91,34 @@ export const consoleNavigation: NavConsoleGroup[] = [
         description: 'Operational activity timeline',
       },
       {
+        label: 'Roles & Permissions',
+        path: '/admin/roles-permissions',
+        icon: ShieldCheck,
+        description: 'Role definitions, permissions and notification recipients',
+      },
+      {
+        label: 'Countries',
+        path: '/admin/countries',
+        icon: Flag,
+        description: 'Country, Region and UTC reference data',
+      },
+      {
+        label: 'US States',
+        path: '/admin/us-states',
+        icon: MapPinned,
+        description: 'US State UTC reference data',
+      },
+      {
         label: 'Time Group Settings',
         path: '/admin/time-groups',
         icon: Timer,
         description: 'Time Zone to Time Group reference mapping',
+      },
+      {
+        label: 'Storage Diagnostics',
+        path: '/admin/storage-diagnostics',
+        icon: Database,
+        description: 'Runtime browser storage metadata for QA',
       },
     ],
   },

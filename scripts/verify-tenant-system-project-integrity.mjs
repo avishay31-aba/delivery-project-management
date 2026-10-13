@@ -100,10 +100,10 @@ function requirementProjectCandidates(tenant, projects, opportunities) {
 
 function currentRequirementIdsForTenant(tenant) {
   const history = Array.isArray(tenant.requirementHistory) ? tenant.requirementHistory : []
-  const currentHistoryIds = history
+  const currentHistoryIds = Array.from(new Set(history
     .filter((relationship) => relationship.status === 'CURRENT')
     .map((relationship) => String(relationship.requirementId || '').trim())
-    .filter(Boolean)
+    .filter(Boolean)))
   if (currentHistoryIds.length > 0) return currentHistoryIds
   return [tenant.sourceRequirementId].map((requirementId) => String(requirementId || '').trim()).filter(Boolean)
 }
@@ -318,9 +318,9 @@ const malformedLicenseNumbers = tenantLicenseAudit
   .map((row) => ({ tid: row.tid, licenseNumber: row.licenseNumber }))
 
 const deletedTenantPresentationSafeguards = {
-  activeSummaryUsesHostedTenants: /const hostedTenants = hostedTenantsForSystem\(system\.id, tenants\)/.test(systemServiceSource),
-  systemFormRendersDeletedTenants: /function renderDeletedTenantsSection\(\)/.test(systemFormSource) &&
-    /historicalInactiveTenantsForSystem\(system\.id, tenants\)/.test(systemFormSource),
+  activeSummaryUsesHostedTenants: /const hostedTenants = hostedTenantsForSystemRecord\(system, tenants, allocatedSystems, projectSystems\)/.test(systemServiceSource),
+  systemFormRendersDeletedTenants: /function renderInactiveTenantsSection\(\)/.test(systemFormSource) &&
+    /historicalInactiveTenantsForSystemRecord\(activeRecord, tenants, allocatedSystems, projectSystems\)/.test(systemFormSource),
   systemFormFiltersDeletedOnly: /isTenantDeleted\(tenant\)/.test(systemFormSource),
   systemFormShowsWarrantyWithoutActions: /showWarrantyStatusColumn/.test(systemFormSource) &&
     !/actions=\{[^}]*renderDeletedTenantsSection/.test(systemFormSource),
@@ -366,6 +366,7 @@ assert(systemProjectTenantGaps.length === 0, 'Project-System tenant membership i
 assert(individuallyInactiveWithoutPreviousStatus.length === 0, 'Individually Deleted/Cancelled Tenants are missing previous Operational Status.')
 assert(systemForcedWithoutPreviousStatus.length === 0, 'System-forced Tenants are missing lifecycle provenance.')
 assert(systemForcedInvalidSystem.length === 0, 'System-forced Tenant references a nonexistent forcing System.')
+assert(requirementOccupiedByMultipleTenants.length > 0, 'Canonical seed must include active one-to-many Tenant Requirement coverage.')
 assert(cancelledTenantStillConsumingRequirement.length === 0, 'Cancelled Tenant still consumes a Requirement ID.')
 assert(missingLicenseNumbers.length === 0, 'Tenant License Number source parts are missing.')
 assert(malformedLicenseNumbers.length === 0, 'Tenant License Number format is malformed.')

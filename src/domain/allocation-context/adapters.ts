@@ -1,4 +1,5 @@
 import type {
+  AllocationSource,
   AllocationType,
   ProjectSystemLink,
   ProjectTenantLink,
@@ -12,25 +13,43 @@ export {
 } from '@/domain/system-inventory'
 
 export function normalizeProjectSystemLink(link: ProjectSystemLink): ProjectSystemLink {
+  const deallocatedAt = link.deallocatedAt ?? null
   return {
     ...link,
     tenantIds: Array.isArray(link.tenantIds) ? link.tenantIds : [],
-    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
+    allocationStatus: deallocatedAt ? 'DEALLOCATED' : link.allocationStatus ?? 'ALLOCATED',
     allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
+    allocationSources: normalizeAllocationSources(link.allocationSources),
     sourceMachineId: link.sourceMachineId ? reusedInternalMachineIdRouteKey(link.sourceMachineId) : null,
-    deallocatedAt: link.deallocatedAt ?? null,
+    deallocatedAt,
   }
 }
 
 export function normalizeProjectTenantLink(link: ProjectTenantLink): ProjectTenantLink {
+  const deallocatedAt = link.deallocatedAt ?? null
   return {
     ...link,
     systemId: link.systemId ?? '',
-    allocationStatus: link.allocationStatus ?? 'ALLOCATED',
+    allocationStatus: deallocatedAt ? 'DEALLOCATED' : link.allocationStatus ?? 'ALLOCATED',
     allocationType: link.allocationType ?? 'EXISTING_SYSTEM',
+    allocationSources: normalizeAllocationSources(link.allocationSources),
     allocatedAt: link.allocatedAt ?? '',
-    deallocatedAt: link.deallocatedAt ?? null,
+    deallocatedAt,
   }
+}
+
+export function normalizeAllocationSources(sources: AllocationSource[] | undefined, fallback: AllocationSource[] = ['MANUAL']): AllocationSource[] {
+  const allowed = new Set<AllocationSource>(['MANUAL', 'GRID_B', 'GRID_C'])
+  const normalized = Array.from(new Set((sources ?? fallback).filter((source): source is AllocationSource => allowed.has(source))))
+  return normalized.length > 0 ? normalized : [...fallback]
+}
+
+export function allocationHasAutomaticSource(link: Pick<ProjectSystemLink | ProjectTenantLink, 'allocationSources'>): boolean {
+  return (link.allocationSources ?? ['MANUAL']).some((source) => source === 'GRID_B' || source === 'GRID_C')
+}
+
+export function allocationHasManualSource(link: Pick<ProjectSystemLink | ProjectTenantLink, 'allocationSources'>): boolean {
+  return (link.allocationSources ?? ['MANUAL']).includes('MANUAL')
 }
 
 export function createProjectSystemLink(
@@ -38,7 +57,7 @@ export function createProjectSystemLink(
   systemId: string,
   allocationType: AllocationType,
   allocatedAt: string,
-  options: { tenantIds?: string[]; sourceMachineId?: string | null } = {},
+  options: { tenantIds?: string[]; sourceMachineId?: string | null; allocationSources?: AllocationSource[] } = {},
 ): ProjectSystemLink {
   return {
     id: `alloc-${crypto.randomUUID()}`,
@@ -47,6 +66,7 @@ export function createProjectSystemLink(
     tenantIds: options.tenantIds ?? [],
     allocationStatus: 'ALLOCATED',
     allocationType,
+    allocationSources: normalizeAllocationSources(options.allocationSources),
     sourceMachineId: options.sourceMachineId ? reusedInternalMachineIdRouteKey(options.sourceMachineId) : null,
     allocatedAt,
     deallocatedAt: null,
@@ -59,6 +79,7 @@ export function createProjectTenantLink(
   systemId: string,
   allocationType: AllocationType,
   allocatedAt: string,
+  allocationSources: AllocationSource[] = ['MANUAL'],
 ): ProjectTenantLink {
   return {
     id: `proj-ten-${crypto.randomUUID()}`,
@@ -67,6 +88,7 @@ export function createProjectTenantLink(
     systemId,
     allocationStatus: 'ALLOCATED',
     allocationType,
+    allocationSources: normalizeAllocationSources(allocationSources),
     allocatedAt,
     deallocatedAt: null,
   }

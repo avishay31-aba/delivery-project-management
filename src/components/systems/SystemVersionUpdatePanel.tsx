@@ -1,13 +1,9 @@
 import { type ChangeEvent, useMemo, useState } from 'react'
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
-import type { ReferenceDataRecord, VersionUpdateAttachmentCategory, VersionUpdateRecord } from '@/data/seed.types'
+import { Plus, Save, Trash2, X } from 'lucide-react'
+import type { ReferenceDataRecord, VersionUpgradeRecord, VersionUpdateAttachmentCategory, VersionUpdateRecord } from '@/data/seed.types'
 import { createPendingAttachmentDraft, type PendingAttachmentDraft } from '@/domain/attachment'
 import {
-  activeBuildNumberRecordsForVersion,
-  activeReferenceDataRecords,
   referenceDataRecordById,
-  referenceDataLabel,
-  VERSION_NUMBER_REFERENCE_TYPE,
 } from '@/domain/reference-data'
 import {
   VERSION_UPDATE_ATTACHMENT_CATEGORIES,
@@ -15,13 +11,12 @@ import {
   versionUpdateRowsForSystem,
   type VersionUpdateRow,
 } from '@/domain/system-version-update'
+import { schedulerBuildOptionsForVersion, versionUpgradeCatalog } from '@/domain/version-upgrade-scheduler'
 import { useAppStore } from '@/store/useAppStore'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import { EditableChildObjectActionButton } from '@/components/child-objects'
-import { BusinessIdLink, FileDownloadLink, FormField, ReadonlyField, RichTextContent, RichTextEditor, TableSection } from '@/components/ui'
+import { EditableChildObjectActionButton, editableChildObjectActionButtonClassName } from '@/components/child-objects'
+import { BusinessIdLink, EDIT_ACTION_LABEL, EditActionIcon, FileDownloadLink, FormField, ReadonlyField, RecordHistorySection, RichTextContent, RichTextEditor, TableSection, type RecordHistoryColumn } from '@/components/ui'
 
-type SortKey = 'id' | 'timestamp' | 'userName' | 'mid' | 'sid' | 'versionLabel' | 'buildLabel' | 'emailSentAt' | 'remarks'
-type SortState = { key: SortKey; direction: 'asc' | 'desc' } | null
 type VersionUpdateFieldKey = 'versionNumber' | 'buildNumber' | VersionUpdateAttachmentCategory
 
 interface SystemVersionUpdatePanelProps {
@@ -52,34 +47,34 @@ const EMPTY_DRAFT: VersionUpdateDraft = {
   remarks: '',
 }
 
-function sortValue(row: VersionUpdateRow, key: SortKey): string {
-  const values: Record<SortKey, string> = {
-    id: row.id,
-    timestamp: row.timestamp,
-    userName: row.userName,
-    mid: row.mid,
-    sid: row.sid,
-    versionLabel: row.versionLabel,
-    buildLabel: row.buildLabel,
-    emailSentAt: row.emailSentAt ?? '',
-    remarks: row.remarks.replace(/<[^>]*>/g, ' '),
-  }
-  return values[key].trim().toLocaleLowerCase()
-}
-
 function attachmentFor(row: VersionUpdateRow, category: VersionUpdateAttachmentCategory) {
   return row.record.attachments.find((attachment) => attachment.category === category)
 }
 
-function versionOptions(records: ReferenceDataRecord[], currentId: string): ReferenceDataRecord[] {
-  const active = activeReferenceDataRecords(records, VERSION_NUMBER_REFERENCE_TYPE)
+function versionUpdateSearchText(row: VersionUpdateRow): string {
+  return [
+    row.id,
+    row.timestamp,
+    row.userName,
+    row.mid,
+    row.sid,
+    row.versionLabel,
+    row.buildLabel,
+    row.emailSentAt ?? '',
+    row.remarks.replace(/<[^>]*>/g, ' '),
+    ...VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category) => attachmentFor(row, category)?.fileName ?? ''),
+  ].join(' ')
+}
+
+function versionOptions(records: ReferenceDataRecord[], schedulerRecords: VersionUpgradeRecord[], currentId: string): ReferenceDataRecord[] {
+  const active = versionUpgradeCatalog(records, schedulerRecords).map((option) => option.version)
   const current = referenceDataRecordById(records, currentId)
   if (current && !active.some((record) => record.id === current.id)) return [...active, current]
   return active
 }
 
-function buildOptions(records: ReferenceDataRecord[], versionNumberId: string, currentId: string): ReferenceDataRecord[] {
-  const active = activeBuildNumberRecordsForVersion(records, versionNumberId)
+function buildOptions(records: ReferenceDataRecord[], schedulerRecords: VersionUpgradeRecord[], versionNumberId: string, currentId: string): ReferenceDataRecord[] {
+  const active = schedulerBuildOptionsForVersion(records, schedulerRecords, versionNumberId)
   const current = referenceDataRecordById(records, currentId)
   if (current && current.versionNumberId === versionNumberId && !active.some((record) => record.id === current.id)) return [...active, current]
   return active
@@ -94,11 +89,11 @@ export function SystemVersionUpdatePanel({
   readOnly = false,
 }: SystemVersionUpdatePanelProps) {
   const referenceData = useAppStore((state) => state.referenceData)
+  const versionUpgradeRecords = useAppStore((state) => state.versionUpgradeRecords)
   const versionUpdates = useAppStore((state) => state.versionUpdates)
   const saveVersionUpdate = useAppStore((state) => state.saveVersionUpdate)
   const deleteVersionUpdate = useAppStore((state) => state.deleteVersionUpdate)
   const [draft, setDraft] = useState<VersionUpdateDraft | null>(null)
-  const [sort, setSort] = useState<SortState>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<VersionUpdateFieldKey, string>>>({})
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false)
@@ -107,21 +102,6 @@ export function SystemVersionUpdatePanel({
     () => versionUpdateRowsForSystem(versionUpdates, referenceData, systemId),
     [referenceData, systemId, versionUpdates],
   )
-  const displayedRows = useMemo(() => {
-    if (!sort) return rows
-    return [...rows].sort((first, second) => {
-      const comparison = sortValue(first, sort.key).localeCompare(sortValue(second, sort.key), undefined, { numeric: true, sensitivity: 'base' })
-      return sort.direction === 'asc' ? comparison : -comparison
-    })
-  }, [rows, sort])
-
-  function toggleSort(key: SortKey) {
-    setSort((current) => {
-      if (!current || current.key !== key) return { key, direction: 'asc' }
-      if (current.direction === 'asc') return { key, direction: 'desc' }
-      return null
-    })
-  }
 
   function beginAdd() {
     setDraft({ ...EMPTY_DRAFT, attachments: {} })
@@ -200,25 +180,6 @@ export function SystemVersionUpdatePanel({
   }
 
   function selectVersion(value: string) {
-    if (value === '__add_new__') {
-      const label = window.prompt('Add Version Number')
-      const nextLabel = referenceDataLabel(label ?? '')
-      if (!nextLabel) return
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              versionNumberRefId: '',
-              buildNumberRefId: '',
-              newVersionNumberLabel: nextLabel,
-              newBuildNumberLabel: '',
-            }
-          : current,
-      )
-      setMessage(null)
-      if (hasAttemptedSave) clearFieldErrors('versionNumber')
-      return
-    }
     setDraft((current) => {
       if (!current) return current
       const currentBuild = referenceDataRecordById(referenceData, current.buildNumberRefId)
@@ -236,23 +197,6 @@ export function SystemVersionUpdatePanel({
   }
 
   function selectBuild(value: string) {
-    if (value === '__add_new__') {
-      const label = window.prompt('Add Build Number')
-      const nextLabel = referenceDataLabel(label ?? '')
-      if (!nextLabel) return
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              buildNumberRefId: '',
-              newBuildNumberLabel: nextLabel,
-            }
-          : current,
-      )
-      setMessage(null)
-      if (hasAttemptedSave) clearFieldErrors('buildNumber')
-      return
-    }
     setDraft((current) => current ? { ...current, buildNumberRefId: value, newBuildNumberLabel: '' } : current)
     setMessage(null)
     if (hasAttemptedSave) clearFieldErrors('buildNumber')
@@ -313,13 +257,99 @@ export function SystemVersionUpdatePanel({
   const actions = readOnly ? null : (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      className={editableChildObjectActionButtonClassName()}
       onClick={beginAdd}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
       Add Version
     </button>
   )
+
+  const columns: Array<RecordHistoryColumn<VersionUpdateRow>> = [
+    {
+      key: 'actions',
+      label: 'Action',
+      render: (row) => readOnly ? null : (
+        <div className="flex flex-wrap gap-1">
+          <EditableChildObjectActionButton title={EDIT_ACTION_LABEL} ariaLabel={EDIT_ACTION_LABEL} onClick={() => beginEdit(row.record)}>
+            <EditActionIcon />
+          </EditableChildObjectActionButton>
+          <EditableChildObjectActionButton
+            variant="danger"
+            disabled={currentVersionUpdateId === row.record.id}
+            onClick={() => deleteRecord(row.record)}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            Delete
+          </EditableChildObjectActionButton>
+        </div>
+      ),
+    },
+    {
+      key: 'id',
+      label: 'ID',
+      render: (row) => row.id,
+      sortValue: (row) => row.id,
+    },
+    {
+      key: 'timestamp',
+      label: 'Creation Date',
+      render: (row) => <DateTimeValue value={row.timestamp} semanticType="datetime" />,
+      sortValue: (row) => Date.parse(row.timestamp) || 0,
+    },
+    {
+      key: 'userName',
+      label: 'User Name',
+      render: (row) => row.userName,
+      sortValue: (row) => row.userName,
+    },
+    {
+      key: 'mid',
+      label: 'MID',
+      render: (row) => row.mid || '-',
+      sortValue: (row) => row.mid,
+    },
+    {
+      key: 'sid',
+      label: 'SID',
+      render: (row) => row.sid || '-',
+      sortValue: (row) => row.sid,
+    },
+    {
+      key: 'versionLabel',
+      label: 'Version',
+      render: (row) => row.versionLabel || '-',
+      sortValue: (row) => row.versionLabel,
+    },
+    {
+      key: 'buildLabel',
+      label: 'Build No',
+      render: (row) => row.buildLabel || '-',
+      sortValue: (row) => row.buildLabel,
+    },
+    ...VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category): RecordHistoryColumn<VersionUpdateRow> => ({
+      key: category.toLocaleLowerCase(),
+      label: VERSION_UPDATE_ATTACHMENT_LABELS[category],
+      render: (row) => {
+        const attachment = attachmentFor(row, category)
+        return attachment ? <FileDownloadLink fileName={attachment.fileName} fileReference={attachment.storedFileReference} /> : '-'
+      },
+      sortValue: (row) => attachmentFor(row, category)?.fileName ?? '',
+    })),
+    {
+      key: 'emailSentAt',
+      label: 'Email Sent Date',
+      render: (row) => <DateTimeValue value={row.emailSentAt} semanticType="datetime" />,
+      sortValue: (row) => row.emailSentAt ? Date.parse(row.emailSentAt) || 0 : 0,
+    },
+    {
+      key: 'remarks',
+      label: 'Remarks',
+      className: 'max-w-96 border border-sf-border px-1.5 py-1 align-top text-sf-text',
+      render: (row) => <RichTextContent value={row.remarks} />,
+      sortValue: (row) => row.remarks.replace(/<[^>]*>/g, ' '),
+    },
+  ]
 
   return (
     <TableSection title="Version Updates" actions={actions}>
@@ -334,85 +364,21 @@ export function SystemVersionUpdatePanel({
           {message.text}
         </div>
       ) : null}
-      <div className="sf-scroll-x rounded border border-sf-border bg-white">
-        <table className="w-max min-w-full border-collapse text-sm leading-tight">
-          <thead className="bg-sf-surface-alt text-left">
-            <tr>
-              {[
-                ['actions', 'Action'],
-                ['id', 'ID'],
-                ['timestamp', 'Timestamp'],
-                ['userName', 'User Name'],
-                ['mid', 'MID'],
-                ['sid', 'SID'],
-                ['versionLabel', 'Version'],
-                ['buildLabel', 'Build No'],
-                ['config', 'Config File'],
-                ['atp', 'ATP File'],
-                ['checklist', 'Checklist File'],
-                ['emailSentAt', 'Email Sent Date'],
-                ['remarks', 'Remarks'],
-              ].map(([key, label]) => (
-                <th key={key} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
-                  {['actions', 'config', 'atp', 'checklist'].includes(key) ? label : (
-                    <button type="button" className="font-semibold hover:text-sf-brand" onClick={() => toggleSort(key as SortKey)}>
-                      {label}
-                    </button>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {displayedRows.map((row) => (
-              <tr key={row.id} className="hover:bg-sf-surface-alt">
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top">
-                  {readOnly ? null : (
-                    <div className="flex flex-wrap gap-1">
-                      <EditableChildObjectActionButton onClick={() => beginEdit(row.record)}>
-                        <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Edit
-                      </EditableChildObjectActionButton>
-                      <EditableChildObjectActionButton
-                        variant="danger"
-                        disabled={currentVersionUpdateId === row.record.id}
-                        onClick={() => deleteRecord(row.record)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Delete
-                      </EditableChildObjectActionButton>
-                    </div>
-                  )}
-                </td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.id}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><DateTimeValue value={row.timestamp} semanticType="datetime" /></td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.userName}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.mid || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.sid || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.versionLabel || '-'}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">{row.buildLabel || '-'}</td>
-                {VERSION_UPDATE_ATTACHMENT_CATEGORIES.map((category) => {
-                  const attachment = attachmentFor(row, category)
-                  return (
-                    <td key={category} className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text">
-                      {attachment ? <FileDownloadLink fileName={attachment.fileName} fileReference={attachment.storedFileReference} /> : '-'}
-                    </td>
-                  )
-                })}
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text"><DateTimeValue value={row.emailSentAt} semanticType="datetime" /></td>
-                <td className="max-w-96 border border-sf-border px-1.5 py-1 align-top text-sf-text"><RichTextContent value={row.remarks} /></td>
-              </tr>
-            ))}
-            {displayedRows.length === 0 ? (
-              <tr>
-                <td className="border border-sf-border px-3 py-4 text-sf-text-muted" colSpan={13}>
-                  No Version Updates have been recorded for this System.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <RecordHistorySection
+        records={rows}
+        columns={columns}
+        getRowKey={(row) => row.id}
+        getSearchText={versionUpdateSearchText}
+        getDateValue={(row) => row.timestamp}
+        emptyText="No Version Updates have been recorded for this System."
+        filteredEmptyText="No matching Version Updates."
+        searchLabel="Search / Filter"
+        searchPlaceholder="Search Version Updates"
+        recordsPerPageLabel="Records per page"
+        initialSort={{ key: 'timestamp', direction: 'desc' }}
+        logicalTableType="version-updates"
+        logicalTableLabel="Version Updates"
+      />
 
               {draft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
@@ -476,18 +442,16 @@ export function SystemVersionUpdatePanel({
                     onChange={(event) => selectVersion(event.target.value)}
                   >
                     <option value="">Select Version Number</option>
-                    {versionOptions(referenceData, draft.versionNumberRefId).map((record) => (
+                    {versionOptions(referenceData, versionUpgradeRecords, draft.versionNumberRefId).map((record) => (
                       <option key={record.id} value={record.id}>{record.label}{record.active ? '' : ' (inactive)'}</option>
                     ))}
-                    {draft.newVersionNumberLabel ? <option value="__new_version__">{draft.newVersionNumberLabel} (new)</option> : null}
-                    <option value="__add_new__">Add new...</option>
                   </select>
                 </FormField>
                 <FormField
                   label="Build Number"
                   required
                   error={fieldErrors.buildNumber}
-                  helperText={draft.versionNumberRefId && buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).length === 0 && !draft.newBuildNumberLabel ? 'No builds for this Version yet.' : undefined}
+                  helperText={draft.versionNumberRefId && buildOptions(referenceData, versionUpgradeRecords, draft.versionNumberRefId, draft.buildNumberRefId).length === 0 && !draft.newBuildNumberLabel ? 'No scheduler builds for this Version yet.' : undefined}
                   fieldId="version-update-buildNumber"
                   errorId={fieldErrorId('buildNumber')}
                   controlWidthClassName="w-full"
@@ -505,11 +469,9 @@ export function SystemVersionUpdatePanel({
                     onChange={(event) => selectBuild(event.target.value)}
                   >
                     <option value="">Select Build Number</option>
-                    {draft.versionNumberRefId ? buildOptions(referenceData, draft.versionNumberRefId, draft.buildNumberRefId).map((record) => (
+                    {draft.versionNumberRefId ? buildOptions(referenceData, versionUpgradeRecords, draft.versionNumberRefId, draft.buildNumberRefId).map((record) => (
                       <option key={record.id} value={record.id}>{record.label}{record.active ? '' : ' (inactive)'}</option>
                     )) : null}
-                    {draft.newBuildNumberLabel ? <option value="__new_build__">{draft.newBuildNumberLabel} (new)</option> : null}
-                    {draft.versionNumberRefId || draft.newVersionNumberLabel ? <option value="__add_new__">Add new...</option> : null}
                   </select>
                 </FormField>
               </div>
@@ -528,7 +490,7 @@ export function SystemVersionUpdatePanel({
                         aria-describedby={fieldErrors[category] ? fieldErrorId(category) : undefined}
                         onChange={(event) => void handleFileChange(category, event)}
                       />
-                      <span className="text-sm font-normal text-sf-text-muted">{attachment?.fileName ?? 'No file selected'}</span>
+                      <span className={`text-sm font-normal ${attachment ? 'text-sf-brand' : 'text-sf-text-muted'}`}>{attachment?.fileName ?? 'No file selected'}</span>
                     </div>
                   </FormField>
                 )

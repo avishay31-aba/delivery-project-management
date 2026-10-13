@@ -1,9 +1,11 @@
 import type {
   ReferenceDataRecord,
+  VersionUpgradeRecord,
   VersionUpdateAttachmentCategory,
   VersionUpdateRecord,
 } from '@/data/seed.types'
-import { referenceDataDisplayValue, referenceDataRecordById, validateReferenceDataLabel } from '@/domain/reference-data'
+import { referenceDataDisplayValue, referenceDataRecordById } from '@/domain/reference-data'
+import { schedulerHasVersionBuildPair } from '@/domain/version-upgrade-scheduler'
 
 export const VERSION_UPDATE_ATTACHMENT_CATEGORIES: VersionUpdateAttachmentCategory[] = ['CONFIG', 'ATP', 'CHECKLIST']
 
@@ -87,6 +89,8 @@ export function validateVersionUpdateDraft(input: {
   newBuildNumberLabel?: string
   attachmentCategories: VersionUpdateAttachmentCategory[]
   referenceData: ReferenceDataRecord[]
+  versionUpgradeRecords?: VersionUpgradeRecord[]
+  existingVersionUpdateId?: string
 }): string[] {
   const messages: string[] = []
   const newVersionLabel = input.newVersionNumberLabel?.trim() ?? ''
@@ -94,20 +98,29 @@ export function validateVersionUpdateDraft(input: {
   const versionReference = referenceDataRecordById(input.referenceData, input.versionNumberRefId)
   const buildReference = referenceDataRecordById(input.referenceData, input.buildNumberRefId)
   if (newVersionLabel) {
-    messages.push(...validateReferenceDataLabel(input.referenceData, 'VERSION_NUMBER', newVersionLabel))
+    messages.push('Version Number must be selected from Version Upgrade Scheduler.')
   } else if (!versionReference || versionReference.referenceType !== 'VERSION_NUMBER') {
     messages.push('Version Number is required.')
   }
 
   const selectedVersionId = versionReference?.referenceType === 'VERSION_NUMBER' ? versionReference.id : null
   if (newBuildLabel) {
-    messages.push(...validateReferenceDataLabel(input.referenceData, 'BUILD_NUMBER', newBuildLabel, undefined, selectedVersionId ?? (newVersionLabel ? '__new_version__' : null)))
+    messages.push('Build Number must be selected from Version Upgrade Scheduler.')
   } else if (!buildReference || buildReference.referenceType !== 'BUILD_NUMBER') {
     messages.push('Build Number is required.')
   } else if (newVersionLabel) {
     messages.push('Build Number must be created under the new Version Number.')
   } else if (buildReference.versionNumberId !== selectedVersionId) {
     messages.push('Build Number does not belong to the selected Version Number.')
+  }
+
+  if (
+    input.versionUpgradeRecords &&
+    versionReference?.referenceType === 'VERSION_NUMBER' &&
+    buildReference?.referenceType === 'BUILD_NUMBER' &&
+    !schedulerHasVersionBuildPair(input.versionUpgradeRecords, versionReference.id, buildReference.id)
+  ) {
+    messages.push('Version and Build must come from an active Version Upgrade Scheduler record.')
   }
 
   VERSION_UPDATE_ATTACHMENT_CATEGORIES.forEach((category) => {

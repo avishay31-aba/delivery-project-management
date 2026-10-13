@@ -1212,9 +1212,9 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     linkedEsxiInfrastructureItemId: text(raw.linkedEsxiInfrastructureItemId),
     memoryTypeRefId: text(raw.memoryTypeRefId),
     memorySizeRefId: text(raw.memorySizeRefId),
-    memoryQuantity: numberOrNull(raw.memoryQuantity),
+    memoryQuantity: numberOrNull(raw.memoryQuantity) ?? undefined,
     cpuTypeRefId: text(raw.cpuTypeRefId),
-    cpuQuantity: numberOrNull(raw.cpuQuantity),
+    cpuQuantity: numberOrNull(raw.cpuQuantity) ?? undefined,
     disks: Array.isArray(raw.disks)
       ? raw.disks.map((disk) => ({
           id: text((disk as Record<string, unknown>).id) || `disk-${crypto.randomUUID()}`,
@@ -1235,7 +1235,7 @@ function normalizeInfrastructureProperties(item: Partial<InfrastructureItem> & R
     sslVersion: text(raw.sslVersion),
     linkedDomainInfrastructureItemId: text(raw.linkedDomainInfrastructureItemId),
     vpnTypeRefId: text(raw.vpnTypeRefId),
-    vpnLicenseCount: numberOrNull(raw.vpnLicenseCount),
+    vpnLicenseCount: numberOrNull(raw.vpnLicenseCount) ?? undefined,
   }
 }
 

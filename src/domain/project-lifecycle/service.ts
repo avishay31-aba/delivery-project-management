@@ -4,6 +4,7 @@ import { activeProjectSystemLinks, activeProjectTenantLinks } from '@/domain/all
 import { formatConfigurationSummaryForRecords } from '@/domain/application-configuration'
 import { projectTimeZoneDisplayValue, resolveGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry } from '@/domain/business-region'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { isTenantCancelled } from '@/domain/tenant-operations/lifecycle'
 import type { RequirementColumnMetadata } from '@/config/opportunity-metadata'
 import type { ProjectHeaderFieldKey } from './metadata'
@@ -159,9 +160,18 @@ function projectConfigurationSummary(context: ProjectDeliveryDashboardContext, o
 
 function projectFinancialProfile(project: Project, opportunity: Opportunity | undefined): string {
   if (project.mainType === 'POC') {
+    if (opportunity?.financialProfile) return opportunity.financialProfile
+    if (project.subType === 'FREE' || project.subType === 'PAID') return project.subType
     return opportunity?.subType === 'FREE' || opportunity?.subType === 'PAID' ? opportunity.subType : ''
   }
   return project.mainType === 'DELIVERY' || project.mainType === 'RENEWAL' ? 'PAID' : ''
+}
+
+export function projectSubTypeDisplayValue(subType: Project['subType'] | string | undefined): string {
+  if (!subType || subType === 'NONE') return ''
+  if (subType === 'FREE') return 'Free'
+  if (subType === 'PAID') return 'Paid'
+  return subType
 }
 
 function projectDashboardAlertSeverity(status: ProjectHealthStatus): ProjectDeliveryDashboardReadModel['projectAlertSeverity'] {
@@ -193,7 +203,7 @@ export function deriveProjectAlerts(project: Project, today = new Date()): Proje
       ? { key: 'deliveryOverdue', label: 'Delivery Overdue' }
       : null,
     isPoc && project.pocEndDate && isOpen && isPastDate(project.pocEndDate, today)
-      ? { key: 'pocOverdue', label: 'POC Overdue' }
+      ? { key: 'pocOverdue', label: 'POC end date overdue' }
       : null,
     !project.deliveryDate ? { key: 'noDeliveryDate', label: 'No Delivery Date' } : null,
     isPoc && !project.pocEndDate ? { key: 'noEndDate', label: 'No End Date' } : null,
@@ -273,14 +283,14 @@ export function projectDeliveryDashboardReadModel(context: ProjectDeliveryDashbo
     endUser: account?.accountName ?? context.project.accountName,
     payingCustomer: account?.accountName ?? context.project.accountName,
     region: location.region,
-    country: location.country,
+    country: countryDisplayName(location.country),
     status: context.project.progressStatus,
     statusLabel: projectStatusLabel(context.project.progressStatus),
     deliveryDate: context.project.deliveryDate ?? '',
     pocStartDate: context.project.pocStartDate ?? opportunity?.pocStartDate ?? '',
     pocEndDate: context.project.pocEndDate ?? opportunity?.pocEndDate ?? '',
     type: context.project.mainType,
-    subType: context.project.subType === 'NONE' ? '' : context.project.subType,
+    subType: projectSubTypeDisplayValue(context.project.subType),
     hosting: configuration.hosting,
     product: configuration.product,
     modules: configuration.modules,
@@ -314,9 +324,10 @@ export function projectMainTypeLabel(type: ProjectMainType | string | undefined)
 }
 
 export function projectStatusLabel(status: string): string {
-  if (status === 'DELETED') return 'Deleted'
-  if (status === 'CANCELLED') return 'Cancelled'
-  if (status === 'DONE') return 'Done'
+  const normalized = String(status ?? '').trim().toLocaleUpperCase()
+  if (normalized === 'DELETED') return 'Deleted'
+  if (normalized === 'CANCELLED' || normalized === 'CANCELED') return 'Cancelled'
+  if (normalized === 'DONE') return 'Done'
   return 'Open'
 }
 
@@ -527,6 +538,8 @@ export function projectHeaderFieldValue(
       return project.pocEndDate ?? context.linkedOpportunity?.pocEndDate ?? ''
     case 'financialProfile':
       return context.linkedOpportunity?.financialProfile ?? projectFinancialProfile(project, context.linkedOpportunity)
+    case 'subType':
+      return projectSubTypeDisplayValue(project.subType)
     case 'warrantyServiceMonths':
       return textValue(context.linkedOpportunity?.warrantyServiceMonths)
     case 'currentMilestone':
@@ -548,6 +561,17 @@ export function projectHeaderFieldValue(
 export function projectTimeZoneResolution(project: Project, context: ProjectLifecycleContext = {}) {
   const location = projectLocationContext(project, context.linkedOpportunity, context.account)
   return resolveGeographicTimeZone(location.country, location.state, project.deliveryDate)
+}
+
+export function projectHasLocationValidationSource(project: Project, context: ProjectLifecycleContext = {}): boolean {
+  return Boolean(
+    context.linkedOpportunity ||
+      context.account ||
+      project.country ||
+      project.state ||
+      project.region ||
+      project.timeGroup,
+  )
 }
 
 export function isProjectHeaderFieldChanged(
@@ -688,9 +712,11 @@ export function linkedSystemsForProject(
 ): System[] {
   void _opportunity
   void _tenants
-  void _projectSystems
   if (!project) return []
-  const linkedSystemIds = new Set(activeSystemLinks.map((link) => link.systemId))
+  const projectLinks = activeSystemLinks.length > 0
+    ? activeSystemLinks
+    : activeProjectSystemLinks(_projectSystems).filter((link) => link.projectId === project.id)
+  const linkedSystemIds = new Set(projectLinks.map((link) => link.systemId))
   return systems.filter((system) => {
     const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
     return linkedSystemIds.has(system.id) && !status.includes('cancel')
@@ -718,14 +744,14 @@ export function linkedTenantsForProject(
   projectSystems: ProjectSystemLink[] = [],
 ): Tenant[] {
   void _opportunity
+  void projectSystems
   if (!project) return []
   const projectTenantLinksForProject = activeProjectTenantLinks(projectTenants).filter((link) => link.projectId === project.id)
   const linkedTenantIds = new Set(
     projectTenantLinksForProject.map((link) => link.tenantId),
   )
   return tenants.filter((tenant) =>
-    linkedTenantIds.has(tenant.id) &&
-    tenantBelongsToCurrentProjectSystem(tenant, project.id, projectSystems) &&
+    (linkedTenantIds.has(tenant.id) || tenant.deliveryPid === project.pid) &&
     !isTenantCancelled(tenant),
   )
 }

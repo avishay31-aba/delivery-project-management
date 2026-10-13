@@ -2119,7 +2119,7 @@ export function resolveProjectMilestoneTemplate(project: Project, opportunity: O
   return { templateId: '3', reason: 'Default delivery template' }
 }
 
-export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTemplateId): { milestones: ProjectMilestone[]; tasks: ProjectTask[] } {
+export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTemplateId, status: ProjectTask['status'] = 'OPEN'): { milestones: ProjectMilestone[]; tasks: ProjectTask[] } {
   const template = PROJECT_MILESTONE_TASK_TEMPLATES[templateId]
   const milestoneMap = new Map<string, ProjectMilestone>()
   const tasks: ProjectTask[] = []
@@ -2131,7 +2131,7 @@ export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTempl
         id: milestoneId,
         name: row.milestone,
         order: row.milestoneOrder,
-        status: 'OPEN',
+        status,
         deadline: null,
         comment: '',
       })
@@ -2142,7 +2142,7 @@ export function buildProjectMilestonesAndTasks(templateId: ProjectMilestoneTempl
       name: row.task,
       department: row.department,
       resource: row.resource,
-      status: 'OPEN',
+      status,
       order: index + 1,
       deadline: null,
       comment: '',

@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useMemo } from 'react'
 import { DataDashboard } from '@/components/dashboard'
 import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/components/record'
-import { productionSystemInventoryColumns } from '@/config/system-inventory-columns'
+import { createProductionSystemInventoryColumns } from '@/config/system-inventory-columns'
 import { useAppStore } from '@/store/useAppStore'
 import { systemReference } from '@/domain/business-reference'
 import { SYSTEM_OPERATIONAL_STATUS_CANCELED, systemDashboardRowClassName } from '@/domain/system-inventory'
@@ -12,6 +12,8 @@ export function ProductionSystemInventoryPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const systems = useAppStore((state) => state.productionSystemInventory)
+  const projects = useAppStore((state) => state.projects)
+  const projectSystems = useAppStore((state) => state.projectSystems)
   const sortedSystems = useMemo(
     () => [...systems]
       .filter((system) => system.operationalStatus !== SYSTEM_OPERATIONAL_STATUS_CANCELED)
@@ -19,6 +21,10 @@ export function ProductionSystemInventoryPage() {
     [systems],
   )
   const updateSystem = useAppStore((state) => state.updateProductionSystemInventoryItem)
+  const productionSystemInventoryColumns = useMemo(
+    () => createProductionSystemInventoryColumns(projects, projectSystems),
+    [projectSystems, projects],
+  )
 
   return (
     <WorkspaceFrame>

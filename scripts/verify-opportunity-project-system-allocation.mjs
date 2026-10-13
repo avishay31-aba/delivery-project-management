@@ -35,38 +35,41 @@ function functionBody(source, functionName) {
 }
 
 assert(
-  /function opportunityRequestedSystemTenantIds\(opportunity: Opportunity\): Map<string, string\[\]>/.test(store),
-  'Opportunity save must collect requested System IDs through a shared helper.',
+  /function ensureAutomaticRequirementRelationships\(/.test(store),
+  'Opportunity save must use a shared helper for automatic Grid B/C Project relationships.',
 )
 assert(
-  /applicableOpportunityRequirementSources\(opportunity\)/.test(functionBody(store, 'opportunityRequestedSystemTenantIds')),
-  'Opportunity requested-System allocation must use currently applicable requirement sources, not all stored rows.',
+  /requiredExistingTenantAllocationsForProject\(project, opportunity, state\.tenants\)/.test(functionBody(store, 'ensureAutomaticRequirementRelationships')),
+  'Automatic Project relationship sync must use the AllocationContext Grid B/C derivation.',
 )
 assert(
-  /deployTarget === 'EXISTING_SID'/.test(functionBody(store, 'opportunityRequestedSystemTenantIds')) && /add\(requirement\.existingSystemId\)/.test(store),
-  'Grid A Existing SID requirements must drive Project/System allocation.',
+  /source\.requirementType === 'A' && 'deployTarget' in requirement/.test(functionBody(allocationService, 'requestedSystemCandidatesForProject')) &&
+    /requirement\.deployTarget === 'EXISTING_SID'/.test(functionBody(allocationService, 'requestedSystemCandidatesForProject')),
+  'Grid A Existing SID requirements must drive only manual requested-existing System candidates.',
 )
 assert(
-  /add\(requirement\.systemId, requirement\.tenantId\)/.test(store),
-  'Grid B/C existing Tenant/System requirements must preserve Tenant IDs on Project/System links.',
+  /source\.requirementType !== 'B' && source\.requirementType !== 'C'/.test(functionBody(allocationService, 'requiredExistingTenantAllocationsForProject')) &&
+    /tenantHostingSystemId\(tenant\)/.test(functionBody(allocationService, 'requiredExistingTenantAllocationsForProject')),
+  'Grid B/C existing Tenant requirements must derive automatic Project relationships from the Tenant hosting System.',
 )
 assert(
-  /new Map<string, string\[\]>\(\)/.test(store) && /Array\.from\(new Set/.test(store),
-  'Requested existing System allocation must deduplicate repeated Systems and Tenant IDs.',
+  /sourcesByTenantId/.test(functionBody(store, 'ensureAutomaticRequirementRelationships')) &&
+    /Array\.from\(sourcesByTenantId\.keys\(\)\)/.test(functionBody(store, 'ensureAutomaticRequirementRelationships')),
+  'Automatic relationship sync must deduplicate repeated Grid B/C Tenant references.',
 )
 assert(
-  /ensureOpportunityRequestedSystemAllocations\(/.test(store) &&
-    /createProjectSystemLink\(project\.id, system\.id/.test(store),
-  'Opportunity Project sync must create missing ProjectSystemLink records at Save.',
+  /createProjectSystemLink\(project\.id, hostingSystem\.id/.test(functionBody(store, 'ensureProjectTenantHostingRelationships')) &&
+    /allocationSources/.test(functionBody(store, 'ensureProjectTenantHostingRelationships')),
+  'Opportunity Project sync must create or merge ProjectSystemLink records with allocation source metadata.',
 )
 assert(
   /result\.projectChanges\.forEach/.test(store) &&
-    /ensureOpportunityRequestedSystemAllocations\(\s*allocationState,\s*committedOpportunity,\s*project,\s*now,\s*\)/m.test(store),
-  'Opportunity save transaction must run requested-System allocation for generated or updated Projects.',
+    /ensureAutomaticRequirementRelationships\(/.test(store),
+  'Opportunity save transaction must run automatic Grid B/C relationship sync for generated or updated Projects.',
 )
 assert(
-  /isSystemOperationallyVisible\(candidate\)/.test(store),
-  'Opportunity allocation must not link cancelled or operationally hidden Systems.',
+  /validateProjectTenantHostingRelationshipSync\(state, existingTenantIds\)/.test(store),
+  'Opportunity save must validate Grid B/C Tenants resolve to hosting Systems before syncing relationships.',
 )
 assert(
   /export function opportunityWithApplicableRequirements/.test(lifecycleApplicability) &&

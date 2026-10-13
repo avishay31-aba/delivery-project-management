@@ -2,10 +2,10 @@ import type { TenantHostingSnapshot } from '@/data/seed.types'
 
 export const TENANT_REMARK_TYPES = ['Note', 'Warranty', 'Temporary change', 'Permanent change', 'Task']
 
-export const TENANT_HOSTING_FIELDS: Array<{ key: keyof TenantHostingSnapshot | 'tenantCount'; label: string }> = [
-  { key: 'currentSystem', label: 'Current system' },
+export const TENANT_HOSTING_FIELDS: Array<{ key: keyof TenantHostingSnapshot | 'tenantCount' | 'tenants'; label: string }> = [
   { key: 'sid', label: 'SID' },
   { key: 'tenantCount', label: 'Number of Tenants' },
+  { key: 'tenants', label: 'Tenants' },
   { key: 'operationalStatus', label: 'Operational Status' },
   { key: 'machineNumber', label: 'Machine Number' },
   { key: 'versionNumber', label: 'Version Number' },

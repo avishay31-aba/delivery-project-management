@@ -3,7 +3,7 @@ import type { ActivityEvent } from '@/domain/activity-log'
 /** Core enums and entity types for mock data (Phase A — no business logic). */
 
 export type ProjectMainType = 'POC' | 'DELIVERY' | 'RENEWAL'
-export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL'
+export type ProjectSubType = 'NONE' | 'NEW' | 'UPSELL' | 'STANDARD' | 'DOWN_SELL' | 'FREE' | 'PAID'
 export type WorkItemStatus = 'OPEN' | 'DONE'
 export type ProgressStatus = WorkItemStatus | 'DELETED' | 'CANCELLED'
 export type AccountCustomerType = 'NEW_CUSTOMER' | 'VETERAN_CUSTOMER'
@@ -21,7 +21,7 @@ export type SystemClass = 'CUSTOMER' | 'POC_DEMO_TRAINING'
 export type SystemSource = 'Production' | 'Reused Internal Systems'
 export type SystemPurpose =
   | 'Delivery'
-  | 'Available'
+  | 'None'
   | 'POC'
   | 'Demo'
   | 'Training'
@@ -68,6 +68,7 @@ export type IdCounterKey =
 export type TenantContractStatus = 'UNDER_CONTRACT' | 'OUT_OF_CONTRACT'
 export type AllocationStatus = 'ALLOCATED' | 'DEALLOCATED'
 export type AllocationType = 'PRODUCTION' | 'REUSED_INTERNAL' | 'EXISTING_SYSTEM'
+export type AllocationSource = 'MANUAL' | 'GRID_B' | 'GRID_C'
 export type TenantFormType = 'POC' | 'CUSTOMER' | 'INTERNAL'
 
 export interface IdCounters {
@@ -371,6 +372,8 @@ export interface System {
   /** Active hosted Tenant that currently governs the System Time Group. */
   timeGroupGovernanceTenantId?: string
   timeGroupAlert?: string
+  occupationStartDate?: string | null
+  occupationEndDate?: string | null
   operationalStatus: string
   cancellationRequested?: YesNo
   cancellationReason?: string
@@ -552,6 +555,8 @@ export interface ConfigurationHistoryRecord {
   id: string
   recordId: string
   timestamp: string
+  pid?: string
+  sid?: string
   tid?: string
   recordedBy: string
   configuration: TenantConfiguration
@@ -562,6 +567,7 @@ export interface ReusedInternalPurposeHistoryRecord {
   recordId: string
   startDate: string
   endDate: string | null
+  owner?: string
   purposeType: string
   pid?: string
   sid?: string
@@ -601,6 +607,7 @@ export interface DocumentRecord {
   fileSize: number
   uploadedAt: string
   replacedAt?: string
+  replacedBy?: string
   objectUrl?: string
   storedFileReference?: string
   uploadedBy?: string
@@ -844,6 +851,45 @@ export interface VersionUpdateRecord {
   updatedBy: string
 }
 
+export type VersionUpgradeOperationalStatus = 'ACTIVE' | 'CANCELLED'
+export type VersionUpgradeCustomerTimeZone = 'ET' | 'CET' | 'IST' | 'SGT'
+
+export interface VersionUpgradeSystemSchedule {
+  systemId: string
+  requestedUpgradeDate: string | null
+  requestedUpgradeTime: string
+  customerTimeZone: VersionUpgradeCustomerTimeZone | ''
+  csComments: string
+  scheduleConfirmed: boolean
+  activityDurationHours: number | null
+  assignedEngineerUserId: string
+  confirmedAt?: string | null
+  confirmedBy?: string | null
+  updatedAt: string
+  updatedBy: string
+}
+
+export interface VersionUpgradeRecord {
+  id: string
+  versionNumberRefId: string
+  buildNumberRefId: string
+  releaseDate: string | null
+  phaseOutDate: string | null
+  limitedToCloudPlatform: string
+  remarks: string
+  operationalStatus: VersionUpgradeOperationalStatus
+  cancellationRequested?: YesNo
+  cancellationReason?: string
+  cancellationHistory?: ProjectDeletionHistoryEntry[]
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  schedules: VersionUpgradeSystemSchedule[]
+  createdAt: string
+  createdBy: string
+  updatedAt: string
+  updatedBy: string
+}
+
 export interface TenantHostedSystemHistory {
   systemId: string
   startedAt: string
@@ -876,6 +922,7 @@ export interface ProductionSystemInventoryItem {
   timeGroup: string
   timeGroupAlert?: string
   linkedProjects?: string[]
+  availability?: AvailabilityStatus
   operationalStatus: string
   cancellationRequested?: YesNo
   cancellationReason?: string
@@ -923,7 +970,7 @@ export interface ReusedInternalSystem {
   id: string
   machineId: string
   source: 'Reused Internal Systems'
-  purpose: 'Available' | 'POC' | 'Demo' | 'Training' | 'Support' | 'OBSOLETE'
+  purpose: 'None' | 'POC' | 'Demo' | 'Training' | 'Support' | 'OBSOLETE'
   status: ReusedInternalSystemStatus
   logo?: string
   url?: string
@@ -1007,6 +1054,7 @@ export interface ProjectSystemLink {
   tenantIds?: string[]
   allocationStatus?: AllocationStatus
   allocationType?: AllocationType
+  allocationSources?: AllocationSource[]
   sourceMachineId?: string | null
   allocatedAt: string
   deallocatedAt?: string | null
@@ -1019,6 +1067,7 @@ export interface ProjectTenantLink {
   systemId?: string
   allocationStatus?: AllocationStatus
   allocationType?: AllocationType
+  allocationSources?: AllocationSource[]
   allocatedAt?: string
   deallocatedAt?: string | null
 }
@@ -1034,12 +1083,190 @@ export interface TimeGroupLookupRecord {
   updatedAt?: string
 }
 
+export interface GeographicCountryRecord {
+  id: string
+  countryName: string
+  countryCodeName: string
+  region: string
+  timeZone: string
+  active: boolean
+  updatedAt?: string
+}
+
+export interface GeographicUsStateRecord {
+  id: string
+  state: string
+  timeZone: string
+  active: boolean
+  updatedAt?: string
+}
+
 export interface UserPresentationPreference {
   id: string
   userId: string
   preferenceType: string
   context: string
   value: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type PermissionAccessLevel = 'HIDDEN' | 'READ_ONLY' | 'READ_WRITE'
+export type FieldPermissionLevel = 'HIDDEN' | 'READ_ONLY' | 'READ_WRITE'
+export type ActionPermissionLevel = 'ALLOWED' | 'NOT_ALLOWED'
+
+export interface ObjectPermissionDefinition {
+  objectKey: string
+  access: PermissionAccessLevel
+  actions: Record<string, ActionPermissionLevel>
+  fields: Record<string, FieldPermissionLevel>
+}
+
+export interface RoleDefinition {
+  id: string
+  name: string
+  normalizedName: string
+  description: string
+  permissions: ObjectPermissionDefinition[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UserRoleAssignment {
+  id: string
+  userId: string
+  roleIds: string[]
+  updatedAt: string
+}
+
+export type NotificationAlertType = 'ALERT' | 'NOTIFICATION' | 'REQUEST'
+export type NotificationAlertSeverity = 'INFO' | 'WARNING' | 'HIGH'
+export type NotificationStatus = 'UNREAD' | 'READ'
+export type AlertStatus = 'OPEN' | 'RESOLVED'
+export type NotificationAlertCategory =
+  | 'PROJECT'
+  | 'SYSTEM'
+  | 'TENANT'
+  | 'TENANT_WARRANTY'
+  | 'INFRASTRUCTURE_ITEM'
+  | 'INFRASTRUCTURE_WARRANTY'
+  | 'ALLOCATION'
+  | 'ADMINISTRATION'
+
+export interface NotificationAlertObjectRef {
+  objectType: string
+  id: string
+  businessId: string
+  displayLabel: string
+  routePath?: string
+  snapshot?: Record<string, unknown>
+}
+
+export interface NotificationRuleDefinition {
+  id: string
+  eventKey: string
+  type: NotificationAlertType
+  severity: NotificationAlertSeverity
+  category: NotificationAlertCategory
+  enabled: boolean
+  recipientRoleIds: string[]
+  emailEnabled: boolean
+  reminderFrequencyDays?: number | null
+  schemaVersion: number
+  updatedAt: string
+}
+
+export interface NotificationEmailPayload {
+  enabled: boolean
+  recipientRoleIds: string[]
+  subject: string
+  fullDescription: string
+  deepLinkLabel: string
+  deepLinkRoute?: string
+  generatedAt: string
+}
+
+export interface NotificationReadReceipt {
+  userId: string
+  readAt: string
+  readBy?: string | null
+}
+
+export interface NotificationRecord {
+  id: string
+  type: 'NOTIFICATION'
+  severity: NotificationAlertSeverity
+  category: NotificationAlertCategory
+  eventKey: string
+  ruleId: string
+  sourceActivityEventId?: string
+  primaryObject: NotificationAlertObjectRef
+  relatedObjects: NotificationAlertObjectRef[]
+  shortMessage: string
+  fullDescription: string
+  createdAt: string
+  createdBy?: string | null
+  status: NotificationStatus
+  readAt?: string | null
+  readBy?: string | null
+  readReceipts?: NotificationReadReceipt[]
+  recipientRoleIds: string[]
+  email: NotificationEmailPayload
+  deepLinkRoute?: string
+  schemaVersion: number
+}
+
+export interface AlertRecord {
+  id: string
+  type: 'ALERT'
+  severity: NotificationAlertSeverity
+  category: NotificationAlertCategory
+  eventKey: string
+  ruleId: string
+  conditionKey: string
+  primaryObject: NotificationAlertObjectRef
+  relatedObjects: NotificationAlertObjectRef[]
+  shortMessage: string
+  fullDescription: string
+  createdAt: string
+  createdBy?: string | null
+  status: AlertStatus
+  resolvedAt?: string | null
+  resolvedBy?: string | null
+  resolutionSummary?: string | null
+  recipientRoleIds: string[]
+  email: NotificationEmailPayload
+  reminderFrequencyDays?: number | null
+  lastReminderAt?: string | null
+  nextReminderEligibleAt?: string | null
+  deepLinkRoute?: string
+  schemaVersion: number
+}
+
+export type ReminderSourceType =
+  | 'REMARK'
+  | 'PROJECT_TASK'
+  | 'PROJECT_MILESTONE'
+  | 'INFRASTRUCTURE_MAINTENANCE_TASK'
+
+export type ReminderExecutionSyncState = 'NOT_SYNCED' | 'SYNCED' | 'ERROR'
+
+export interface ReminderExecutionRecord {
+  id: string
+  sourceKey: string
+  sourceType: ReminderSourceType
+  sourceId: string
+  parentObjectType: string
+  parentObjectId: string
+  parentBusinessId: string
+  executedAt: string | null
+  executedBy: string | null
+  sourceDueDateAtExecution: string | null
+  restoredAt?: string | null
+  restoredBy?: string | null
+  externalEventId?: string | null
+  externalSyncState?: ReminderExecutionSyncState | null
+  externalSyncedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -1057,11 +1284,20 @@ export interface AppDataState {
   tenants: Tenant[]
   warrantyRecords: WarrantyRecord[]
   referenceData: ReferenceDataRecord[]
+  countryLookups: GeographicCountryRecord[]
+  usStateLookups: GeographicUsStateRecord[]
   timeGroupLookups: TimeGroupLookupRecord[]
   userPresentationPreferences: UserPresentationPreference[]
+  versionUpgradeRecords: VersionUpgradeRecord[]
   versionUpdates: VersionUpdateRecord[]
   infrastructureItems: InfrastructureItem[]
   activityEvents: ActivityEvent[]
+  roles: RoleDefinition[]
+  userRoleAssignments: UserRoleAssignment[]
+  notificationRules: NotificationRuleDefinition[]
+  notificationRecords: NotificationRecord[]
+  alertRecords: AlertRecord[]
+  reminderExecutions: ReminderExecutionRecord[]
   projectSystems: ProjectSystemLink[]
   projectTenants: ProjectTenantLink[]
   idCounters: IdCounters

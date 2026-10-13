@@ -10,5 +10,10 @@ export const localStoragePersistenceAdapter: KeyValuePersistenceAdapter = {
   removeItem(key) {
     localStorage.removeItem(key)
   },
+  key(index) {
+    return localStorage.key(index)
+  },
+  get length() {
+    return localStorage.length
+  },
 }
-

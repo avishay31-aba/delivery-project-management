@@ -46,3 +46,7 @@ export function hasCancellationValidationError(messages: string[]): boolean {
 export function validationControlClassName(isInvalid: boolean): string {
   return isInvalid ? 'border-red-500 ring-1 ring-red-500' : ''
 }
+
+export function dirtyControlClassName(isDirty: boolean): string {
+  return isDirty ? 'bg-yellow-100' : 'bg-white'
+}

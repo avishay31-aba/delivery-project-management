@@ -262,6 +262,7 @@ ProjectLifecycle-owned validations may include:
 - Delivery date must be valid when present.
 - POC start/end dates must be valid for POC projects.
 - POC end date should not precede POC start date.
+- An Open POC Project with an active Reused Internal System allocation must have both POC Start Date and POC End Date in the Project header before it can be persisted. Those Project header dates are the only authoritative POC occupation-date source for the allocated Reused Internal System; existing Projects that lack the dates are corrected retroactively by blocking the next relevant save until the user supplies them, without inventing fallback dates.
 - Project status must be valid.
 - Opportunity reference must resolve when project is Opportunity-generated.
 - Customer/account context must resolve where required.
@@ -390,7 +391,9 @@ Examples:
 - Project created.
 - System allocated to project.
 - System deallocated from project.
-- Manual System deallocation releases the current Project-to-System allocation and the same-Project Tenant attachments hosted through that System. Project current Systems/Tenants tables must not retain Tenants solely because of historical PID/provenance after the hosting System has been deallocated. Deleted Tenants and retained legacy Cancelled Tenant records with a current allocation plus attachment remain in the normal Tenant Warranty Status sections, with Operational Status carrying the lifecycle state.
+- Existing eligible Systems can be manually allocated to the Project through the allocation dialog, using the shared System candidate dialog and AllocationContext validations. The Grid A requested-existing action is labeled `Allocate Requested Existing System`; it shows only existing Systems requested through New Tenant requirements and links an existing System without creating a new System.
+- Project-System allocation source is domain-owned. Manual Allocated Systems are user-selected through the allocation dialog. Auto-Allocated Systems are required by Grid B Change Request or Grid C Tenant Renewal requirements because the existing Tenant is already hosted on a System. Auto-Allocated Systems are deduplicated by System identity, automatically associate the affected existing Tenants, and cannot be manually deallocated while the Grid B/C requirement reason exists.
+- Manual System deallocation releases the current Project-to-System allocation only after validation confirms the System is not Deleted and no current same-SID/PID Tenant exists. If current Tenants exist, deallocation is blocked and the user must explicitly delete or cancel those Tenants before retrying. System deallocation must not automatically delete, cancel, release Requirement IDs for, or otherwise rewrite Tenant records. Deleted Tenants and retained legacy Cancelled Tenant records on the same SID/PID do not block deallocation and retain their historical relationship data.
 - Project cancellation is blocked while any System remains actively allocated to the Project. The user must explicitly deallocate all Systems first; Project cancellation must not automatically deallocate Systems, release Tenants, or rewrite Project-System history.
 - Existing system linked.
 - Tenant created from requirement.
@@ -513,6 +516,8 @@ V1 includes:
 - Milestones and tasks.
 - Milestone/task ordering, deadlines, comments, progress, and status.
 - Systems/Tenants operational context.
+- Project Systems/Tenants Tenant tables label Tenant Type as `Type` and show `Type`, `Hosting`, `Cloud Platform`, then `Product` in that order. Hosting and Cloud Platform display the authoritative Tenant/System relationship values.
+- Project Systems/Tenants Systems presentation separates `Manual Allocated Systems` from `Auto-Allocated Systems`. The distinction is based on AllocationContext source metadata, not page-local visual grouping.
 - Allocation/deallocation behavior already supported.
 - RequirementCoverage validation output.
 - Documents where already supported.

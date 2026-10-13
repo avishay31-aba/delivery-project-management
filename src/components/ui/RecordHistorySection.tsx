@@ -76,6 +76,12 @@ function reactNodeText(node: ReactNode): string {
   return Children.toArray(node.props.children).map(reactNodeText).filter(Boolean).join(' ')
 }
 
+function defaultNewestFirstSortKey<TRecord>(columns: Array<RecordHistoryColumn<TRecord>>, hasDateValue: boolean): string | null {
+  if (!hasDateValue) return null
+  const preferred = ['timestamp', 'created', 'createdAt', 'uploadedAt', 'startDate', 'date']
+  return preferred.map((key) => columns.find((column) => column.key === key && column.sortValue)?.key).find(Boolean) ?? null
+}
+
 export function RecordHistorySection<TRecord>({
   records,
   columns,
@@ -116,7 +122,12 @@ export function RecordHistorySection<TRecord>({
   const [search, setSearch] = useState('')
   const [pageSize, setPageSize] = useState<RecordHistoryPageSize>(effectiveInitialPageSize)
   const [pageNumber, setPageNumber] = useState(1)
-  const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(initialSort)
+  const defaultSort = initialSort ?? (
+    defaultNewestFirstSortKey(columns, Boolean(getDateValue))
+      ? { key: defaultNewestFirstSortKey(columns, Boolean(getDateValue)) as string, direction: 'desc' as const }
+      : null
+  )
+  const [sort, setSort] = useState<{ key: string; direction: RecordHistorySortDirection } | null>(defaultSort)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [preferenceMessage, setPreferenceMessage] = useState('')
@@ -169,9 +180,11 @@ export function RecordHistorySection<TRecord>({
 
     return [...filtered].sort((first, second) => {
       const result = compareValues(column.sortValue?.(first), column.sortValue?.(second))
-      return sort.direction === 'asc' ? result : -result
+      if (result !== 0) return sort.direction === 'asc' ? result : -result
+      const tieBreak = getRowKey(first, 0).localeCompare(getRowKey(second, 0), undefined, { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? tieBreak : -tieBreak
     })
-  }, [columns, enableSearch, fromDate, getDateValue, getSearchText, records, search, sort, toDate])
+  }, [columns, enableSearch, fromDate, getDateValue, getRowKey, getSearchText, records, search, sort, toDate])
 
   const totalMatchingRecords = sortedAndFilteredRecords.length
   const numericPageSize = pageSize === 'all' ? Math.max(totalMatchingRecords, 1) : pageSize
@@ -196,8 +209,7 @@ export function RecordHistorySection<TRecord>({
     if (!column?.sortValue) return
     setSort((current) => {
       if (!current || current.key !== key) return { key, direction: 'asc' }
-      if (current.direction === 'asc') return { key, direction: 'desc' }
-      return null
+      return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
     })
     resetToFirstPage()
   }

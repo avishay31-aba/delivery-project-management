@@ -39,6 +39,8 @@ const routes = [
   { path: '/systems/cancelled', id: 'cancelledSystemsDashboard' },
   { path: '/systems/:sid', id: 'allocatedSystemExisting' },
   { path: '/tenants/:tid', id: 'tenantExisting' },
+  { path: '/version-upgrades/new', id: 'versionUpgradeCreate' },
+  { path: '/version-upgrades/:id', id: 'versionUpgradeExisting' },
   { path: '/infrastructure/:infrastructureId', id: 'infrastructureExistingAndCreate' },
 ]
 
@@ -60,6 +62,8 @@ const routeCases = [
   { name: 'Allocated System existing', path: '/systems/S000001', routeId: 'allocatedSystemExisting', param: 'sid', create: false, expectedParam: 'S000001' },
   { name: 'Allocated System generic new redirect', path: '/systems/new', routeId: 'systemCreateRedirect', param: 'sid', create: true, expectedParam: undefined },
   { name: 'Tenant existing', path: '/tenants/T000001', routeId: 'tenantExisting', param: 'tid', create: false, expectedParam: 'T000001' },
+  { name: 'Version Upgrade create', path: '/version-upgrades/new', routeId: 'versionUpgradeCreate', param: 'id', create: true, expectedParam: undefined },
+  { name: 'Version Upgrade existing', path: '/version-upgrades/VU000001', routeId: 'versionUpgradeExisting', param: 'id', create: false, expectedParam: 'VU000001' },
   { name: 'Infrastructure create control', path: '/infrastructure/new', routeId: 'infrastructureExistingAndCreate', param: 'infrastructureId', create: true, expectedParam: 'new' },
   { name: 'Infrastructure existing control', path: '/infrastructure/INF000001', routeId: 'infrastructureExistingAndCreate', param: 'infrastructureId', create: false, expectedParam: 'INF000001' },
 ]
@@ -79,6 +83,7 @@ const opportunityForm = source('src/pages/opportunities/OpportunityFormPage.tsx'
 const systemInventoryForm = source('src/pages/systems/SystemInventoryFormPages.tsx')
 const routesSource = source('src/routes/index.tsx')
 const infrastructureForm = source('src/pages/infrastructure/InfrastructureFormPage.tsx')
+const versionUpgradeForm = source('src/pages/version-upgrades/VersionUpgradeSchedulerPage.tsx')
 
 const lookupSource = source('src/components/ui/SearchableReferenceLookup.tsx')
 
@@ -101,8 +106,11 @@ assert(
   'Shared reference lookup must default to five options plus Search... and confirm with Select.',
 )
 assert(
-  systemInventoryForm.includes("tenantOccupiesRequirement(tenant) ? 'Replace REQ-ID' : 'Attach REQ-ID'"),
-  'System Tenant actions must label Requirement ID attach versus replace without changing eligibility.',
+  systemInventoryForm.includes('Replace Requirement ID') &&
+    systemInventoryForm.includes('Replace tenant requirement') &&
+    !systemInventoryForm.includes('Attach REQ-ID') &&
+    !systemInventoryForm.includes('Replace REQ-ID'),
+  'System Tenant actions must use Replace Requirement ID and must not retain legacy Attach/Replace REQ-ID actions.',
 )
 assert(opportunityForm.includes('isCreateRoute(location, opportunityId)'), 'Opportunity form must use route-aware create detection.')
 assert(systemInventoryForm.includes('isCreateRoute(location, sid)'), 'Production System form must use route-aware create detection.')
@@ -114,9 +122,11 @@ assert(routesSource.indexOf("path: 'opportunities/new'") < routesSource.indexOf(
 assert(routesSource.indexOf("path: 'systems/production-inventory/new'") < routesSource.indexOf("path: 'systems/production-inventory/:sid'"), 'Production System /new route must be declared before /:sid.')
 assert(routesSource.indexOf("path: 'systems/reused-internal/new'") < routesSource.indexOf("path: 'systems/reused-internal/:mid'"), 'Reused Internal System /new route must be declared before /:mid.')
 assert(routesSource.indexOf("path: 'systems/cancelled'") < routesSource.indexOf("path: 'systems/:sid'"), 'Cancelled Systems dashboard route must be declared before /systems/:sid.')
+assert(routesSource.indexOf("path: 'version-upgrades/new'") < routesSource.indexOf("path: 'version-upgrades/:id'"), 'Version Upgrade /new route must be declared before /:id.')
 assert(!routesSource.includes("path: 'tenants/cancelled'"), 'Tenant Workspace must not expose a Cancelled Tenants dashboard route.')
 assert(routesSource.includes('<Navigate to="/systems/production-inventory/new" replace />'), 'Generic /systems/new must redirect to the supported Production System create route.')
 assert(infrastructureForm.includes("const isNew = infrastructureId === 'new'"), 'Infrastructure control flow must remain route-param create mode.')
+assert(versionUpgradeForm.includes("location.pathname === '/version-upgrades/new'"), 'Version Upgrade form must recognize the explicit /version-upgrades/new route as create mode.')
 
 const listSources = [
   'src/pages/projects/ProjectListPage.tsx',

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, Edit2, Plus, Save, Settings2, Trash2, X } from 'lucide-react'
@@ -10,16 +10,19 @@ import { ActivityTimeline } from '@/components/activity'
 import { ConfigurationHistorySection } from '@/components/application-configuration/ConfigurationHistorySection'
 import { ApplicationConfigurationSummaryTable } from '@/components/application-configuration/ApplicationConfigurationSummaryTable'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
-import { LinkedProjectsTable } from '@/components/projects/LinkedProjectsTable'
-import { projectMainTypeLabel } from '@/domain/project-lifecycle'
+import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
+import { projectMainTypeLabel, projectSubTypeDisplayValue } from '@/domain/project-lifecycle'
 import {
   EditableChildObjectActionButton,
+  editableChildObjectActionButtonClassName,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
 import {
   AlertStatusIcon,
   BusinessObjectLink,
   CheckboxMultiSelect,
+  EDIT_ACTION_LABEL,
+  EditActionIcon,
   FormField,
   LinkedProjectsLinks,
   MetadataHeaderField,
@@ -32,6 +35,7 @@ import {
   RichTextEditor,
   SaveButtonLabel,
   WarrantyStatusPresentation,
+  dirtyControlClassName,
   formMessageClassName,
 } from '@/components/ui'
 import { ConfigurationColumnHeaders } from '@/components/configuration'
@@ -40,6 +44,7 @@ import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { isRouteViewMode } from '@/utils/route-mode'
+import { cancelFormNavigationTarget, successfulSaveApplyNavigationTarget } from '@/utils/save-apply-navigation'
 import { YES_NO_OPTIONS } from '@/config/opportunity-metadata'
 import { PRODUCT_OPTIONS } from '@/config/cloud-platform-metadata'
 import { ADDITIONAL_FEATURE_OPTIONS, AI_OPTIONS, CROSS_SYSTEM_OPTIONS } from '@/config/picklist-options'
@@ -59,9 +64,10 @@ import type {
 import { useAppStore } from '@/store/useAppStore'
 import { addCustomPicklistOption, loadCustomPicklistOptions } from '@/utils/custom-picklist-options'
 import {
+  compareApplicationConfigurationField,
   configurationHistoryReadModel,
 } from '@/domain/application-configuration'
-import { formattedReusedInternalMachineId, tenantCountForSystem } from '@/domain/system-inventory'
+import { currentTenantPopulationForSystem, formattedReusedInternalMachineId } from '@/domain/system-inventory'
 import {
   ENGAGEMENT_CIRCLE_EMPTY_TEXT,
   ENGAGEMENT_CIRCLE_TABLE_HEADERS,
@@ -101,31 +107,29 @@ import {
   tenantConfigurationFromTenant,
   tenantDraftWithAttachedSystem,
   tenantActiveProjects,
-  tenantActivePocProject,
   tenantFormType,
   tenantHasActiveWarrantyProject,
-  tenantPocPidDisplay,
   tenantRelatedProjects,
+  tenantRequirementIdDisplay,
   tenantTimeZoneDisplayValue,
   TENANT_MANUAL_OPERATIONAL_MODES,
   TENANT_HOSTING_FIELDS,
   validateTenantConfigurationSave,
 } from '@/domain/tenant-operations'
-import { systemReference } from '@/domain/business-reference'
+import { systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForTenant } from '@/domain/activity-log'
 import { REMARK_TYPE_OPTIONS, type RemarkRecord } from '@/domain/remarks'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
-import { linkedProjectRowsForTenant } from '@/domain/linked-projects'
 import { tenantTimeGroupFromLocation } from '@/domain/time-groups'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 
-type TenantTab = 'tenantConfiguration' | 'hosting' | 'engagement' | 'linkedProjects' | 'usage' | 'documents' | 'activity'
+type TenantTab = 'tenantConfiguration' | 'hosting' | 'engagement' | 'usage' | 'documents' | 'activity'
 type TenantHostingTab = 'environment' | 'systemApplicationConfiguration'
 const TENANT_REMARK_TYPE_PICKLIST_KEY = 'tenantRemarkType'
 
 const TENANT_TABS: Array<{ id: TenantTab; label: string }> = [
   { id: 'tenantConfiguration', label: 'Tenant Configuration' },
   { id: 'hosting', label: 'Hosting' },
-  { id: 'linkedProjects', label: 'Linked Projects' },
   { id: 'usage', label: 'Usage' },
   { id: 'documents', label: 'Documents' },
   { id: 'engagement', label: ENGAGEMENT_CIRCLE_TAB_LABEL },
@@ -160,6 +164,34 @@ const TENANT_WARRANTY_HEADERS = [
 ]
 
 const CONFIGURATION_FIELDS: TenantConfigurationFieldMetadata[] = TENANT_CONFIGURATION_FIELDS
+const TENANT_CONFIGURATION_MIRROR_FIELDS: Array<keyof Tenant> = [
+  'productType',
+  'licenses',
+  'users',
+  'concurrentSearches',
+  'dailySearches',
+  'monthlySearches',
+  'concurrentAnalyses',
+  'topicAnalyses',
+  'dailyAnalyses',
+  'monthlyAnalyses',
+  'standardMonitors',
+  'fullMonitors',
+  'topicMonitors',
+  'mapCenter',
+  'tangles',
+  'tanglesGo',
+  'webloc',
+  'webeye',
+  'ingest',
+  'blockchain',
+  'crossSystemFeatures',
+  'apiEnabled',
+  'apiDailyQty',
+  'apiMonthlyQty',
+  'aiFeatures',
+  'additionalFeatures',
+]
 
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
@@ -170,7 +202,11 @@ function tenantParentSaveScope(tenant: Tenant): Partial<Tenant> {
   delete parentScope.documents
   delete parentScope.remarks
   delete parentScope.warranties
+  delete parentScope.configurationHistory
   delete parentScope.updatedAt
+  TENANT_CONFIGURATION_MIRROR_FIELDS.forEach((field) => {
+    delete parentScope[field]
+  })
   return parentScope
 }
 
@@ -279,8 +315,8 @@ export function TenantFormPage() {
   const { tid } = useParams<{ tid: string }>()
 const navigate = useNavigate()
 const location = useLocation()
-const isViewMode = isRouteViewMode(location)
 const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
+const isViewMode = !isNewRecordSession && isRouteViewMode(location)
   const tenants = useAppStore((state) => state.tenants)
   const systems = useAppStore((state) => state.systems)
   const projects = useAppStore((state) => state.projects)
@@ -323,9 +359,20 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const [predecessorSearch, setPredecessorSearch] = useState('')
   const [customPicklistOptions, setCustomPicklistOptions] = useState<Record<string, string[]>>(() => loadCustomPicklistOptions())
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
+  const bypassUnsavedPromptRef = useRef(false)
   const isDirty = Boolean(savedTenant && draft && !valuesEqual(tenantParentSaveScope(savedTenant), tenantParentSaveScope(draft)))
-  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
+  const navigationBlocker = useBlocker(() => isDirty && !isViewMode && !bypassUnsavedPrompt && !bypassUnsavedPromptRef.current)
   useBeforeUnloadWarning(isDirty && !isViewMode)
+
+  useEffect(() => {
+    bypassUnsavedPromptRef.current = false
+    setBypassUnsavedPrompt(false)
+  }, [location.pathname])
+
+  function bypassNextTenantNavigation() {
+    bypassUnsavedPromptRef.current = true
+    setBypassUnsavedPrompt(true)
+  }
 
   useReactiveDraftSync({
     source: savedTenant ? cloneTenant(savedTenant) : null,
@@ -344,7 +391,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return (
       <PlaceholderCard
         title="Tenant not found"
-        description={`No tenant with TID "${tid}" in mock store.`}
+        description={`No tenant with TID "${tid}" exists in the current ERP data.`}
       />
     )
   }
@@ -364,18 +411,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   const formType = tenantFormType(tenantDraft)
   const tenantConfiguration = configurationFromTenant(tenantDraft, activeSystem)
   const configuration = tenantConfiguration
+  const persistedConfiguration = configurationFromTenant(persistedTenant, activeSystem)
   const hosting = hostingSnapshotFromSystem(tenantDraft, activeSystem)
   const relatedProjects = tenantRelatedProjects(tenantDraft, projects, projectTenants, systems, projectSystems, opportunities)
-  const linkedProjectRows = linkedProjectRowsForTenant(tenantDraft, { projects, projectSystems, projectTenants, opportunities, accounts, systems })
   const projectById = new Map(projects.map((candidate) => [candidate.id, candidate]))
-  const pocPidDisplay = tenantPocPidDisplay(tenantDraft, projects, projectTenants)
-  const originalDeliveryProject = tenantDraft.deliveryPid
-    ? projects.find((candidate) => candidate.pid === tenantDraft.deliveryPid && candidate.mainType !== 'POC')
+  const headerProjectId = tenantDraft.deliveryPid ?? ''
+  const headerProject = headerProjectId
+    ? projects.find((candidate) => candidate.pid === headerProjectId)
     : undefined
-  const headerPocProject = tenantActivePocProject(tenantDraft, projects, projectTenants)
-  const headerProject = formType === 'POC' ? headerPocProject : originalDeliveryProject
-  const headerDeliveryPid = formType === 'POC' ? '' : tenantDraft.deliveryPid ?? ''
-  const headerPocPid = formType === 'POC' ? headerPocProject?.pid ?? pocPidDisplay : ''
+  const headerPocProject = headerProject?.mainType === 'POC' ? headerProject : undefined
   const showWarrantySection = tenantHasActiveWarrantyProject(tenantDraft, projects, projectTenants)
   const computedWarrantiesForTenant = (tenant: Tenant, source: TenantWarranty[]): TenantWarranty[] =>
     computeTenantWarranties(source, tenant, projects, (selectedProject) => resolveOpportunity(selectedProject, opportunities), projectOpportunityReference)
@@ -497,22 +541,47 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
       setMessages(['No changes to save.'])
       setSaveMenuOpen(false)
       onSuccess?.()
-      if (!stayOnPage && returnTo) {
-        setBypassUnsavedPrompt(true)
-        window.setTimeout(() => navigate(returnTo), 0)
+      const navigationTarget = successfulSaveApplyNavigationTarget({
+        isCreateMode: false,
+        stayOnPage,
+        persistedRoute: `/tenants/${tenantDraft.tid}`,
+        returnTo,
+        fallbackExitRoute: '/tenants',
+      })
+      if (navigationTarget) {
+        bypassNextTenantNavigation()
+        window.setTimeout(() => navigate(navigationTarget), 0)
       }
       return
     }
 
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id, { preserveNewState: isNewRecordSession })
+    let committedTenant: Tenant | undefined
+    try {
+      committedTenant = saveTenantConfiguration(persistedTenant.id, normalizedDraft, activeSystem?.id, { preserveNewState: isNewRecordSession })
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? ` ${error.message}` : ''
+      setMessages([`Tenant could not be saved.${reason}`])
+      setSaveMenuOpen(false)
+      return
+    }
+    if (committedTenant) {
+      resetDraft(cloneTenant(committedTenant))
+    }
     setMessages(['Tenant saved.'])
     setSaveMenuOpen(false)
     onSuccess?.()
-    if (!stayOnPage && returnTo) {
-      setBypassUnsavedPrompt(true)
-      window.setTimeout(() => navigate(returnTo), 0)
+    const navigationTarget = successfulSaveApplyNavigationTarget({
+      isCreateMode: false,
+      stayOnPage,
+      persistedRoute: `/tenants/${committedTenant?.tid ?? tenantDraft.tid}`,
+      returnTo,
+      fallbackExitRoute: '/tenants',
+    })
+    if (navigationTarget) {
+      bypassNextTenantNavigation()
+      window.setTimeout(() => navigate(navigationTarget), 0)
     }
   }
 
@@ -522,9 +591,19 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function cancelTenant() {
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    const navigationTarget = cancelFormNavigationTarget({
+      isCreateMode: false,
+      persistedRoute: `/tenants/${persistedTenant.tid}`,
+      returnTo,
+      fallbackExitRoute: '/tenants',
+      currentRoute: `${location.pathname}${location.search}`,
+    })
     resetDraft(cloneTenant(persistedTenant))
-    setBypassUnsavedPrompt(true)
-    window.setTimeout(() => navigate('/tenants'), 0)
+    bypassNextTenantNavigation()
+    window.setTimeout(() => navigate(navigationTarget), 0)
   }
 
   function editWarranty(warranty: TenantWarranty) {
@@ -684,8 +763,8 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     return (
       <div className="flex flex-wrap gap-2">
         {isViewMode ? (
-          <button type="button" className="rounded bg-sf-brand px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700" onClick={switchToEditMode}>
-            Edit
+          <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded bg-sf-brand text-white hover:bg-blue-700" title={EDIT_ACTION_LABEL} aria-label={EDIT_ACTION_LABEL} onClick={switchToEditMode}>
+            <EditActionIcon />
           </button>
         ) : null}
         {isViewMode ? null : (
@@ -858,10 +937,10 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     )
   }
 
-  function renderCurrentSidField() {
+  function renderHostSidField() {
     if (activeSystem) {
       return renderHeaderField(
-        'Current SID',
+        'Host SID',
         <BusinessObjectLink reference={systemReference(activeSystem)}>{hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)}</BusinessObjectLink>,
       )
     }
@@ -869,7 +948,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     if (tenantDraft.systemId) {
       return (
         <MetadataHeaderField
-          label="Current SID"
+          label="Host SID"
           controlWidthClassName="w-52"
           businessEditable={false}
           editor={null}
@@ -879,7 +958,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
     }
 
     return (
-      <FormField label="Current SID" controlWidthClassName="w-52">
+      <FormField label="Host SID" controlWidthClassName="w-52">
         <select
           className="h-8 w-full rounded border border-sf-border bg-white px-2 py-1 text-sm"
           value={tenantDraft.systemId}
@@ -902,7 +981,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <div className="flex flex-wrap items-start gap-3">
           {renderTenantTypeField()}
           {renderOperationalModeField()}
-          {renderHeaderField('License Number', formType === 'CUSTOMER' ? licenseNumber(headerDeliveryPid, hosting.sid, tenantDraft.tid) : '', 'w-64')}
+          {renderHeaderField('License Number', formType === 'CUSTOMER' ? licenseNumber(headerProjectId, hosting.sid, tenantDraft.tid) : '', 'w-64')}
           {renderHeaderField('Delivery Date', <DateTimeValue value={headerProject?.deliveryDate} semanticType="date" fallback="-" />)}
           {headerPocProject ? renderHeaderField('POC Start Date', <DateTimeValue value={headerPocProject.pocStartDate} semanticType="date" fallback="-" />) : null}
           {headerPocProject ? renderHeaderField('POC End Date', <DateTimeValue value={headerPocProject.pocEndDate} semanticType="date" fallback="-" />) : null}
@@ -910,23 +989,48 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
           {renderHeaderField('Alert', formType === 'POC' && tenantDraft.pocEndDate ? 'POC period tracked' : '')}
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderHeaderField('Delivery PID', renderPidLinks(headerDeliveryPid))}
-          {renderHeaderField('POC PID', renderPidLinks(headerPocPid))}
-          {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
-          {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
-          {renderCurrentSidField()}
+          {renderHostSidField()}
           {renderHeaderField('System Operational Status', renderSystemStatus(activeSystem?.operationalStatus ?? hosting.operationalStatus))}
+          {renderHeaderField('Requirement ID', tenantRequirementIdDisplay(tenantDraft))}
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderHeaderField('Account / End User', tenantDraft.accountName || project?.accountName || '')}
+          {renderHeaderField('Project ID', renderPidLinks(headerProjectId))}
+          {renderHeaderField('Project Type', projectMainTypeLabel(headerProject?.mainType))}
+          {renderHeaderField('Project Sub Type', projectSubTypeDisplayValue(headerProject?.subType))}
+          {renderHeaderField('Project Name', headerProject?.opportunityName ?? '')}
+          {renderHeaderField('Project Status', headerProject ? <ProjectStatusIcon status={headerProject.progressStatus} /> : '')}
+        </div>
+        <div className="flex flex-wrap items-start gap-3">
+          {renderHeaderField('Account', tenantDraft.accountName || project?.accountName || '')}
           {renderHeaderField('Region', opportunity?.region ?? activeSystem?.region ?? '')}
-          {renderHeaderField('Country', tenantDraft.country || opportunity?.country || activeSystem?.country || '')}
+          {renderHeaderField('Country', countryDisplayName(tenantDraft.country || opportunity?.country || activeSystem?.country || ''))}
           {renderHeaderField('State', opportunity?.state ?? activeSystem?.state ?? '')}
           {renderHeaderField('Time Zone', tenantTimeZoneDisplayValue(tenantDraft, opportunity, activeSystem))}
           {renderHeaderField('Time Group', tenantTimeGroupFromLocation({ ...tenantDraft, state: opportunity?.state ?? activeSystem?.state ?? '' }, timeGroupLookups).timeGroup || '')}
         </div>
         {renderCancellationAuditHeaderRow()}
       </section>
+    )
+  }
+
+  function renderTenantLinksForHosting(systemTenants: Tenant[]) {
+    if (systemTenants.length === 0) return '-'
+    const tenantRows = Array.from({ length: Math.ceil(systemTenants.length / 3) }, (_, index) =>
+      systemTenants.slice(index * 3, index * 3 + 3),
+    )
+    return (
+      <div className="max-w-[24rem] space-y-0.5 whitespace-normal">
+        {tenantRows.map((tenantRow) => (
+          <div key={tenantRow.map((tenant) => tenant.id).join('|')} className="whitespace-nowrap">
+            {tenantRow.map((tenant, index) => (
+              <span key={tenant.id}>
+                <BusinessObjectLink reference={tenantReference(tenant)}>{tenant.tid}</BusinessObjectLink>
+                {index < tenantRow.length - 1 ? <span className="text-sf-text-muted">, </span> : null}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
     )
   }
 
@@ -939,13 +1043,15 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
   }
 
   function renderHostingTab() {
+    const hostedTenantSet = activeSystem ? currentTenantPopulationForSystem(activeSystem.id, tenants) : []
     const hostingRows = activeSystem
       ? [TENANT_HOSTING_FIELDS.map((field) => {
           if (field.key === 'sid') {
             const sid = hosting.sid || activeSystem.sid || formattedReusedInternalMachineId(activeSystem.machineId)
             return sid ? <BusinessObjectLink reference={systemReference(activeSystem)}>{sid}</BusinessObjectLink> : '-'
           }
-          if (field.key === 'tenantCount') return activeSystem ? String(tenantCountForSystem(activeSystem, tenants)) : '0'
+          if (field.key === 'tenantCount') return String(hostedTenantSet.length)
+          if (field.key === 'tenants') return renderTenantLinksForHosting(hostedTenantSet)
           return textValue(hosting[field.key])
         })]
       : []
@@ -982,21 +1088,26 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
     function editorFor(field: TenantConfigurationFieldMetadata) {
       const value = configuration[field.configKey]
+      const isChanged = !compareApplicationConfigurationField(
+        field,
+        { [field.configKey]: value },
+        persistedConfiguration,
+      ).matches
       if (isViewMode || !field.editable) return textValue(value) || '-'
       if (field.inputType === 'multiselect') {
-        return <CheckboxMultiSelect id={`tenant-configuration-${field.configKey}`} label={field.label} selected={Array.isArray(value) ? value.map(String) : []} options={optionsFor(field).filter(Boolean).map((option) => ({ value: option }))} onChange={(selected) => updateConfiguration(field, selected)} />
+        return <CheckboxMultiSelect id={`tenant-configuration-${field.configKey}`} label={field.label} selected={Array.isArray(value) ? value.map(String) : []} options={optionsFor(field).filter(Boolean).map((option) => ({ value: option }))} dirty={isChanged} onChange={(selected) => updateConfiguration(field, selected)} />
       }
       if (field.inputType === 'picklist') {
         return (
-          <select className="h-8 w-40 rounded border border-sf-border bg-white px-2 py-1 text-sm" value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)}>
+          <select className={['h-8 w-40 rounded border border-sf-border px-2 py-1 text-sm', dirtyControlClassName(isChanged)].join(' ')} value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)}>
             {optionsFor(field).map((option) => <option key={option} value={option}>{option || 'Not set'}</option>)}
           </select>
         )
       }
       if (field.inputType === 'integer') {
-        return <input className="h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm" type="number" min="0" step="1" inputMode="numeric" value={value == null ? '' : String(value)} onChange={(event) => updateConfiguration(field, event.target.value === '' ? null : Math.max(0, Math.trunc(Number(event.target.value))))} />
+        return <input className={['h-8 w-24 rounded border border-sf-border px-2 py-1 text-sm', dirtyControlClassName(isChanged)].join(' ')} type="number" min="0" step="1" inputMode="numeric" value={value == null ? '' : String(value)} onChange={(event) => updateConfiguration(field, event.target.value === '' ? null : Math.max(0, Math.trunc(Number(event.target.value))))} />
       }
-      return <input className="h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm" value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)} />
+      return <input className={['h-8 w-36 rounded border border-sf-border px-2 py-1 text-sm', dirtyControlClassName(isChanged)].join(' ')} value={textValue(value)} onChange={(event) => updateConfiguration(field, event.target.value)} />
     }
 
     return (
@@ -1039,25 +1150,20 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         documents={tenantDraft.documents ?? []}
         emptyText="No documents uploaded for this tenant."
         readOnly={isViewMode}
-        onChange={(documents) => {
-          if (isViewMode) return
-          updateTenant(persistedTenant.id, { documents })
-          setDraft((current) => (current ? { ...current, documents } : current))
+          onChange={(documents) => {
+            if (isViewMode) return
+          const committedTenant = updateTenant(persistedTenant.id, { documents })
+          setDraft((current) => (current && committedTenant ? cloneTenant(committedTenant) : current))
           setMessages([])
         }}
       />
     )
   }
 
-  function renderLinkedProjectsTab() {
-    return <LinkedProjectsTable rows={linkedProjectRows} />
-  }
-
   function renderActiveTab() {
     if (activeTab === 'tenantConfiguration') return renderApplicationConfigurationTab()
     if (activeTab === 'hosting') return renderHostingTab()
     if (activeTab === 'engagement') return renderEngagementTab()
-    if (activeTab === 'linkedProjects') return renderLinkedProjectsTab()
     if (activeTab === 'documents') return renderDocumentsTab()
     if (activeTab === 'activity') {
       return (
@@ -1072,35 +1178,30 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
 
   function renderRemarks() {
     return (
-      <section className="sf-card space-y-3 p-3">
-        <RemarksGrid
-          remarks={(tenantDraft.remarks ?? []) as RemarkRecord[]}
-          onChange={(remarks) => {
-            if (isViewMode) return
-            updateTenant(persistedTenant.id, { remarks })
-            setDraft((current) => (current ? { ...current, remarks } : current))
-            setMessages([])
-          }}
-          typeOptions={optionsWithCustom(TENANT_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Warranty', 'Add new...'])}
-          onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, TENANT_REMARK_TYPE_PICKLIST_KEY, value))}
-          readOnly={isViewMode}
-        />
-      </section>
+      <RemarksGrid
+        remarks={(tenantDraft.remarks ?? []) as RemarkRecord[]}
+        onChange={(remarks) => {
+          if (isViewMode) return
+          const committedTenant = updateTenant(persistedTenant.id, { remarks })
+          setDraft((current) => (current && committedTenant ? cloneTenant(committedTenant) : current))
+          setMessages([])
+        }}
+        typeOptions={optionsWithCustom(TENANT_REMARK_TYPE_PICKLIST_KEY, [...REMARK_TYPE_OPTIONS, 'Warranty', 'Add new...'])}
+        onAddTypeOption={(value) => setCustomPicklistOptions((current) => addCustomPicklistOption(current, TENANT_REMARK_TYPE_PICKLIST_KEY, value))}
+        readOnly={isViewMode}
+      />
     )
   }
 
   function renderConfigurationHistory() {
     const records = configurationHistoryReadModel(persistedTenant)
     return (
-      <section className="sf-card space-y-3 p-3">
-        <h2 className="text-lg font-semibold text-sf-text">Configuration History</h2>
-        <ConfigurationHistorySection
-          records={records}
-          fields={CONFIGURATION_FIELDS}
-          emptyText="No configuration changes have been recorded for this POC tenant."
-          tidValue={() => 'this'}
-        />
-      </section>
+      <ConfigurationHistorySection
+        records={records}
+        fields={CONFIGURATION_FIELDS}
+        emptyText="No configuration changes have been recorded for this POC tenant."
+        tidValue={() => 'this'}
+      />
     )
   }
 
@@ -1144,7 +1245,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-sf-text">Warranties</h2>
           {isViewMode ? null : (
-            <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarranty}>
+            <button type="button" className={editableChildObjectActionButtonClassName()} onClick={addWarranty}>
               <Plus className="h-4 w-4" aria-hidden="true" />
               Add warranty
             </button>
@@ -1432,7 +1533,7 @@ const isNewRecordSession = (location.state as { newRecordSession?: boolean } | n
                     <option key={tenant.id} value={tenant.id}>{tenant.tid}</option>
                   ))}
                 </select>
-                <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={addWarrantyDialogPredecessor}>
+                <button type="button" className={editableChildObjectActionButtonClassName()} onClick={addWarrantyDialogPredecessor}>
                   Add predecessor
                 </button>
               </div>

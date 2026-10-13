@@ -18,6 +18,7 @@ export function ReusedInternalSystemsInventoryPage() {
   const systems = useAppStore((state) => state.reusedInternalSystems)
   const projects = useAppStore((state) => state.projects)
   const projectSystems = useAppStore((state) => state.projectSystems)
+  const allocatedSystems = useAppStore((state) => state.systems)
   const sortedSystems = useMemo(
     () => [...systems]
       .filter((system) => system.operationalStatus !== SYSTEM_OPERATIONAL_STATUS_CANCELED)
@@ -26,8 +27,8 @@ export function ReusedInternalSystemsInventoryPage() {
   )
   const updateSystem = useAppStore((state) => state.updateReusedInternalSystem)
   const reusedInternalSystemColumns = useMemo(
-    () => createReusedInternalSystemColumns(projects, projectSystems),
-    [projectSystems, projects],
+    () => createReusedInternalSystemColumns(projects, projectSystems, allocatedSystems),
+    [allocatedSystems, projectSystems, projects],
   )
 
   return (

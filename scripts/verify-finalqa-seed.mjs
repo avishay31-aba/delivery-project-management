@@ -19,6 +19,35 @@ function countBy(rows, keyFn) {
   }, {})
 }
 
+function loadProjectMilestoneTaskTemplates() {
+  const source = readFileSync(fileURLToPath(new URL('../src/config/project-milestone-templates.ts', import.meta.url)), 'utf8')
+  const declarationIndex = source.indexOf('export const PROJECT_MILESTONE_TASK_TEMPLATES')
+  const objectStart = source.indexOf('{', declarationIndex)
+  const objectEnd = source.indexOf('\n} as Record', objectStart)
+  if (declarationIndex < 0 || objectStart < 0 || objectEnd < 0) throw new Error('Unable to locate PROJECT_MILESTONE_TASK_TEMPLATES.')
+  return Function(`return (${source.slice(objectStart, objectEnd + 2)})`)()
+}
+
+function projectMilestonePlanMatchesTemplate(project, templates) {
+  const template = templates[project.milestoneTemplateId]
+  if (!template) return false
+  const expectedMilestones = [...new Map(template.rows.map((row) => [
+    `${row.milestoneOrder}:${row.milestone}`,
+    { order: row.milestoneOrder, name: row.milestone },
+  ])).values()].sort((first, second) => first.order - second.order)
+  const milestones = [...(project.milestones ?? [])].sort((first, second) => first.order - second.order)
+  const tasks = [...(project.tasks ?? [])].sort((first, second) => first.order - second.order)
+  return milestones.length === expectedMilestones.length &&
+    tasks.length === template.rows.length &&
+    expectedMilestones.every((expected, index) => milestones[index]?.order === expected.order && milestones[index]?.name === expected.name) &&
+    template.rows.every((expected, index) => {
+      const actual = tasks[index]
+      return actual?.name === expected.task &&
+        actual.department === expected.department &&
+        actual.resource === expected.resource
+    })
+}
+
 function allRequirements(opportunity) {
   return [
     ...(opportunity.newTenantRequirements ?? []).map((requirement) => ({ opportunity, requirement, type: 'A' })),
@@ -53,6 +82,8 @@ const nonSequentialRequirementIds = requirementIds.filter((requirementId, index)
 const projectsById = new Map(projects.map((project) => [project.id, project]))
 const systemsById = new Map(systems.map((system) => [system.id, system]))
 const tenantsById = new Map(tenants.map((tenant) => [tenant.id, tenant]))
+const reusedSystemsByMachineId = new Map(reusedInternalSystems.map((system) => [system.machineId, system]))
+const projectTemplates = loadProjectMilestoneTaskTemplates()
 const requirementByProjectAndId = new Set()
 projects.forEach((project) => {
   const opportunity = opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId)
@@ -93,10 +124,60 @@ const allProductionSystems = [...hostedProductionSystems, ...productionSystemInv
 const productionSystemsById = new Map(allProductionSystems.map((system) => [system.id, system]))
 const allAllocatedAndProductionSids = [...systems, ...productionSystemInventory].map((system) => system.sid).filter(Boolean)
 const duplicateSystemSids = allAllocatedAndProductionSids.filter((sid, index) => allAllocatedAndProductionSids.indexOf(sid) !== index)
+const projectTemplateMismatches = projects
+  .filter((project) => project.milestoneTemplateId)
+  .filter((project) => !projectMilestonePlanMatchesTemplate(project, projectTemplates))
+  .map((project) => project.pid)
+const doneProjectsWithOpenTasks = projects
+  .filter((project) => project.progressStatus === 'DONE')
+  .filter((project) => (project.tasks ?? []).some((task) => task.status !== 'DONE'))
+  .map((project) => project.pid)
+const openProjectsWithAllTasksDone = projects
+  .filter((project) => project.progressStatus === 'OPEN' && (project.tasks ?? []).length > 0)
+  .filter((project) => (project.tasks ?? []).every((task) => task.status === 'DONE'))
+  .map((project) => project.pid)
 const onPremProductionSystems = allProductionSystems.filter((system) => system.hostingType === 'On premise')
 const openPocProjects = projects.filter((project) => project.mainType === 'POC' && project.progressStatus === 'OPEN')
 const donePocProjects = projects.filter((project) => project.mainType === 'POC' && project.progressStatus === 'DONE')
+const invalidPocProjectDates = projects
+  .filter((project) => project.mainType === 'POC' && project.pocStartDate && project.pocEndDate && project.pocEndDate < project.pocStartDate)
+  .map((project) => `${project.pid}:${project.pocStartDate}>${project.pocEndDate}`)
+const activePocRisMissingOccupationDates = reusedInternalSystems
+  .filter((system) => system.purpose === 'POC')
+  .filter((system) => !system.occupationStartDate || !system.occupationEndDate)
+  .map((system) => system.machineId)
+const purposeHistoryMissingOwner = reusedInternalSystems
+  .flatMap((system) => (system.purposeHistory ?? []).map((row) => ({ system, row })))
+  .filter(({ row }) => !row.owner)
+  .map(({ system, row }) => `${system.machineId}/${row.recordId}`)
+const configurationHistoryTidIsSid = systems
+  .flatMap((system) => (system.configurationHistory ?? []).map((row) => ({ system, row })))
+  .filter(({ system, row }) => row.tid && row.tid === system.sid)
+  .map(({ system, row }) => `${system.sid}/${row.recordId}`)
 const reusedPurposeCounts = countBy(reusedInternalSystems, (system) => system.purpose)
+const reusedInternalPurposeInvariantMismatches = [
+  ...reusedInternalSystems
+    .filter((system) => !String(system.purpose ?? '').trim())
+    .map((system) => `${system.machineId}:blank-purpose`),
+  ...reusedInternalSystems
+    .filter((system) => system.purpose === 'None' && system.status !== 'Available')
+    .map((system) => `${system.machineId}:None/${system.status}`),
+  ...reusedInternalSystems
+    .filter((system) => system.purpose === 'POC' && system.status !== 'Occupied')
+    .map((system) => `${system.machineId}:POC/${system.status}`),
+  ...systems
+    .filter((system) => system.source === 'Reused Internal Systems')
+    .filter((system) => !String(system.purpose ?? '').trim())
+    .map((system) => `${system.sid}:blank-purpose`),
+  ...systems
+    .filter((system) => system.source === 'Reused Internal Systems')
+    .filter((system) => system.purpose === 'None' && system.availability !== 'AVAILABLE')
+    .map((system) => `${system.sid}:None/${system.availability}`),
+  ...systems
+    .filter((system) => system.source === 'Reused Internal Systems')
+    .filter((system) => system.purpose === 'POC' && system.availability !== 'OCCUPIED')
+    .map((system) => `${system.sid}:POC/${system.availability}`),
+]
 const accountsByRegion = countBy(accounts, (account) => account.region)
 const referenceById = new Map(referenceData.map((record) => [record.id, record]))
 const referenceLabel = (id) => referenceById.get(id)?.label ?? ''
@@ -360,17 +441,107 @@ const activeReusedInternalAllocationIdentityMismatches = activeReusedInternalAll
     return !allocatedSystem || !allocatedSystem.sid || !link.sourceMachineId || !reusedResource || allocatedSystem.machineId !== link.sourceMachineId || allocatedSystem.sid === link.sourceMachineId
   })
   .map((link) => ({ id: link.id, systemId: link.systemId, sourceMachineId: link.sourceMachineId ?? '' }))
+const activeReusedInternalOccupationDateMismatches = activeReusedInternalAllocations
+  .map((link) => ({ link, system: systemsById.get(link.systemId), project: projectsById.get(link.projectId) }))
+  .filter(({ system, project }) =>
+    !system ||
+    !project ||
+    project.mainType !== 'POC' ||
+    system.purpose !== 'POC' ||
+    system.availability !== 'OCCUPIED' ||
+    system.occupationStartDate !== project.pocStartDate ||
+    system.occupationEndDate !== project.pocEndDate,
+  )
+  .map(({ link, system, project }) => ({ id: link.id, sid: system?.sid ?? link.systemId, pid: project?.pid ?? link.projectId }))
+const historicalSystemAllocationMismatches = projectSystems
+  .map((link) => ({ link, system: systemsById.get(link.systemId), project: projectsById.get(link.projectId) }))
+  .filter(({ system, project }) =>
+    !system ||
+    !project ||
+    !(system.linkedProjectIds ?? []).includes(project.id),
+  )
+  .map(({ link, system, project }) => ({ id: link.id, sid: system?.sid ?? link.systemId, pid: project?.pid ?? link.projectId }))
+const completedPocActiveRisAllocations = projectSystems
+  .filter((link) => link.allocationType === 'REUSED_INTERNAL' && link.allocationStatus !== 'DEALLOCATED')
+  .filter((link) => {
+    const project = projectsById.get(link.projectId)
+    return project?.mainType === 'POC' && project.progressStatus === 'DONE'
+  })
+  .map((link) => ({ id: link.id, pid: projectsById.get(link.projectId)?.pid ?? link.projectId, sid: systemsById.get(link.systemId)?.sid ?? link.systemId }))
+const completedPocReleasedSidMismatches = projectSystems
+  .filter((link) => link.allocationType === 'REUSED_INTERNAL' && link.allocationStatus === 'DEALLOCATED')
+  .map((link) => ({ link, project: projectsById.get(link.projectId), system: systemsById.get(link.systemId) }))
+  .filter(({ project }) => project?.mainType === 'POC' && project.progressStatus === 'DONE')
+  .filter(({ system }) =>
+    !system ||
+    system.purpose !== 'None' ||
+    system.availability !== 'AVAILABLE' ||
+    Boolean(system.deliveryPid) ||
+    Boolean(system.occupationStartDate || system.occupationEndDate),
+  )
+  .map(({ link, project, system }) => ({ pid: project?.pid ?? link.projectId, sid: system?.sid ?? link.systemId }))
+const completedPocPurposeHistoryMismatches = projectSystems
+  .filter((link) => link.allocationType === 'REUSED_INTERNAL' && link.allocationStatus === 'DEALLOCATED')
+  .map((link) => ({ link, project: projectsById.get(link.projectId), reused: reusedSystemsByMachineId.get(link.sourceMachineId) }))
+  .filter(({ project }) => project?.mainType === 'POC' && project.progressStatus === 'DONE')
+  .filter(({ project, reused }) => !(reused?.purposeHistory ?? []).some((row) =>
+    row.purposeType === 'POC' &&
+    row.startDate === project.pocStartDate &&
+    row.endDate === project.pocEndDate &&
+    row.owner,
+  ))
+  .map(({ project, link }) => ({ pid: project?.pid ?? link.projectId, machineId: link.sourceMachineId }))
+const explicitQaSid = systems.find((system) => system.sid === 'S000270')
+const explicitQaProject = projects.find((project) => project.pid === 'P000360')
+const explicitQaAllocation = explicitQaSid && explicitQaProject
+  ? projectSystems.find((link) => link.systemId === explicitQaSid.id && link.projectId === explicitQaProject.id)
+  : undefined
+const explicitQaOccupationDateMatch = Boolean(
+  explicitQaSid &&
+  explicitQaProject &&
+  explicitQaAllocation &&
+  explicitQaSid.occupationStartDate === explicitQaProject.pocStartDate &&
+  explicitQaSid.occupationEndDate === explicitQaProject.pocEndDate,
+)
+const explicitProjectQa = projects.find((project) => project.pid === 'P000390')
+const explicitSystemQa = systems.find((system) => system.sid === 'S000300')
+const explicitProjectSystemQa = explicitProjectQa && explicitSystemQa
+  ? projectSystems.find((link) => link.projectId === explicitProjectQa.id && link.systemId === explicitSystemQa.id)
+  : undefined
+const explicitReusedSystemQa = explicitSystemQa ? reusedSystemsByMachineId.get(explicitSystemQa.machineId) : undefined
+const explicitProjectQaValid = Boolean(
+  explicitProjectQa &&
+  explicitSystemQa &&
+  explicitProjectSystemQa &&
+  explicitReusedSystemQa &&
+  explicitProjectQa.progressStatus === 'DONE' &&
+  (explicitProjectQa.tasks ?? []).length > 2 &&
+  (explicitProjectQa.tasks ?? []).every((task) => task.status === 'DONE') &&
+  explicitProjectSystemQa.allocationStatus === 'DEALLOCATED' &&
+  explicitSystemQa.purpose === 'None' &&
+  explicitSystemQa.availability === 'AVAILABLE' &&
+  explicitSystemQa.deliveryPid === '' &&
+  !explicitSystemQa.occupationStartDate &&
+  !explicitSystemQa.occupationEndDate &&
+  (explicitSystemQa.linkedProjectIds ?? []).includes(explicitProjectQa.id) &&
+  !(explicitReusedSystemQa.currentProjectIds ?? []).includes(explicitProjectQa.id) &&
+  (explicitReusedSystemQa.purposeHistory ?? []).some((row) =>
+    row.purposeType === 'POC' &&
+    row.startDate === explicitProjectQa.pocStartDate &&
+    row.endDate === explicitProjectQa.pocEndDate,
+  )
+)
 const activeAllocatedSystemsWithoutSid = systems
   .filter((system) => activeProjectSystemIds.has(system.id) && !system.sid)
   .map((system) => system.id)
 const cancellableUnallocatedProductionSystems = productionSystemInventory.filter((system) => system.operationalStatus !== 'Canceled' && system.operationalStatus !== 'Cancelled' && !activeProjectSystemIds.has(system.id))
 const allocatedProductionSystemsRejectCancellation = hostedProductionSystems.filter((system) => system.operationalStatus !== 'Canceled' && system.operationalStatus !== 'Cancelled' && activeProjectSystemIds.has(system.id))
-const availableReusedInternalSystemsCanCancel = reusedInternalSystems.filter((system) => system.purpose === 'Available' && system.operationalStatus !== 'Canceled' && system.operationalStatus !== 'Cancelled')
+const availableReusedInternalSystemsCanCancel = reusedInternalSystems.filter((system) => system.purpose === 'None' && system.operationalStatus !== 'Canceled' && system.operationalStatus !== 'Cancelled')
 const occupiedReusedInternalSystemsRejectCancellation = reusedInternalSystems.filter(
   (system) =>
     system.operationalStatus !== 'Canceled' &&
     system.operationalStatus !== 'Cancelled' &&
-    (activeProjectSystemLinks.some((link) => link.sourceMachineId === system.machineId || link.systemId === system.id) || !['Available', 'OBSOLETE'].includes(system.purpose)),
+    (activeProjectSystemLinks.some((link) => link.sourceMachineId === system.machineId || link.systemId === system.id) || !['None', 'OBSOLETE'].includes(system.purpose)),
 )
 const cancelledSystemsWithNoActiveAllocation = cancelledSystems.filter((system) => !activeProjectSystemIds.has(system.id))
 
@@ -381,16 +552,41 @@ const summary = {
   hostedProductionSystems: hostedProductionSystems.length,
   productionInventorySystems: productionSystemInventory.length,
   duplicateSystemSids,
+  projectTemplateMismatches,
+  doneProjectsWithOpenTasks,
+  openProjectsWithAllTasksDone,
   activeReusedInternalAllocations: activeReusedInternalAllocations.length,
   reusedInternalMultiUseHistory,
   activeReusedInternalAllocationIdentityMismatches,
+  activeReusedInternalOccupationDateMismatches,
+  historicalSystemAllocationMismatches,
+  completedPocActiveRisAllocations,
+  completedPocReleasedSidMismatches,
+  completedPocPurposeHistoryMismatches,
+  explicitQa: {
+    sid: explicitQaSid?.sid ?? null,
+    pid: explicitQaProject?.pid ?? null,
+    allocationId: explicitQaAllocation?.id ?? null,
+    occupationDateMatch: explicitQaOccupationDateMatch,
+  },
+  explicitProjectQa: {
+    pid: explicitProjectQa?.pid ?? null,
+    sid: explicitSystemQa?.sid ?? null,
+    allocationStatus: explicitProjectSystemQa?.allocationStatus ?? null,
+    projectValid: explicitProjectQaValid,
+  },
   activeAllocatedSystemsWithoutSid,
   onPremProductionSystems: onPremProductionSystems.length,
   customerTenants: tenants.filter((tenant) => tenant.tenantType === 'CUSTOMER').length,
   reusedInternalSystems: reusedInternalSystems.length,
   reusedPurposeCounts,
+  reusedInternalPurposeInvariantMismatches,
   openPocProjects: openPocProjects.length,
   donePocProjects: donePocProjects.length,
+  invalidPocProjectDates,
+  activePocRisMissingOccupationDates,
+  purposeHistoryMissingOwner,
+  configurationHistoryTidIsSid,
   requirements: requirementIds.length,
   infrastructureItems: infrastructureItems.length,
   hpServerCount,
@@ -449,17 +645,32 @@ assert(hostedProductionSystems.length === 200, 'Final QA seed must contain 200 h
 assert(productionSystemInventory.length === 40, 'Final QA seed must contain 40 standalone Production inventory Systems.')
 assert(hostedProductionSystems.length + productionSystemInventory.length === 240, 'Final QA seed must contain 240 total Production Systems.')
 assert(duplicateSystemSids.length === 0, 'SID values must be globally unique across allocated Systems and Production Inventory.')
+assert(projectTemplateMismatches.length === 0, 'Projects must use their resolved milestone/task template shape.')
+assert(doneProjectsWithOpenTasks.length === 0, 'DONE Projects must not have OPEN tasks.')
+assert(openProjectsWithAllTasksDone.length === 0, 'OPEN Projects must not have every task DONE.')
 assert(activeAllocatedSystemsWithoutSid.length === 0, 'Every active allocated System must have an SID.')
 assert(activeReusedInternalAllocationIdentityMismatches.length === 0, 'Every active Reused Internal allocation must resolve an allocated SID instance and a distinct reusable MID resource.')
+assert(activeReusedInternalOccupationDateMismatches.length === 0, 'Every active Reused Internal POC allocation must populate allocated SID occupation dates from the POC Project.')
+assert(historicalSystemAllocationMismatches.length === 0, 'Every historical Project/System allocation must remain represented in the System Linked Projects field.')
+assert(completedPocActiveRisAllocations.length === 0, 'DONE POC Projects must not retain active RIS allocations.')
+assert(completedPocReleasedSidMismatches.length === 0, 'Released DONE POC allocated SIDs must be None/Available with no current occupation dates.')
+assert(completedPocPurposeHistoryMismatches.length === 0, 'Completed POC RIS releases must retain historical POC Purpose History.')
+assert(explicitQaOccupationDateMatch, 'Explicit QA scenario S000270/P000360 must retain the allocation and matching POC occupation dates.')
+assert(explicitProjectQaValid, 'Explicit QA scenario P000390/S000300 must have completed template tasks, released RIS allocation, historical linkage, and retained POC Purpose History.')
 assert(reusedInternalMultiUseHistory.some((row) => row.sourceMachineId === 'M000002' && row.allocationSids.length >= 2), 'Final QA seed must contain a deterministic Reused Internal MID with multiple SID allocation instances over time.')
 assert(reusedInternalSystems.length === 60, 'Final QA seed must contain exactly 60 Reused Internal Systems.')
+assert(reusedInternalPurposeInvariantMismatches.length === 0, 'RIS Purpose/Availability invariants must hold for MIDs and allocated reused SIDs.')
 assert(reusedPurposeCounts.POC === 30, 'Final QA seed must contain 30 POC Reused Internal Systems.')
 assert(reusedPurposeCounts.Demo === 10, 'Final QA seed must contain 10 Demo Reused Internal Systems.')
 assert(reusedPurposeCounts.Training === 10, 'Final QA seed must contain 10 Training Reused Internal Systems.')
-assert(reusedPurposeCounts.Available === 8, 'Final QA seed must contain 8 Available Reused Internal Systems.')
+assert(reusedPurposeCounts.None === 8, 'Final QA seed must contain 8 None-purpose Reused Internal Systems.')
 assert(reusedPurposeCounts.Support === 2, 'Final QA seed must contain 2 Support Reused Internal Systems.')
 assert(openPocProjects.length === 30, 'Final QA seed must contain 30 open POC Projects.')
 assert(donePocProjects.length === 30, 'Final QA seed must contain 30 done POC Projects.')
+assert(invalidPocProjectDates.length === 0, 'Final QA seed must not contain invalid POC Project date ranges.')
+assert(activePocRisMissingOccupationDates.length === 0, 'Active POC Reused Internal Systems must have occupation dates.')
+assert(purposeHistoryMissingOwner.length === 0, 'RIS Purpose History rows must retain Owner snapshots.')
+assert(configurationHistoryTidIsSid.length === 0, 'System Configuration History TID must contain the Tenant ID, not the owning SID.')
 assert(malformedRequirementIds.length === 0, 'Requirement IDs must use A-xxx format.')
 assert(duplicateRequirementIds.length === 0, 'Requirement IDs must be globally unique.')
 assert(nonSequentialRequirementIds.length === 0, 'Requirement IDs must be globally sequential without gaps.')

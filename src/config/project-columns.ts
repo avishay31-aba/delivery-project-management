@@ -17,6 +17,7 @@ import type {
 } from '@/data/seed.types'
 import {
   projectDeliveryDashboardReadModel,
+  projectStatusLabel,
   type ProjectDeliveryDashboardReadModel,
 } from '@/domain/project-lifecycle'
 import { projectReference } from '@/domain/business-reference'
@@ -106,7 +107,12 @@ export function createProjectListColumns(context: ProjectDashboardColumnContext)
       getValue: (project) => projectRow(project).statusLabel,
       render: (project) => {
         const row = projectRow(project)
-        return createElement(ProjectStatusIcon, { status: row.status })
+        return createElement(
+          'span',
+          { className: 'inline-flex items-center gap-1.5' },
+          createElement(ProjectStatusIcon, { status: row.status, showLabel: false }),
+          projectStatusLabel(row.status),
+        )
       },
     },
     {

@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ActivityTimeline } from '@/components/activity'
+import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
-import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, FileDownloadLink, OperationalStatusIcon, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
+import { AlertStatusIcon, BusinessIdLink, BusinessObjectLink, ClampedTableCellContent, OperationalStatusIcon, PlaceholderCard, ProgressBar, StatusBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { ProjectStatusIcon } from '@/components/projects/ProjectStatusIcon'
 import type { Tenant } from '@/data/seed.types'
@@ -14,7 +15,6 @@ import {
   customerProjectProgress,
   customerTypeLabel,
 } from '@/domain/customer-account'
-import { formatDocumentSize } from '@/domain/document-collection'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 import { activityEventsForCustomer } from '@/domain/activity-log'
 import { requirementCoverageRows } from '@/domain/requirement-coverage'
@@ -37,6 +37,7 @@ import {
   warrantyDashboardRows,
 } from '@/domain/warranty-collection'
 import { effectiveTenantOperationalMode, isTenantLifecycleInactive, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { useAppStore } from '@/store/useAppStore'
 
 type Customer360Tab = 'overview' | 'opportunities' | 'projects' | 'systems' | 'tenants' | 'warranties' | 'requirements' | 'documents' | 'activity'
@@ -300,7 +301,7 @@ export function Customer360Page() {
           tenantRequirementIdDisplay(tenant) || '-',
           tenant.productType,
           operationalStatus(effectiveTenantOperationalMode(tenant, systems.find((candidate) => candidate.id === (tenant.hostedSystemId || tenant.systemId)))),
-          tenant.country,
+          countryDisplayName(tenant.country),
         ]),
         'No tenants found for this customer.',
       )
@@ -350,22 +351,13 @@ export function Customer360Page() {
     }
 
     if (activeTab === 'documents') {
-      return readOnlyTable(
-      ['File', 'Source Type', 'Source ID', 'Source Name', 'Type', 'Size', 'Uploaded At', 'Replaced At', 'Open'],
-      customer.documents.map((document) => [
-        document.fileName,
-        document.sourceObjectType,
-        document.sourceObjectId,
-        document.sourceObjectName,
-        document.fileType,
-        formatDocumentSize(document.fileSize),
-        <DateTimeValue value={document.uploadedAt} semanticType="datetime" />,
-        <DateTimeValue value={document.replacedAt} semanticType="datetime" />,
-        document.storedFileReference || document.objectUrl
-          ? <FileDownloadLink fileName={document.fileName} fileReference={document.storedFileReference ?? document.objectUrl}>Open</FileDownloadLink>
-          : '',
-      ]),
-      'No documents found across this customer portfolio.',
+      return (
+        <DocumentsPanel
+          documents={customer.documents}
+          emptyText="No documents found across this customer portfolio."
+          onChange={() => undefined}
+          readOnly
+        />
       )
     }
 
@@ -399,7 +391,7 @@ export function Customer360Page() {
         {readOnlyValue('Customer Name', customerDisplayName(account))}
         {readOnlyValue('Account Manager', customer.accountManager)}
         {readOnlyValue('Region', account.region)}
-        {readOnlyValue('Country', account.country)}
+        {readOnlyValue('Country', countryDisplayName(account.country))}
         {readOnlyValue('State', account.state ?? '')}
         {readOnlyValue('Customer Type', customerTypeLabel(account))}
       </section>

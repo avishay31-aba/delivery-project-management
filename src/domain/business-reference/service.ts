@@ -64,7 +64,13 @@ export function routePathForBusinessReference(objectType: string, businessId: st
   if (objectType === 'INFRASTRUCTURE_ITEM') return `/infrastructure/${id}`
   if (objectType === 'PRODUCTION_SYSTEM') return `/systems/production-inventory/${id}`
   if (objectType === 'INTERNAL_REUSED_SYSTEM') return `/systems/reused-internal/${formattedReusedInternalMachineId(reusedInternalMachineIdRouteKey(id))}`
-  if (objectType === 'SYSTEM') return `/systems/${id}`
+  if (objectType === 'SYSTEM') {
+    const reusedRouteKey = reusedInternalMachineIdRouteKey(id)
+    if (/^\d+$/.test(reusedRouteKey) && /^M?\d+$/i.test(id)) {
+      return `/systems/reused-internal/${formattedReusedInternalMachineId(reusedRouteKey)}`
+    }
+    return `/systems/${id}`
+  }
   return null
 }
 

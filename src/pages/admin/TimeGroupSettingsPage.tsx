@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react'
-import { Edit2, Save, X } from 'lucide-react'
-import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
-import { BusinessIdListLinks, CheckboxMultiSelect, RecordHistorySection, SaveButtonLabel, formMessageClassName, type CheckboxMultiSelectOption, type RecordHistoryColumn } from '@/components/ui'
+import { useCallback, useMemo, useState } from 'react'
+import { Save, X } from 'lucide-react'
+import { DataDashboard, DashboardActionButton, type DashboardColumn } from '@/components/dashboard'
+import { PageHeader, WorkspaceDashboardContent, WorkspaceFrame } from '@/components/record'
+import { BusinessIdListLinks, CheckboxMultiSelect, formMessageClassName, type CheckboxMultiSelectOption } from '@/components/ui'
 import type { TimeGroupLookupRecord } from '@/data/seed.types'
-import { TIME_GROUP_LOOKUP_SOURCE, joinSemicolonValues, linkedSidsForTimeGroup, linkedTidsForTimeGroup } from '@/domain/time-groups'
+import { uniqueConfiguredTimeZones } from '@/domain/geographic-configuration'
+import { joinSemicolonValues, linkedSidsForTimeGroup, linkedTidsForTimeGroup, withDerivedTimeGroupMembership } from '@/domain/time-groups'
 import { useAppStore } from '@/store/useAppStore'
 
 type TimeGroupRow = TimeGroupLookupRecord & {
@@ -11,26 +13,21 @@ type TimeGroupRow = TimeGroupLookupRecord & {
   linkedTids: string[]
 }
 
-function distinctValues(rows: TimeGroupLookupRecord[], key: 'timeZones' | 'countries' | 'states'): string[] {
-  return Array.from(new Set([...TIME_GROUP_LOOKUP_SOURCE, ...rows].flatMap((row) => row[key]).filter(Boolean)))
-    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }))
+function optionsForRecord(rows: TimeGroupLookupRecord[], record: TimeGroupLookupRecord, allTimeZones: string[]): CheckboxMultiSelectOption[] {
+  const selected = new Set(record.timeZones)
+  return allTimeZones.map((value) => ({
+    value,
+    disabled: !selected.has(value) && rows.some((row) => row.active && row.id !== record.id && row.timeZones.includes(value)),
+  }))
 }
 
-function optionsForRecord(
-  rows: TimeGroupLookupRecord[],
-  record: TimeGroupLookupRecord,
-  key: 'timeZones' | 'countries' | 'states',
-): CheckboxMultiSelectOption[] {
-  const selected = new Set(record[key])
-  return distinctValues(rows, key)
-    .map((value) => ({
-      value,
-      disabled: !selected.has(value) && rows.some((row) => row.active && row.id !== record.id && row[key].includes(value)),
-    }))
-}
+const FULL_CELL_CLASS_NAME = 'sf-full-table-cell'
+const WRAPPED_VALUE_COLUMN_CLASS_NAME = 'min-w-64 max-w-96 whitespace-normal'
 
 export function TimeGroupSettingsPage() {
   const lookups = useAppStore((state) => state.timeGroupLookups)
+  const countries = useAppStore((state) => state.countryLookups)
+  const states = useAppStore((state) => state.usStateLookups)
   const systems = useAppStore((state) => state.systems)
   const productionSystems = useAppStore((state) => state.productionSystemInventory)
   const reusedSystems = useAppStore((state) => state.reusedInternalSystems)
@@ -40,18 +37,24 @@ export function TimeGroupSettingsPage() {
   const [draft, setDraft] = useState<TimeGroupLookupRecord | null>(null)
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
+  const allTimeZones = useMemo(() => uniqueConfiguredTimeZones(countries, states), [countries, states])
+
   const rows = useMemo<TimeGroupRow[]>(() => {
     const allSystems = [...systems, ...productionSystems, ...reusedSystems]
-    return lookups.map((lookup) => ({
-      ...lookup,
-      linkedSids: linkedSidsForTimeGroup(lookup, allSystems, tenants, lookups),
-      linkedTids: linkedTidsForTimeGroup(lookup, tenants, lookups),
-    }))
-  }, [lookups, productionSystems, reusedSystems, systems, tenants])
+    return lookups.map((lookup) => {
+      const derived = withDerivedTimeGroupMembership(lookup, countries, states)
+      return {
+        ...derived,
+        linkedSids: linkedSidsForTimeGroup(derived, allSystems, tenants, lookups, countries, states),
+        linkedTids: linkedTidsForTimeGroup(derived, tenants, lookups, countries, states),
+      }
+    })
+  }, [countries, lookups, productionSystems, reusedSystems, states, systems, tenants])
 
   function beginEdit(row: TimeGroupLookupRecord) {
+    const derived = withDerivedTimeGroupMembership(row, countries, states)
     setEditingId(row.id)
-    setDraft({ ...row, timeZones: [...row.timeZones], countries: [...row.countries], states: [...row.states] })
+    setDraft({ ...derived, timeZones: [...derived.timeZones], countries: [...derived.countries], states: [...derived.states] })
     setMessage(null)
   }
 
@@ -61,14 +64,20 @@ export function TimeGroupSettingsPage() {
     setMessage(null)
   }
 
-  function updateDraft(patch: Partial<TimeGroupLookupRecord>) {
-    setDraft((current) => current ? { ...current, ...patch } : current)
+  const updateDraft = useCallback((patch: Partial<TimeGroupLookupRecord>) => {
+    setDraft((current) => {
+      if (!current) return current
+      return withDerivedTimeGroupMembership({ ...current, ...patch }, countries, states)
+    })
     setMessage(null)
-  }
+  }, [countries, states])
 
   function saveDraft() {
     if (!draft) return
-    const result = updateTimeGroupLookup(draft.id, draft)
+    const result = updateTimeGroupLookup(draft.id, {
+      timeGroup: draft.timeGroup,
+      timeZones: draft.timeZones,
+    })
     setMessage({ kind: result.ok ? 'success' : 'error', text: result.message })
     if (result.ok) {
       setEditingId(null)
@@ -76,132 +85,103 @@ export function TimeGroupSettingsPage() {
     }
   }
 
-  const columns = useMemo<Array<RecordHistoryColumn<TimeGroupRow>>>(() => [
+  const columns = useMemo<Array<DashboardColumn<TimeGroupRow>>>(() => [
     {
-      key: 'actions',
-      label: 'Actions',
-      render: (row) => editingId === row.id ? (
-        <span className="inline-flex items-center gap-1">
-          <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={saveDraft}>
-            <Save className="h-3.5 w-3.5" aria-hidden="true" />
-            <SaveButtonLabel saving={false} />
-          </button>
-          <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={cancelEdit}>
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-            Cancel
-          </button>
-        </span>
-      ) : (
-        <button type="button" className="inline-flex items-center gap-1 rounded border border-sf-border px-2 py-1 text-xs hover:bg-sf-surface-alt" onClick={() => beginEdit(row)}>
-          <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-          Edit
-        </button>
-      ),
-      className: 'whitespace-nowrap border border-sf-border px-1.5 py-1 align-top text-sf-text',
-    },
-    {
-      key: 'timeGroupId',
+      id: 'timeGroupId',
       label: 'Time Group ID#',
-      render: (row) => row.timeGroupId,
+      getValue: (row) => row.timeGroupId,
       sortValue: (row) => Number(row.timeGroupId),
+      promoteAsBusinessIdentifier: true,
     },
     {
-      key: 'timeGroup',
+      id: 'timeGroup',
       label: 'Time Group',
+      headerClassName: 'min-w-72',
+      cellClassName: 'min-w-72 whitespace-nowrap',
+      cellContentClassName: `${FULL_CELL_CLASS_NAME} whitespace-nowrap`,
+      getValue: (row) => row.timeGroup,
       render: (row) => editingId === row.id && draft
         ? <input aria-label="Time Group" className="h-8 w-72 rounded border border-sf-border px-2 py-1 text-sm" value={draft.timeGroup} onChange={(event) => updateDraft({ timeGroup: event.target.value })} />
         : row.timeGroup,
-      sortValue: (row) => row.timeGroup,
     },
     {
-      key: 'timeZones',
+      id: 'timeZones',
       label: 'Time Zones',
+      headerClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellContentClassName: FULL_CELL_CLASS_NAME,
+      getValue: (row) => joinSemicolonValues(row.timeZones),
       render: (row) => editingId === row.id && draft
         ? (
           <CheckboxMultiSelect
             id={`${row.id}:timeZones`}
             label="Time Zones"
             selected={draft.timeZones}
-            options={optionsForRecord(lookups, draft, 'timeZones')}
+            options={optionsForRecord(lookups, draft, allTimeZones)}
             onChange={(timeZones) => updateDraft({ timeZones })}
           />
         )
         : joinSemicolonValues(row.timeZones),
-      sortValue: (row) => joinSemicolonValues(row.timeZones),
     },
     {
-      key: 'countries',
+      id: 'countries',
       label: 'Countries',
-      render: (row) => editingId === row.id && draft
-        ? (
-          <CheckboxMultiSelect
-            id={`${row.id}:countries`}
-            label="Countries"
-            selected={draft.countries}
-            options={optionsForRecord(lookups, draft, 'countries')}
-            onChange={(countries) => updateDraft({ countries })}
-          />
-        )
-        : joinSemicolonValues(row.countries),
-      sortValue: (row) => joinSemicolonValues(row.countries),
-      className: 'max-w-xl whitespace-normal border border-sf-border px-1.5 py-1 align-top text-sf-text',
+      headerClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellContentClassName: FULL_CELL_CLASS_NAME,
+      getValue: (row) => joinSemicolonValues(row.countries),
+      render: (row) => <span className="whitespace-normal">{joinSemicolonValues(editingId === row.id && draft ? draft.countries : row.countries)}</span>,
     },
     {
-      key: 'states',
+      id: 'states',
       label: 'States',
-      render: (row) => editingId === row.id && draft
-        ? (
-          <CheckboxMultiSelect
-            id={`${row.id}:states`}
-            label="States"
-            selected={draft.states}
-            options={optionsForRecord(lookups, draft, 'states')}
-            onChange={(states) => updateDraft({ states })}
-          />
-        )
-        : joinSemicolonValues(row.states),
-      sortValue: (row) => joinSemicolonValues(row.states),
-      className: 'max-w-xl whitespace-normal border border-sf-border px-1.5 py-1 align-top text-sf-text',
+      headerClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellContentClassName: FULL_CELL_CLASS_NAME,
+      getValue: (row) => joinSemicolonValues(row.states),
+      render: (row) => <span className="whitespace-normal">{joinSemicolonValues(editingId === row.id && draft ? draft.states : row.states)}</span>,
     },
     {
-      key: 'linkedSids',
+      id: 'linkedSids',
       label: 'Linked SIDs',
+      headerClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellContentClassName: FULL_CELL_CLASS_NAME,
+      getValue: (row) => row.linkedSids.join('; '),
       render: (row) => <BusinessIdListLinks objectType="SYSTEM" businessIds={row.linkedSids} />,
-      sortValue: (row) => row.linkedSids.join('; '),
     },
     {
-      key: 'linkedTids',
+      id: 'linkedTids',
       label: 'Linked TIDs',
+      headerClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellClassName: WRAPPED_VALUE_COLUMN_CLASS_NAME,
+      cellContentClassName: FULL_CELL_CLASS_NAME,
+      getValue: (row) => row.linkedTids.join('; '),
       render: (row) => <BusinessIdListLinks objectType="TENANT" businessIds={row.linkedTids} />,
-      sortValue: (row) => row.linkedTids.join('; '),
     },
-  ], [draft, editingId, lookups])
+  ], [allTimeZones, draft, editingId, lookups, updateDraft])
 
   return (
     <WorkspaceFrame>
-      <PageHeader title="Time Group Settings" subtitle="Version 1.2 Time Zone to Time Group reference mapping" />
-      <WorkspaceScrollContent>
-        <RecordHistorySection
-          records={rows}
+      <PageHeader title="Time Group Settings" subtitle="Version 1.3 Time Zone to Time Group reference mapping" />
+      <WorkspaceDashboardContent>
+        <DataDashboard
+          title="Time Group Settings"
+          dashboardScope="timeGroupLookups"
+          rows={rows}
           columns={columns}
-          getRowKey={(row) => row.id}
-          getSearchText={(row) => [
-            row.timeGroupId,
-            row.timeGroup,
-            joinSemicolonValues(row.timeZones),
-            joinSemicolonValues(row.countries),
-            joinSemicolonValues(row.states),
-            row.linkedSids.join('; '),
-            row.linkedTids.join('; '),
-          ].join(' ')}
-          emptyText="No Time Group mappings are available."
-          initialPageSize={10}
-          logicalTableType="time-group-settings"
-          logicalTableLabel="Time Group Settings"
-          message={message ? <div className={message.kind === 'error' ? formMessageClassName([message.text]) : 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'}>{message.text}</div> : null}
-          resetPageSignal={editingId}
+          onEditRecord={beginEdit}
+          renderRecordActions={(row) => editingId === row.id ? (
+            <>
+              <DashboardActionButton icon={<Save className="h-4 w-4" aria-hidden="true" />} label="Save" onClick={saveDraft} />
+              <DashboardActionButton icon={<X className="h-4 w-4" aria-hidden="true" />} label="Cancel" onClick={cancelEdit} />
+            </>
+          ) : null}
+          toolbar={message ? <div className={message.kind === 'error' ? formMessageClassName([message.text]) : 'rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700'}>{message.text}</div> : null}
+          enableRecordActions
+          initialSorting={[{ id: 'timeGroupId', desc: false }]}
         />
-      </WorkspaceScrollContent>
+      </WorkspaceDashboardContent>
     </WorkspaceFrame>
   )
 }

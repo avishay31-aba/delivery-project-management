@@ -230,6 +230,7 @@ Document fields:
 ## 10. Relationships
 
 - System may be allocated to many Projects over its lifetime through AllocationContext.
+- A Project-System relationship may be Manual Allocated or Auto-Allocated. Auto-Allocated relationships are derived by AllocationContext from Grid B/C existing-Tenant requirements because the Tenant is currently hosted on the System; they cannot be manually deallocated while that requirement reason exists.
 - Project may allocate many Systems.
 - System may host many Tenants.
 - Tenant belongs to or is hosted on a System.
@@ -301,6 +302,7 @@ SystemInventory-owned validations may include:
 - SID uniqueness for production systems.
 - MID/machine ID uniqueness for reused internal systems.
 - Editing an existing System must ignore the current record during uniqueness validation.
+- Reused Internal Systems with Purpose `POC` derive Occupation Start Date and Occupation End Date only from the active/Open allocated POC Project header dates. The RIS dates remain read-only and must not be manually edited to repair missing legacy Project dates; the Project validation boundary requires the authoritative POC dates when an Open POC Project actively allocates an RIS.
 - Source/type must be valid.
 - Operational status must be valid.
 - Product type must be valid.
@@ -311,7 +313,8 @@ SystemInventory-owned validations may include:
 - Capacity/resource values must be numeric where modeled as numeric.
 - Version/product values must be valid where constrained by metadata.
 - Deleted/Cancelled states must preserve historical links safely.
-- Individually Deleted Tenants and retained legacy Cancelled Tenant records remain linked to the System for historical visibility. Active System Tenant Warranty Status sections show operationally visible hosted Tenants. The System form displays individually Deleted Tenants in a dedicated `Deleted Tenants` table below Application Configuration Summary, with Warranty Status and without operational Actions. Deleted Tenants do not contribute to current Tenant count or System Application Configuration Summary. Retained legacy Cancelled Tenants do not appear in normal System Tenant tables and remain available only through explicit history/audit/provenance surfaces. System Tenant sections must not expose Tenant Cancel or Restore actions.
+- A System whose Operational Status is `Deleted` cannot be deallocated from a Project. Deallocation is blocked while any current same-SID/PID Tenant exists; the user must explicitly delete or cancel those Tenants first. Deleted Tenants and retained legacy Cancelled Tenants on the same SID/PID do not block deallocation. Deleted Tenants retain their historical SID/PID, Requirement, Warranty, document, configuration, remarks, and activity data; active Tenant Cancel removes the Tenant and Tenant-specific references entirely because it means the Tenant was created by mistake.
+- Individually Deleted Tenants and retained legacy Cancelled Tenant records remain linked to the System for historical visibility. Active System Tenant Warranty Status sections show operationally visible hosted Tenants. The System form displays individually Deleted Tenants in a dedicated `Deleted Tenants` table below Application Configuration Summary, with Warranty Status and without operational Actions. Deleted Tenants do not contribute to current Tenant count or System Application Configuration Summary. Active System Tenant rows expose Edit, Delete, and Cancel. Delete retains the Tenant as Deleted history; Cancel physically removes the Tenant from all Tenant-related views and references. Retained legacy Cancelled Tenants do not appear in normal System Tenant tables and remain available only through explicit history/audit/provenance surfaces. System Tenant sections must not expose Tenant Restore actions.
 - System Operational Status transitions to `Off`, `Access blocked`, or `Service blocked` temporarily force only currently hosted Tenants that were not already individually Deleted/Cancelled. The System transition stores each Tenant's previous Operational Status separately from individual Delete/Cancel restore state. Returning the System to `On` restores only those system-forced Tenants.
 - System `Canceled` and `Deleted` are independent lifecycle states. `Deleted` remains the legitimate end-of-life operational workflow. `Canceled` is reached only through the System form header cancellation workflow and is not a shortcut for deallocation or occupation release. A System cannot be cancelled while any active Project allocation exists, regardless of Project status. An occupied Reused Internal System cannot be cancelled until released through its normal operational workflow. Only an unallocated Production System or available/unoccupied Reused Internal System may be cancelled. Restore returns only the System to inventory/available state and never reconstructs Project allocation or occupation.
 - Cancelled Systems are shown in the Systems Workspace `Cancelled Systems` dashboard, which includes cancelled allocated Systems, Production inventory Systems, and Reused Internal Systems while active inventory dashboards exclude cancelled records.

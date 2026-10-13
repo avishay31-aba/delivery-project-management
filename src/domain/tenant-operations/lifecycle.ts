@@ -24,7 +24,12 @@ export function isTenantCancelled(tenant: Pick<Tenant, 'operationalStatus'>): bo
 }
 
 export function isTenantOperationallyVisible(tenant: Pick<Tenant, 'operationalStatus'>): boolean {
-  return !isTenantCancelled(tenant)
+  return !isTenantDeleted(tenant) && !isTenantCancelled(tenant)
+}
+
+export function isTenantRetainedDashboardVisible(tenant: Pick<Tenant, 'operationalStatus'>): boolean {
+  void tenant
+  return true
 }
 
 export function isTenantLifecycleInactive(tenant: Pick<Tenant, 'operationalStatus'>): boolean {

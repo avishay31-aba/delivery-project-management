@@ -298,27 +298,38 @@ export function useEditableChildObjectEditor<TRecord extends { id: string }>() {
 }
 
 interface EditableChildObjectActionButtonProps {
+  ariaLabel?: string
   children: ReactNode
   className?: string
+  dataTestId?: string
   disabled?: boolean
   onClick: () => void
+  title?: string
   variant?: 'primary' | 'secondary' | 'danger'
 }
 
+export function editableChildObjectActionButtonClassName(variant: 'primary' | 'secondary' | 'danger' = 'secondary'): string {
+  if (variant === 'primary') {
+    return 'sf-view-mode-allow inline-flex items-center gap-1 rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:border-blue-700 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-sf-brand/30 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-surface-alt disabled:text-sf-text-muted disabled:shadow-none'
+  }
+  if (variant === 'danger') {
+    return 'sf-view-mode-allow inline-flex items-center gap-1 rounded border border-red-300 bg-white px-3 py-1.5 text-sm font-semibold text-red-700 shadow-sm hover:border-red-500 hover:bg-red-50 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-surface-alt disabled:text-sf-text-muted disabled:shadow-none'
+  }
+  return 'sf-view-mode-allow inline-flex items-center gap-1 rounded border border-sf-brand/60 bg-white px-3 py-1.5 text-sm font-semibold text-sf-brand shadow-sm hover:border-blue-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-sf-brand/30 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-surface-alt disabled:text-sf-text-muted disabled:shadow-none'
+}
+
 export function EditableChildObjectActionButton({
+  ariaLabel,
   children,
   className,
+  dataTestId,
   disabled = false,
   onClick,
+  title,
   variant = 'secondary',
 }: EditableChildObjectActionButtonProps) {
   const handledPointerDownRef = useRef(false)
-  const variantClassName =
-    variant === 'primary'
-      ? 'inline-flex items-center gap-1 rounded border border-sf-brand bg-transparent px-2 py-1 text-xs text-sf-brand hover:border-blue-700 hover:text-blue-700 disabled:cursor-wait disabled:opacity-70'
-      : variant === 'danger'
-        ? 'inline-flex items-center gap-1 rounded border border-red-200 bg-transparent px-2 py-1 text-xs text-red-700 hover:border-red-400 hover:text-red-800 disabled:cursor-wait disabled:opacity-70'
-        : 'inline-flex items-center gap-1 rounded border border-sf-border bg-transparent px-2 py-1 text-xs text-sf-text hover:border-sf-text-muted disabled:cursor-wait disabled:opacity-70'
+  const variantClassName = editableChildObjectActionButtonClassName(variant)
 
   function keepEditorStable(event: PointerEvent<HTMLButtonElement>) {
     if (disabled) return
@@ -340,6 +351,9 @@ export function EditableChildObjectActionButton({
       type="button"
       className={className ?? variantClassName}
       disabled={disabled}
+      data-testid={dataTestId}
+      title={title}
+      aria-label={ariaLabel}
       onPointerDown={keepEditorStable}
       onClick={handleClick}
     >

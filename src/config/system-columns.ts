@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks } from '@/components/ui'
 import type { Account, SalesManager, System, Tenant } from '@/data/seed.types'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { hostedTenantsForSystem, joinUniqueValues, systemIdentity, tenantCountForSystem } from '@/domain/system-inventory'
 
 export function createSystemColumns(
@@ -32,7 +33,7 @@ export function createSystemColumns(
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '' },
     { id: 'product', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
     { id: 'region', label: 'Region', getValue: (row) => row.region ?? row.timeGroup },
-    { id: 'country', label: 'Country', getValue: (row) => row.country ?? '' },
+    { id: 'country', label: 'Country', getValue: (row) => countryDisplayName(row.country) },
     { id: 'state', label: 'State', getValue: (row) => row.state ?? '' },
     {
       id: 'tenantCount',

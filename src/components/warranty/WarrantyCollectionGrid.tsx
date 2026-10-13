@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
-import { Edit2, Save, X } from 'lucide-react'
+import { Save, X } from 'lucide-react'
 import { EditableChildObjectActionButton, editableChildObjectPermissions, useEditableChildObjectEditor } from '@/components/child-objects'
-import { RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, WarrantyStatusPresentation } from '@/components/ui'
+import { EDIT_ACTION_LABEL, EditActionIcon, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, WarrantyStatusPresentation } from '@/components/ui'
 import type { TenantWarranty } from '@/data/seed.types'
 import {
   createInfrastructureWarranty,
@@ -160,9 +160,8 @@ export function WarrantyCollectionGrid({
                           </>
                         ) : (
                           <>
-                            <EditableChildObjectActionButton onClick={() => editor.beginEdit(warranty)}>
-                              <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              Edit
+                            <EditableChildObjectActionButton title={EDIT_ACTION_LABEL} ariaLabel={EDIT_ACTION_LABEL} onClick={() => editor.beginEdit(warranty)}>
+                              <EditActionIcon />
                             </EditableChildObjectActionButton>
                           </>
                         )}

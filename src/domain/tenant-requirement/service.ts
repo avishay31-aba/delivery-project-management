@@ -291,7 +291,7 @@ export function opportunityWithUniqueTenantRequirementIds(
 export interface RequirementAttachmentOption {
   project: Project
   requirement: NewTenantRequirement
-  occupyingTenant?: Tenant
+  occupyingTenants: Tenant[]
   disabled: boolean
 }
 
@@ -306,25 +306,25 @@ export function requirementAttachmentOptionsForProject(
     ? opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId)
     : undefined
   if (!project || !opportunity) return []
-  const occupancy = new Map<string, Tenant>()
+  const occupancy = new Map<string, Tenant[]>()
   tenants.forEach((tenant) => {
     if (tenant.operationalStatus === 'Cancelled' || tenant.operationalStatus === 'Cancelled - By System') return
     const requirementIds = tenant.requirementHistory?.length
       ? tenant.requirementHistory.filter((relationship) => relationship.status === 'CURRENT').map((relationship) => relationship.requirementId)
       : [tenant.sourceRequirementId].filter((requirementId): requirementId is string => Boolean(requirementId))
     requirementIds.forEach((requirementId) => {
-      if (!occupancy.has(requirementId)) occupancy.set(requirementId, tenant)
+      occupancy.set(requirementId, [...(occupancy.get(requirementId) ?? []), tenant])
     })
   })
   return applicableOpportunityRequirementSources(opportunity)
     .filter((source): source is Extract<ReturnType<typeof applicableOpportunityRequirementSources>[number], { requirementType: 'A' }> => source.requirementType === 'A')
     .map((source) => source.requirement)
     .map((requirement) => {
-    const occupyingTenant = occupancy.get(requirement.requirementId)
+    const occupyingTenants = occupancy.get(requirement.requirementId) ?? []
     return {
       project,
       requirement,
-      occupyingTenant,
+      occupyingTenants,
       disabled: false,
     }
   })
@@ -435,6 +435,17 @@ function dedupeSystemsByCurrentTenantHost(tenants: Tenant[], systems: System[]):
   return rows
 }
 
+function dedupeSystems(systems: System[]): System[] {
+  const seen = new Set<string>()
+  const rows: System[] = []
+  systems.forEach((system) => {
+    if (seen.has(system.id)) return
+    seen.add(system.id)
+    rows.push(system)
+  })
+  return rows
+}
+
 export function opportunityExistingAssetTenants(opportunity: Opportunity, tenants: Tenant[], systems: System[]): Tenant[] {
   return getEligibleCustomerExistingTenants(opportunity.accountId, tenants, systems)
 }
@@ -446,9 +457,14 @@ export function opportunityExistingSystemGroups(
   systems: System[],
 ): { accountSystems: System[]; dealOwnerSystems: System[]; allSystems: System[] } {
   const accountSystemIds = new Set<string>()
-  const accountSystems = dedupeSystemsByCurrentTenantHost(
-    getEligibleCustomerExistingTenants(opportunity.accountId, tenants, systems),
-    systems,
+  const accountSystems = dedupeSystems(
+    [
+      ...systems.filter((system) => system.accountId === opportunity.accountId && Boolean(system.sid) && isSystemOperationallyVisible(system)),
+      ...dedupeSystemsByCurrentTenantHost(
+        getEligibleCustomerExistingTenants(opportunity.accountId, tenants, systems),
+        systems,
+      ),
+    ],
   )
   accountSystems.forEach((system) => accountSystemIds.add(system.id))
 
@@ -457,14 +473,22 @@ export function opportunityExistingSystemGroups(
       .filter((account) => account.salesManagerId === opportunity.salesManagerId)
       .map((account) => account.id),
   )
-  const dealOwnerSystems = dedupeSystemsByCurrentTenantHost(
-    tenants.filter(
-      (tenant) =>
-        tenant.accountId !== opportunity.accountId &&
-        ownedAccountIds.has(tenant.accountId) &&
-        tenantIsEligibleCustomerExistingAsset(tenant, systems),
-    ),
-    systems,
+  const dealOwnerSystems = dedupeSystems(
+    [
+      ...systems.filter((system) => {
+        const accountId = system.accountId ?? ''
+        return accountId !== opportunity.accountId && ownedAccountIds.has(accountId) && Boolean(system.sid) && isSystemOperationallyVisible(system)
+      }),
+      ...dedupeSystemsByCurrentTenantHost(
+        tenants.filter(
+          (tenant) =>
+            tenant.accountId !== opportunity.accountId &&
+            ownedAccountIds.has(tenant.accountId) &&
+            tenantIsEligibleCustomerExistingAsset(tenant, systems),
+        ),
+        systems,
+      ),
+    ],
   ).filter((system) => !accountSystemIds.has(system.id))
 
   return { accountSystems, dealOwnerSystems, allSystems: [...accountSystems, ...dealOwnerSystems] }

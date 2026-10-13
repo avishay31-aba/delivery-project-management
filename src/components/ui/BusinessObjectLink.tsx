@@ -12,6 +12,7 @@ interface BusinessObjectLinkProps {
   reference: BusinessObjectReference | null | undefined
   children?: ReactNode
   className?: string
+  newTab?: boolean
 }
 
 interface BusinessIdLinkProps {
@@ -19,6 +20,7 @@ interface BusinessIdLinkProps {
   businessId: string | null | undefined
   children?: ReactNode
   className?: string
+  newTab?: boolean
 }
 
 interface BusinessIdListLinksProps {
@@ -36,7 +38,13 @@ function fallbackLabel(reference: BusinessObjectReference | null | undefined, ch
   return children ?? reference?.displayLabel ?? reference?.businessId ?? ''
 }
 
-export function BusinessObjectLink({ reference, children, className }: BusinessObjectLinkProps) {
+function businessObjectViewRoutePath(routePath: string): string {
+  if (/[?&]mode=/.test(routePath)) return routePath
+  const separator = routePath.includes('?') ? '&' : '?'
+  return `${routePath}${separator}mode=view`
+}
+
+export function BusinessObjectLink({ reference, children, className, newTab = false }: BusinessObjectLinkProps) {
   const label = fallbackLabel(reference, children)
   if (!reference || !label) return label
   if (!reference.routePath || reference.isMissing) {
@@ -48,20 +56,20 @@ export function BusinessObjectLink({ reference, children, className }: BusinessO
   }
 
   return (
-    <LinkId to={reference.routePath} className={className} title={reference.isStale ? 'Stale reference' : undefined}>
+    <LinkId to={businessObjectViewRoutePath(reference.routePath)} className={className} title={reference.isStale ? 'Stale reference' : undefined} newTab={newTab}>
       {label}
     </LinkId>
   )
 }
 
-export function BusinessIdLink({ objectType, businessId, children, className }: BusinessIdLinkProps) {
+export function BusinessIdLink({ objectType, businessId, children, className, newTab = false }: BusinessIdLinkProps) {
   const label = objectType === 'INTERNAL_REUSED_SYSTEM'
     ? displayBusinessIdForReference(objectType, businessId)
     : children ?? businessId ?? ''
   const routePath = routePathForBusinessReference(objectType, businessId)
   if (!routePath || !label) return label
   return (
-    <LinkId to={routePath} className={className}>
+    <LinkId to={businessObjectViewRoutePath(routePath)} className={className} newTab={newTab}>
       {label}
     </LinkId>
   )

@@ -5,6 +5,7 @@ import { buildProjectMilestonesAndTasks, projectMilestonePlanMatchesTemplate, re
 import {
   activePocProjectForOpportunity,
   finalProjectForOpportunity,
+  pocProjectSubTypeForOpportunity,
   projectSubTypeForOpportunity,
   uniqueOpportunityValues,
 } from './service'
@@ -97,7 +98,7 @@ export function syncOpportunityProjectsFromOpportunity(
     projectSource,
     accountName: context.account?.accountName ?? '',
     mainType: projectSource === 'POC' ? 'POC' : nextOpportunity.type,
-    subType: projectSource === 'POC' ? 'NONE' : projectSubTypeForOpportunity(nextOpportunity),
+    subType: projectSource === 'POC' ? pocProjectSubTypeForOpportunity(nextOpportunity) : projectSubTypeForOpportunity(nextOpportunity),
     deliveryDate: nextOpportunity.deliveryDate,
     dealOwner: context.salesManager?.name ?? '',
     opportunityName: nextOpportunity.opportunityName,

@@ -21,7 +21,7 @@ export function SystemListPage({ mode = 'allocated' }: SystemListPageProps) {
   const tenants = useAppStore((s) => s.tenants)
   const projectSystems = useAppStore((s) => s.projectSystems)
   const updateSystem = useAppStore((s) => s.updateSystem)
-  const allocatedSystemListColumns = createAllocatedSystemColumns(projects, tenants)
+  const allocatedSystemListColumns = createAllocatedSystemColumns(projects, tenants, projectSystems)
   const cancelledSystemListColumns = createCancelledSystemColumns(projects, projectSystems, tenants)
   const allocatedSystems = allocatedSystemDashboardRows(systems, projectSystems).filter((system) => system.operationalStatus !== SYSTEM_OPERATIONAL_STATUS_CANCELED)
   const cancelledSystems = [...systems, ...productionSystemInventory, ...reusedInternalSystems]

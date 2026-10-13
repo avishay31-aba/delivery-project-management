@@ -28,6 +28,8 @@ export interface ProjectLifecycleContext {
   linkedOpportunity?: Opportunity
   account?: Account
   salesManager?: SalesManager
+  projectSystems?: ProjectSystemLink[]
+  systems?: System[]
 }
 
 export interface ProjectSystemsTenantsContext {

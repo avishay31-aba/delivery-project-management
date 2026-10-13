@@ -1,13 +1,14 @@
 import { createElement } from 'react'
 import type { DashboardColumn } from '@/components/dashboard/DataDashboard'
 import { BusinessIdLink, BusinessIdListLinks, OperationalStatusIcon, RichTextContent } from '@/components/ui'
-import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, Tenant } from '@/data/seed.types'
+import type { ProductionSystemInventoryItem, Project, ProjectSystemLink, ReusedInternalSystem, System, Tenant } from '@/data/seed.types'
 import type { AllocatedSystemDashboardRow, SystemInventoryRecord } from '@/domain/system-inventory'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { richTextPlainText } from '@/domain/rich-text'
 import { systemCurrentVersionLabel } from '@/domain/system-version-update'
 import { useAppStore } from '@/store/useAppStore'
-import { REGION_OPTIONS, REUSED_PURPOSE_OPTIONS } from '@/config/picklist-options'
+import { REGION_OPTIONS, REUSED_MANUAL_PURPOSE_OPTIONS } from '@/config/picklist-options'
 import { activeProjectSystemLinks } from '@/domain/allocation-context'
 import {
   deriveReusedSystemOccupationWindow,
@@ -55,7 +56,8 @@ function systemVersionColumn<T extends { id: string; currentVersionUpdateId?: st
   }
 }
 
-export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemInventoryItem>[] = [
+export function createProductionSystemInventoryColumns(projects: Project[], projectSystems: ProjectSystemLink[]): DashboardColumn<ProductionSystemInventoryItem>[] {
+  return [
   {
     id: 'sid',
     label: 'SID',
@@ -68,12 +70,13 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
   systemVersionColumn<ProductionSystemInventoryItem>(),
   systemUrlColumn<ProductionSystemInventoryItem>(),
   { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
+  { id: 'performanceTier', label: 'Performance Tier', getValue: (row) => row.performanceTier ?? '', editable: true, editKey: 'performanceTier' },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
   { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.timeGroup ?? '', editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
   { id: 'region', label: 'Region', getValue: (row) => row.region ?? '', editable: true, editKey: 'region', options: REGION_OPTIONS },
-  { id: 'country', label: 'Country', getValue: (row) => row.country ?? '', editable: true, editKey: 'country' },
+  { id: 'country', label: 'Country', getValue: (row) => countryDisplayName(row.country), editable: true, editKey: 'country' },
   { id: 'state', label: 'State', getValue: (row) => row.state ?? '', editable: true, editKey: 'state' },
   { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editable: true, editKey: 'timeGroup', options: REGION_OPTIONS },
   {
@@ -84,13 +87,26 @@ export const productionSystemInventoryColumns: DashboardColumn<ProductionSystemI
     editKey: 'operationalStatus',
     render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
   },
+  {
+    id: 'linkedProjects',
+    label: 'Linked Projects',
+    getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
+    render: (row) =>
+      createElement(BusinessIdListLinks, {
+        objectType: 'PROJECT',
+        businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
+      }),
+  },
   { id: 'alerts', label: 'Alerts', getValue: (row) => row.alerts.join('; ') },
-]
+  ]
+}
 
-export function createReusedInternalSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[]): DashboardColumn<ReusedInternalSystem>[] {
+export const productionSystemInventoryColumns = createProductionSystemInventoryColumns([], [])
+
+export function createReusedInternalSystemColumns(projects: Project[], projectSystems: ProjectSystemLink[], systems: System[] = []): DashboardColumn<ReusedInternalSystem>[] {
   const activeAllocations = activeProjectSystemLinks(projectSystems)
   const occupationWindow = (row: ReusedInternalSystem) =>
-    deriveReusedSystemOccupationWindow(row, activeAllocations, projects, new Date().toISOString())
+    deriveReusedSystemOccupationWindow(row, activeAllocations, projects, new Date().toISOString(), systems)
 
   return [
   {
@@ -102,12 +118,13 @@ export function createReusedInternalSystemColumns(projects: Project[], projectSy
       : '',
   },
   { id: 'source', label: 'Source', getValue: (row) => row.source },
-  { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_PURPOSE_OPTIONS },
-  { id: 'status', label: 'Availability Status', getValue: (row) => reusedInternalAvailabilityStatus(row, activeAllocations, projects) },
+  { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose, editable: true, editKey: 'purpose', options: REUSED_MANUAL_PURPOSE_OPTIONS },
+  { id: 'status', label: 'Availability Status', getValue: (row) => reusedInternalAvailabilityStatus(row, activeAllocations, projects, systems) },
   { id: 'productType', label: 'Product', getValue: (row) => row.productType, editable: true, editKey: 'productType' },
   systemVersionColumn<ReusedInternalSystem>(),
   systemUrlColumn<ReusedInternalSystem>(),
   { id: 'tenantCount', label: '# Tenants', getValue: (row) => row.tenantCount },
+  { id: 'performanceTier', label: 'Performance Tier', getValue: (row) => row.performanceTier ?? '', editable: true, editKey: 'performanceTier' },
   { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editable: true, editKey: 'hostingType' },
   { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editable: true, editKey: 'cloudPlatform' },
   { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editable: true, editKey: 'cloudRegion' },
@@ -154,6 +171,7 @@ export function createCancelledSystemColumns(projects: Project[], projectSystems
     systemVersionColumn<SystemInventoryRecord>(),
     systemUrlColumn<SystemInventoryRecord>(),
     { id: 'tenantCount', label: '# Tenants', getValue: (row) => tenantCountForSystem(row, tenants) },
+    { id: 'performanceTier', label: 'Performance Tier', getValue: (row) => row.performanceTier ?? '' },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType },
     { id: 'region', label: 'Region', getValue: (row) => ('region' in row ? row.region ?? '' : 'usedInRegion' in row ? row.usedInRegion ?? '' : '') },
     { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup ?? '' },
@@ -190,7 +208,7 @@ export function createCancelledSystemColumns(projects: Project[], projectSystems
   ]
 }
 
-export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[]): DashboardColumn<AllocatedSystemDashboardRow>[] {
+export function createAllocatedSystemColumns(projects: Project[], tenants: Tenant[], projectSystems: ProjectSystemLink[] = []): DashboardColumn<AllocatedSystemDashboardRow>[] {
   return [
     {
       id: 'sid',
@@ -201,12 +219,12 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     {
       id: 'pid',
       label: 'PID',
-      getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
+      getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
       hideInFullDashboard: true,
       render: (row) =>
         createElement(BusinessIdListLinks, {
           objectType: 'PROJECT',
-          businessIds: currentProjectPidsForSystem(row, projects),
+          businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
         }),
     },
     {
@@ -219,15 +237,23 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
     },
     { id: 'source', label: 'Source', getValue: (row) => systemSourceLabel(row) },
     { id: 'purpose', label: 'Purpose', getValue: (row) => row.purpose },
+    {
+      id: 'operationalStatus',
+      label: 'Operational Status',
+      getValue: (row) => row.operationalStatus,
+      editKey: 'operationalStatus',
+      replaceable: true,
+      render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
+    },
     { id: 'allocatedAt', label: 'Allocated At', getValue: (row) => row.allocatedAt, semanticType: 'datetime' },
     {
       id: 'projects',
       label: 'Linked Projects',
-      getValue: (row) => currentProjectPidsForSystem(row, projects).join('; '),
+      getValue: (row) => currentProjectPidsForSystem(row, projects, projectSystems).join('; '),
       render: (row) =>
         createElement(BusinessIdListLinks, {
           objectType: 'PROJECT',
-          businessIds: currentProjectPidsForSystem(row, projects),
+          businessIds: currentProjectPidsForSystem(row, projects, projectSystems),
         }),
     },
     {
@@ -248,19 +274,12 @@ export function createAllocatedSystemColumns(projects: Project[], tenants: Tenan
       label: '# Tenants',
       getValue: (row) => tenantCountForSystem(row, tenants),
     },
+    { id: 'performanceTier', label: 'Performance Tier', getValue: (row) => row.performanceTier ?? '', editKey: 'performanceTier', replaceable: true },
     { id: 'hostingType', label: 'Hosting', getValue: (row) => row.hostingType, editKey: 'hostingType', replaceable: true },
     { id: 'cloudPlatform', label: 'Cloud Platform', getValue: (row) => row.cloudPlatform ?? '', editKey: 'cloudPlatform', replaceable: true },
     { id: 'cloudRegion', label: 'Cloud Region', getValue: (row) => row.cloudRegion ?? '', editKey: 'cloudRegion', replaceable: true },
     { id: 'usedInRegion', label: 'Used In Region', getValue: (row) => row.region ?? row.timeGroup ?? '', editKey: 'region', replaceable: true, options: REGION_OPTIONS },
     { id: 'timeGroup', label: 'Time Group', getValue: (row) => row.timeGroup, editKey: 'timeGroup', replaceable: true, options: REGION_OPTIONS },
-    {
-      id: 'operationalStatus',
-      label: 'Operational Status',
-      getValue: (row) => row.operationalStatus,
-      editKey: 'operationalStatus',
-      replaceable: true,
-      render: (row) => createElement(OperationalStatusIcon, { status: row.operationalStatus, showLabel: true }),
-    },
     { id: 'updatedAt', label: 'Updated At', getValue: (row) => row.updatedAt, semanticType: 'datetime' },
   ]
 }

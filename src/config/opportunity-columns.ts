@@ -4,6 +4,7 @@ import { BusinessIdLink } from '@/components/ui'
 import { applicableOpportunityRequirementCount, getVisibleRequirementTypesForOpportunity } from '@/config/opportunity-metadata'
 import { REGION_OPTIONS } from '@/config/picklist-options'
 import type { Account, Opportunity, SalesManager, System, Tenant } from '@/data/seed.types'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { getHiddenRequirementTypesWithRows, validateOpportunity } from '@/utils/opportunity-validation'
 
 export function createOpportunityColumns(
@@ -38,7 +39,7 @@ export function createOpportunityColumns(
     { id: 'type', label: 'Opportunity Type', getValue: (row) => row.type, editKey: 'type' },
     { id: 'subType', label: 'Opportunity Sub Type', getValue: (row) => row.subType, editKey: 'subType' },
     { id: 'region', label: 'Region', getValue: (row) => row.region, editKey: 'region', options: REGION_OPTIONS },
-    { id: 'country', label: 'Country', getValue: (row) => row.country, editKey: 'country' },
+    { id: 'country', label: 'Country', getValue: (row) => countryDisplayName(row.country), editKey: 'country' },
     { id: 'deliveryDate', label: 'Delivery Date', getValue: (row) => row.deliveryDate ?? '', editKey: 'deliveryDate', semanticType: 'date' },
     { id: 'pocStartDate', label: 'POC Start Date', getValue: (row) => row.pocStartDate ?? '', editKey: 'pocStartDate' },
     { id: 'pocEndDate', label: 'POC End Date', getValue: (row) => row.pocEndDate ?? '', editKey: 'pocEndDate' },

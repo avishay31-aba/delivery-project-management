@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type {
+  AllocationSource,
   AllocationType,
   AppDataState,
   Opportunity,
@@ -7,11 +8,22 @@ import type {
   OpportunityType,
   ReferenceDataRecord,
   ReferenceDataType,
+  GeographicCountryRecord,
+  GeographicUsStateRecord,
   InfrastructureItem,
   TimeGroupLookupRecord,
   UserPresentationPreference,
   VersionUpdateAttachmentRecord,
+  VersionUpgradeRecord,
+  VersionUpgradeSystemSchedule,
   VersionUpdateRecord,
+  DocumentRecord,
+  RemarkRecord,
+  ConfigurationHistoryRecord,
+  TenantConfigurationHistoryRecord,
+  RoleDefinition,
+  NotificationRuleDefinition,
+  ReminderExecutionRecord,
 } from '@/data/seed.types'
 import { CURRENT_USER_DISPLAY_NAME, CURRENT_USER_ID } from '@/config/current-user'
 import { commitBusinessIdFromCounter, generateBusinessIdFromCounter, reserveBusinessId } from '@/domain/business-identity'
@@ -39,6 +51,7 @@ import {
 } from '@/store/persistence'
 import {
   publishCommittedStateChange,
+  requestCommittedStateSnapshot,
   subscribeToCommittedStateChanges,
 } from '@/store/crossTabSync'
 import {
@@ -48,7 +61,11 @@ import {
   createProjectTenantLink,
   deallocateProjectSystemLink,
   deallocateProjectTenantLink,
+  normalizeAllocationSources,
   projectBusinessRegionForAllocation,
+  requiredExistingTenantAllocationsForProject,
+  resolvedProjectSystemAllocationSources,
+  resolvedProjectTenantAllocationSources,
   unlinkProjectFromSystem,
   validateExistingSystemLink,
   validateProductionAllocation,
@@ -61,15 +78,18 @@ import {
   createReusedInternalInventorySystem,
   createStandaloneSystem,
   createSystemConfigurationHistoryRecord,
+  applyAllocatedReusedSystemOccupationWindow,
   hasActiveOpenPocPurposeLock,
-  isSystemOperationallyVisible,
   isReusedInternalOccupied,
+  isOccupationPeriodVisibleForPurpose,
   reusedInternalAvailabilityStatus,
+  SYSTEM_PURPOSE_DELIVERY,
   SYSTEM_OPERATIONAL_STATUS_ACCESS_BLOCKED,
   SYSTEM_OPERATIONAL_STATUS_CANCELED,
   SYSTEM_OPERATIONAL_STATUS_OFF,
   SYSTEM_OPERATIONAL_STATUS_ON,
   SYSTEM_OPERATIONAL_STATUS_SERVICE_BLOCKED,
+  SYSTEM_SOURCE_REUSED_INTERNAL,
   normalizeSystemInventoryRecord,
   normalizeReusedInternalMachineId,
   occupyReusedInternalSystem,
@@ -80,6 +100,8 @@ import {
   reusedInternalMachineIdsEqual,
   reusedInternalMachineIdRouteKey,
   reusedInternalStatusForPurpose,
+  SYSTEM_AVAILABILITY_AVAILABLE,
+  purposeHistoryOwnerSnapshot,
   systemApplicationConfigurationSummary,
   systemFromProductionInventoryAllocation,
   systemFromReusedInternalAllocation,
@@ -98,7 +120,14 @@ import {
 import { applyProjectLifecycleStatus, createStandaloneProject, latestProjectDeletionEntry, projectDeletionHistory, projectHeaderFieldValue, projectStatusFromTaskCompletion, projectStatusLabel, projectTimeZoneResolution } from '@/domain/project-lifecycle'
 import { applyGeographicTimeZone } from '@/domain/geographic-time-zone'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
-import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupSource, systemsWithDerivedTimeGroups, tenantIsEligibleSystemTimeGroupGovernor, tenantTimeGroupFromLocation, timeGroupForTimeZone, validateTimeGroupLookupRows } from '@/domain/time-groups'
+import {
+  businessRegionForCountry,
+  normalizeCountryLookups,
+  normalizeUsStateLookups,
+  validateCountryLookupRows,
+  validateUsStateLookupRows,
+} from '@/domain/geographic-configuration'
+import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemTimeGroupSource, systemsWithDerivedTimeGroups, tenantIsEligibleSystemTimeGroupGovernor, tenantTimeGroupFromLocation, timeGroupForTimeZone, timeGroupFromLocation, validateTimeGroupLookupRows } from '@/domain/time-groups'
 import { USER_PREFERENCE_TYPE_RECORDS_PER_PAGE, normalizeRecordsPerPageValue } from '@/domain/user-preferences'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import {
@@ -110,13 +139,36 @@ import {
 import { commitVersionUpdateAttachment, type PendingAttachmentDraft } from '@/domain/attachment'
 import { validateVersionUpdateDraft } from '@/domain/system-version-update'
 import {
+  deriveEngineerAvailability,
+  schedulerHasVersionBuildPair,
+  versionUpgradeRef,
+} from '@/domain/version-upgrade-scheduler'
+import { normalizeIdCounters } from '@/data/id-generator'
+import { reconcileGlobalChildRecords } from '@/domain/global-child-objects'
+import {
+  canExecuteAction,
+  normalizeRoles,
+  normalizeUserRoleAssignments,
+} from '@/domain/authorization'
+import {
+  normalizeNotificationRules,
+  notificationReadStatusForUser,
+  reconcileNotificationsAndAlerts,
+} from '@/domain/notifications-alerts'
+import {
+  deriveReminderRows,
+  reminderExecutionIdForSource,
+} from '@/domain/reminders'
+import {
   deletedTenantHostedSystemHistory,
+  endedTenantHostedSystemHistory,
   isTenantIndividuallyLifecycleInactive,
   isTenantLifecycleInactive,
   isTenantSystemForced,
   isEligiblePocTenantForCustomerExistingContext,
   resolveTenantCreationSource,
   systemForTenant,
+  TENANT_OPERATIONAL_STATUS_CANCELLED,
   TENANT_OPERATIONAL_STATUS_DELETED,
   TENANT_SYSTEM_FORCED_STATUS_ACCESS_BLOCKED,
   TENANT_SYSTEM_FORCED_STATUS_OFF,
@@ -153,6 +205,143 @@ type SaveTimestampOptions = { preserveNewState?: boolean }
 type TenantTimeGroupMismatchDecision = 'continue' | 'change'
 type TenantTimeGroupOverrideOptions = { timeGroupMismatchDecision?: TenantTimeGroupMismatchDecision }
 let unsubscribeCommittedStateChanges: (() => void) | null = null
+const RIS_OWNER_REQUIRED_PURPOSES = new Set(['Demo', 'Training', 'Support'])
+
+function reusedInternalOwnerRequirementMessages(
+  next: { purpose: string; owners?: unknown[] },
+): string[] {
+  if (!RIS_OWNER_REQUIRED_PURPOSES.has(next.purpose)) return []
+  return (next.owners ?? []).length > 0 ? [] : [`A ${next.purpose} system must have an owner.`]
+}
+
+function requestCommittedStateSnapshotsOnStartup() {
+  requestCommittedStateSnapshot()
+  if (typeof window === 'undefined') return
+  window.setTimeout(requestCommittedStateSnapshot, 250)
+  window.setTimeout(requestCommittedStateSnapshot, 1000)
+}
+
+type RebasedCollectionKey = {
+  [Key in keyof AppDataState]: AppDataState[Key] extends Array<unknown> ? Key : never
+}[keyof AppDataState]
+
+const REBASED_COLLECTION_KEYS: RebasedCollectionKey[] = [
+  'salesManagers',
+  'accounts',
+  'opportunities',
+  'projects',
+  'productionSystemInventory',
+  'reusedInternalSystems',
+  'systems',
+  'tenants',
+  'warrantyRecords',
+  'referenceData',
+  'countryLookups',
+  'usStateLookups',
+  'timeGroupLookups',
+  'userPresentationPreferences',
+  'versionUpgradeRecords',
+  'versionUpdates',
+  'infrastructureItems',
+  'activityEvents',
+  'roles',
+  'userRoleAssignments',
+  'notificationRules',
+  'notificationRecords',
+  'alertRecords',
+  'reminderExecutions',
+  'projectSystems',
+  'projectTenants',
+]
+
+function recordKeyForPersistence(collection: RebasedCollectionKey, value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const keyedValue =
+    collection === 'projects' ? record.pid ?? record.id :
+    collection === 'opportunities' ? record.opportunityId ?? record.id :
+    collection === 'productionSystemInventory' || collection === 'systems' ? record.sid ?? record.id :
+    collection === 'reusedInternalSystems' ? record.machineId ?? record.id :
+    collection === 'tenants' ? record.tid ?? record.id :
+    collection === 'infrastructureItems' ? record.infrastructureId ?? record.id :
+    collection === 'warrantyRecords' ? record.warrantyRecordId ?? record.id :
+    record.id ?? record.businessId
+  return typeof keyedValue === 'string' && keyedValue.trim() ? `${collection}:${keyedValue}` : null
+}
+
+function rebaseCollectionForPersistence<T>(collection: RebasedCollectionKey, current: T[], latest: T[]): T[] {
+  const currentKeys = new Set(current.map((item) => recordKeyForPersistence(collection, item)).filter((key): key is string => Boolean(key)))
+  const preserved = latest.filter((item) => {
+    const key = recordKeyForPersistence(collection, item)
+    return key ? !currentKeys.has(key) : false
+  })
+  return preserved.length > 0 ? [...current, ...preserved] : current
+}
+
+function rebaseAppDataStateForPersistence(current: AppDataState, latest: AppDataState | null): AppDataState {
+  if (!latest) return current
+  const currentPersistedAt = current.lastPersistedAt ?? ''
+  const latestPersistedAt = latest.lastPersistedAt ?? ''
+  if (!latestPersistedAt || latestPersistedAt <= currentPersistedAt) return current
+
+  const rebased: AppDataState = {
+    ...current,
+  }
+  REBASED_COLLECTION_KEYS.forEach((key) => {
+    rebased[key] = rebaseCollectionForPersistence(key, current[key] as never[], latest[key] as never[]) as never
+  })
+  return {
+    ...rebased,
+    idCounters: normalizeIdCounters({
+      ...latest.idCounters,
+      ...current.idCounters,
+    }, rebased),
+  }
+}
+
+function stableIncomingCollection<T>(collection: RebasedCollectionKey, current: T[], incoming: T[]): T[] {
+  const currentByKey = new Map<string, T>()
+  current.forEach((item) => {
+    const key = recordKeyForPersistence(collection, item)
+    if (key) currentByKey.set(key, item)
+  })
+
+  let changed = current.length !== incoming.length
+  const merged = incoming.map((incomingItem, index) => {
+    const key = recordKeyForPersistence(collection, incomingItem)
+    const currentItem = key ? currentByKey.get(key) : current[index]
+    if (currentItem && valuesEqual(currentItem, incomingItem)) {
+      if (currentItem !== current[index]) changed = true
+      return currentItem
+    }
+    changed = true
+    return incomingItem
+  })
+
+  if (!changed && merged.every((item, index) => item === current[index])) return current
+  return merged
+}
+
+function mergeIncomingCommittedState(current: AppStore, incomingState: AppDataState): Partial<AppStore> {
+  const incoming = reconcileNotificationsAndAlerts(incomingState)
+  const next: Partial<AppStore> = {
+    hydrated: true,
+  }
+
+  REBASED_COLLECTION_KEYS.forEach((key) => {
+    next[key] = stableIncomingCollection(
+      key,
+      current[key] as never[],
+      incoming[key] as never[],
+    ) as never
+  })
+
+  next.version = incoming.version
+  next.lastPersistedAt = incoming.lastPersistedAt
+  next.idCounters = valuesEqual(current.idCounters, incoming.idCounters) ? current.idCounters : incoming.idCounters
+
+  return next
+}
 
 function opportunityWithCommittedRequirementContext(opportunity: Opportunity, tenants: AppDataState['tenants']): Opportunity {
   return {
@@ -174,8 +363,15 @@ function opportunityWithCommittedRequirementContext(opportunity: Opportunity, te
   }
 }
 
-function opportunityWithDerivedGeography(opportunity: Opportunity, timeGroupLookups: TimeGroupLookupRecord[]): Opportunity {
-  const region = getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
+function opportunityWithDerivedGeography(
+  opportunity: Opportunity,
+  timeGroupLookups: TimeGroupLookupRecord[],
+  countryLookups: GeographicCountryRecord[] = [],
+  usStateLookups: GeographicUsStateRecord[] = [],
+): Opportunity {
+  const countries = normalizeCountryLookups(countryLookups)
+  const states = normalizeUsStateLookups(usStateLookups)
+  const region = businessRegionForCountry(countries, opportunity.country) || getBusinessRegionForCountry(opportunity.country, opportunity.state) || normalizeBusinessRegion(opportunity.region)
   const located = applyGeographicTimeZone(
     {
       ...opportunity,
@@ -183,17 +379,26 @@ function opportunityWithDerivedGeography(opportunity: Opportunity, timeGroupLook
       timeGroup: opportunity.timeGroup || '',
     },
     opportunity.deliveryDate ?? opportunity.pocStartDate,
+    countries,
+    states,
   )
   return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
-function accountWithDerivedGeography(account: AppDataState['accounts'][number], timeGroupLookups: TimeGroupLookupRecord[]): AppDataState['accounts'][number] {
-  const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+function accountWithDerivedGeography(
+  account: AppDataState['accounts'][number],
+  timeGroupLookups: TimeGroupLookupRecord[],
+  countryLookups: GeographicCountryRecord[] = [],
+  usStateLookups: GeographicUsStateRecord[] = [],
+): AppDataState['accounts'][number] {
+  const countries = normalizeCountryLookups(countryLookups)
+  const states = normalizeUsStateLookups(usStateLookups)
+  const region = businessRegionForCountry(countries, account.country) || getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
   const located = applyGeographicTimeZone({
     ...account,
     region,
     timeGroup: account.timeGroup || '',
-  })
+  }, undefined, countries, states)
   return { ...located, timeGroup: timeGroupForTimeZone(timeGroupLookups, located.timeZone) }
 }
 
@@ -280,6 +485,133 @@ function versionUpdateRef(record: VersionUpdateRecord): ActivityObjectRefInput {
   }
 }
 
+type VersionUpdateSystemRecord =
+  | AppDataState['productionSystemInventory'][number]
+  | AppDataState['reusedInternalSystems'][number]
+  | AppDataState['systems'][number]
+type VersionUpdateCurrentPatch = Partial<Pick<VersionUpdateSystemRecord, 'currentVersionUpdateId' | 'currentVersionNumberRefId' | 'currentBuildNumberRefId'>>
+
+function versionSystemSnapshot(system: VersionUpdateSystemRecord): { mid: string; sid: string } {
+  return {
+    mid: 'machineId' in system ? system.machineId ?? '' : '',
+    sid: 'sid' in system ? system.sid ?? '' : '',
+  }
+}
+
+function cloneVersionUpdateRecordsForSystem(input: {
+  sourceSystemId: string
+  sourceCurrentVersionUpdateId?: string | null
+  targetSystem: VersionUpdateSystemRecord
+  targetCollection: VersionUpdateRecord['systemCollection']
+  versionUpdates: VersionUpdateRecord[]
+  idCounters: AppDataState['idCounters']
+  timestamp: string
+}): {
+  idCounters: AppDataState['idCounters']
+  records: VersionUpdateRecord[]
+  currentPatch: VersionUpdateCurrentPatch
+} {
+  const sourceRecords = input.versionUpdates
+    .filter((record) => record.systemId === input.sourceSystemId && !record.deletedAt)
+    .sort((first, second) => first.committedSequence - second.committedSequence || first.committedAt.localeCompare(second.committedAt))
+  if (sourceRecords.length === 0) return { idCounters: input.idCounters, records: [], currentPatch: {} }
+
+  let idCounters = input.idCounters
+  const usedVersionUpdateIds = input.versionUpdates.map((record) => record.id)
+  const usedAttachmentIds = input.versionUpdates.flatMap((record) => record.attachments.map((attachment) => attachment.id))
+  const targetSnapshot = versionSystemSnapshot(input.targetSystem)
+  const sourceToCloneId = new Map<string, string>()
+  const records = sourceRecords.map((sourceRecord) => {
+    const nextVersionUpdateIdentity = generateBusinessIdFromCounter('versionUpdate', idCounters, usedVersionUpdateIds)
+    idCounters = nextVersionUpdateIdentity.counters
+    usedVersionUpdateIds.push(nextVersionUpdateIdentity.id)
+    sourceToCloneId.set(sourceRecord.id, nextVersionUpdateIdentity.id)
+    const attachments = sourceRecord.attachments.map((attachment) => {
+      const nextAttachmentIdentity = generateBusinessIdFromCounter('versionUpdateAttachment', idCounters, usedAttachmentIds)
+      idCounters = nextAttachmentIdentity.counters
+      usedAttachmentIds.push(nextAttachmentIdentity.id)
+      return {
+        ...attachment,
+        id: nextAttachmentIdentity.id,
+        parentBusinessId: nextVersionUpdateIdentity.id,
+      }
+    })
+    return {
+      ...sourceRecord,
+      id: nextVersionUpdateIdentity.id,
+      systemId: input.targetSystem.id,
+      systemCollection: input.targetCollection,
+      midSnapshot: targetSnapshot.mid,
+      sidSnapshot: targetSnapshot.sid,
+      attachments,
+      createdAt: input.timestamp,
+      updatedAt: input.timestamp,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+  })
+  const sourceCurrentRecord =
+    sourceRecords.find((record) => record.id === input.sourceCurrentVersionUpdateId) ??
+    sourceRecords[sourceRecords.length - 1]
+  const clonedCurrentRecord = sourceCurrentRecord
+    ? records.find((record) => record.id === sourceToCloneId.get(sourceCurrentRecord.id))
+    : undefined
+  return {
+    idCounters,
+    records,
+    currentPatch: clonedCurrentRecord
+      ? {
+          currentVersionUpdateId: clonedCurrentRecord.id,
+          currentVersionNumberRefId: clonedCurrentRecord.versionNumberRefId,
+          currentBuildNumberRefId: clonedCurrentRecord.buildNumberRefId,
+        }
+      : {},
+  }
+}
+
+function cloneSingleVersionUpdateRecordForSystem(input: {
+  sourceRecord: VersionUpdateRecord
+  targetSystem: VersionUpdateSystemRecord
+  targetCollection: VersionUpdateRecord['systemCollection']
+  versionUpdates: VersionUpdateRecord[]
+  idCounters: AppDataState['idCounters']
+  timestamp: string
+}): {
+  idCounters: AppDataState['idCounters']
+  record: VersionUpdateRecord
+} {
+  let idCounters = input.idCounters
+  const usedVersionUpdateIds = input.versionUpdates.map((record) => record.id)
+  const usedAttachmentIds = input.versionUpdates.flatMap((record) => record.attachments.map((attachment) => attachment.id))
+  const nextVersionUpdateIdentity = generateBusinessIdFromCounter('versionUpdate', idCounters, usedVersionUpdateIds)
+  idCounters = nextVersionUpdateIdentity.counters
+  const targetSnapshot = versionSystemSnapshot(input.targetSystem)
+  const attachments = input.sourceRecord.attachments.map((attachment) => {
+    const nextAttachmentIdentity = generateBusinessIdFromCounter('versionUpdateAttachment', idCounters, usedAttachmentIds)
+    idCounters = nextAttachmentIdentity.counters
+    usedAttachmentIds.push(nextAttachmentIdentity.id)
+    return {
+      ...attachment,
+      id: nextAttachmentIdentity.id,
+      parentBusinessId: nextVersionUpdateIdentity.id,
+    }
+  })
+  return {
+    idCounters,
+    record: {
+      ...input.sourceRecord,
+      id: nextVersionUpdateIdentity.id,
+      systemId: input.targetSystem.id,
+      systemCollection: input.targetCollection,
+      midSnapshot: targetSnapshot.mid,
+      sidSnapshot: targetSnapshot.sid,
+      attachments,
+      createdAt: input.timestamp,
+      updatedAt: input.timestamp,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    },
+  }
+}
+
 function infrastructureRef(record: InfrastructureItem): ActivityObjectRefInput {
   return {
     objectType: 'INFRASTRUCTURE_ITEM',
@@ -300,7 +632,18 @@ const AUDIT_FIELD_EXCLUSIONS = new Set([
   'technicalId',
 ])
 
+const AUDIT_FIELD_LABEL_OVERRIDES: Record<string, string> = {
+  productType: 'Product',
+  ipRestrictionEnabled: 'IP Restriction',
+  usedInRegion: 'Used In Region',
+  currentVersion: 'Current Version',
+  currentBuild: 'Current Build',
+  currentVersionUpdateId: 'Current Version Update ID',
+}
+
 function auditFieldLabel(field: string): string {
+  const override = AUDIT_FIELD_LABEL_OVERRIDES[field]
+  if (override) return override
   return field
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/^./, (first) => first.toUpperCase())
@@ -487,6 +830,7 @@ function appendFieldChangeActivityEvents<T extends Record<string, unknown>>(
     primaryObject: ActivityObjectRefInput
     relatedObjects?: ActivityObjectRefInput[]
     excludeFields?: string[]
+    summaryPrefix?: string
   },
 ): ActivityEvent[] {
   let nextEvents = events
@@ -505,7 +849,7 @@ function appendFieldChangeActivityEvents<T extends Record<string, unknown>>(
       category,
       eventType: auditEventTypeForField(config.eventTypePrefix, field),
       severity: 'INFO',
-      summary: `${config.objectLabel} ${fieldLabel} changed from ${auditValue(beforeValue)} to ${auditValue(afterValue)}.`,
+      summary: `${config.summaryPrefix ? `${config.summaryPrefix}: ` : ''}${config.objectLabel} ${fieldLabel} changed from ${auditValue(beforeValue)} to ${auditValue(afterValue)}.`,
       primaryObject: config.primaryObject,
       relatedObjects: config.relatedObjects ?? [],
       before: { [field]: beforeValue ?? null },
@@ -593,7 +937,7 @@ function removeTenantsFromSystemTransaction(
     tenants,
     systems: state.systems.map((system) => {
       if (!removedSystemIds.has(system.id)) return system
-      const source = systemTimeGroupSource(system, tenants, state.timeGroupLookups)
+      const source = systemTimeGroupSource(system, tenants, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
       return {
         ...system,
         timeGroupGovernanceTenantId: source.governorTenantId,
@@ -604,6 +948,137 @@ function removeTenantsFromSystemTransaction(
     projectSystems: state.projectSystems,
     projectTenants: state.projectTenants,
     activityEvents,
+  }
+}
+
+function activityEventReferencesTenant(event: ActivityEvent, tenant: AppDataState['tenants'][number]): boolean {
+  const matchesRef = (ref: { objectType?: string; id?: string; businessId?: string } | null | undefined) =>
+    Boolean(
+      ref &&
+        ref.objectType?.toLocaleLowerCase() === 'tenant' &&
+        (ref.id === tenant.id || ref.businessId === tenant.tid),
+    )
+  return (
+    matchesRef(event.primaryObject) ||
+    event.relatedObjects.some(matchesRef) ||
+    event.summary.includes(tenant.tid) ||
+    event.summary.includes(tenant.id) ||
+    event.details?.includes(tenant.tid) === true ||
+    event.details?.includes(tenant.id) === true
+  )
+}
+
+function cancelTenantInState(
+  state: AppDataState,
+  tenantId: string,
+  now: string,
+): Pick<AppDataState, 'tenants' | 'systems' | 'projectSystems' | 'projectTenants' | 'opportunities' | 'warrantyRecords' | 'activityEvents'> {
+  const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
+  if (!tenant) {
+    return {
+      tenants: state.tenants,
+      systems: state.systems,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      opportunities: state.opportunities,
+      warrantyRecords: state.warrantyRecords,
+      activityEvents: state.activityEvents,
+    }
+  }
+
+  const affectedSystemIds = new Set([
+    tenant.systemId,
+    tenant.hostedSystemId,
+    ...state.projectSystems.filter((link) => (link.tenantIds ?? []).includes(tenantId)).map((link) => link.systemId),
+    ...state.projectTenants.filter((link) => link.tenantId === tenantId).map((link) => link.systemId ?? ''),
+  ].filter(Boolean))
+  const previousOperationalStatus = isTenantLifecycleInactive(tenant)
+    ? tenant.individualLifecyclePreviousOperationalStatus ?? tenant.lastManualOperationalStatus ?? 'Active'
+    : tenant.operationalStatus
+  const releasedRequirementId = tenant.sourceRequirementId ?? tenant.releasedRequirementId ?? null
+  const tenants = state.tenants.map((candidate) => {
+    if (candidate.id !== tenantId) return candidate
+    return {
+      ...candidate,
+      operationalStatus: TENANT_OPERATIONAL_STATUS_CANCELLED,
+      individualLifecyclePreviousOperationalStatus: previousOperationalStatus,
+      systemForcedPreviousOperationalStatus: null,
+      systemForcedBySystemId: null,
+      sourceRequirementId: undefined,
+      releasedRequirementId,
+      requirementHistory: (candidate.requirementHistory ?? []).map((relationship) =>
+        relationship.status === 'CURRENT'
+          ? { ...relationship, status: 'HISTORICAL' as const, endedAt: now }
+          : relationship,
+      ),
+      hostedSystemHistory: endedTenantHostedSystemHistory(candidate, now, 'Cancelled'),
+      cancellationAt: candidate.cancellationAt ?? now,
+      cancelledBy: candidate.cancelledBy ?? CURRENT_USER_DISPLAY_NAME,
+      updatedAt: now,
+    }
+  })
+
+  return {
+    tenants,
+    systems: state.systems.map((system) => {
+      if (!affectedSystemIds.has(system.id)) return system
+      const isReleasedReusedInternalSid =
+        system.source === SYSTEM_SOURCE_REUSED_INTERNAL &&
+        Boolean(system.sid) &&
+        !activeProjectSystemLinks(state.projectSystems).some((link) => link.systemId === system.id)
+      if (isReleasedReusedInternalSid) return system
+      const tenantIds = (system.tenantIds ?? []).filter((id) => id !== tenantId)
+      const source = systemTimeGroupSource(system, tenants, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
+      return {
+        ...system,
+        tenantIds,
+        timeGroupGovernanceTenantId: source.governorTenantId,
+        timeGroup: source.timeGroup,
+        updatedAt: now,
+      }
+    }),
+    projectSystems: state.projectSystems.map((link) =>
+      (link.tenantIds ?? []).includes(tenantId)
+        ? {
+            ...link,
+            tenantIds: (link.tenantIds ?? []).filter((id) => id !== tenantId),
+          }
+        : link,
+    ),
+    projectTenants: state.projectTenants.map((link) =>
+      link.tenantId === tenantId && link.allocationStatus !== 'DEALLOCATED'
+        ? deallocateProjectTenantLink(link, now)
+        : link,
+    ),
+    opportunities: state.opportunities.map((opportunity) => ({
+      ...opportunity,
+      changeRequestRequirements: opportunity.changeRequestRequirements.map((requirement) =>
+        requirement.tenantId === tenantId
+          ? { ...requirement, tenantId: '', systemId: '', baselineConfiguration: undefined }
+          : requirement,
+      ),
+      standardRenewalRequirements: opportunity.standardRenewalRequirements.map((requirement) =>
+        requirement.tenantId === tenantId
+          ? { ...requirement, tenantId: '', systemId: '', warrantyRecordId: '', warrantyStatus: 'NOT_SET', warrantyEndDate: null }
+          : requirement,
+      ),
+    })),
+    warrantyRecords: state.warrantyRecords,
+    activityEvents: appendActivityEvent(state.activityEvents.filter((event) => !activityEventReferencesTenant(event, tenant)), now, {
+      category: 'TENANT',
+      eventType: 'tenant.cancelledFromSystem',
+      severity: 'WARNING',
+      summary: `Tenant ${tenant.tid} cancelled and excluded from active hosting calculations.`,
+      primaryObject: tenantRef(tenant),
+      before: {
+        operationalStatus: tenant.operationalStatus,
+        sourceRequirementId: tenant.sourceRequirementId ?? null,
+      },
+      after: {
+        operationalStatus: TENANT_OPERATIONAL_STATUS_CANCELLED,
+        releasedRequirementId,
+      },
+    }),
   }
 }
 
@@ -681,6 +1156,40 @@ function applySystemOperationalStatusToTenants(
   return { tenants, activityEvents: state.activityEvents }
 }
 
+const REUSED_INTERNAL_CURRENT_PHYSICAL_SYNC_KEYS = [
+  'productType',
+  'logo',
+  'url',
+  'hostingType',
+  'cloudPlatform',
+  'csp',
+  'cloudRegion',
+  'vpnEnabled',
+  'vpnType',
+  'externalInterface',
+  'ipRestrictionEnabled',
+  'performanceTier',
+  'cognitoRegion',
+  'usedInRegion',
+  'timeGroup',
+  'timeGroupAlert',
+  'mapCenter',
+  'operationalStatus',
+  'currentVersionUpdateId',
+  'currentVersionNumberRefId',
+  'currentBuildNumberRefId',
+] as const
+
+function reusedInternalCurrentPhysicalPatchFromSid(system: AppDataState['systems'][number]): Partial<AppDataState['reusedInternalSystems'][number]> {
+  const patch: Partial<AppDataState['reusedInternalSystems'][number]> = {}
+  REUSED_INTERNAL_CURRENT_PHYSICAL_SYNC_KEYS.forEach((key) => {
+    if (key in system) {
+      ;(patch as Record<string, unknown>)[key] = (system as unknown as Record<string, unknown>)[key]
+    }
+  })
+  return patch
+}
+
 function projectAssignmentLocation(state: AppDataState, project: AppDataState['projects'][number]) {
   const linkedOpportunity = state.opportunities.find((opportunity) => opportunity.id === project.opportunityId)
   const account = state.accounts.find((candidate) => candidate.accountName === project.accountName)
@@ -698,15 +1207,26 @@ function recalculateReusedSystemOccupationWindows(
   projectSystems: AppDataState['projectSystems'],
   projects: AppDataState['projects'],
   now: string,
+  systems: AppDataState['systems'] = [],
 ): AppDataState['reusedInternalSystems'] {
-  const activeLinks = activeProjectSystemLinks(projectSystems)
   return reusedSystems.map((system) =>
     applyReusedSystemOccupationWindow(
       system,
-      activeLinks,
+      projectSystems,
       projects,
       now,
+      systems,
     ),
+  )
+}
+
+function recalculateAllocatedReusedSystemOccupationWindows(
+  systems: AppDataState['systems'],
+  projectSystems: AppDataState['projectSystems'],
+  projects: AppDataState['projects'],
+): AppDataState['systems'] {
+  return systems.map((system) =>
+    applyAllocatedReusedSystemOccupationWindow(system, projectSystems, projects),
   )
 }
 
@@ -715,6 +1235,7 @@ function sanitizeReusedInternalSystemUserPatch(
   patch: Partial<AppDataState['reusedInternalSystems'][number]>,
   projects: AppDataState['projects'],
   projectSystems: AppDataState['projectSystems'],
+  systems: AppDataState['systems'] = [],
 ): Partial<AppDataState['reusedInternalSystems'][number]> {
   const safePatch = { ...patch }
   delete safePatch.purposeHistory
@@ -722,15 +1243,15 @@ function sanitizeReusedInternalSystemUserPatch(
   if (typeof safePatch.machineId === 'string') {
     safePatch.machineId = normalizeReusedInternalMachineId(safePatch.machineId)
   }
-  if (!isReusedInternalOccupied(reusedInternalStatusForPurpose(safePatch.purpose ?? system.purpose))) {
+  if (!isOccupationPeriodVisibleForPurpose(safePatch.purpose ?? system.purpose)) {
+    safePatch.occupationStartDate = null
+    safePatch.occupationEndDate = null
+  }
+  if (reusedInternalHasActivePocAllocation(system, activeProjectSystemLinks(projectSystems), projects, systems)) {
     delete safePatch.occupationStartDate
     delete safePatch.occupationEndDate
   }
-  if (reusedInternalHasActivePocAllocation(system, activeProjectSystemLinks(projectSystems), projects)) {
-    delete safePatch.occupationStartDate
-    delete safePatch.occupationEndDate
-  }
-  if (!hasActiveOpenPocPurposeLock(system, projects, projectSystems)) return safePatch
+  if (!hasActiveOpenPocPurposeLock(system, projects, projectSystems, systems)) return safePatch
   delete safePatch.purpose
   delete safePatch.occupationStartDate
   delete safePatch.occupationEndDate
@@ -748,7 +1269,7 @@ function projectWithDerivedTimeZone(state: AppDataState, project: AppDataState['
 }
 
 function tenantWithDerivedProjectTimeGroup(
-  state: Pick<AppDataState, 'accounts' | 'opportunities' | 'projects' | 'systems' | 'timeGroupLookups'>,
+  state: Pick<AppDataState, 'accounts' | 'opportunities' | 'projects' | 'systems' | 'timeGroupLookups' | 'countryLookups' | 'usStateLookups'>,
   tenant: AppDataState['tenants'][number],
 ): AppDataState['tenants'][number] {
   const project = tenant.deliveryPid
@@ -775,12 +1296,13 @@ function tenantWithDerivedProjectTimeGroup(
     ...tenant,
     country,
     state: stateName,
-  }, state.timeGroupLookups)
+  }, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
 }
 
 function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): string[] {
   return Array.from(new Set(
     applicableOpportunityRequirementSources(opportunity)
+      .filter((source) => source.requirementType === 'B' || source.requirementType === 'C')
       .map((source) => ('tenantId' in source.requirement ? source.requirement.tenantId : ''))
       .filter(Boolean),
   ))
@@ -788,7 +1310,7 @@ function existingTenantIdsForOpportunityFinalProject(opportunity: Opportunity): 
 
 function tenantSystemTimeGroupMismatchMessage(state: AppDataState, tenant: AppDataState['tenants'][number], system: AppDataState['systems'][number]): string {
   if (!tenantIsEligibleSystemTimeGroupGovernor(tenant)) return ''
-  const tenantTimeGroup = tenantTimeGroupFromLocation(tenant, state.timeGroupLookups).timeGroup
+  const tenantTimeGroup = tenantTimeGroupFromLocation(tenant, state.timeGroupLookups, undefined, state.countryLookups, state.usStateLookups).timeGroup
   const systemTimeGroup = system.timeGroup
   if (!systemTimeGroup || !tenantTimeGroup || systemTimeGroup === tenantTimeGroup) return ''
   return `The selected Tenant belongs to Time Group ${tenantTimeGroup}, while System ${systemBusinessId(system)} currently belongs to Time Group ${systemTimeGroup}, based on its governing Customer/POC Tenant.\n\nDo you want to continue adding this Tenant to the System?`
@@ -799,6 +1321,8 @@ function systemWithAddedTenantTimeGroupGovernance(
   existingTenants: AppDataState['tenants'],
   incomingTenant: AppDataState['tenants'][number],
   records: TimeGroupLookupRecord[],
+  countryRecords: GeographicCountryRecord[],
+  stateRecords: GeographicUsStateRecord[],
   decision?: TenantTimeGroupMismatchDecision,
 ) {
   const candidate = {
@@ -807,7 +1331,7 @@ function systemWithAddedTenantTimeGroupGovernance(
       ? incomingTenant.id
       : system.timeGroupGovernanceTenantId,
   }
-  const source = systemTimeGroupSource(candidate, [incomingTenant, ...existingTenants], records)
+  const source = systemTimeGroupSource(candidate, [incomingTenant, ...existingTenants], records, countryRecords, stateRecords)
   return { timeGroup: source.timeGroup, timeGroupGovernanceTenantId: source.governorTenantId }
 }
 
@@ -816,7 +1340,7 @@ function timeGroupMismatchResult(state: AppDataState, tenant: AppDataState['tena
   return {
     message,
     currentSystemTimeGroup: system.timeGroup,
-    incomingTenantTimeGroup: tenantTimeGroupFromLocation(tenant, state.timeGroupLookups).timeGroup,
+    incomingTenantTimeGroup: tenantTimeGroupFromLocation(tenant, state.timeGroupLookups, undefined, state.countryLookups, state.usStateLookups).timeGroup,
   }
 }
 
@@ -854,6 +1378,7 @@ function ensureProjectTenantHostingRelationships(
   tenantIds: string[],
   now: string,
   source: 'opportunityWon' | 'tenantSave' = 'opportunityWon',
+  allocationSourcesByTenantId: Map<string, AllocationSource[]> = new Map(),
 ): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
   let systems = state.systems
   let projectSystems = state.projectSystems
@@ -865,6 +1390,7 @@ function ensureProjectTenantHostingRelationships(
     const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
     if (!tenant) return
     const hostingSystem = systemForTenant(tenant, systems)
+    const allocationSources = normalizeAllocationSources(allocationSourcesByTenantId.get(tenant.id))
     const allocationType = hostingSystem
       ? relationshipAllocationTypeForSystem(hostingSystem)
       : 'EXISTING_SYSTEM'
@@ -876,7 +1402,7 @@ function ensureProjectTenantHostingRelationships(
         link.allocationStatus !== 'DEALLOCATED',
     )
     if (!activeTenantLink) {
-      const projectTenant = createProjectTenantLink(project.id, tenant.id, hostingSystem?.id ?? '', allocationType, now)
+      const projectTenant = createProjectTenantLink(project.id, tenant.id, hostingSystem?.id ?? '', allocationType, now, allocationSources)
       projectTenants = [projectTenant, ...projectTenants]
       activityEvents = appendActivityEvent(activityEvents, now, {
         category: 'TENANT',
@@ -902,12 +1428,17 @@ function ensureProjectTenantHostingRelationships(
     if (activeSystemLink) {
       projectSystems = projectSystems.map((link) =>
         link.id === activeSystemLink.id
-          ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])) }
+          ? {
+              ...link,
+              tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenant.id])),
+              allocationSources: normalizeAllocationSources([...(link.allocationSources ?? ['MANUAL']), ...allocationSources]),
+            }
           : link,
       )
     } else {
       const allocation = createProjectSystemLink(project.id, hostingSystem.id, committedAllocationType, now, {
         tenantIds: [tenant.id],
+        allocationSources,
         sourceMachineId: committedAllocationType === 'REUSED_INTERNAL' ? hostingSystem.machineId : null,
       })
       projectSystems = [allocation, ...projectSystems]
@@ -925,7 +1456,12 @@ function ensureProjectTenantHostingRelationships(
 
     projectTenants = projectTenants.map((link) =>
       link.projectId === project.id && link.tenantId === tenant.id && link.allocationStatus !== 'DEALLOCATED'
-        ? { ...link, systemId: hostingSystem.id, allocationType: committedAllocationType }
+        ? {
+            ...link,
+            systemId: hostingSystem.id,
+            allocationType: committedAllocationType,
+            allocationSources: normalizeAllocationSources([...(link.allocationSources ?? ['MANUAL']), ...allocationSources]),
+          }
         : link,
     )
 
@@ -946,83 +1482,92 @@ function ensureProjectTenantHostingRelationships(
   return { systems, projectSystems, projectTenants, activityEvents }
 }
 
-function opportunityRequestedSystemTenantIds(opportunity: Opportunity): Map<string, string[]> {
-  const requested = new Map<string, string[]>()
-  const add = (systemId: string | null | undefined, tenantId?: string | null) => {
-    if (!systemId) return
-    const tenantIds = requested.get(systemId) ?? []
-    requested.set(systemId, tenantId ? Array.from(new Set([...tenantIds, tenantId])) : tenantIds)
-  }
-
-  applicableOpportunityRequirementSources(opportunity).forEach((source) => {
-    const requirement = source.requirement
-    if ('deployTarget' in requirement) {
-      if (requirement.deployTarget === 'EXISTING_SID') add(requirement.existingSystemId)
-      return
-    }
-    if ('systemId' in requirement) add(requirement.systemId, requirement.tenantId)
-  })
-
-  return requested
-}
-
-function ensureOpportunityRequestedSystemAllocations(
-  state: Pick<AppDataState, 'systems' | 'projectSystems' | 'activityEvents'>,
+function ensureAutomaticRequirementRelationships(
+  state: AppDataState,
   opportunity: Opportunity,
   project: AppDataState['projects'][number],
   now: string,
-): Pick<AppDataState, 'systems' | 'projectSystems' | 'activityEvents'> {
-  let systems = state.systems
-  let projectSystems = state.projectSystems
-  let activityEvents = state.activityEvents
-  const requestedSystemTenantIds = opportunityRequestedSystemTenantIds(opportunity)
-
-  requestedSystemTenantIds.forEach((tenantIds, systemId) => {
-    const system = systems.find((candidate) => candidate.id === systemId && isSystemOperationallyVisible(candidate))
-    if (!system) return
-    const allocationType = relationshipAllocationTypeForSystem(system)
-    const activeSystemLink = projectSystems.find((link) =>
-      link.projectId === project.id &&
-      link.systemId === system.id &&
-      link.allocationStatus !== 'DEALLOCATED',
-    )
-
-    if (activeSystemLink) {
-      const mergedTenantIds = Array.from(new Set([...(activeSystemLink.tenantIds ?? []), ...tenantIds]))
-      if (mergedTenantIds.length !== (activeSystemLink.tenantIds ?? []).length) {
-        projectSystems = projectSystems.map((link) =>
-          link.id === activeSystemLink.id ? { ...link, tenantIds: mergedTenantIds } : link,
-        )
-      }
-    } else {
-      const allocation = createProjectSystemLink(project.id, system.id, allocationType, now, {
-        tenantIds,
-        sourceMachineId: allocationType === 'REUSED_INTERNAL' ? system.machineId : null,
-      })
-      projectSystems = [allocation, ...projectSystems]
-      activityEvents = appendActivityEvent(activityEvents, now, {
-        category: 'ALLOCATION',
-        eventType: 'allocation.existingSystemLinkedFromOpportunity',
-        severity: 'SUCCESS',
-        summary: `Existing system ${systemBusinessId(system)} linked to project ${project.pid} from Opportunity ${opportunity.opportunityId}.`,
-        primaryObject: allocationRef(allocation),
-        relatedObjects: relatedRefs(projectRef(project), systemRef(system), activityObjectRefFromBusinessReference(opportunityReference(opportunity))),
-      })
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
+  const requiredAllocations = requiredExistingTenantAllocationsForProject(project, opportunity, state.tenants)
+  if (requiredAllocations.length === 0) {
+    return {
+      systems: state.systems,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      activityEvents: state.activityEvents,
     }
+  }
 
-    systems = systems.map((candidate) =>
-      candidate.id === system.id
-        ? {
-            ...candidate,
-            linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), project.id])),
-            tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), ...tenantIds])),
-            updatedAt: now,
-          }
-        : candidate,
-    )
+  const sourcesByTenantId = new Map<string, AllocationSource[]>()
+  requiredAllocations.forEach((allocation) => {
+    const existing = sourcesByTenantId.get(allocation.tenantId) ?? []
+    sourcesByTenantId.set(allocation.tenantId, normalizeAllocationSources([...existing, ...allocation.sources], []))
   })
 
-  return { systems, projectSystems, activityEvents }
+  return ensureProjectTenantHostingRelationships(
+    state,
+    project,
+    Array.from(sourcesByTenantId.keys()),
+    now,
+    'opportunityWon',
+    sourcesByTenantId,
+  )
+}
+
+function reconcileProjectAllocationSources(
+  state: Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'projects' | 'opportunities' | 'tenants' | 'activityEvents'>,
+  projectIds: string[],
+  now: string,
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> {
+  const affectedProjectIds = new Set(projectIds)
+  const projectById = new Map(state.projects.map((project) => [project.id, project]))
+  const opportunityForProject = (project: AppDataState['projects'][number]) =>
+    state.opportunities.find((opportunity) =>
+      opportunity.id === project.opportunityId ||
+      opportunity.opportunityId === project.opportunityId ||
+      opportunity.pocProjectIds.includes(project.id) ||
+      opportunity.finalProjectId === project.id,
+    )
+  const projectSystems = state.projectSystems.map((link) => {
+    if (link.allocationStatus === 'DEALLOCATED' || !affectedProjectIds.has(link.projectId)) return link
+    const project = projectById.get(link.projectId)
+    if (!project) return link
+    const allocationSources = resolvedProjectSystemAllocationSources(link, project, opportunityForProject(project), state.tenants)
+    return allocationSources.length > 0
+      ? { ...link, allocationSources }
+      : { ...deallocateProjectSystemLink(link, now), allocationSources }
+  })
+  const projectTenants = state.projectTenants.map((link) => {
+    if (link.allocationStatus === 'DEALLOCATED' || !affectedProjectIds.has(link.projectId)) return link
+    const project = projectById.get(link.projectId)
+    if (!project) return link
+    const allocationSources = resolvedProjectTenantAllocationSources(link, project, opportunityForProject(project), state.tenants)
+    return allocationSources.length > 0
+      ? { ...link, allocationSources }
+      : { ...deallocateProjectTenantLink(link, now), allocationSources }
+  })
+  const projectIdsBySystemId = new Map<string, string[]>()
+  const activeTenantIdsBySystemId = new Map<string, string[]>()
+  activeProjectSystemLinks(projectSystems).forEach((link) => {
+    projectIdsBySystemId.set(link.systemId, Array.from(new Set([...(projectIdsBySystemId.get(link.systemId) ?? []), link.projectId])))
+  })
+  activeProjectSystemLinks(projectSystems).forEach((link) => {
+    activeTenantIdsBySystemId.set(link.systemId, Array.from(new Set([...(activeTenantIdsBySystemId.get(link.systemId) ?? []), ...(link.tenantIds ?? [])])))
+  })
+  const systems = state.systems.map((system) =>
+    Array.from(affectedProjectIds).some((projectId) =>
+      (system.linkedProjectIds ?? []).includes(projectId) ||
+      (projectIdsBySystemId.get(system.id) ?? []).includes(projectId),
+    )
+      ? {
+          ...system,
+          linkedProjectIds: projectIdsBySystemId.get(system.id) ?? [],
+          tenantIds: Array.from(new Set([...(system.tenantIds ?? []), ...(activeTenantIdsBySystemId.get(system.id) ?? [])])),
+          updatedAt: now,
+        }
+      : system,
+  )
+  return { systems, projectSystems, projectTenants, activityEvents: state.activityEvents }
 }
 
 function ensureTenantCommittedProjectRelationships(
@@ -1142,16 +1687,43 @@ function hostedTenantCountForSystemId(state: AppDataState, systemId: string): nu
   return state.tenants.filter((tenant) => tenantIsActivelyHostedBySystem(tenant, systemId)).length
 }
 
+function configurationHistoryAttributionForSystem(
+  state: Pick<AppDataState, 'projects' | 'projectSystems'>,
+  system: AppDataState['systems'][number],
+): { pid?: string; sid?: string } {
+  if (system.source !== SYSTEM_SOURCE_REUSED_INTERNAL || !system.sid) return {}
+  const link = state.projectSystems.find((candidate) => candidate.systemId === system.id)
+  const project = link ? state.projects.find((candidate) => candidate.id === link.projectId) : undefined
+  return {
+    pid: project?.pid,
+    sid: system.sid,
+  }
+}
+
+function stampSystemConfigurationHistoryAttribution(
+  records: ConfigurationHistoryRecord[],
+  state: Pick<AppDataState, 'projects' | 'projectSystems'>,
+  system: AppDataState['systems'][number],
+): ConfigurationHistoryRecord[] {
+  const attribution = configurationHistoryAttributionForSystem(state, system)
+  if (!attribution.pid && !attribution.sid) return records
+  return records.map((record) => ({
+    ...record,
+    pid: record.pid ?? attribution.pid,
+    sid: record.sid ?? attribution.sid,
+  }))
+}
+
 function updateSystemMapCenterTransaction(
   state: AppDataState,
   systemId: string,
   mapCenter: string,
   now: string,
   sourceTenantId?: string,
-): Pick<AppDataState, 'systems' | 'activityEvents'> {
+): Pick<AppDataState, 'systems' | 'activityEvents' | 'idCounters'> {
   const system = state.systems.find((candidate) => candidate.id === systemId)
   if (!system || String(system.mapCenter ?? '') === mapCenter) {
-    return { systems: state.systems, activityEvents: state.activityEvents }
+    return { systems: state.systems, activityEvents: state.activityEvents, idCounters: state.idCounters }
   }
 
   const beforeSummary = systemApplicationConfigurationSummary(system, state.tenants)
@@ -1165,15 +1737,26 @@ function updateSystemMapCenterTransaction(
     now,
     CURRENT_USER_DISPLAY_NAME,
     sourceTenant?.tid ?? '',
+    configurationHistoryAttributionForSystem(state, system),
   )
+  const reconciledHistory = historyRecord
+    ? reconcileGlobalChildRecords<ConfigurationHistoryRecord>(
+        state,
+        state.idCounters,
+        'configurationHistory',
+        existingHistory,
+        [historyRecord, ...existingHistory],
+      )
+    : { counters: state.idCounters, records: existingHistory }
   const hostedCount = hostedTenantCountForSystemId(state, systemId)
 
   return {
+    idCounters: reconciledHistory.counters,
     systems: state.systems.map((candidate) =>
       candidate.id === systemId
         ? {
             ...nextSystem,
-            configurationHistory: historyRecord ? [historyRecord, ...existingHistory] : existingHistory,
+            configurationHistory: reconciledHistory.records,
           }
         : candidate,
     ),
@@ -1193,6 +1776,48 @@ function updateSystemMapCenterTransaction(
 
 function valuesEqual(first: unknown, second: unknown): boolean {
   return JSON.stringify(first ?? null) === JSON.stringify(second ?? null)
+}
+
+function stateWithDerivedGeographicConfiguration(state: AppDataState): AppDataState {
+  const countryLookups = normalizeCountryLookups(state.countryLookups)
+  const usStateLookups = normalizeUsStateLookups(state.usStateLookups)
+  const timeGroupLookups = normalizeTimeGroupLookups(state.timeGroupLookups, countryLookups, usStateLookups)
+  const accounts = state.accounts.map((account) => accountWithDerivedGeography(account, timeGroupLookups, countryLookups, usStateLookups))
+  const opportunities = state.opportunities.map((opportunity) => opportunityWithDerivedGeography(opportunity, timeGroupLookups, countryLookups, usStateLookups))
+  const projects = state.projects.map((project) => {
+    const opportunity = opportunities.find((candidate) =>
+      candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId,
+    )
+    const account = accounts.find((candidate) =>
+      candidate.id === opportunity?.accountId || candidate.accountName === project.accountName,
+    )
+    const country = opportunity?.country || account?.country || project.country || ''
+    const stateName = opportunity?.state || account?.state || project.state || ''
+    const location = timeGroupFromLocation(timeGroupLookups, country, stateName, project.deliveryDate, countryLookups, usStateLookups)
+    return {
+      ...project,
+      country,
+      state: stateName,
+      region: businessRegionForCountry(countryLookups, country) || normalizeBusinessRegion(project.region),
+      timeZone: location.timeZone,
+      timeGroup: location.timeGroup,
+    }
+  })
+  const tenants = state.tenants.map((tenant) => normalizeTenantTimeGroup(tenant, timeGroupLookups, countryLookups, usStateLookups))
+  const systems = systemsWithDerivedTimeGroups(state.systems, tenants, timeGroupLookups, countryLookups, usStateLookups)
+  const now = new Date().toISOString()
+  return {
+    ...state,
+    countryLookups,
+    usStateLookups,
+    timeGroupLookups,
+    accounts,
+    opportunities,
+    projects,
+    tenants,
+    systems,
+    reusedInternalSystems: recalculateReusedSystemOccupationWindows(state.reusedInternalSystems, state.projectSystems, projects, now, systems),
+  }
 }
 
 interface AppStore extends AppDataState {
@@ -1223,9 +1848,34 @@ interface AppStore extends AppDataState {
   createReferenceDataRecord: (referenceType: ReferenceDataType, label: string, options?: { versionNumberId?: string | null }) => AllocationActionResult & { record?: ReferenceDataRecord }
   updateReferenceDataRecord: (id: string, label: string) => AllocationActionResult & { record?: ReferenceDataRecord }
   setReferenceDataActive: (id: string, active: boolean) => AllocationActionResult
+  updateCountryLookup: (id: string, patch: Partial<GeographicCountryRecord>) => AllocationActionResult & { record?: GeographicCountryRecord }
+  updateUsStateLookup: (id: string, patch: Partial<GeographicUsStateRecord>) => AllocationActionResult & { record?: GeographicUsStateRecord }
   updateTimeGroupLookup: (id: string, patch: Partial<TimeGroupLookupRecord>) => AllocationActionResult
+  updateProjectDocuments: (id: string, documents: AppDataState['projects'][number]['documents']) => AppDataState['projects'][number] | undefined
   setRecordsPerPagePreference: (context: string, value: string | number) => AllocationActionResult & { preference?: UserPresentationPreference }
   resetRecordsPerPagePreference: (context: string) => AllocationActionResult
+  updateRoleDefinition: (role: RoleDefinition) => AllocationActionResult & { record?: RoleDefinition }
+  updateNotificationRule: (rule: NotificationRuleDefinition) => AllocationActionResult & { record?: NotificationRuleDefinition }
+  markNotificationRead: (id: string) => AllocationActionResult
+  markNotificationUnread: (id: string) => AllocationActionResult
+  resolveAlert: (id: string, resolutionSummary?: string) => AllocationActionResult
+  reopenAlert: (id: string) => AllocationActionResult
+  reconcileNotificationsAndAlerts: () => void
+  executeReminder: (sourceKey: string) => AllocationActionResult
+  restoreReminder: (sourceKey: string) => AllocationActionResult
+  saveVersionUpgradeRecord: (
+    id: string | null,
+    draft: {
+      versionNumber: string
+      buildNumber: string
+      releaseDate: string | null
+      phaseOutDate: string | null
+      limitedToCloudPlatform: string
+      remarks: string
+      schedules: VersionUpgradeSystemSchedule[]
+    },
+  ) => AllocationActionResult & { record?: VersionUpgradeRecord }
+  cancelVersionUpgradeRecord: (id: string, reason: string) => AllocationActionResult & { record?: VersionUpgradeRecord }
   createInfrastructureItem: (draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   updateInfrastructureItem: (id: string, draft: InfrastructureItem) => AllocationActionResult & { record?: InfrastructureItem }
   linkInfrastructureItemToSystem: (itemId: string, systemId: string) => AllocationActionResult
@@ -1244,9 +1894,10 @@ interface AppStore extends AppDataState {
     },
   ) => AllocationActionResult & { record?: VersionUpdateRecord }
   deleteVersionUpdate: (id: string, reason?: string) => AllocationActionResult
-  updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => void
-  saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => void
+  updateTenant: (id: string, patch: Partial<AppDataState['tenants'][number]>, options?: SaveTimestampOptions) => AppDataState['tenants'][number] | undefined
+  saveTenantConfiguration: (id: string, draft: AppDataState['tenants'][number], activeSystemId?: string, options?: SaveTimestampOptions) => AppDataState['tenants'][number] | undefined
   deleteTenantFromSystem: (id: string) => void
+  cancelTenant: (id: string) => AllocationActionResult
   attachTenantToProjectRequirement: (tenantId: string, projectId: string, requirementId: string) => AllocationActionResult
   rollbackSystemFormTenantCreation: (tenantId: string) => void
   moveTenantToSystem: (id: string, destinationSystemId: string) => AllocationActionResult
@@ -1269,7 +1920,7 @@ interface AppStore extends AppDataState {
   allocateProductionSystemToProject: (projectId: string, productionSystemId: string, requirementIds?: string[]) => AllocationActionResult
   allocateReusedInternalSystemToProject: (projectId: string, reusedSystemId: string, requirementIds?: string[]) => AllocationActionResult
   linkExistingSystemToProject: (projectId: string, systemId: string, requirementIds?: string[]) => AllocationActionResult
-  deallocateProjectSystem: (allocationId: string, options?: { confirmedTenantCancellation?: boolean }) => AllocationActionResult
+  deallocateProjectSystem: (allocationId: string) => AllocationActionResult
 }
 
 export type {
@@ -1286,18 +1937,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   initialize: () => {
     const persisted = loadPersistedState()
-    const next = persisted ?? createInitialState()
+    const next = reconcileNotificationsAndAlerts(stateWithDerivedGeographicConfiguration(persisted ?? createInitialState()))
     set({ ...next, hydrated: true })
     if (!unsubscribeCommittedStateChanges) {
       unsubscribeCommittedStateChanges = subscribeToCommittedStateChanges((state) => {
-        set({ ...state, hydrated: true })
+        set((current) => mergeIncomingCommittedState(current, state))
       })
     }
+    requestCommittedStateSnapshotsOnStartup()
   },
 
   saveToStorage: () => {
-    const state = get()
-    const systems = systemsWithDerivedTimeGroups(state.systems, state.tenants, state.timeGroupLookups)
+    const state = reconcileNotificationsAndAlerts(stateWithDerivedGeographicConfiguration(get()))
+    const systems = systemsWithDerivedTimeGroups(state.systems, state.tenants, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
+    const persistedAt = new Date().toISOString()
     const data: AppDataState = {
       version: state.version,
       salesManagers: state.salesManagers,
@@ -1310,34 +1963,55 @@ export const useAppStore = create<AppStore>((set, get) => ({
       tenants: state.tenants,
       warrantyRecords: state.warrantyRecords,
       referenceData: state.referenceData,
+      countryLookups: state.countryLookups,
+      usStateLookups: state.usStateLookups,
       timeGroupLookups: state.timeGroupLookups,
       userPresentationPreferences: state.userPresentationPreferences,
+      versionUpgradeRecords: state.versionUpgradeRecords,
       versionUpdates: state.versionUpdates,
       infrastructureItems: state.infrastructureItems,
       activityEvents: state.activityEvents,
+      roles: state.roles,
+      userRoleAssignments: state.userRoleAssignments,
+      notificationRules: state.notificationRules,
+      notificationRecords: state.notificationRecords,
+      alertRecords: state.alertRecords,
+      reminderExecutions: state.reminderExecutions,
       projectSystems: state.projectSystems,
       projectTenants: state.projectTenants,
-      idCounters: state.idCounters,
-      lastPersistedAt: state.lastPersistedAt,
+      idCounters: normalizeIdCounters(state.idCounters, state),
+      lastPersistedAt: persistedAt,
     }
-    persistState(data)
-    set({ lastPersistedAt: new Date().toISOString() })
-    publishCommittedStateChange()
+    const dataToPersist = rebaseAppDataStateForPersistence(data, loadPersistedState())
+    persistState(dataToPersist)
+    set({
+      ...state,
+      ...dataToPersist,
+      hydrated: true,
+      lastPersistedAt: dataToPersist.lastPersistedAt,
+    })
+    try {
+      publishCommittedStateChange(dataToPersist)
+    } catch (error) {
+      console.error('Delivery ERP state cross-tab notification failed after persistence completed.', error)
+    }
   },
 
   resetToSeed: () => {
     clearPersistedState()
-    set({ ...createInitialState(), hydrated: true, projectLifecycleChangesByOpportunityId: {} })
+    set({ ...reconcileNotificationsAndAlerts(createInitialState()), hydrated: true, projectLifecycleChangesByOpportunityId: {} })
   },
 
   updateProject: (id, patch, options) => {
     const now = new Date().toISOString()
+    const previousState = get()
     let committedProject: AppDataState['projects'][number] | undefined
     let blockedByActiveSystemAllocations = false
-    set((state) => {
-      let updatedProject: AppDataState['projects'][number] | undefined
-      let previousProject: AppDataState['projects'][number] | undefined
-      const projects = state.projects.map((project) => {
+    try {
+      set((state) => {
+        let updatedProject: AppDataState['projects'][number] | undefined
+        let previousProject: AppDataState['projects'][number] | undefined
+        const projects = state.projects.map((project) => {
         if (project.id !== id) return project
         previousProject = project
         const patchWithDeletionHistory = (() => {
@@ -1400,6 +2074,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         return updatedProject
       })
       committedProject = updatedProject
+      const reusedMachineIdForProjectLink = (link: AppDataState['projectSystems'][number]): string | null => {
+        if (link.sourceMachineId) return link.sourceMachineId
+        const allocatedSystem = state.systems.find((candidate) => candidate.id === link.systemId)
+        return allocatedSystem?.source === SYSTEM_SOURCE_REUSED_INTERNAL ? allocatedSystem.machineId : null
+      }
       const sourceMachineIds =
         updatedProject?.mainType === 'POC'
           ? new Set(
@@ -1408,21 +2087,24 @@ export const useAppStore = create<AppStore>((set, get) => ({
                   (link) =>
                     link.projectId === id &&
                     link.allocationStatus !== 'DEALLOCATED' &&
-                    link.allocationType === 'REUSED_INTERNAL' &&
-                    link.sourceMachineId,
+                    Boolean(reusedMachineIdForProjectLink(link)),
                 )
-                .map((link) => link.sourceMachineId as string),
+                .map((link) => reusedMachineIdForProjectLink(link) as string),
             )
           : new Set<string>()
       const sourceMachinePurposeContext = new Map<string, ReturnType<typeof purposeHistoryContextFromProject>>()
       if (updatedProject && sourceMachineIds.size > 0) {
         const completedProject = updatedProject
         state.projectSystems
-          .filter((link) => link.projectId === id && link.sourceMachineId && sourceMachineIds.has(link.sourceMachineId))
+          .filter((link) => {
+            const sourceMachineId = reusedMachineIdForProjectLink(link)
+            return link.projectId === id && sourceMachineId && sourceMachineIds.has(sourceMachineId)
+          })
           .forEach((link) => {
             const system = state.systems.find((candidate) => candidate.id === link.systemId)
+            const sourceMachineId = reusedMachineIdForProjectLink(link) as string
             sourceMachinePurposeContext.set(
-              link.sourceMachineId as string,
+              sourceMachineId,
               system
                 ? purposeHistoryContextFromProject(completedProject, system)
                 : {
@@ -1441,8 +2123,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         ? state.projectSystems.filter((link) =>
             link.projectId === id &&
             link.allocationStatus !== 'DEALLOCATED' &&
-            link.allocationType === 'REUSED_INTERNAL' &&
-            link.sourceMachineId,
+            Boolean(reusedMachineIdForProjectLink(link)),
           )
         : []
       const completingPocAllocationIds = new Set(activeReusedInternalLinksForCompletingPoc.map((link) => link.id))
@@ -1450,8 +2131,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const projectSystemsForLifecycle = completingPocAllocationIds.size > 0
         ? state.projectSystems.map((link) => completingPocAllocationIds.has(link.id) ? deallocateProjectSystemLink(link, now) : link)
         : state.projectSystems
-      const systemsForLifecycle = completingPocSystemIds.size > 0
-        ? state.systems.map((system) => completingPocSystemIds.has(system.id) ? unlinkProjectFromSystem(system, id, now) : system)
+      const systemsForLifecycle = completingPocAllocationIds.size > 0
+        ? recalculateAllocatedReusedSystemOccupationWindows(state.systems, projectSystemsForLifecycle, projects)
         : state.systems
       const projectTenantsForLifecycle = completingPocSystemIds.size > 0
         ? state.projectTenants.map((link) =>
@@ -1474,30 +2155,34 @@ export const useAppStore = create<AppStore>((set, get) => ({
             if (pocProjectForPurposeSync.progressStatus === 'OPEN') {
               return occupyReusedInternalSystem(system, id, now, context, projectSystemsForLifecycle, projects)
             }
-            if (pocProjectForPurposeSync.progressStatus === 'DONE' && system.currentProjectIds.includes(id)) {
+            if (pocProjectForPurposeSync.progressStatus === 'DONE') {
               return releaseReusedInternalSystem(system, id, now, context)
             }
             return system
           })
         : state.reusedInternalSystems
 
-      return {
-        projects,
-        systems: systemsForLifecycle,
-        projectSystems: projectSystemsForLifecycle,
-        projectTenants: projectTenantsForLifecycle,
-        activityEvents:
-          previousProject && updatedProject
-            ? appendProjectSaveActivityEvents(state.activityEvents, now, previousProject, updatedProject, {
-                linkedOpportunity: state.opportunities.find((opportunity) => opportunity.opportunityId === updatedProject?.opportunityId),
-                account: state.accounts.find((candidate) => candidate.accountName === updatedProject?.accountName),
-              })
-            : state.activityEvents,
-        reusedInternalSystems: recalculateReusedSystemOccupationWindows(reusedInternalSystems, projectSystemsForLifecycle, projects, now),
-      }
-    })
-    if (blockedByActiveSystemAllocations) return undefined
-    get().saveToStorage()
+        return {
+          projects,
+          systems: systemsForLifecycle,
+          projectSystems: projectSystemsForLifecycle,
+          projectTenants: projectTenantsForLifecycle,
+          activityEvents:
+            previousProject && updatedProject
+              ? appendProjectSaveActivityEvents(state.activityEvents, now, previousProject, updatedProject, {
+                  linkedOpportunity: state.opportunities.find((opportunity) => opportunity.opportunityId === updatedProject?.opportunityId),
+                  account: state.accounts.find((candidate) => candidate.accountName === updatedProject?.accountName),
+                })
+              : state.activityEvents,
+          reusedInternalSystems: recalculateReusedSystemOccupationWindows(reusedInternalSystems, projectSystemsForLifecycle, projects, now, systemsForLifecycle),
+        }
+      })
+      if (blockedByActiveSystemAllocations) return undefined
+      get().saveToStorage()
+    } catch (error) {
+      set(previousState)
+      throw error
+    }
     return committedProject
   },
 
@@ -1581,15 +2266,34 @@ export const useAppStore = create<AppStore>((set, get) => ({
   updateSystem: (id, patch, options) => {
     const now = new Date().toISOString()
     set((state) => {
+      let idCounters = state.idCounters
       let previousSystem: AppDataState['systems'][number] | undefined
       let nextSystem: AppDataState['systems'][number] | undefined
       const systems = state.systems.map((system) => {
         if (system.id !== id) return system
         previousSystem = system
-        nextSystem = { ...system, ...patch, updatedAt: options?.preserveNewState ? system.createdAt : now }
+        const nextPatch = { ...patch }
+        if ('documents' in nextPatch) {
+          const reconciled = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', system.documents ?? [], nextPatch.documents ?? [])
+          idCounters = reconciled.counters
+          nextPatch.documents = reconciled.records
+        }
+        if ('remarks' in nextPatch) {
+          const reconciled = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', system.remarks ?? [], nextPatch.remarks ?? [])
+          idCounters = reconciled.counters
+          nextPatch.remarks = reconciled.records
+        }
+        if ('configurationHistory' in nextPatch) {
+          nextPatch.configurationHistory = stampSystemConfigurationHistoryAttribution(nextPatch.configurationHistory ?? [], state, system)
+          const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(state, idCounters, 'configurationHistory', system.configurationHistory ?? [], nextPatch.configurationHistory)
+          idCounters = reconciled.counters
+          nextPatch.configurationHistory = reconciled.records
+        }
+        nextSystem = { ...system, ...nextPatch, updatedAt: options?.preserveNewState ? system.createdAt : now }
         return nextSystem
       })
       return {
+        idCounters,
         systems,
         activityEvents: previousSystem && nextSystem
           ? appendFieldChangeActivityEvents(state.activityEvents, now, {
@@ -1633,16 +2337,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   saveSystemFormTransaction: (collection, id, patch, tenantRemovalIds = [], options) => {
     const now = new Date().toISOString()
+    const previousState = get()
     let committedRecord: AppDataState['productionSystemInventory'][number] | AppDataState['reusedInternalSystems'][number] | AppDataState['systems'][number] | undefined
-    set((state) => {
+    try {
+      set((state) => {
       const tenantRemovalState = removeTenantsFromSystemTransaction(state, tenantRemovalIds, now)
       const updatedAtFor = (createdAt: string | undefined) => options?.preserveNewState ? createdAt ?? now : now
-      const productionPatch = patch as Partial<AppDataState['productionSystemInventory'][number]>
-      const reusedPatch = patch as Partial<AppDataState['reusedInternalSystems'][number]>
-      const allocatedPatch = patch as Partial<AppDataState['systems'][number]>
+      let productionPatch = patch as Partial<AppDataState['productionSystemInventory'][number]>
+      let reusedPatch = patch as Partial<AppDataState['reusedInternalSystems'][number]>
+      let allocatedPatch = patch as Partial<AppDataState['systems'][number]>
+      let idCounters = state.idCounters
       const cancellationRequested = (patch as { cancellationRequested?: string }).cancellationRequested === 'YES'
       const cancellationReason = String((patch as { cancellationReason?: string }).cancellationReason ?? '').trim()
-      const { mapCenter: allocatedMapCenter, ...allocatedRestPatch } = allocatedPatch
       const previousAllocatedSystem = collection === 'allocated'
         ? tenantRemovalState.systems.find((system) => system.id === id)
         : undefined
@@ -1652,17 +2358,72 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const previousReusedSystem = collection === 'reused'
         ? state.reusedInternalSystems.find((system) => system.id === id)
         : undefined
+      if (collection === 'production' && previousProductionSystem) {
+        if ('documents' in productionPatch) {
+          const reconciled = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', previousProductionSystem.documents ?? [], productionPatch.documents ?? [])
+          idCounters = reconciled.counters
+          productionPatch = { ...productionPatch, documents: reconciled.records }
+        }
+        if ('remarks' in productionPatch) {
+          const reconciled = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', previousProductionSystem.remarks ?? [], productionPatch.remarks ?? [])
+          idCounters = reconciled.counters
+          productionPatch = { ...productionPatch, remarks: reconciled.records }
+        }
+        if ('configurationHistory' in productionPatch) {
+          const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(state, idCounters, 'configurationHistory', previousProductionSystem.configurationHistory ?? [], productionPatch.configurationHistory ?? [])
+          idCounters = reconciled.counters
+          productionPatch = { ...productionPatch, configurationHistory: reconciled.records }
+        }
+      }
+      if (collection === 'reused' && previousReusedSystem) {
+        if ('documents' in reusedPatch) {
+          const reconciled = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', previousReusedSystem.documents ?? [], reusedPatch.documents ?? [])
+          idCounters = reconciled.counters
+          reusedPatch = { ...reusedPatch, documents: reconciled.records }
+        }
+        if ('remarks' in reusedPatch) {
+          const reconciled = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', previousReusedSystem.remarks ?? [], reusedPatch.remarks ?? [])
+          idCounters = reconciled.counters
+          reusedPatch = { ...reusedPatch, remarks: reconciled.records }
+        }
+        if ('configurationHistory' in reusedPatch) {
+          const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(state, idCounters, 'configurationHistory', previousReusedSystem.configurationHistory ?? [], reusedPatch.configurationHistory ?? [])
+          idCounters = reconciled.counters
+          reusedPatch = { ...reusedPatch, configurationHistory: reconciled.records }
+        }
+      }
+      if (collection === 'allocated' && previousAllocatedSystem) {
+        if ('documents' in allocatedPatch) {
+          const reconciled = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', previousAllocatedSystem.documents ?? [], allocatedPatch.documents ?? [])
+          idCounters = reconciled.counters
+          allocatedPatch = { ...allocatedPatch, documents: reconciled.records }
+        }
+        if ('remarks' in allocatedPatch) {
+          const reconciled = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', previousAllocatedSystem.remarks ?? [], allocatedPatch.remarks ?? [])
+          idCounters = reconciled.counters
+          allocatedPatch = { ...allocatedPatch, remarks: reconciled.records }
+        }
+        if ('configurationHistory' in allocatedPatch) {
+          allocatedPatch = {
+            ...allocatedPatch,
+            configurationHistory: stampSystemConfigurationHistoryAttribution(allocatedPatch.configurationHistory ?? [], state, previousAllocatedSystem),
+          }
+          const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(state, idCounters, 'configurationHistory', previousAllocatedSystem.configurationHistory ?? [], allocatedPatch.configurationHistory ?? [])
+          idCounters = reconciled.counters
+          allocatedPatch = { ...allocatedPatch, configurationHistory: reconciled.records }
+        }
+      }
       if (cancellationRequested) {
         const activeSystemLinks = activeProjectSystemLinks(state.projectSystems).filter((link) =>
           link.systemId === id ||
           (previousReusedSystem && reusedInternalMachineIdsEqual(link.sourceMachineId, previousReusedSystem.machineId)),
         )
         const reusedIsOccupied = previousReusedSystem
-          ? isReusedInternalOccupied(reusedInternalAvailabilityStatus(previousReusedSystem, activeProjectSystemLinks(state.projectSystems), state.projects))
+          ? isReusedInternalOccupied(reusedInternalAvailabilityStatus(previousReusedSystem, activeProjectSystemLinks(state.projectSystems), state.projects, state.systems))
           : false
         if (richTextIsEmpty(cancellationReason) || activeSystemLinks.length > 0 || reusedIsOccupied) return state
       }
-      let idCounters = state.idCounters
+      const { mapCenter: allocatedMapCenter, ...allocatedRestPatch } = allocatedPatch
       let createdProductionSystem: AppDataState['productionSystemInventory'][number] | undefined
       let createdReusedSystem: AppDataState['reusedInternalSystems'][number] | undefined
       if (collection === 'production' && !previousProductionSystem) {
@@ -1711,31 +2472,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? previousReusedSystem
               ? state.reusedInternalSystems.map((system) => {
                 if (system.id !== id) return system
-                const safePatch = sanitizeReusedInternalSystemUserPatch(system, reusedPatch, state.projects, state.projectSystems)
+                const safePatch = sanitizeReusedInternalSystemUserPatch(system, reusedPatch, state.projects, state.projectSystems, state.systems)
                 const blockedPurposeChange = validateReusedInternalPurposeChange(
                   system,
                   { ...system, ...safePatch },
                   state.projects,
                   state.projectSystems,
+                  state.systems,
                 )
+                const ownerRequirementMessages = reusedInternalOwnerRequirementMessages({ ...system, ...safePatch })
                 const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch }, state)
-                if (blockedPurposeChange.length > 0 || requiredFieldMessages.length > 0) return system
+                if (blockedPurposeChange.length > 0 || ownerRequirementMessages.length > 0 || requiredFieldMessages.length > 0) return system
                 const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
-                  ? updateReusedInternalPurpose(system, safePatch.purpose, now)
+                  ? updateReusedInternalPurpose({ ...system, owners: safePatch.owners ?? system.owners }, safePatch.purpose, now, {
+                    owner: purposeHistoryOwnerSnapshot(safePatch.owners ?? system.owners),
+                  })
                   : { ...system, updatedAt: updatedAtFor(system.createdAt) }
-                return applyReusedSystemOccupationWindow({
+                const nextReusedSystem = applyReusedSystemOccupationWindow({
                   ...nextSystem,
                   ...safePatch,
                   status: reusedInternalStatusForPurpose(safePatch.purpose ?? nextSystem.purpose),
                   updatedAt: updatedAtFor(system.createdAt),
-                }, activeProjectSystemLinks(state.projectSystems), state.projects, now)
+                }, state.projectSystems, state.projects, now, state.systems)
+                return nextReusedSystem
               })
               : [createdReusedSystem as AppDataState['reusedInternalSystems'][number], ...state.reusedInternalSystems]
             : state.reusedInternalSystems,
         systems:
           collection === 'allocated'
             ? tenantRemovalState.systems.map((system) =>
-                system.id === id ? { ...system, ...allocatedRestPatch, updatedAt: updatedAtFor(system.createdAt) } : system,
+                system.id === id
+                  ? system.source === SYSTEM_SOURCE_REUSED_INTERNAL && reusedInternalOwnerRequirementMessages({ ...system, ...allocatedRestPatch }).length > 0
+                    ? system
+                    : { ...system, ...allocatedRestPatch, updatedAt: updatedAtFor(system.createdAt) }
+                  : system,
               )
             : tenantRemovalState.systems,
       }
@@ -1769,18 +2539,75 @@ export const useAppStore = create<AppStore>((set, get) => ({
           result.reusedInternalSystems = result.reusedInternalSystems.map((system) => system.id === id ? { ...system, ...cancelledStatusPatch, updatedAt: now } : system)
         }
       }
-      const tenantPropagation = previousAllocatedSystem
-        ? applySystemOperationalStatusToTenants(
-            { ...state, ...result },
-            id,
-            previousAllocatedSystem.operationalStatus,
-            result.systems.find((system) => system.id === id)?.operationalStatus,
-            now,
+      const operationalStatusSyncTargets: Array<{ systemId: string; previousStatus?: string; nextStatus?: string }> = []
+      const synchronizedMidChanges: Array<{
+        previous: AppDataState['reusedInternalSystems'][number]
+        next: AppDataState['reusedInternalSystems'][number]
+        sourceSid: string
+      }> = []
+      if (collection === 'allocated' && previousAllocatedSystem?.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
+        const nextSystem = result.systems.find((system) => system.id === id)
+        if (nextSystem) {
+          result.reusedInternalSystems = result.reusedInternalSystems.map((system) =>
+            reusedInternalMachineIdsEqual(system.machineId, previousAllocatedSystem.machineId)
+              ? (() => {
+                  const nextMid = { ...system, ...reusedInternalCurrentPhysicalPatchFromSid(nextSystem), updatedAt: now }
+                  if (!valuesEqual(system, nextMid)) {
+                    synchronizedMidChanges.push({ previous: system, next: nextMid, sourceSid: nextSystem.sid ?? systemBusinessId(nextSystem) })
+                  }
+                  return nextMid
+                })()
+              : system,
           )
-        : { tenants: result.tenants, activityEvents: result.activityEvents }
+        }
+        if (nextSystem && previousAllocatedSystem.operationalStatus !== nextSystem.operationalStatus) {
+          operationalStatusSyncTargets.push({
+            systemId: nextSystem.id,
+            previousStatus: previousAllocatedSystem.operationalStatus,
+            nextStatus: nextSystem.operationalStatus,
+          })
+        }
+      }
+      if (collection === 'reused' && previousReusedSystem) {
+        const nextReusedSystem = result.reusedInternalSystems.find((system) => system.id === id)
+        if (nextReusedSystem && previousReusedSystem.operationalStatus !== nextReusedSystem.operationalStatus) {
+          const activeSidIds = new Set(
+            activeProjectSystemLinks(result.projectSystems)
+              .filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, previousReusedSystem.machineId))
+              .map((link) => link.systemId),
+          )
+          result.systems = result.systems.map((system) =>
+            activeSidIds.has(system.id)
+              ? { ...system, operationalStatus: nextReusedSystem.operationalStatus, updatedAt: now }
+              : system,
+          )
+          operationalStatusSyncTargets.push({
+            systemId: nextReusedSystem.id,
+            previousStatus: previousReusedSystem.operationalStatus,
+            nextStatus: nextReusedSystem.operationalStatus,
+          })
+          activeSidIds.forEach((systemId) => {
+            operationalStatusSyncTargets.push({
+              systemId,
+              previousStatus: previousReusedSystem.operationalStatus,
+              nextStatus: nextReusedSystem.operationalStatus,
+            })
+          })
+        }
+      }
+      const tenantPropagation = operationalStatusSyncTargets.reduce(
+        (current, target) => applySystemOperationalStatusToTenants(
+          { ...state, ...result, tenants: current.tenants, activityEvents: current.activityEvents },
+          target.systemId,
+          target.previousStatus,
+          target.nextStatus,
+          now,
+        ),
+        { tenants: result.tenants, activityEvents: result.activityEvents },
+      )
       result.tenants = tenantPropagation.tenants
       result.activityEvents = tenantPropagation.activityEvents
-      result.systems = systemsWithDerivedTimeGroups(result.systems, result.tenants, state.timeGroupLookups)
+      result.systems = systemsWithDerivedTimeGroups(result.systems, result.tenants, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
       let activityEvents = result.activityEvents
       if (collection === 'production') {
         const previousSystem = previousProductionSystem
@@ -1843,11 +2670,23 @@ export const useAppStore = create<AppStore>((set, get) => ({
             excludeFields: typeof allocatedMapCenter === 'string' ? ['mapCenter'] : [],
           })
         }
+        synchronizedMidChanges.forEach((change) => {
+          activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+            previous: change.previous as unknown as Record<string, unknown>,
+            next: change.next as unknown as Record<string, unknown>,
+            category: 'SYSTEM',
+            eventTypePrefix: 'system',
+            objectLabel: `System ${systemBusinessId(change.next)}`,
+            primaryObject: systemRef(change.next),
+            relatedObjects: nextSystem ? relatedRefs(systemRef(nextSystem)) : [],
+            summaryPrefix: `Automatically synchronized from active SID ${change.sourceSid}`,
+          })
+        })
       }
       const auditedResult = {
         ...result,
         reusedInternalSystems: collection === 'reused'
-          ? recalculateReusedSystemOccupationWindows(result.reusedInternalSystems, result.projectSystems, state.projects, now)
+          ? recalculateReusedSystemOccupationWindows(result.reusedInternalSystems, result.projectSystems, state.projects, now, result.systems)
           : result.reusedInternalSystems,
         activityEvents,
       }
@@ -1859,8 +2698,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         now,
       )
       return { ...auditedResult, systems: mapCenterState.systems, activityEvents: mapCenterState.activityEvents }
-    })
-    get().saveToStorage()
+      })
+      get().saveToStorage()
+    } catch (error) {
+      set(previousState)
+      throw error
+    }
     return committedRecord
   },
 
@@ -1977,6 +2820,88 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return { ok: true, message: `${REFERENCE_DATA_TYPE_LABELS[existing.referenceType]} ${active ? 'activated' : 'deactivated'}.` }
   },
 
+  updateCountryLookup: (id, patch) => {
+    const state = get()
+    const existing = state.countryLookups.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'Country record not found.' }
+    const now = new Date().toISOString()
+    const candidate: GeographicCountryRecord = {
+      ...existing,
+      ...patch,
+      id: existing.id,
+      countryName: String(patch.countryName ?? existing.countryName).trim(),
+      countryCodeName: String(patch.countryCodeName ?? existing.countryCodeName).trim(),
+      region: String(patch.region ?? existing.region).trim().toLocaleUpperCase(),
+      timeZone: String(patch.timeZone ?? existing.timeZone).trim(),
+      active: patch.active ?? existing.active,
+      updatedAt: now,
+    }
+    const nextCountries = normalizeCountryLookups(state.countryLookups.map((record) => record.id === id ? candidate : record))
+    const messages = validateCountryLookupRows(nextCountries)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const record = nextCountries.find((country) => country.id === id) ?? candidate
+    set((current) => stateWithDerivedGeographicConfiguration({
+      ...current,
+      countryLookups: nextCountries,
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: 'country.mappingUpdated',
+        severity: 'INFO',
+        summary: `Country mapping ${record.countryName} updated.`,
+        primaryObject: {
+          objectType: 'CONFIGURATION',
+          id: record.id,
+          businessId: record.countryName,
+          displayLabel: record.countryName,
+        },
+        before: existing as unknown as Record<string, unknown>,
+        after: record as unknown as Record<string, unknown>,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Country mapping updated.', record }
+  },
+
+  updateUsStateLookup: (id, patch) => {
+    const state = get()
+    const existing = state.usStateLookups.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'US State record not found.' }
+    const now = new Date().toISOString()
+    const candidate: GeographicUsStateRecord = {
+      ...existing,
+      ...patch,
+      id: existing.id,
+      state: String(patch.state ?? existing.state).trim(),
+      timeZone: String(patch.timeZone ?? existing.timeZone).trim(),
+      active: patch.active ?? existing.active,
+      updatedAt: now,
+    }
+    const nextStates = normalizeUsStateLookups(state.usStateLookups.map((record) => record.id === id ? candidate : record))
+    const messages = validateUsStateLookupRows(nextStates)
+    if (messages.length > 0) return { ok: false, message: messages.join(' ') }
+    const record = nextStates.find((stateRecord) => stateRecord.id === id) ?? candidate
+    set((current) => stateWithDerivedGeographicConfiguration({
+      ...current,
+      usStateLookups: nextStates,
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: 'usState.mappingUpdated',
+        severity: 'INFO',
+        summary: `US State mapping ${record.state} updated.`,
+        primaryObject: {
+          objectType: 'CONFIGURATION',
+          id: record.id,
+          businessId: record.state,
+          displayLabel: record.state,
+        },
+        before: existing as unknown as Record<string, unknown>,
+        after: record as unknown as Record<string, unknown>,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'US State mapping updated.', record }
+  },
+
   updateTimeGroupLookup: (id, patch) => {
     const state = get()
     const existing = state.timeGroupLookups.find((record) => record.id === id)
@@ -1993,7 +2918,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       active: patch.active ?? existing.active,
       updatedAt: now,
     }
-    const nextRows = normalizeTimeGroupLookups(state.timeGroupLookups.map((record) => record.id === id ? nextRecord : record))
+    const nextRows = normalizeTimeGroupLookups(state.timeGroupLookups.map((record) => record.id === id ? nextRecord : record), state.countryLookups, state.usStateLookups)
     const messages = validateTimeGroupLookupRows(nextRows)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     set((current) => ({
@@ -2015,6 +2940,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }))
     get().saveToStorage()
     return { ok: true, message: 'Time Group mapping updated.' }
+  },
+
+  updateProjectDocuments: (id, documents) => {
+    const now = new Date().toISOString()
+    let committedProject: AppDataState['projects'][number] | undefined
+    set((state) => {
+      let idCounters = state.idCounters
+      const projects = state.projects.map((project) => {
+        if (project.id !== id) return project
+        const reconciledDocuments = reconcileGlobalChildRecords<DocumentRecord>(
+          state,
+          idCounters,
+          'document',
+          project.documents ?? [],
+          documents ?? [],
+        )
+        idCounters = reconciledDocuments.counters
+        committedProject = { ...project, documents: reconciledDocuments.records, updatedAt: now }
+        return committedProject
+      })
+      return { projects, idCounters }
+    })
+    get().saveToStorage()
+    return committedProject
   },
 
   setRecordsPerPagePreference: (context, value) => {
@@ -2058,6 +3007,444 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }))
     get().saveToStorage()
     return { ok: true, message: 'Records per page default reset.' }
+  },
+
+  updateRoleDefinition: (role) => {
+    const state = get()
+    if (!canExecuteAction(state, 'rolesPermissions', 'Edit')) {
+      return { ok: false, message: 'Current user is not allowed to edit Roles & Permissions.' }
+    }
+    const now = new Date().toISOString()
+    const normalizedRoles = normalizeRoles([
+      ...state.roles.filter((candidate) => candidate.id !== role.id),
+      { ...role, updatedAt: now },
+    ], now)
+    const normalizedAssignments = normalizeUserRoleAssignments(state.userRoleAssignments, normalizedRoles, now)
+    const record = normalizedRoles.find((candidate) => candidate.id === role.id)
+    set({
+      roles: normalizedRoles,
+      userRoleAssignments: normalizedAssignments,
+      notificationRules: normalizeNotificationRules(state.notificationRules, normalizedRoles, now),
+      activityEvents: appendActivityEvent(state.activityEvents, now, {
+        category: 'ADMINISTRATION',
+        eventType: 'admin.rolePermissionsUpdated',
+        severity: 'WARNING',
+        summary: `Role ${role.name} permissions were updated by ${CURRENT_USER_DISPLAY_NAME}.`,
+        primaryObject: {
+          objectType: 'Role',
+          id: role.id,
+          businessId: role.id,
+          displayLabel: `Role ${role.name}`,
+        },
+      }),
+    })
+    get().saveToStorage()
+    return record ? { ok: true, message: `Role ${record.name} permissions saved.`, record } : { ok: false, message: 'Role could not be saved.' }
+  },
+
+  updateNotificationRule: (rule) => {
+    const state = get()
+    if (!canExecuteAction(state, 'notificationsAlerts', 'Edit')) {
+      return { ok: false, message: 'Current user is not allowed to edit Notifications & Alerts rules.' }
+    }
+    const now = new Date().toISOString()
+    const rules = normalizeNotificationRules([
+      ...state.notificationRules.filter((candidate) => candidate.id !== rule.id),
+      { ...rule, updatedAt: now },
+    ], state.roles, now)
+    const record = rules.find((candidate) => candidate.id === rule.id)
+    set({
+      notificationRules: rules,
+      activityEvents: appendActivityEvent(state.activityEvents, now, {
+        category: 'ADMINISTRATION',
+        eventType: 'admin.notificationRuleUpdated',
+        severity: 'WARNING',
+        summary: `Notification rule ${rule.eventKey} was updated by ${CURRENT_USER_DISPLAY_NAME}.`,
+        primaryObject: {
+          objectType: 'Notification Rule',
+          id: rule.id,
+          businessId: rule.eventKey,
+          displayLabel: `Notification Rule ${rule.eventKey}`,
+        },
+      }),
+    })
+    get().saveToStorage()
+    return record ? { ok: true, message: `Rule ${record.eventKey} saved.`, record } : { ok: false, message: 'Rule could not be saved.' }
+  },
+
+  markNotificationRead: (id) => {
+    const now = new Date().toISOString()
+    set((state) => ({
+      notificationRecords: state.notificationRecords.map((record) =>
+        record.id === id
+          ? {
+              ...record,
+              status: 'READ',
+              readAt: now,
+              readBy: CURRENT_USER_DISPLAY_NAME,
+              readReceipts: [
+                ...(record.readReceipts ?? []).filter((receipt) => receipt.userId !== CURRENT_USER_ID),
+                { userId: CURRENT_USER_ID, readAt: now, readBy: CURRENT_USER_DISPLAY_NAME },
+              ],
+            }
+          : record,
+      ),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Notification marked read.' }
+  },
+
+  markNotificationUnread: (id) => {
+    set((state) => ({
+      notificationRecords: state.notificationRecords.map((record) => {
+        if (record.id !== id) return record
+        const readReceipts = (record.readReceipts ?? []).filter((receipt) => receipt.userId !== CURRENT_USER_ID)
+        return {
+          ...record,
+          status: notificationReadStatusForUser({ ...record, readReceipts }, CURRENT_USER_ID),
+          readAt: readReceipts.find((receipt) => receipt.userId === CURRENT_USER_ID)?.readAt ?? null,
+          readBy: readReceipts.find((receipt) => receipt.userId === CURRENT_USER_ID)?.readBy ?? null,
+          readReceipts,
+        }
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Notification marked unread.' }
+  },
+
+  resolveAlert: (id, resolutionSummary = 'Resolved manually.') => {
+    const state = get()
+    if (!canExecuteAction(state, 'notificationsAlerts', 'Resolve')) {
+      return { ok: false, message: 'Current user is not allowed to resolve alerts.' }
+    }
+    const now = new Date().toISOString()
+    set((current) => ({
+      alertRecords: current.alertRecords.map((record) =>
+        record.id === id
+          ? { ...record, status: 'RESOLVED', resolvedAt: now, resolvedBy: CURRENT_USER_DISPLAY_NAME, resolutionSummary }
+          : record,
+      ),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Alert resolved.' }
+  },
+
+  reopenAlert: (id) => {
+    const state = get()
+    if (!canExecuteAction(state, 'notificationsAlerts', 'Resolve')) {
+      return { ok: false, message: 'Current user is not allowed to reopen alerts.' }
+    }
+    set((current) => ({
+      alertRecords: current.alertRecords.map((record) =>
+        record.id === id
+          ? { ...record, status: 'OPEN', resolvedAt: null, resolvedBy: null, resolutionSummary: null }
+          : record,
+      ),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Alert reopened.' }
+  },
+
+  reconcileNotificationsAndAlerts: () => {
+    set((state) => reconcileNotificationsAndAlerts(state))
+    get().saveToStorage()
+  },
+
+  executeReminder: (sourceKey) => {
+    const state = get()
+    if (!canExecuteAction(state, 'reminders', 'Execute')) {
+      return { ok: false, message: 'Current user is not allowed to execute reminders.' }
+    }
+    const reminder = deriveReminderRows(state).find((row) => row.sourceKey === sourceKey)
+    if (!reminder) return { ok: false, message: 'Reminder could not be found.' }
+    if (reminder.status === 'EXECUTED') return { ok: true, message: 'Reminder is already executed.' }
+    const now = new Date().toISOString()
+    const execution: ReminderExecutionRecord = {
+      id: reminderExecutionIdForSource(sourceKey),
+      sourceKey,
+      sourceType: reminder.sourceType,
+      sourceId: reminder.sourceId,
+      parentObjectType: reminder.parentObjectType,
+      parentObjectId: reminder.parentObjectId,
+      parentBusinessId: reminder.parentBusinessId,
+      executedAt: now,
+      executedBy: CURRENT_USER_DISPLAY_NAME,
+      sourceDueDateAtExecution: reminder.dueDate,
+      restoredAt: null,
+      restoredBy: null,
+      externalEventId: null,
+      externalSyncState: 'NOT_SYNCED',
+      externalSyncedAt: null,
+      createdAt: state.reminderExecutions.find((record) => record.sourceKey === sourceKey)?.createdAt ?? now,
+      updatedAt: now,
+    }
+    set((current) => ({
+      reminderExecutions: [
+        ...current.reminderExecutions.filter((record) => record.sourceKey !== sourceKey),
+        execution,
+      ],
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'TASK',
+        eventType: 'reminder.executed',
+        severity: 'INFO',
+        summary: `Reminder ${reminder.sourceLabel} for ${reminder.parentBusinessId} was executed by ${CURRENT_USER_DISPLAY_NAME}.`,
+        primaryObject: {
+          objectType: 'Reminder',
+          id: execution.id,
+          businessId: reminder.sourceLabel,
+          displayLabel: `Reminder ${reminder.sourceLabel}`,
+        },
+        relatedObjects: [activityObjectRefFromBusinessReference(reminder.parentReference)],
+        details: reminder.message,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Reminder marked executed.' }
+  },
+
+  restoreReminder: (sourceKey) => {
+    const state = get()
+    if (!canExecuteAction(state, 'reminders', 'Restore')) {
+      return { ok: false, message: 'Current user is not allowed to restore reminders.' }
+    }
+    const existing = state.reminderExecutions.find((record) => record.sourceKey === sourceKey)
+    const reminder = deriveReminderRows(state).find((row) => row.sourceKey === sourceKey)
+    if (!existing && !reminder) return { ok: false, message: 'Reminder could not be found.' }
+    const now = new Date().toISOString()
+    set((current) => ({
+      reminderExecutions: current.reminderExecutions.map((record) =>
+        record.sourceKey === sourceKey
+          ? {
+              ...record,
+              executedAt: null,
+              executedBy: null,
+              sourceDueDateAtExecution: null,
+              restoredAt: now,
+              restoredBy: CURRENT_USER_DISPLAY_NAME,
+              updatedAt: now,
+              externalSyncState: record.externalSyncState ?? 'NOT_SYNCED',
+            }
+          : record,
+      ),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'TASK',
+        eventType: 'reminder.restored',
+        severity: 'INFO',
+        summary: `Reminder ${(reminder?.sourceLabel ?? existing?.sourceId ?? sourceKey)} was restored to Pending by ${CURRENT_USER_DISPLAY_NAME}.`,
+        primaryObject: {
+          objectType: 'Reminder',
+          id: existing?.id ?? reminderExecutionIdForSource(sourceKey),
+          businessId: reminder?.sourceLabel ?? existing?.sourceId ?? sourceKey,
+          displayLabel: `Reminder ${reminder?.sourceLabel ?? existing?.sourceId ?? sourceKey}`,
+        },
+        relatedObjects: reminder ? [activityObjectRefFromBusinessReference(reminder.parentReference)] : [],
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Reminder restored to Pending.' }
+  },
+
+  saveVersionUpgradeRecord: (id, draft) => {
+    const state = get()
+    if (!canExecuteAction(state, 'versionUpgradeScheduler', id ? 'Edit' : 'Create')) {
+      return { ok: false, message: 'Current user is not allowed to save Version Upgrade records.' }
+    }
+    const versionLabel = referenceDataLabel(draft.versionNumber)
+    const buildLabel = referenceDataLabel(draft.buildNumber)
+    const messages: string[] = []
+    if (!versionLabel) messages.push('Version Number is required.')
+    if (!buildLabel) messages.push('Build Number is required.')
+    const existing = id ? state.versionUpgradeRecords.find((record) => record.id === id) : undefined
+    if (id && !existing) messages.push('Version Upgrade record not found.')
+    let nextReferenceData = state.referenceData
+    let nextIdCounters = state.idCounters
+    const now = new Date().toISOString()
+    let versionReference = nextReferenceData.find((record) => record.referenceType === 'VERSION_NUMBER' && record.normalizedLabel === normalizeReferenceLabel(versionLabel))
+    if (!versionReference && versionLabel) {
+      const nextVersion = generateBusinessIdFromCounter('versionNumber', nextIdCounters, nextReferenceData.map((record) => record.id))
+      nextIdCounters = nextVersion.counters
+      versionReference = {
+        id: nextVersion.id,
+        referenceType: 'VERSION_NUMBER',
+        versionNumberId: null,
+        label: versionLabel,
+        normalizedLabel: normalizeReferenceLabel(versionLabel),
+        active: true,
+        createdAt: now,
+        createdBy: CURRENT_USER_DISPLAY_NAME,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_DISPLAY_NAME,
+      }
+      nextReferenceData = [...nextReferenceData, versionReference]
+    }
+    let buildReference = versionReference
+      ? nextReferenceData.find((record) =>
+          record.referenceType === 'BUILD_NUMBER' &&
+          record.versionNumberId === versionReference?.id &&
+          record.normalizedLabel === normalizeReferenceLabel(buildLabel),
+        )
+      : undefined
+    if (!buildReference && versionReference && buildLabel) {
+      const nextBuild = generateBusinessIdFromCounter('buildNumber', nextIdCounters, nextReferenceData.map((record) => record.id))
+      nextIdCounters = nextBuild.counters
+      buildReference = {
+        id: nextBuild.id,
+        referenceType: 'BUILD_NUMBER',
+        versionNumberId: versionReference.id,
+        label: buildLabel,
+        normalizedLabel: normalizeReferenceLabel(buildLabel),
+        active: true,
+        createdAt: now,
+        createdBy: CURRENT_USER_DISPLAY_NAME,
+        updatedAt: now,
+        updatedBy: CURRENT_USER_DISPLAY_NAME,
+      }
+      nextReferenceData = [...nextReferenceData, buildReference]
+    }
+    if (versionReference && buildReference && schedulerHasVersionBuildPair(state.versionUpgradeRecords, versionReference.id, buildReference.id, existing?.id)) {
+      messages.push('A Version Upgrade record already exists for this Version + Build pair.')
+    }
+    const schedules = draft.schedules.map((schedule) => {
+      const previous = existing?.schedules.find((candidate) => candidate.systemId === schedule.systemId)
+      const materialScheduleChanged = Boolean(previous?.scheduleConfirmed) && (
+        previous?.requestedUpgradeDate !== schedule.requestedUpgradeDate ||
+        previous?.requestedUpgradeTime !== schedule.requestedUpgradeTime ||
+        previous?.customerTimeZone !== schedule.customerTimeZone
+      )
+      return {
+        ...schedule,
+        scheduleConfirmed: materialScheduleChanged ? false : schedule.scheduleConfirmed,
+        confirmedAt: materialScheduleChanged || !schedule.scheduleConfirmed ? null : (schedule.confirmedAt ?? previous?.confirmedAt ?? now),
+        confirmedBy: materialScheduleChanged || !schedule.scheduleConfirmed ? null : (schedule.confirmedBy ?? previous?.confirmedBy ?? CURRENT_USER_DISPLAY_NAME),
+        updatedAt: now,
+        updatedBy: CURRENT_USER_DISPLAY_NAME,
+      }
+    })
+    const provisionalRecord: VersionUpgradeRecord | undefined = versionReference && buildReference
+      ? {
+          id: existing?.id ?? `version-upgrade-${crypto.randomUUID()}`,
+          versionNumberRefId: versionReference.id,
+          buildNumberRefId: buildReference.id,
+          releaseDate: draft.releaseDate,
+          phaseOutDate: draft.phaseOutDate,
+          limitedToCloudPlatform: draft.limitedToCloudPlatform,
+          remarks: draft.remarks,
+          operationalStatus: existing?.operationalStatus ?? 'ACTIVE',
+          cancellationRequested: existing?.cancellationRequested ?? 'NO',
+          cancellationReason: existing?.cancellationReason ?? '',
+          cancellationHistory: existing?.cancellationHistory ?? [],
+          cancelledAt: existing?.cancelledAt ?? null,
+          cancelledBy: existing?.cancelledBy ?? null,
+          schedules,
+          createdAt: existing?.createdAt ?? now,
+          createdBy: existing?.createdBy ?? CURRENT_USER_DISPLAY_NAME,
+          updatedAt: now,
+          updatedBy: CURRENT_USER_DISPLAY_NAME,
+        }
+      : undefined
+    if (provisionalRecord) {
+      schedules.forEach((schedule) => {
+        if (!schedule.scheduleConfirmed) return
+        const availability = deriveEngineerAvailability({ ...state, referenceData: nextReferenceData, versionUpgradeRecords: [
+          ...state.versionUpgradeRecords.filter((record) => record.id !== provisionalRecord.id),
+          provisionalRecord,
+        ] }, provisionalRecord, schedule)
+        if (availability.availability === 'No') messages.push(`Schedule for ${schedule.systemId} cannot be confirmed. ${availability.reason}`)
+      })
+    }
+    if (messages.length > 0 || !provisionalRecord) return { ok: false, message: messages.join(' ') || 'Version Upgrade record could not be saved.' }
+    const record = provisionalRecord
+    set((current) => ({
+      idCounters: nextIdCounters,
+      referenceData: nextReferenceData,
+      versionUpgradeRecords: existing
+        ? current.versionUpgradeRecords.map((candidate) => candidate.id === existing.id ? record : candidate)
+        : [record, ...current.versionUpgradeRecords],
+      activityEvents: schedules.reduce((events, schedule) => {
+        const previous = existing?.schedules.find((candidate) => candidate.systemId === schedule.systemId)
+        const hasRequest = Boolean(schedule.requestedUpgradeDate && schedule.requestedUpgradeTime && schedule.customerTimeZone)
+        const materialScheduleChanged = Boolean(previous && (
+          previous.requestedUpgradeDate !== schedule.requestedUpgradeDate ||
+          previous.requestedUpgradeTime !== schedule.requestedUpgradeTime ||
+          previous.customerTimeZone !== schedule.customerTimeZone
+        ))
+        const eventType = !previous && hasRequest
+          ? 'versionUpgrade.scheduleRequested'
+          : materialScheduleChanged && hasRequest
+            ? 'versionUpgrade.scheduleUpdated'
+            : schedule.scheduleConfirmed && !previous?.scheduleConfirmed
+              ? 'versionUpgrade.scheduleConfirmed'
+              : ''
+        if (!eventType) return events
+        const system = current.systems.find((candidate) => candidate.id === schedule.systemId)
+        return appendActivityEvent(events, now, {
+          category: 'SYSTEM',
+          eventType,
+          severity: 'INFO',
+          summary: `System upgrade schedule ${eventType.endsWith('Confirmed') ? 'confirmed' : eventType.endsWith('Updated') ? 'updated' : 'requested'} for ${system ? systemBusinessId(system) : schedule.systemId}.`,
+          primaryObject: system ? systemRef(system) : versionUpgradeRef(record, nextReferenceData),
+          relatedObjects: relatedRefs(versionUpgradeRef(record, nextReferenceData)),
+          before: previous as unknown as Record<string, unknown> | undefined,
+          after: schedule as unknown as Record<string, unknown>,
+        })
+      }, appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: existing ? 'versionUpgrade.edited' : 'versionUpgrade.created',
+        severity: 'SUCCESS',
+        summary: `Version Upgrade ${versionLabel} / ${buildLabel} ${existing ? 'saved' : 'created'}.`,
+        primaryObject: versionUpgradeRef(record, nextReferenceData),
+        before: existing as unknown as Record<string, unknown> | undefined,
+        after: record as unknown as Record<string, unknown>,
+      })),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Version Upgrade record saved.', record }
+  },
+
+  cancelVersionUpgradeRecord: (id, reason) => {
+    const state = get()
+    if (!canExecuteAction(state, 'versionUpgradeScheduler', 'Cancel')) {
+      return { ok: false, message: 'Current user is not allowed to cancel Version Upgrade records.' }
+    }
+    const existing = state.versionUpgradeRecords.find((record) => record.id === id)
+    if (!existing) return { ok: false, message: 'Version Upgrade record not found.' }
+    if (existing.operationalStatus === 'CANCELLED') return { ok: true, message: 'Version Upgrade record is already cancelled.', record: existing }
+    const now = new Date().toISOString()
+    const trimmedReason = reason.trim()
+    if (!trimmedReason) return { ok: false, message: 'Cancellation Reason is required.' }
+    const record: VersionUpgradeRecord = {
+      ...existing,
+      operationalStatus: 'CANCELLED',
+      cancellationRequested: 'NO',
+      cancellationReason: trimmedReason,
+      cancelledAt: now,
+      cancelledBy: CURRENT_USER_DISPLAY_NAME,
+      cancellationHistory: [
+        ...(existing.cancellationHistory ?? []),
+        {
+          id: `version-upgrade-cancellation-${crypto.randomUUID()}`,
+          reason: trimmedReason,
+          timestamp: now,
+          deletedBy: CURRENT_USER_DISPLAY_NAME,
+        },
+      ],
+      updatedAt: now,
+      updatedBy: CURRENT_USER_DISPLAY_NAME,
+    }
+    set((current) => ({
+      versionUpgradeRecords: current.versionUpgradeRecords.map((candidate) => candidate.id === id ? record : candidate),
+      activityEvents: appendActivityEvent(current.activityEvents, now, {
+        category: 'CONFIGURATION',
+        eventType: 'versionUpgrade.cancelled',
+        severity: 'WARNING',
+        summary: `Version Upgrade ${versionUpgradeRef(record, current.referenceData).businessId} was cancelled.`,
+        primaryObject: versionUpgradeRef(record, current.referenceData),
+        before: existing as unknown as Record<string, unknown>,
+        after: record as unknown as Record<string, unknown>,
+      }),
+    }))
+    get().saveToStorage()
+    return { ok: true, message: 'Version Upgrade record cancelled.', record }
   },
 
   createInfrastructureItem: (draft) => {
@@ -2161,7 +3548,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           },
         ]
       : existing.cancellationHistory ?? draft.cancellationHistory ?? []
-    const record: InfrastructureItem = normalizeInfrastructureItem({
+    let record: InfrastructureItem = normalizeInfrastructureItem({
       ...draft,
       id: existing.id,
       infrastructureId: existing.infrastructureId,
@@ -2184,6 +3571,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       createdAt: existing.createdAt,
       updatedAt: now,
     }, infrastructureMaintenanceTaskIds(state.infrastructureItems, existing.id), infrastructureWarrantyIds(state.infrastructureItems, existing.id))
+    let idCounters = state.idCounters
+    const documents = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', existing.documents ?? [], record.documents ?? [])
+    idCounters = documents.counters
+    const remarks = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', existing.remarks ?? [], record.remarks ?? [])
+    idCounters = remarks.counters
+    record = { ...record, documents: documents.records, remarks: remarks.records }
     const messages = validateInfrastructureItemDraft(record, state.infrastructureItems, state.referenceData)
     if (messages.length > 0) return { ok: false, message: messages.join(' ') }
     set((current) => {
@@ -2197,6 +3590,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         excludeFields: ['maintenanceTasks', 'deletionHistory'],
       })
       return {
+        idCounters,
         infrastructureItems: current.infrastructureItems.map((item) => item.id === id ? record : item),
         activityEvents: appendInfrastructureMaintenanceActivityEvents(fieldActivityEvents, now, existing, record),
       }
@@ -2273,6 +3667,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       newBuildNumberLabel: draft.newBuildNumberLabel,
       attachmentCategories: draft.attachments.map((attachment) => attachment.category),
       referenceData: state.referenceData,
+      versionUpgradeRecords: state.versionUpgradeRecords,
+      existingVersionUpdateId: existingRecord?.id,
     })
     if (validationMessages.length > 0) return { ok: false, message: validationMessages.join(' ') }
 
@@ -2360,7 +3756,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const shouldUpdateCurrent = isNew || isCurrentEdit
 
     set((current) => {
-      const versionUpdates = existingRecord
+      let versionUpdates = existingRecord
         ? current.versionUpdates.map((candidate) => candidate.id === existingRecord.id ? record : candidate)
         : [...current.versionUpdates, record]
       const currentPatch = shouldUpdateCurrent
@@ -2371,6 +3767,66 @@ export const useAppStore = create<AppStore>((set, get) => ({
             updatedAt: now,
           }
         : {}
+      let syncedReusedSystemId = ''
+      let syncedReusedPatch: typeof currentPatch = {}
+      let syncedAllocatedSystemId = ''
+      let syncedAllocatedPatch: typeof currentPatch = {}
+      if (shouldUpdateCurrent && systemCollection === 'allocated' && 'machineId' in system && system.source === SYSTEM_SOURCE_REUSED_INTERNAL) {
+        const hasActiveSidAllocation = activeProjectSystemLinks(current.projectSystems).some((link) => link.systemId === system.id)
+        const targetMid = hasActiveSidAllocation
+          ? current.reusedInternalSystems.find((candidate) => reusedInternalMachineIdsEqual(candidate.machineId, system.machineId))
+          : undefined
+        if (targetMid) {
+          const synced = cloneSingleVersionUpdateRecordForSystem({
+            sourceRecord: record,
+            targetSystem: targetMid,
+            targetCollection: 'reused',
+            versionUpdates,
+            idCounters: nextIdCounters,
+            timestamp: now,
+          })
+          nextIdCounters = synced.idCounters
+          versionUpdates = [...versionUpdates, synced.record]
+          syncedReusedSystemId = targetMid.id
+          syncedReusedPatch = {
+            currentVersionUpdateId: synced.record.id,
+            currentVersionNumberRefId: synced.record.versionNumberRefId,
+            currentBuildNumberRefId: synced.record.buildNumberRefId,
+            updatedAt: now,
+          }
+        }
+      }
+      if (shouldUpdateCurrent && systemCollection === 'reused' && 'machineId' in system) {
+        const activeSidIds = new Set(
+          activeProjectSystemLinks(current.projectSystems)
+            .filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, system.machineId))
+            .map((link) => link.systemId),
+        )
+        const targetSid = current.systems.find((candidate) =>
+          activeSidIds.has(candidate.id) &&
+          candidate.source === SYSTEM_SOURCE_REUSED_INTERNAL &&
+          reusedInternalMachineIdsEqual(candidate.machineId, system.machineId),
+        )
+        if (targetSid) {
+          const synced = cloneSingleVersionUpdateRecordForSystem({
+            sourceRecord: record,
+            targetSystem: targetSid,
+            targetCollection: 'allocated',
+            versionUpdates,
+            idCounters: nextIdCounters,
+            timestamp: now,
+          })
+          nextIdCounters = synced.idCounters
+          versionUpdates = [...versionUpdates, synced.record]
+          syncedAllocatedSystemId = targetSid.id
+          syncedAllocatedPatch = {
+            currentVersionUpdateId: synced.record.id,
+            currentVersionNumberRefId: synced.record.versionNumberRefId,
+            currentBuildNumberRefId: synced.record.buildNumberRefId,
+            updatedAt: now,
+          }
+        }
+      }
       let activityBase = current.activityEvents
       if (createdVersionReference) {
         activityBase = appendActivityEvent(activityBase, now, {
@@ -2453,10 +3909,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : current.productionSystemInventory,
         reusedInternalSystems: systemCollection === 'reused'
           ? current.reusedInternalSystems.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
-          : current.reusedInternalSystems,
+          : syncedReusedSystemId
+            ? current.reusedInternalSystems.map((candidate) => candidate.id === syncedReusedSystemId ? { ...candidate, ...syncedReusedPatch } : candidate)
+            : current.reusedInternalSystems,
         systems: systemCollection === 'allocated'
           ? current.systems.map((candidate) => candidate.id === systemId ? { ...candidate, ...currentPatch } : candidate)
-          : current.systems,
+          : syncedAllocatedSystemId
+            ? current.systems.map((candidate) => candidate.id === syncedAllocatedSystemId ? { ...candidate, ...syncedAllocatedPatch } : candidate)
+            : current.systems,
         activityEvents,
       }
     })
@@ -2517,23 +3977,43 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateTenant: (id, patch, options) => {
     const now = new Date().toISOString()
+    let committedTenant: AppDataState['tenants'][number] | undefined
     set((state) => {
+      let idCounters = state.idCounters
       let previousTenant: AppDataState['tenants'][number] | undefined
       let nextTenant: AppDataState['tenants'][number] | undefined
       const tenants = state.tenants.map((tenant) => {
         if (tenant.id !== id) return tenant
         previousTenant = tenant
+        const nextPatch = { ...patch }
+        if ('documents' in nextPatch) {
+          const reconciled = reconcileGlobalChildRecords<DocumentRecord>(state, idCounters, 'document', tenant.documents ?? [], nextPatch.documents ?? [])
+          idCounters = reconciled.counters
+          nextPatch.documents = reconciled.records
+        }
+        if ('remarks' in nextPatch) {
+          const reconciled = reconcileGlobalChildRecords<RemarkRecord>(state, idCounters, 'remark', tenant.remarks ?? [], nextPatch.remarks ?? [])
+          idCounters = reconciled.counters
+          nextPatch.remarks = reconciled.records
+        }
+        if ('configurationHistory' in nextPatch) {
+          const reconciled = reconcileGlobalChildRecords<TenantConfigurationHistoryRecord>(state, idCounters, 'configurationHistory', tenant.configurationHistory ?? [], nextPatch.configurationHistory ?? [])
+          idCounters = reconciled.counters
+          nextPatch.configurationHistory = reconciled.records
+        }
         nextTenant = tenantWithDerivedProjectTimeGroup(state, {
           ...tenant,
-          ...patch,
+          ...nextPatch,
           // Tenant Type is immutable after creation, including for direct store callers.
           tenantType: tenant.tenantType,
           tenantFormType: tenantFormType(tenant),
           updatedAt: options?.preserveNewState ? tenant.createdAt : now,
         })
+        committedTenant = nextTenant
         return nextTenant
       })
       return {
+        idCounters,
         tenants,
         activityEvents: previousTenant && nextTenant
           ? appendFieldChangeActivityEvents(state.activityEvents, now, {
@@ -2548,11 +4028,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     })
     get().saveToStorage()
+    return committedTenant
   },
 
   saveTenantConfiguration: (id, draft, activeSystemId, options) => {
     const now = new Date().toISOString()
-    set((state) => {
+    const previousState = get()
+    let savedConfigurationTenant: AppDataState['tenants'][number] | undefined
+    try {
+      set((state) => {
       const savedTenant = state.tenants.find((tenant) => tenant.id === id)
       if (!savedTenant) return state
 
@@ -2562,24 +4046,44 @@ export const useAppStore = create<AppStore>((set, get) => ({
         activeSystemId,
       ].filter((value): value is string => Boolean(value))))
       const systemSummariesBefore = new Map(
-        affectedSystemIds
-          .map((systemId) => state.systems.find((system) => system.id === systemId))
-          .filter((system): system is AppDataState['systems'][number] => Boolean(system))
-          .map((system) => [system.id, systemApplicationConfigurationSummary(system, state.tenants)]),
+        [
+          ...affectedSystemIds
+            .map((systemId) => state.systems.find((system) => system.id === systemId))
+            .filter((system): system is AppDataState['systems'][number] => Boolean(system))
+            .map((system) => [system.id, systemApplicationConfigurationSummary(system, state.tenants)] as const),
+          ...affectedSystemIds
+            .map((systemId) => state.reusedInternalSystems.find((system) => system.id === systemId))
+            .filter((system): system is AppDataState['reusedInternalSystems'][number] => Boolean(system))
+            .map((system) => [system.id, systemApplicationConfigurationSummary(system, state.tenants, state.systems, state.projectSystems)] as const),
+        ],
       )
       const activeSystem = state.systems.find((system) => system.id === activeSystemId)
         ?? state.systems.find((system) => system.id === (draft.hostedSystemId ?? draft.systemId))
+      let idCounters = state.idCounters
       const { patch } = tenantConfigurationSaveDraft(draft, savedTenant, activeSystem, now)
+      let tenantPatch = patch
+      if ('configurationHistory' in tenantPatch) {
+        const reconciled = reconcileGlobalChildRecords<TenantConfigurationHistoryRecord>(
+          state,
+          idCounters,
+          'configurationHistory',
+          savedTenant.configurationHistory ?? [],
+          tenantPatch.configurationHistory ?? [],
+        )
+        idCounters = reconciled.counters
+        tenantPatch = { ...tenantPatch, configurationHistory: reconciled.records }
+      }
       const tenants = state.tenants.map((tenant) =>
         tenant.id === id ? tenantWithDerivedProjectTimeGroup(state, {
           ...tenant,
-          ...patch,
+          ...tenantPatch,
           tenantType: savedTenant.tenantType,
           tenantFormType: tenantFormType(savedTenant),
           updatedAt: options?.preserveNewState ? tenant.createdAt : now,
         }) : tenant,
       )
       const committedTenant = tenants.find((tenant) => tenant.id === id) ?? savedTenant
+      savedConfigurationTenant = committedTenant
       const relationshipState = ensureTenantCommittedProjectRelationships(
         { ...state, tenants },
         committedTenant,
@@ -2593,19 +4097,66 @@ export const useAppStore = create<AppStore>((set, get) => ({
         if (!beforeSummary || valuesEqual(beforeSummary, afterSummary)) return system
 
         const existingHistory = system.configurationHistory ?? []
-        const record = createSystemConfigurationHistoryRecord(afterSummary, existingHistory, now, CURRENT_USER_DISPLAY_NAME, savedTenant.tid)
+        const record = createSystemConfigurationHistoryRecord(
+          afterSummary,
+          existingHistory,
+          now,
+          CURRENT_USER_DISPLAY_NAME,
+          savedTenant.tid,
+          configurationHistoryAttributionForSystem({ ...state, projectSystems: relationshipState.projectSystems }, system),
+        )
         if (!record) return system
+        const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(
+          { ...state, tenants, idCounters },
+          idCounters,
+          'configurationHistory',
+          existingHistory,
+          [record, ...existingHistory],
+        )
+        idCounters = reconciled.counters
 
         return {
           ...system,
-          configurationHistory: [record, ...existingHistory],
+          configurationHistory: reconciled.records,
+          updatedAt: now,
+        }
+      })
+      const reusedInternalSystems = state.reusedInternalSystems.map((system) => {
+        if (!affectedSystemIds.includes(system.id)) return system
+        const beforeSummary = systemSummariesBefore.get(system.id)
+        const afterSummary = systemApplicationConfigurationSummary(system, tenants, relationshipState.systems, relationshipState.projectSystems)
+        if (!beforeSummary || valuesEqual(beforeSummary, afterSummary)) return system
+
+        const existingHistory = system.configurationHistory ?? []
+        const record = createSystemConfigurationHistoryRecord(
+          afterSummary,
+          existingHistory,
+          now,
+          CURRENT_USER_DISPLAY_NAME,
+          savedTenant.tid,
+        )
+        if (!record) return system
+        const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(
+          { ...state, tenants, systems: relationshipState.systems, idCounters },
+          idCounters,
+          'configurationHistory',
+          existingHistory,
+          [record, ...existingHistory],
+        )
+        idCounters = reconciled.counters
+
+        return {
+          ...system,
+          configurationHistory: reconciled.records,
           updatedAt: now,
         }
       })
 
       return {
+        idCounters,
         tenants,
         systems,
+        reusedInternalSystems,
         projectSystems: relationshipState.projectSystems,
         projectTenants: relationshipState.projectTenants,
         activityEvents: appendFieldChangeActivityEvents(relationshipState.activityEvents, now, {
@@ -2618,8 +4169,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
           relatedObjects: relatedRefs(activeSystem ? systemRef(activeSystem) : null),
         }),
       }
-    })
-    get().saveToStorage()
+      })
+      get().saveToStorage()
+    } catch (error) {
+      set(previousState)
+      throw error
+    }
+    return savedConfigurationTenant
   },
 
   deleteTenantFromSystem: (id) => {
@@ -2628,13 +4184,23 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().saveToStorage()
   },
 
+  cancelTenant: (id) => {
+    const tenant = get().tenants.find((candidate) => candidate.id === id)
+    if (!tenant) return { ok: false, message: 'Tenant not found.' }
+    const now = new Date().toISOString()
+    set((state) => cancelTenantInState(state, id, now))
+    get().saveToStorage()
+    return { ok: true, message: `Tenant ${tenant.tid} cancelled and retained historically.` }
+  },
+
   attachTenantToProjectRequirement: (tenantId, projectId, requirementId) => {
     const state = get()
     const tenant = state.tenants.find((candidate) => candidate.id === tenantId)
     const project = state.projects.find((candidate) => candidate.id === projectId)
     if (!tenant) return { ok: false, message: 'Tenant not found.' }
     if (!project) return { ok: false, message: 'Project not found.' }
-    if (isTenantLifecycleInactive(tenant)) return { ok: false, message: `Tenant ${tenant.tid} must be restored before attaching to a Requirement.` }
+    if (tenant.tenantType !== 'CUSTOMER' && tenant.tenantType !== 'POC') return { ok: false, message: 'Only Customer and POC Tenants can replace Requirement ID.' }
+    if (isTenantLifecycleInactive(tenant)) return { ok: false, message: `Tenant ${tenant.tid} must be restored before replacing Requirement ID.` }
     const systemId = tenant.hostedSystemId || tenant.systemId
     if (!systemId) return { ok: false, message: `Tenant ${tenant.tid} has no hosting System.` }
     const systemAllocation = activeProjectSystemLinks(state.projectSystems).find((link) => link.projectId === projectId && link.systemId === systemId)
@@ -2651,51 +4217,70 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return {
         tenants: current.tenants.map((candidate) =>
           candidate.id === tenantId
-            ? {
-                ...candidate,
-                sourceRequirementId: requirement.requirementId,
-                releasedRequirementId: null,
-                requirementHistory: [
-                  ...(candidate.requirementHistory ?? []).map((relationship) =>
-                    relationship.projectId === project.id && relationship.requirementId === requirement.requirementId
-                      ? { ...relationship, status: 'CURRENT' as const, endedAt: null }
-                      : relationship,
-                  ),
-                  ...(candidate.requirementHistory ?? []).some((relationship) => relationship.projectId === project.id && relationship.requirementId === requirement.requirementId)
-                    ? []
-                    : [{
-                        id: `tenant-req-${crypto.randomUUID()}`,
-                        pid: project.pid,
-                        projectId: project.id,
-                        requirementId: requirement.requirementId,
-                        relationshipType: 'A' as const,
-                        status: 'CURRENT' as const,
-                        startedAt: now,
-                        endedAt: null,
-                      }],
-                ],
-                updatedAt: now,
-              }
+            ? tenantWithDerivedProjectTimeGroup(current, {
+              ...candidate,
+              deliveryPid: project.pid,
+              sourceRequirementId: requirement.requirementId,
+              releasedRequirementId: candidate.releasedRequirementId ?? null,
+              requirementHistory: [
+                ...(candidate.requirementHistory ?? []).map((relationship) => {
+                  if (relationship.projectId === project.id && relationship.requirementId === requirement.requirementId) {
+                    return { ...relationship, status: 'CURRENT' as const, endedAt: null }
+                  }
+                  if (relationship.status === 'CURRENT') {
+                    return { ...relationship, status: 'HISTORICAL' as const, endedAt: now }
+                  }
+                  return relationship
+                }),
+                ...(candidate.requirementHistory ?? []).some((relationship) => relationship.projectId === project.id && relationship.requirementId === requirement.requirementId)
+                  ? []
+                  : [{
+                      id: `tenant-req-${crypto.randomUUID()}`,
+                      pid: project.pid,
+                      projectId: project.id,
+                      requirementId: requirement.requirementId,
+                      relationshipType: 'A' as const,
+                      status: 'CURRENT' as const,
+                      startedAt: now,
+                      endedAt: null,
+                    }],
+              ],
+              updatedAt: now,
+            })
             : candidate,
         ),
         projectSystems: current.projectSystems.map((link) =>
           link.id === systemAllocation.id
             ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), tenantId])) }
-            : link,
+            : { ...link, tenantIds: (link.tenantIds ?? []).filter((id) => id !== tenantId) },
         ),
-        projectTenants: projectTenant ? [projectTenant, ...current.projectTenants] : current.projectTenants,
+        projectTenants: [
+          ...(projectTenant ? [projectTenant] : []),
+          ...current.projectTenants.map((link) => {
+            if (link.tenantId !== tenantId || link.allocationStatus === 'DEALLOCATED') return link
+            if (link.projectId === projectId) {
+              return {
+                ...link,
+                systemId,
+                allocationType: systemAllocation.allocationType ?? link.allocationType ?? 'EXISTING_SYSTEM',
+                deallocatedAt: null,
+              }
+            }
+            return deallocateProjectTenantLink(link, now)
+          }),
+        ],
         activityEvents: appendActivityEvent(current.activityEvents, now, {
           category: 'TENANT',
-          eventType: 'tenant.attachedToRequirement',
+          eventType: 'tenant.requirementReplaced',
           severity: 'SUCCESS',
-          summary: `Tenant ${tenant.tid} attached to requirement ${requirement.requirementId} for project ${project.pid}.`,
+          summary: `Tenant ${tenant.tid} Requirement ID replaced with ${requirement.requirementId} for project ${project.pid}.`,
           primaryObject: tenantRef(tenant),
           relatedObjects: relatedRefs(projectRef(project), requirementRef(requirement.requirementId)),
         }),
       }
     })
     get().saveToStorage()
-    return { ok: true, message: `Tenant ${tenant.tid} attached to requirement ${requirement.requirementId}.` }
+    return { ok: true, message: `Tenant ${tenant.tid} Requirement ID replaced with ${requirement.requirementId}.` }
   },
 
   rollbackSystemFormTenantCreation: (tenantId) => {
@@ -2793,7 +4378,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             ? {
                 ...candidate,
                 tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), tenant.id])),
-                ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, tenant, current.timeGroupLookups, options?.timeGroupMismatchDecision),
+                ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, tenant, current.timeGroupLookups, current.countryLookups, current.usStateLookups, options?.timeGroupMismatchDecision),
                 updatedAt: now,
               }
             : candidate,
@@ -2815,12 +4400,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const state = get()
     const project = state.projects.find((candidate) => candidate.id === projectId)
     const system = state.systems.find((candidate) => candidate.id === systemId)
-    if (!project) return { ok: false, message: 'Project not found.' }
-    if (!system) return { ok: false, message: 'System not found.' }
-    const opportunity = state.opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId)
-    const account = state.accounts.find((candidate) => candidate.id === opportunity?.accountId || candidate.accountName === project.accountName)
-    const tenantCountry = opportunity?.country || account?.country || project.country || ''
-    const tenantState = opportunity?.state || account?.state || project.state || system.state || ''
+    const reusedSystem = system ? undefined : state.reusedInternalSystems.find((candidate) => candidate.id === systemId)
+    const hostingRecord = system ?? reusedSystem
+    if (!project && !reusedSystem) return { ok: false, message: 'Project not found.' }
+    if (!hostingRecord) return { ok: false, message: 'System not found.' }
+    const opportunity = project ? state.opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId) : undefined
+    const account = state.accounts.find((candidate) => candidate.id === opportunity?.accountId || candidate.accountName === project?.accountName)
+    const tenantCountry = opportunity?.country || account?.country || project?.country || ''
+    const tenantState = opportunity?.state || account?.state || project?.state || ('state' in hostingRecord ? hostingRecord.state ?? '' : '')
 
     const now = new Date().toISOString()
     const nextTenantId = commitBusinessIdFromCounter(
@@ -2829,16 +4416,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       '',
       state.tenants.map((tenant) => tenant.tid),
     )
-    const idCounters = nextTenantId.counters
+    let idCounters = nextTenantId.counters
     const nextTid = nextTenantId.id
     const tenant: AppDataState['tenants'][number] = {
       id: `ten-${crypto.randomUUID()}`,
       tid: nextTid,
-      accountId: system.accountId ?? '',
-      systemId: system.id,
-      hostedSystemId: system.id,
-      hostingSid: system.sid ?? '',
-      deliveryPid: project.pid,
+      accountId: 'accountId' in hostingRecord ? hostingRecord.accountId ?? '' : '',
+      systemId: hostingRecord.id,
+      hostedSystemId: hostingRecord.id,
+      hostingSid: 'sid' in hostingRecord ? hostingRecord.sid ?? '' : '',
+      deliveryPid: project?.pid ?? '',
       tenantType: 'PENLINK_INTERNAL',
       tenantFormType: 'INTERNAL',
       accountName: 'Internal',
@@ -2851,11 +4438,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       systemForcedPreviousOperationalStatus: null,
       systemForcedBySystemId: null,
       contractStatus: 'UNDER_CONTRACT',
-      hostedSystemHistory: [{ systemId: system.id, startedAt: now, endedAt: null, reason: 'Created' }],
-      productType: system.productType,
-      hostingType: system.hostingType,
-      cloudPlatform: system.cloudPlatform ?? '',
-      mapCenter: system.mapCenter ?? '',
+      hostedSystemHistory: [{ systemId: hostingRecord.id, startedAt: now, endedAt: null, reason: 'Created' }],
+      productType: hostingRecord.productType,
+      hostingType: hostingRecord.hostingType,
+      cloudPlatform: hostingRecord.cloudPlatform ?? '',
+      mapCenter: hostingRecord.mapCenter ?? '',
       licenses: null,
       users: null,
       concurrentSearches: null,
@@ -2889,26 +4476,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
       updatedAt: now,
     }
     const normalizedTenant = tenantWithDerivedProjectTimeGroup(state, tenant)
-    const mismatchMessage = tenantSystemTimeGroupMismatchMessage(state, normalizedTenant, system)
+    const mismatchMessage = system ? tenantSystemTimeGroupMismatchMessage(state, normalizedTenant, system) : ''
     if (mismatchMessage && !options?.timeGroupMismatchDecision) {
-      return { ok: false, requiresTimeGroupOverride: true, ...timeGroupMismatchResult(state, normalizedTenant, system) }
+      return { ok: false, requiresTimeGroupOverride: true, ...timeGroupMismatchResult(state, normalizedTenant, system!) }
     }
-    const projectTenant = createProjectTenantLink(
-      project.id,
-      normalizedTenant.id,
-      system.id,
-      system.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM',
-      now,
-    )
+    const projectTenant = project
+      ? createProjectTenantLink(
+          project.id,
+          normalizedTenant.id,
+          hostingRecord.id,
+          hostingRecord.source === 'Reused Internal Systems' ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM',
+          now,
+        )
+      : null
 
     set((current) => {
       let activityEvents = appendActivityEvent(current.activityEvents, now, {
         category: 'TENANT',
         eventType: 'tenant.internalCreatedForProject',
         severity: 'SUCCESS',
-        summary: `Tenant ${normalizedTenant.tid} created for project ${project.pid}.`,
+        summary: project
+          ? `Tenant ${normalizedTenant.tid} created for project ${project.pid}.`
+          : `Tenant ${normalizedTenant.tid} created for system ${systemBusinessId(hostingRecord)}.`,
         primaryObject: tenantRef(normalizedTenant),
-        relatedObjects: relatedRefs(projectRef(project), systemRef(system)),
+        relatedObjects: relatedRefs(project ? projectRef(project) : null, systemRef(hostingRecord)),
       })
       if (mismatchMessage && options?.timeGroupMismatchDecision) {
         activityEvents = appendActivityEvent(activityEvents, now, {
@@ -2916,37 +4507,91 @@ export const useAppStore = create<AppStore>((set, get) => ({
           eventType: options.timeGroupMismatchDecision === 'change' ? 'tenant.timeGroupMismatchSystemChanged' : 'tenant.timeGroupMismatchSystemPreserved',
           severity: 'WARNING',
           summary: options.timeGroupMismatchDecision === 'change'
-            ? `Tenant ${normalizedTenant.tid} was added and replaced System ${systemBusinessId(system)} Time Group governance.`
-            : `Tenant ${normalizedTenant.tid} was added while System ${systemBusinessId(system)} Time Group was preserved.`,
+              ? `Tenant ${normalizedTenant.tid} was added and replaced System ${systemBusinessId(hostingRecord)} Time Group governance.`
+              : `Tenant ${normalizedTenant.tid} was added while System ${systemBusinessId(hostingRecord)} Time Group was preserved.`,
           primaryObject: tenantRef(normalizedTenant),
-          relatedObjects: relatedRefs(projectRef(project), systemRef(system)),
+          relatedObjects: relatedRefs(project ? projectRef(project) : null, systemRef(hostingRecord)),
           metadata: { warning: mismatchMessage },
         })
       }
+      const tenants = [normalizedTenant, ...current.tenants]
+      const systems = current.systems.map((candidate) => {
+        if (candidate.id !== hostingRecord.id) return candidate
+        const beforeSummary = systemApplicationConfigurationSummary(candidate, current.tenants)
+        const nextSystem = {
+          ...candidate,
+          tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), normalizedTenant.id])),
+          ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, normalizedTenant, current.timeGroupLookups, current.countryLookups, current.usStateLookups, options?.timeGroupMismatchDecision),
+          updatedAt: now,
+        }
+        const afterSummary = systemApplicationConfigurationSummary(nextSystem, tenants)
+        const historyRecord = createSystemConfigurationHistoryRecord(
+          afterSummary,
+          nextSystem.configurationHistory ?? [],
+          now,
+          CURRENT_USER_DISPLAY_NAME,
+          normalizedTenant.tid,
+          configurationHistoryAttributionForSystem(current, nextSystem),
+        )
+        if (!historyRecord || (valuesEqual(beforeSummary, afterSummary) && (nextSystem.configurationHistory ?? []).length > 0)) return nextSystem
+        const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(
+          { ...current, tenants, idCounters },
+          idCounters,
+          'configurationHistory',
+          nextSystem.configurationHistory ?? [],
+          [historyRecord, ...(nextSystem.configurationHistory ?? [])],
+        )
+        idCounters = reconciled.counters
+        return {
+          ...nextSystem,
+          configurationHistory: reconciled.records,
+        }
+      })
+      const reusedInternalSystems = current.reusedInternalSystems.map((candidate) => {
+        if (candidate.id !== hostingRecord.id) return candidate
+        const beforeSummary = systemApplicationConfigurationSummary(candidate, current.tenants, current.systems, current.projectSystems)
+        const nextSystem = {
+          ...candidate,
+          updatedAt: now,
+        }
+        const afterSummary = systemApplicationConfigurationSummary(nextSystem, tenants, current.systems, current.projectSystems)
+        const historyRecord = createSystemConfigurationHistoryRecord(
+          afterSummary,
+          nextSystem.configurationHistory ?? [],
+          now,
+          CURRENT_USER_DISPLAY_NAME,
+          normalizedTenant.tid,
+        )
+        if (!historyRecord || (valuesEqual(beforeSummary, afterSummary) && (nextSystem.configurationHistory ?? []).length > 0)) return nextSystem
+        const reconciled = reconcileGlobalChildRecords<ConfigurationHistoryRecord>(
+          { ...current, tenants, idCounters },
+          idCounters,
+          'configurationHistory',
+          nextSystem.configurationHistory ?? [],
+          [historyRecord, ...(nextSystem.configurationHistory ?? [])],
+        )
+        idCounters = reconciled.counters
+        return {
+          ...nextSystem,
+          configurationHistory: reconciled.records,
+        }
+      })
       return {
         idCounters,
-        tenants: [normalizedTenant, ...current.tenants],
-        systems: current.systems.map((candidate) =>
-          candidate.id === system.id
-            ? {
-                ...candidate,
-                tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), normalizedTenant.id])),
-                ...systemWithAddedTenantTimeGroupGovernance(candidate, current.tenants, normalizedTenant, current.timeGroupLookups, options?.timeGroupMismatchDecision),
-                updatedAt: now,
-              }
-            : candidate,
-        ),
+        tenants,
+        systems,
+        reusedInternalSystems,
         projectSystems: current.projectSystems.map((link) =>
-          link.projectId === project.id && link.systemId === system.id && link.allocationStatus !== 'DEALLOCATED'
+          project && link.projectId === project.id && link.systemId === hostingRecord.id && link.allocationStatus !== 'DEALLOCATED'
             ? { ...link, tenantIds: Array.from(new Set([...(link.tenantIds ?? []), normalizedTenant.id])) }
             : link,
         ),
-        projectTenants: [projectTenant, ...current.projectTenants],
+        projectTenants: projectTenant ? [projectTenant, ...current.projectTenants] : current.projectTenants,
         activityEvents,
       }
     })
     get().saveToStorage()
-    return { ok: true, message: `Tenant ${normalizedTenant.tid} created.`, allocationId: projectTenant.id, tenantId: normalizedTenant.id }
+    return { ok: true, message: `Tenant ${normalizedTenant.tid} created.`, allocationId: projectTenant?.id, tenantId: normalizedTenant.id }
   },
 
   updateAccount: (id, patch) => {
@@ -2957,7 +4602,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const accounts = state.accounts.map((account) => {
         if (account.id !== id) return account
         previousAccount = account
-        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now }, state.timeGroupLookups)
+        nextAccount = accountWithDerivedGeography({ ...account, ...patch, updatedAt: now }, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
         return nextAccount
       })
       return {
@@ -3013,27 +4658,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const reusedInternalSystems = state.reusedInternalSystems.map((system) => {
         if (system.id !== id) return system
         previousSystem = system
-        const safePatch = sanitizeReusedInternalSystemUserPatch(system, patch, state.projects, state.projectSystems)
+        const safePatch = sanitizeReusedInternalSystemUserPatch(system, patch, state.projects, state.projectSystems, state.systems)
         const blockedPurposeChange = validateReusedInternalPurposeChange(
           system,
           { ...system, ...safePatch },
           state.projects,
           state.projectSystems,
+          state.systems,
         )
+        const ownerRequirementMessages = reusedInternalOwnerRequirementMessages({ ...system, ...safePatch })
         const requiredFieldMessages = validateSystemInventoryRequiredFields({ ...system, ...safePatch }, state)
-        if (blockedPurposeChange.length > 0 || requiredFieldMessages.length > 0) {
+        if (blockedPurposeChange.length > 0 || ownerRequirementMessages.length > 0 || requiredFieldMessages.length > 0) {
           nextCommittedSystem = system
           return system
         }
         const nextSystem = safePatch.purpose && safePatch.purpose !== system.purpose
-          ? updateReusedInternalPurpose(system, safePatch.purpose, now)
+          ? updateReusedInternalPurpose({ ...system, owners: safePatch.owners ?? system.owners }, safePatch.purpose, now, {
+            owner: purposeHistoryOwnerSnapshot(safePatch.owners ?? system.owners),
+          })
           : { ...system, updatedAt: options?.preserveNewState ? system.createdAt : now }
         nextCommittedSystem = normalizeSystemInventoryRecord(applyReusedSystemOccupationWindow({
           ...nextSystem,
           ...safePatch,
           status: reusedInternalStatusForPurpose(safePatch.purpose ?? nextSystem.purpose),
           updatedAt: options?.preserveNewState ? system.createdAt : now,
-        }, activeProjectSystemLinks(state.projectSystems), state.projects, now))
+        }, state.projectSystems, state.projects, now, state.systems))
         return nextCommittedSystem
       })
       return {
@@ -3065,7 +4714,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           { ...opportunity, ...patch, updatedAt: options?.preserveNewState ? opportunity.createdAt : now },
           state.tenants,
         )
-        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity, state.timeGroupLookups)
+        nextOpportunityRecord = opportunityWithDerivedGeography(nextOpportunity, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
         return nextOpportunityRecord
       })
       return {
@@ -3100,7 +4749,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ...createOpportunityDraft(state.accounts, state.salesManagers, now, type, subType),
       opportunityId: nextOpportunityId.id,
       opportunityName: 'New opportunity',
-    }, state.timeGroupLookups)
+    }, state.timeGroupLookups, state.countryLookups, state.usStateLookups)
 
     set((currentState) => ({
       idCounters: nextOpportunityId.counters,
@@ -3129,23 +4778,53 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const now = new Date().toISOString()
     const project = projectWithDerivedTimeZone(state, createStandaloneProject(nextPid, now))
 
-    set((s) => ({
-      idCounters,
-      projects: [project, ...s.projects],
-      activityEvents: appendActivityEvent(s.activityEvents, now, {
-        category: 'PROJECT',
-        eventType: 'project.created',
-        severity: 'SUCCESS',
-        summary: `Project ${project.pid} created.`,
-        primaryObject: projectRef(project),
-      }),
-    }))
-    get().saveToStorage()
+    try {
+      set((s) => ({
+        idCounters,
+        projects: [project, ...s.projects],
+        activityEvents: appendActivityEvent(s.activityEvents, now, {
+          category: 'PROJECT',
+          eventType: 'project.created',
+          severity: 'SUCCESS',
+          summary: `Project ${project.pid} created.`,
+          primaryObject: projectRef(project),
+        }),
+      }))
+      get().saveToStorage()
+    } catch (error) {
+      set(state)
+      throw error
+    }
     return project
   },
 
   createProjectFromDraft: (draft) => {
     const state = get()
+    const existingCreatedProject = draft.pid
+      ? state.projects.find((project) => project.pid === draft.pid)
+      : undefined
+    if (existingCreatedProject) {
+      const now = new Date().toISOString()
+      const project = applyProjectLifecycleStatus(projectWithDerivedTimeZone(state, {
+        ...existingCreatedProject,
+        ...draft,
+        id: existingCreatedProject.id,
+        pid: existingCreatedProject.pid,
+        createdAt: existingCreatedProject.createdAt,
+        updatedAt: now,
+      }))
+      try {
+        set((s) => ({
+          projects: s.projects.map((candidate) => candidate.id === existingCreatedProject.id ? project : candidate),
+        }))
+        get().saveToStorage()
+      } catch (error) {
+        set(state)
+        throw error
+      }
+      return project
+    }
+
     const { counters: idCounters, id: nextPid } = commitBusinessIdFromCounter(
       'project',
       state.idCounters,
@@ -3160,18 +4839,23 @@ export const useAppStore = create<AppStore>((set, get) => ({
       updatedAt: now,
     }))
 
-    set((s) => ({
-      idCounters,
-      projects: [project, ...s.projects],
-      activityEvents: appendActivityEvent(s.activityEvents, now, {
-        category: 'PROJECT',
-        eventType: 'project.created',
-        severity: 'SUCCESS',
-        summary: `Project ${project.pid} created.`,
-        primaryObject: projectRef(project),
-      }),
-    }))
-    get().saveToStorage()
+    try {
+      set((s) => ({
+        idCounters,
+        projects: [project, ...s.projects],
+        activityEvents: appendActivityEvent(s.activityEvents, now, {
+          category: 'PROJECT',
+          eventType: 'project.created',
+          severity: 'SUCCESS',
+          summary: `Project ${project.pid} created.`,
+          primaryObject: projectRef(project),
+        }),
+      }))
+      get().saveToStorage()
+    } catch (error) {
+      set(state)
+      throw error
+    }
     return project
   },
 
@@ -3286,12 +4970,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
       },
       options,
     )
+    const changedProjects = result.projectChanges
+      .map((change) => result.projects.find((project) => project.id === change.projectId))
+      .filter((project): project is AppDataState['projects'][number] => Boolean(project))
     const shouldSyncWonRelationships = savedOpportunityForSync.stage !== 'WON' && result.opportunity.stage === 'WON'
     const finalProject = shouldSyncWonRelationships && result.opportunity.finalProjectId
       ? result.projects.find((project) => project.id === result.opportunity.finalProjectId)
       : undefined
-    const existingTenantIds = shouldSyncWonRelationships ? existingTenantIdsForOpportunityFinalProject(result.opportunity) : []
-    const relationshipMessages = finalProject
+    const existingTenantIds = Array.from(new Set([
+      ...(shouldSyncWonRelationships ? existingTenantIdsForOpportunityFinalProject(result.opportunity) : []),
+      ...changedProjects.flatMap((project) =>
+        requiredExistingTenantAllocationsForProject(project, result.opportunity, state.tenants).map((allocation) => allocation.tenantId),
+      ),
+    ]))
+    const relationshipMessages = existingTenantIds.length > 0
       ? validateProjectTenantHostingRelationshipSync(state, existingTenantIds)
       : []
     if (relationshipMessages.length > 0) {
@@ -3302,132 +4994,135 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
     }
 
-    set((currentState) => {
-      const committedOpportunityRecord = opportunityWithDerivedGeography(result.opportunity, currentState.timeGroupLookups)
-      const opportunities = isNewOpportunity
-        ? [committedOpportunityRecord, ...currentState.opportunities]
-        : currentState.opportunities.map((candidate) =>
-            candidate.id === savedOpportunityForSync.id
-              ? committedOpportunityRecord
-              : candidate
-          )
-      const committedState = { ...currentState, opportunities }
-      const projects = result.projects.map((project) => projectWithDerivedTimeZone(committedState, project))
-      const projectForRelationshipSync = finalProject ? projects.find((project) => project.id === finalProject.id) : undefined
-      const relationshipState = projectForRelationshipSync && existingTenantIds.length > 0
-        ? ensureProjectTenantHostingRelationships(
-            { ...currentState, opportunities, projects },
-            projectForRelationshipSync,
-            existingTenantIds,
+    try {
+      set((currentState) => {
+        const committedOpportunityRecord = opportunityWithDerivedGeography(result.opportunity, currentState.timeGroupLookups, currentState.countryLookups, currentState.usStateLookups)
+        const opportunities = isNewOpportunity
+          ? [committedOpportunityRecord, ...currentState.opportunities]
+          : currentState.opportunities.map((candidate) =>
+              candidate.id === savedOpportunityForSync.id
+                ? committedOpportunityRecord
+                : candidate
+            )
+        const committedState = { ...currentState, opportunities }
+        const projects = result.projects.map((project) => projectWithDerivedTimeZone(committedState, project))
+        const projectForRelationshipSync = finalProject ? projects.find((project) => project.id === finalProject.id) : undefined
+        let relationshipState: Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants' | 'activityEvents'> = {
+          systems: currentState.systems,
+          projectSystems: currentState.projectSystems,
+          projectTenants: currentState.projectTenants,
+          activityEvents: currentState.activityEvents,
+        }
+        result.projectChanges.forEach((change) => {
+          const project = projects.find((candidate) => candidate.id === change.projectId)
+          if (!project) return
+          relationshipState = ensureAutomaticRequirementRelationships(
+            { ...currentState, opportunities, projects, ...relationshipState },
+            committedOpportunityRecord,
+            project,
             now,
           )
-        : {
-            systems: currentState.systems,
-            projectSystems: currentState.projectSystems,
-            projectTenants: currentState.projectTenants,
-            activityEvents: currentState.activityEvents,
-          }
-      const committedOpportunity = opportunities.find((candidate) => candidate.id === savedOpportunityForSync.id) ?? committedOpportunityRecord
-      let allocationState: Pick<AppDataState, 'systems' | 'projectSystems' | 'activityEvents'> = {
-        systems: relationshipState.systems,
-        projectSystems: relationshipState.projectSystems,
-        activityEvents: relationshipState.activityEvents,
-      }
-      result.projectChanges.forEach((change) => {
-        const project = projects.find((candidate) => candidate.id === change.projectId)
-        if (!project) return
-        allocationState = ensureOpportunityRequestedSystemAllocations(
-          allocationState,
-          committedOpportunity,
-          project,
+        })
+        relationshipState = reconcileProjectAllocationSources(
+          { ...currentState, opportunities, projects, ...relationshipState },
+          result.projectChanges.map((change) => change.projectId),
           now,
         )
-      })
-      let activityEvents = isNewOpportunity
-        ? appendActivityEvent(allocationState.activityEvents, now, {
-            category: 'OPPORTUNITY',
-            eventType: 'opportunity.created',
-            severity: 'SUCCESS',
-            summary: `Opportunity ${committedOpportunity.opportunityId} created.`,
-            primaryObject: activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)),
-            relatedObjects: relatedRefs(customerRef(account)),
-          })
-        : appendFieldChangeActivityEvents(allocationState.activityEvents, now, {
-            previous: savedOpportunityForSync as unknown as Record<string, unknown>,
-            next: committedOpportunity as unknown as Record<string, unknown>,
-            category: 'OPPORTUNITY',
-            eventTypePrefix: 'opportunity',
-            objectLabel: `Opportunity ${committedOpportunity.opportunityId}`,
-            primaryObject: activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)),
-            relatedObjects: relatedRefs(customerRef(account)),
-          })
-      result.projectChanges.forEach((change) => {
-        const project = projects.find((candidate) => candidate.id === change.projectId)
-        if (!project) return
-        const previousProject = currentState.projects.find((candidate) => candidate.id === change.projectId)
-        if (change.changeStatus === 'New' || !previousProject) {
-          activityEvents = appendActivityEvent(activityEvents, now, {
+        const committedOpportunity = opportunities.find((candidate) => candidate.id === savedOpportunityForSync.id) ?? committedOpportunityRecord
+        const allocationState: Pick<AppDataState, 'systems' | 'projectSystems' | 'activityEvents'> = {
+          systems: relationshipState.systems,
+          projectSystems: relationshipState.projectSystems,
+          activityEvents: relationshipState.activityEvents,
+        }
+        let activityEvents = isNewOpportunity
+          ? appendActivityEvent(allocationState.activityEvents, now, {
+              category: 'OPPORTUNITY',
+              eventType: 'opportunity.created',
+              severity: 'SUCCESS',
+              summary: `Opportunity ${committedOpportunity.opportunityId} created.`,
+              primaryObject: activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)),
+              relatedObjects: relatedRefs(customerRef(account)),
+            })
+          : appendFieldChangeActivityEvents(allocationState.activityEvents, now, {
+              previous: savedOpportunityForSync as unknown as Record<string, unknown>,
+              next: committedOpportunity as unknown as Record<string, unknown>,
+              category: 'OPPORTUNITY',
+              eventTypePrefix: 'opportunity',
+              objectLabel: `Opportunity ${committedOpportunity.opportunityId}`,
+              primaryObject: activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)),
+              relatedObjects: relatedRefs(customerRef(account)),
+            })
+        result.projectChanges.forEach((change) => {
+          const project = projects.find((candidate) => candidate.id === change.projectId)
+          if (!project) return
+          const previousProject = currentState.projects.find((candidate) => candidate.id === change.projectId)
+          if (change.changeStatus === 'New' || !previousProject) {
+            activityEvents = appendActivityEvent(activityEvents, now, {
+              category: 'PROJECT',
+              eventType: 'project.createdFromOpportunity',
+              severity: 'SUCCESS',
+              summary: `Project ${project.pid} created from Opportunity ${committedOpportunity.opportunityId}.`,
+              primaryObject: projectRef(project),
+              relatedObjects: relatedRefs(activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)), customerRef(account)),
+            })
+            return
+          }
+          activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
+            previous: previousProject as unknown as Record<string, unknown>,
+            next: project as unknown as Record<string, unknown>,
             category: 'PROJECT',
-            eventType: 'project.createdFromOpportunity',
-            severity: 'SUCCESS',
-            summary: `Project ${project.pid} created from Opportunity ${committedOpportunity.opportunityId}.`,
+            eventTypePrefix: 'project',
+            objectLabel: `Project ${project.pid}`,
             primaryObject: projectRef(project),
             relatedObjects: relatedRefs(activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)), customerRef(account)),
+            excludeFields: ['tasks', 'milestones', 'progressStatus'],
           })
-          return
+        })
+        const isApprovedPocConversion = shouldSyncWonRelationships &&
+          result.opportunity.subType === 'UPSELL' &&
+          (result.opportunity.type === 'DELIVERY' || result.opportunity.type === 'RENEWAL')
+        const conversionTenantIds = new Set(
+          isApprovedPocConversion
+            ? applicableOpportunityRequirementSources(result.opportunity)
+                .filter((source) => source.requirementType === 'B')
+                .map((source) => source.requirement.tenantId)
+            : [],
+        )
+        const tenants = currentState.tenants.map((tenant) => {
+          if (!conversionTenantIds.has(tenant.id) || tenant.tenantType !== 'POC') return tenant
+          if (!isEligiblePocTenantForCustomerExistingContext(tenant, currentState.systems)) return tenant
+          activityEvents = appendActivityEvent(activityEvents, now, {
+            category: 'TENANT',
+            eventType: 'tenant.pocConvertedToCustomerFromUpsell',
+            severity: 'SUCCESS',
+            summary: `Tenant ${tenant.tid} converted from POC to Customer through ${projectForRelationshipSync?.pid ?? 'the Upsell Project'}.`,
+            primaryObject: tenantRef(tenant),
+            relatedObjects: relatedRefs(projectForRelationshipSync ? projectRef(projectForRelationshipSync) : null, customerRef(account)),
+          })
+          return { ...tenant, tenantType: 'CUSTOMER' as const, tenantFormType: 'CUSTOMER' as const, warrantyStatus: 'NOT_SET' as const, updatedAt: now }
+        })
+        return {
+          idCounters: result.idCounters,
+          projects,
+          systems: allocationState.systems,
+          projectSystems: allocationState.projectSystems,
+          projectTenants: relationshipState.projectTenants,
+          tenants,
+          activityEvents,
+          projectLifecycleChangesByOpportunityId: {
+            ...currentState.projectLifecycleChangesByOpportunityId,
+            [result.opportunity.id]: result.projectChanges,
+          },
+          opportunities,
         }
-        activityEvents = appendFieldChangeActivityEvents(activityEvents, now, {
-          previous: previousProject as unknown as Record<string, unknown>,
-          next: project as unknown as Record<string, unknown>,
-          category: 'PROJECT',
-          eventTypePrefix: 'project',
-          objectLabel: `Project ${project.pid}`,
-          primaryObject: projectRef(project),
-          relatedObjects: relatedRefs(activityObjectRefFromBusinessReference(opportunityReference(committedOpportunity)), customerRef(account)),
-          excludeFields: ['tasks', 'milestones', 'progressStatus'],
-        })
       })
-      const isApprovedPocConversion = shouldSyncWonRelationships &&
-        result.opportunity.subType === 'UPSELL' &&
-        (result.opportunity.type === 'DELIVERY' || result.opportunity.type === 'RENEWAL')
-      const conversionTenantIds = new Set(
-        isApprovedPocConversion
-          ? applicableOpportunityRequirementSources(result.opportunity)
-              .filter((source) => source.requirementType === 'B')
-              .map((source) => source.requirement.tenantId)
-          : [],
-      )
-      const tenants = currentState.tenants.map((tenant) => {
-        if (!conversionTenantIds.has(tenant.id) || tenant.tenantType !== 'POC') return tenant
-        if (!isEligiblePocTenantForCustomerExistingContext(tenant, currentState.systems)) return tenant
-        activityEvents = appendActivityEvent(activityEvents, now, {
-          category: 'TENANT',
-          eventType: 'tenant.pocConvertedToCustomerFromUpsell',
-          severity: 'SUCCESS',
-          summary: `Tenant ${tenant.tid} converted from POC to Customer through ${projectForRelationshipSync?.pid ?? 'the Upsell Project'}.`,
-          primaryObject: tenantRef(tenant),
-          relatedObjects: relatedRefs(projectForRelationshipSync ? projectRef(projectForRelationshipSync) : null, customerRef(account)),
-        })
-        return { ...tenant, tenantType: 'CUSTOMER' as const, tenantFormType: 'CUSTOMER' as const, warrantyStatus: 'NOT_SET' as const, updatedAt: now }
-      })
-      return {
-        idCounters: result.idCounters,
-        projects,
-        systems: allocationState.systems,
-        projectSystems: allocationState.projectSystems,
-        projectTenants: relationshipState.projectTenants,
-        tenants,
-        activityEvents,
-        projectLifecycleChangesByOpportunityId: {
-          ...currentState.projectLifecycleChangesByOpportunityId,
-          [result.opportunity.id]: result.projectChanges,
-        },
-        opportunities,
-      }
-    })
-    get().saveToStorage()
+      get().saveToStorage()
+    } catch (error) {
+      set(state)
+      throw error
+    }
     return {
-      opportunity: opportunityWithDerivedGeography(result.opportunity, get().timeGroupLookups),
+      opportunity: opportunityWithDerivedGeography(result.opportunity, get().timeGroupLookups, get().countryLookups, get().usStateLookups),
       projectChanges: result.projectChanges,
     }
   },
@@ -3519,21 +5214,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
       '',
       [...state.systems, ...state.productionSystemInventory].map((system) => system.sid),
     )
-    const idCounters = nextSystemId.counters
+    let idCounters = nextSystemId.counters
     const tenantIds: string[] = []
     const allocatedSystemId = `sys-${crypto.randomUUID()}`
     const assignmentLocation = projectAssignmentLocation(state, project)
+    const projectAccount = state.accounts.find((account) => account.accountName === project.accountName)
 
-    const allocatedSystem = systemFromReusedInternalAllocation(
-      reusedSystem,
-      project.id,
-      assignmentLocation,
-      allocatedSystemId,
-      nextSystemId.id,
-      project.pid,
-      tenantIds,
-      now,
-    )
+    const allocatedSystem = {
+      ...systemFromReusedInternalAllocation(
+        reusedSystem,
+        project.id,
+        assignmentLocation,
+        allocatedSystemId,
+        nextSystemId.id,
+        project.pid,
+        tenantIds,
+        now,
+        project.pocStartDate ?? null,
+        project.pocEndDate ?? null,
+      ),
+      accountId: projectAccount?.id ?? null,
+      salesManagerId: projectAccount?.salesManagerId ?? null,
+      accountName: project.accountName,
+      currentVersionUpdateId: reusedSystem.currentVersionUpdateId ?? null,
+      currentVersionNumberRefId: reusedSystem.currentVersionNumberRefId ?? null,
+      currentBuildNumberRefId: reusedSystem.currentBuildNumberRefId ?? null,
+    }
     const allocation = createProjectSystemLink(
       projectId,
       allocatedSystem.id,
@@ -3542,38 +5248,66 @@ export const useAppStore = create<AppStore>((set, get) => ({
       { tenantIds, sourceMachineId: reusedSystem.machineId },
     )
 
-    set((current) => ({
+    set((current) => {
+      const staleMidTenantIds = current.tenants
+        .filter((tenant) => tenantIsActivelyHostedBySystem(tenant, reusedSystemId))
+        .map((tenant) => tenant.id)
+      const cleanupState = staleMidTenantIds.reduce(
+        (nextState, tenantId) => ({ ...nextState, ...cancelTenantInState(nextState, tenantId, now) }),
+        current,
+      )
+      const inheritedVersionUpdates = cloneVersionUpdateRecordsForSystem({
+        sourceSystemId: reusedSystemId,
+        sourceCurrentVersionUpdateId: reusedSystem.currentVersionUpdateId,
+        targetSystem: allocatedSystem,
+        targetCollection: 'allocated',
+        versionUpdates: cleanupState.versionUpdates,
+        idCounters,
+        timestamp: now,
+      })
+      idCounters = inheritedVersionUpdates.idCounters
+      const allocatedSystemWithInheritedVersion = {
+        ...allocatedSystem,
+        ...inheritedVersionUpdates.currentPatch,
+      }
+      return {
       idCounters,
-      reusedInternalSystems: current.reusedInternalSystems.map((candidate) =>
+      versionUpdates: [...cleanupState.versionUpdates, ...inheritedVersionUpdates.records],
+      reusedInternalSystems: cleanupState.reusedInternalSystems.map((candidate) =>
         candidate.id === reusedSystemId
           ? {
               ...occupyReusedInternalSystem(
                 candidate,
                 projectId,
                 now,
-                purposeHistoryContextFromProject(project, allocatedSystem),
+                purposeHistoryContextFromProject(project, allocatedSystemWithInheritedVersion),
                 [
-                  ...activeProjectSystemLinks(current.projectSystems).filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, candidate.machineId)),
+                  ...activeProjectSystemLinks(cleanupState.projectSystems).filter((link) => reusedInternalMachineIdsEqual(link.sourceMachineId, candidate.machineId)),
                   allocation,
                 ],
-                current.projects,
+                cleanupState.projects,
               ),
               usedInRegion: assignmentLocation.region,
               timeGroup: assignmentLocation.timeGroup,
             }
           : candidate,
       ),
-      systems: [allocatedSystem, ...current.systems],
-      projectSystems: [allocation, ...current.projectSystems],
-      activityEvents: appendActivityEvent(current.activityEvents, now, {
+      systems: recalculateAllocatedReusedSystemOccupationWindows([allocatedSystemWithInheritedVersion, ...cleanupState.systems], [allocation, ...cleanupState.projectSystems], cleanupState.projects),
+      tenants: cleanupState.tenants,
+      projectSystems: [allocation, ...cleanupState.projectSystems],
+      projectTenants: cleanupState.projectTenants,
+      opportunities: cleanupState.opportunities,
+      warrantyRecords: cleanupState.warrantyRecords,
+      activityEvents: appendActivityEvent(cleanupState.activityEvents, now, {
         category: 'ALLOCATION',
         eventType: 'allocation.systemAllocated',
         severity: 'SUCCESS',
-        summary: `System ${systemBusinessId(allocatedSystem)} allocated to project ${project.pid}.`,
+        summary: `System ${systemBusinessId(allocatedSystemWithInheritedVersion)} allocated to project ${project.pid}.`,
         primaryObject: allocationRef(allocation),
-        relatedObjects: relatedRefs(projectRef(project), systemRef(allocatedSystem), systemRef(reusedSystem)),
+        relatedObjects: relatedRefs(projectRef(project), systemRef(allocatedSystemWithInheritedVersion), systemRef(reusedSystem)),
       }),
-    }))
+    }
+    })
     get().saveToStorage()
     return { ok: true, message: 'Reused internal system allocated.', allocationId: allocation.id }
   },
@@ -3589,17 +5323,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const tenantIds: string[] = []
     const assignmentLocation = project ? projectAssignmentLocation(state, project) : { region: '', timeGroup: '' }
     const activeLinksForSystem = activeProjectSystemLinks(state.projectSystems).filter((link) => link.systemId === systemId)
+    const allocationType: AllocationType = system?.source === SYSTEM_SOURCE_REUSED_INTERNAL ? 'REUSED_INTERNAL' : 'EXISTING_SYSTEM'
 
     const allocation = createProjectSystemLink(
       projectId,
       systemId,
-      'EXISTING_SYSTEM',
+      allocationType,
       now,
-      { tenantIds },
+      { tenantIds, sourceMachineId: allocationType === 'REUSED_INTERNAL' ? system?.machineId ?? null : null },
     )
 
     set((current) => ({
-      systems: current.systems.map((candidate) =>
+      systems: recalculateAllocatedReusedSystemOccupationWindows(current.systems.map((candidate) =>
         candidate.id === systemId
           ? {
               ...candidate,
@@ -3610,7 +5345,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
               updatedAt: now,
             }
           : candidate,
-      ),
+      ), [allocation, ...current.projectSystems], current.projects),
       projectSystems: [allocation, ...current.projectSystems],
       activityEvents: appendActivityEvent(current.activityEvents, now, {
         category: 'ALLOCATION',
@@ -3625,66 +5360,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return { ok: true, message: 'Existing system linked.', allocationId: allocation.id }
   },
 
-  deallocateProjectSystem: (allocationId, options) => {
+  deallocateProjectSystem: (allocationId) => {
     const state = get()
     const allocation = state.projectSystems.find((candidate) => candidate.id === allocationId)
-    const invalid = validateProjectSystemDeallocation(allocationId, state.projectSystems)
+    const invalid = validateProjectSystemDeallocation(allocationId, {
+      projects: state.projects,
+      opportunities: state.opportunities,
+      projectSystems: state.projectSystems,
+      projectTenants: state.projectTenants,
+      systems: state.systems,
+      tenants: state.tenants,
+    })
     if (invalid) return invalid
     if (!allocation) return { ok: false, message: 'Allocation not found.' }
     const project = state.projects.find((candidate) => candidate.id === allocation.projectId)
     const system = state.systems.find((candidate) => candidate.id === allocation.systemId)
     const allocatedSystemForPurposeHistory = system
     const now = new Date().toISOString()
-    const hostedTenantIds = new Set(
-      state.tenants
-        .filter((tenant) => tenant.systemId === allocation.systemId || tenant.hostedSystemId === allocation.systemId)
-        .map((tenant) => tenant.id),
-    )
-    const activeTenantLinksForAllocation = state.projectTenants.filter(
-      (candidate) =>
-        candidate.projectId === allocation.projectId &&
-        candidate.systemId === allocation.systemId &&
-        candidate.allocationStatus !== 'DEALLOCATED' &&
-        hostedTenantIds.has(candidate.tenantId),
-    )
-    const affectedTenantIdsFromLinks = new Set(activeTenantLinksForAllocation.map((link) => link.tenantId))
-    const affectedTenants = project
-      ? state.tenants.filter((tenant) => affectedTenantIdsFromLinks.has(tenant.id) && !isTenantLifecycleInactive(tenant))
-      : []
-    const projectPid = project?.pid ?? allocation.projectId
-    if (affectedTenants.length > 0 && !options?.confirmedTenantCancellation) {
-      return {
-        ok: false,
-        requiresConfirmation: true,
-        message: `The following Tenant Project attachment(s) will be released from Project ${projectPid}. Tenant records will remain active unless deleted through the Tenant lifecycle. Continue? ${affectedTenants.map((tenant) => tenant.tid).join(', ')}`,
-        affectedTenantIds: affectedTenants.map((tenant) => tenant.id),
-        affectedTids: affectedTenants.map((tenant) => tenant.tid),
-      }
-    }
-    const affectedTenantIds = new Set(affectedTenants.map((tenant) => tenant.id))
-    const tenantLinksToUnlink = state.projectTenants.filter(
-      (candidate) =>
-        candidate.projectId === allocation.projectId &&
-        candidate.systemId === allocation.systemId &&
-        hostedTenantIds.has(candidate.tenantId) &&
-        candidate.allocationStatus !== 'DEALLOCATED',
-    )
 
     set((current) => {
-      const tenants = current.tenants.map((tenant) => {
-        if (!affectedTenantIds.has(tenant.id)) return tenant
-        return {
-          ...tenant,
-          sourceRequirementId: undefined,
-          releasedRequirementId: tenant.sourceRequirementId ?? tenant.releasedRequirementId ?? null,
-          requirementHistory: (tenant.requirementHistory ?? []).map((relationship) =>
-            relationship.projectId === allocation.projectId && relationship.status === 'CURRENT'
-              ? { ...relationship, status: 'RELEASED' as const, endedAt: now }
-              : relationship,
-          ),
-          updatedAt: now,
-        }
-      })
       const projectSystems = current.projectSystems.map((candidate) =>
         candidate.id === allocationId
           ? deallocateProjectSystemLink(candidate, now)
@@ -3693,41 +5387,59 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const projectTenants = current.projectTenants.map((candidate) =>
         candidate.projectId === allocation.projectId &&
         candidate.systemId === allocation.systemId &&
-        hostedTenantIds.has(candidate.tenantId) &&
         candidate.allocationStatus !== 'DEALLOCATED'
           ? deallocateProjectTenantLink(candidate, now)
           : candidate,
       )
-      const systems = current.systems.map((system) =>
-        system.id === allocation.systemId
-          ? unlinkProjectFromSystem(system, allocation.projectId, now)
-          : system,
+      const hasRemainingProjectAllocation = activeProjectSystemLinks(projectSystems).some((link) => link.systemId === allocation.systemId)
+      const shouldReturnProductionToInventory = Boolean(
+        system &&
+        system.source !== SYSTEM_SOURCE_REUSED_INTERNAL &&
+        !hasRemainingProjectAllocation,
       )
+      const returnedProductionSystem = shouldReturnProductionToInventory && system
+        ? {
+            ...unlinkProjectFromSystem(system, allocation.projectId, now),
+            source: 'Production' as const,
+            purpose: SYSTEM_PURPOSE_DELIVERY,
+            linkedProjects: [],
+            availability: SYSTEM_AVAILABILITY_AVAILABLE,
+            linkedProjectIds: undefined,
+            allocationIds: undefined,
+            allocationProjectIds: undefined,
+            allocationTypes: undefined,
+            allocatedAt: undefined,
+            allocationStatus: undefined,
+            tenantIds: [],
+            tenantCount: 0,
+            alerts: [],
+            updatedAt: now,
+          } as unknown as AppDataState['productionSystemInventory'][number]
+        : null
+      const systems = shouldReturnProductionToInventory
+        ? current.systems.filter((candidate) => candidate.id !== allocation.systemId)
+        : current.systems.map((system) =>
+            system.id === allocation.systemId
+              ? unlinkProjectFromSystem(system, allocation.projectId, now)
+              : system,
+          )
       const releasedReusedSystems = current.reusedInternalSystems.map((system) =>
         allocation.allocationType === 'REUSED_INTERNAL' && reusedInternalMachineIdsEqual(system.machineId, allocation.sourceMachineId)
           ? releaseReusedInternalSystem(system, allocation.projectId, now, project && allocatedSystemForPurposeHistory ? purposeHistoryContextFromProject(project, allocatedSystemForPurposeHistory) : {})
           : system,
       )
       return {
-        tenants,
         projectSystems,
+        systems: recalculateAllocatedReusedSystemOccupationWindows(systems, projectSystems, current.projects),
+        productionSystemInventory: returnedProductionSystem
+          ? [
+              returnedProductionSystem,
+              ...current.productionSystemInventory.filter((candidate) => candidate.id !== returnedProductionSystem.id),
+            ]
+          : current.productionSystemInventory,
+        reusedInternalSystems: recalculateReusedSystemOccupationWindows(releasedReusedSystems, projectSystems, current.projects, now, systems),
         projectTenants,
-        systems,
-        reusedInternalSystems: recalculateReusedSystemOccupationWindows(releasedReusedSystems, projectSystems, current.projects, now),
-        activityEvents: tenantLinksToUnlink.reduce(
-        (events, link) => {
-          const tenant = current.tenants.find((candidate) => candidate.id === link.tenantId)
-          if (!project || !tenant) return events
-          return appendActivityEvent(events, now, {
-            category: 'TENANT',
-            eventType: 'project.tenantUnlinkedFromDeallocatedSystem',
-            severity: 'WARNING',
-            summary: `Tenant ${tenant.tid} unlinked from project ${project.pid} because system ${system ? systemBusinessId(system) : allocation.systemId} was deallocated.`,
-            primaryObject: projectRef(project),
-            relatedObjects: relatedRefs(tenantRef(tenant), system ? systemRef(system) : null),
-          })
-        },
-        appendActivityEvent(current.activityEvents, now, {
+        activityEvents: appendActivityEvent(current.activityEvents, now, {
           category: 'ALLOCATION',
           eventType: 'allocation.systemDeallocated',
           severity: 'WARNING',
@@ -3735,7 +5447,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
           primaryObject: allocationRef(allocation),
           relatedObjects: relatedRefs(project ? projectRef(project) : null, system ? systemRef(system) : null),
         }),
-      ),
       }
     })
     get().saveToStorage()

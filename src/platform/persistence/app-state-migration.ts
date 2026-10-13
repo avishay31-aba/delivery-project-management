@@ -3,20 +3,39 @@ import seedJson from '@/data/seed.json'
 import { normalizeIdCounters } from '@/data/id-generator'
 import {
   activeProjectSystemLinks,
+  normalizeAllocationSources,
   normalizeProjectSystemLink,
   normalizeProjectTenantLink,
+  requiredExistingTenantAllocationsForProject,
+  resolvedProjectSystemAllocationSources,
+  resolvedProjectTenantAllocationSources,
 } from '@/domain/allocation-context'
 import { normalizeActivityEvents } from '@/domain/activity-log'
-import { normalizeOpportunityLifecycleOpportunity } from '@/domain/opportunity-lifecycle'
+import { normalizeRoles, normalizeUserRoleAssignments } from '@/domain/authorization'
+import {
+  normalizeAlertRecords,
+  normalizeNotificationRecords,
+  normalizeNotificationRules,
+  reconcileNotificationsAndAlerts,
+} from '@/domain/notifications-alerts'
+import { normalizeReminderExecutions } from '@/domain/reminders'
+import { normalizeOpportunityLifecycleOpportunity, pocProjectSubTypeForOpportunity } from '@/domain/opportunity-lifecycle'
 import { normalizeProjectLifecycleProject } from '@/domain/project-lifecycle'
-import { applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } from '@/domain/system-inventory'
+import { applyAllocatedReusedSystemOccupationWindow, applyReusedSystemOccupationWindow, normalizeSystemInventoryRecord } from '@/domain/system-inventory'
 import { normalizeTenantOperationRecord } from '@/domain/tenant-operations'
 import { repairGlobalRequirementIds } from '@/domain/tenant-requirement'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
+import {
+  businessRegionForCountry,
+  normalizeCountryLookups,
+  normalizeUsStateLookups,
+} from '@/domain/geographic-configuration'
 import { ensureInfrastructureReferenceData, normalizeInfrastructureItemsForReferenceData } from '@/domain/infrastructure-item'
 import { normalizeTenantTimeGroup, normalizeTimeGroupLookups, systemsWithDerivedTimeGroups, timeGroupForTimeZone, timeGroupFromLocation } from '@/domain/time-groups'
 import { geographicTimeZoneDisplayValue } from '@/domain/geographic-time-zone'
 import { normalizeUserPresentationPreferences } from '@/domain/user-preferences'
+
+const DEFAULT_NORMALIZATION_TIMESTAMP = '2026-09-15T00:00:00.000Z'
 
 function tenantHistoricalSystemId(tenant: AppDataState['tenants'][number]): string {
   if (tenant.hostedSystemId || tenant.systemId) return tenant.hostedSystemId || tenant.systemId
@@ -126,21 +145,170 @@ function repairRetainedProjectTenantRelationships(
   return { systems, projectSystems, projectTenants }
 }
 
+function linkedOpportunityForProject(
+  project: AppDataState['projects'][number],
+  opportunities: AppDataState['opportunities'],
+): AppDataState['opportunities'][number] | undefined {
+  return opportunities.find((opportunity) =>
+    opportunity.id === project.opportunityId ||
+    opportunity.opportunityId === project.opportunityId ||
+    opportunity.pocProjectIds?.includes(project.id) ||
+    opportunity.finalProjectId === project.id,
+  )
+}
+
+function repairAutomaticProjectRelationships(
+  state: AppDataState,
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants'> {
+  let systems = state.systems
+  let projectSystems = state.projectSystems
+  let projectTenants = state.projectTenants
+  const systemById = new Map(systems.map((system) => [system.id, system]))
+
+  state.projects.forEach((project) => {
+    const opportunity = linkedOpportunityForProject(project, state.opportunities)
+    const requiredAllocations = requiredExistingTenantAllocationsForProject(project, opportunity, state.tenants)
+    requiredAllocations.forEach((allocation) => {
+      const system = systemById.get(allocation.systemId)
+      if (!system) return
+      const allocationType = allocationTypeForRetainedSystem(system)
+      const activeSystemLink = activeProjectSystemLinks(projectSystems).find((link) =>
+        link.projectId === project.id && link.systemId === allocation.systemId
+      )
+      if (activeSystemLink) {
+        projectSystems = projectSystems.map((link) =>
+          link.id === activeSystemLink.id
+            ? {
+                ...link,
+                tenantIds: Array.from(new Set([...(link.tenantIds ?? []), allocation.tenantId])),
+                allocationSources: normalizeAllocationSources([...(link.allocationSources ?? ['MANUAL']), ...allocation.sources]),
+              }
+            : link,
+        )
+      } else {
+        projectSystems = [
+          {
+            id: `proj-auto-system-${project.id}-${allocation.systemId}`,
+            projectId: project.id,
+            systemId: allocation.systemId,
+            tenantIds: [allocation.tenantId],
+            allocationStatus: 'ALLOCATED',
+            allocationType,
+            allocationSources: normalizeAllocationSources(allocation.sources),
+            sourceMachineId: allocationType === 'REUSED_INTERNAL' ? system.machineId : null,
+            allocatedAt: project.createdAt,
+            deallocatedAt: null,
+          },
+          ...projectSystems,
+        ]
+      }
+
+      const activeTenantLink = projectTenants.find((link) =>
+        link.projectId === project.id &&
+        link.tenantId === allocation.tenantId &&
+        link.allocationStatus !== 'DEALLOCATED'
+      )
+      if (activeTenantLink) {
+        projectTenants = projectTenants.map((link) =>
+          link.id === activeTenantLink.id
+            ? {
+                ...link,
+                systemId: allocation.systemId,
+                allocationType,
+                allocationSources: normalizeAllocationSources([...(link.allocationSources ?? ['MANUAL']), ...allocation.sources]),
+              }
+            : link,
+        )
+      } else {
+        projectTenants = [
+          {
+            id: `proj-auto-tenant-${project.id}-${allocation.tenantId}`,
+            projectId: project.id,
+            tenantId: allocation.tenantId,
+            systemId: allocation.systemId,
+            allocationStatus: 'ALLOCATED',
+            allocationType,
+            allocationSources: normalizeAllocationSources(allocation.sources),
+            allocatedAt: project.createdAt,
+            deallocatedAt: null,
+          },
+          ...projectTenants,
+        ]
+      }
+
+      systems = systems.map((candidate) =>
+        candidate.id === allocation.systemId
+          ? {
+              ...candidate,
+              linkedProjectIds: Array.from(new Set([...(candidate.linkedProjectIds ?? []), project.id])),
+              tenantIds: Array.from(new Set([...(candidate.tenantIds ?? []), allocation.tenantId])),
+            }
+          : candidate,
+      )
+    })
+  })
+
+  return { systems, projectSystems, projectTenants }
+}
+
+function reconcileProjectAllocationSources(
+  state: AppDataState,
+): Pick<AppDataState, 'systems' | 'projectSystems' | 'projectTenants'> {
+  const projectById = new Map(state.projects.map((project) => [project.id, project]))
+  const opportunityByProjectId = new Map(state.projects.map((project) => [project.id, linkedOpportunityForProject(project, state.opportunities)]))
+  const projectSystems = state.projectSystems.map((link) => {
+    if (link.allocationStatus === 'DEALLOCATED') return link
+    const project = projectById.get(link.projectId)
+    if (!project) return link
+    const allocationSources = resolvedProjectSystemAllocationSources(link, project, opportunityByProjectId.get(project.id), state.tenants)
+    return allocationSources.length > 0
+      ? { ...link, allocationSources }
+      : { ...link, allocationSources, allocationStatus: 'DEALLOCATED' as const, deallocatedAt: link.deallocatedAt ?? project.updatedAt }
+  })
+  const projectTenants = state.projectTenants.map((link) => {
+    if (link.allocationStatus === 'DEALLOCATED') return link
+    const project = projectById.get(link.projectId)
+    if (!project) return link
+    const allocationSources = resolvedProjectTenantAllocationSources(link, project, opportunityByProjectId.get(project.id), state.tenants)
+    return allocationSources.length > 0
+      ? { ...link, allocationSources }
+      : { ...link, allocationSources, allocationStatus: 'DEALLOCATED' as const, deallocatedAt: link.deallocatedAt ?? project.updatedAt }
+  })
+  const projectIdsBySystemId = new Map<string, string[]>()
+  const activeTenantIdsBySystemId = new Map<string, string[]>()
+  activeProjectSystemLinks(projectSystems).forEach((link) => {
+    projectIdsBySystemId.set(link.systemId, Array.from(new Set([...(projectIdsBySystemId.get(link.systemId) ?? []), link.projectId])))
+  })
+  activeProjectSystemLinks(projectSystems).forEach((link) => {
+    activeTenantIdsBySystemId.set(link.systemId, Array.from(new Set([...(activeTenantIdsBySystemId.get(link.systemId) ?? []), ...(link.tenantIds ?? [])])))
+  })
+  const systems = state.systems.map((system) => ({
+    ...system,
+    linkedProjectIds: projectIdsBySystemId.get(system.id) ?? system.linkedProjectIds ?? [],
+    tenantIds: Array.from(new Set([...(system.tenantIds ?? []), ...(activeTenantIdsBySystemId.get(system.id) ?? [])])),
+  }))
+
+  return { systems, projectSystems, projectTenants }
+}
+
 export function normalizeAppDataState(state: AppDataState): AppDataState {
   const seedState = { ...(seedJson as unknown as AppDataState), activityEvents: [] }
-  const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [])
+  const now = DEFAULT_NORMALIZATION_TIMESTAMP
+  const countryLookups = normalizeCountryLookups(Array.isArray(state.countryLookups) ? state.countryLookups : seedState.countryLookups)
+  const usStateLookups = normalizeUsStateLookups(Array.isArray(state.usStateLookups) ? state.usStateLookups : seedState.usStateLookups)
+  const timeGroupLookups = normalizeTimeGroupLookups(Array.isArray(state.timeGroupLookups) ? state.timeGroupLookups : [], countryLookups, usStateLookups)
   const sourceProjects = (Array.isArray(state.projects) ? state.projects : seedState.projects).map(normalizeProjectLifecycleProject)
   const sourceOpportunities = Array.isArray(state.opportunities) ? state.opportunities : seedState.opportunities
   const usedOpportunityIds = sourceOpportunities.map((opportunity) => opportunity.opportunityId)
   const opportunities = sourceOpportunities.map((opportunity) => {
     const normalized = normalizeOpportunityLifecycleOpportunity(opportunity, sourceProjects, usedOpportunityIds)
     usedOpportunityIds.push(normalized.opportunityId)
-    const location = timeGroupFromLocation(timeGroupLookups, normalized.country, normalized.state, normalized.deliveryDate ?? normalized.pocStartDate)
+    const location = timeGroupFromLocation(timeGroupLookups, normalized.country, normalized.state, normalized.deliveryDate ?? normalized.pocStartDate, countryLookups, usStateLookups)
     return { ...normalized, timeZone: location.timeZone, timeGroup: location.timeGroup }
   })
   const accounts = (Array.isArray(state.accounts) ? state.accounts : seedState.accounts).map((account) => {
-    const region = getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
-    const location = timeGroupFromLocation(timeGroupLookups, account.country, account.state)
+    const region = businessRegionForCountry(countryLookups, account.country) || getBusinessRegionForCountry(account.country, account.state) || normalizeBusinessRegion(account.region)
+    const location = timeGroupFromLocation(timeGroupLookups, account.country, account.state, undefined, countryLookups, usStateLookups)
     return { ...account, region, timeZone: location.timeZone, timeGroup: location.timeGroup }
   })
   const projects = sourceProjects.map((project) => {
@@ -152,12 +320,13 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     )
     const country = opportunity?.country || account?.country || project.country || ''
     const state = opportunity?.state || account?.state || project.state || ''
-    const timeZone = geographicTimeZoneDisplayValue(country, state, project.deliveryDate)
+    const timeZone = geographicTimeZoneDisplayValue(country, state, project.deliveryDate, countryLookups, usStateLookups)
     return {
       ...project,
+      subType: project.mainType === 'POC' && opportunity ? pocProjectSubTypeForOpportunity(opportunity) : project.subType,
       country,
       state,
-      region: getBusinessRegionForCountry(country, state) || normalizeBusinessRegion(project.region),
+      region: businessRegionForCountry(countryLookups, country) || getBusinessRegionForCountry(country, state) || normalizeBusinessRegion(project.region),
       timeZone,
       timeGroup: timeGroupForTimeZone(timeGroupLookups, timeZone),
     }
@@ -205,8 +374,12 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
       ...normalizedTenant,
       country,
       state: stateName,
-    }, timeGroupLookups)
+    }, timeGroupLookups, countryLookups, usStateLookups)
   })
+
+  const roles = normalizeRoles('roles' in state ? state.roles : [], now)
+  const userRoleAssignments = normalizeUserRoleAssignments('userRoleAssignments' in state ? state.userRoleAssignments : [], roles, now)
+  const notificationRules = normalizeNotificationRules('notificationRules' in state ? state.notificationRules : [], roles, now)
 
   const normalizedState = {
     ...state,
@@ -223,34 +396,67 @@ export function normalizeAppDataState(state: AppDataState): AppDataState {
     tenants,
     warrantyRecords: Array.isArray(state.warrantyRecords) ? state.warrantyRecords : seedState.warrantyRecords,
     referenceData,
+    countryLookups,
+    usStateLookups,
     timeGroupLookups,
     userPresentationPreferences: normalizeUserPresentationPreferences(Array.isArray(state.userPresentationPreferences) ? state.userPresentationPreferences : []),
+    versionUpgradeRecords: Array.isArray(state.versionUpgradeRecords) ? state.versionUpgradeRecords : [],
     versionUpdates: Array.isArray(state.versionUpdates) ? state.versionUpdates : [],
-    infrastructureItems: normalizeInfrastructureItemsForReferenceData(Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : [], referenceData),
+    infrastructureItems: normalizeInfrastructureItemsForReferenceData(
+      Array.isArray(state.infrastructureItems) ? state.infrastructureItems as never : seedState.infrastructureItems as never,
+      referenceData,
+    ),
     activityEvents: normalizeActivityEvents('activityEvents' in state ? state.activityEvents : []),
+    roles,
+    userRoleAssignments,
+    notificationRules,
+    notificationRecords: normalizeNotificationRecords('notificationRecords' in state ? state.notificationRecords : []),
+    alertRecords: normalizeAlertRecords('alertRecords' in state ? state.alertRecords : []),
+    reminderExecutions: normalizeReminderExecutions('reminderExecutions' in state ? state.reminderExecutions : []),
     projectSystems,
     projectTenants,
   }
 
   const requirementIdState = repairGlobalRequirementIds(normalizedState)
   const retainedRelationshipState = repairRetainedProjectTenantRelationships(requirementIdState)
-  const normalizedStateWithRetainedRelationships = {
+  const automaticRelationshipState = repairAutomaticProjectRelationships({
     ...requirementIdState,
     systems: retainedRelationshipState.systems,
     projectSystems: retainedRelationshipState.projectSystems,
     projectTenants: retainedRelationshipState.projectTenants,
+  })
+  const reconciledRelationshipState = reconcileProjectAllocationSources({
+    ...requirementIdState,
+    systems: automaticRelationshipState.systems,
+    projectSystems: automaticRelationshipState.projectSystems,
+    projectTenants: automaticRelationshipState.projectTenants,
+  })
+  const normalizedStateWithRetainedRelationships = {
+    ...requirementIdState,
+    systems: reconciledRelationshipState.systems,
+    projectSystems: reconciledRelationshipState.projectSystems,
+    projectTenants: reconciledRelationshipState.projectTenants,
   }
 
   const activeSystemLinks = activeProjectSystemLinks(normalizedStateWithRetainedRelationships.projectSystems)
   const reusedInternalSystems = normalizedStateWithRetainedRelationships.reusedInternalSystems.map((system) =>
-    applyReusedSystemOccupationWindow(system, activeSystemLinks, normalizedStateWithRetainedRelationships.projects, system.updatedAt ?? new Date().toISOString()),
+    applyReusedSystemOccupationWindow(
+      system,
+      activeSystemLinks,
+      normalizedStateWithRetainedRelationships.projects,
+      system.updatedAt ?? DEFAULT_NORMALIZATION_TIMESTAMP,
+      normalizedStateWithRetainedRelationships.systems,
+    ),
   )
-  const systems = systemsWithDerivedTimeGroups(normalizedStateWithRetainedRelationships.systems, normalizedStateWithRetainedRelationships.tenants, timeGroupLookups)
+  const systemsWithOccupationDates = normalizedStateWithRetainedRelationships.systems.map((system) =>
+    applyAllocatedReusedSystemOccupationWindow(system, activeSystemLinks, normalizedStateWithRetainedRelationships.projects),
+  )
+  const systems = systemsWithDerivedTimeGroups(systemsWithOccupationDates, normalizedStateWithRetainedRelationships.tenants, timeGroupLookups, countryLookups, usStateLookups)
 
-  return {
+  return reconcileNotificationsAndAlerts({
     ...normalizedStateWithRetainedRelationships,
     systems,
     reusedInternalSystems,
     idCounters: normalizeIdCounters(state.idCounters, normalizedStateWithRetainedRelationships),
-  }
+  })
 }

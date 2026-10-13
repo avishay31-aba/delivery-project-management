@@ -53,6 +53,11 @@ export function dashboardRecordRoutePath(scope: DashboardViewScope, row: unknown
       )
     case 'activityLog':
       return routeForActivityObject(record.primaryObject)
+    case 'notificationAlerts':
+    case 'notifications':
+      return routeForActivityObject(record.primaryObject)
+    case 'versionUpgradeScheduler':
+      return `/version-upgrades/${text(record.id)}`
     case 'infrastructure':
     case 'cancelledInfrastructure':
       return routePathForBusinessReference('INFRASTRUCTURE_ITEM', text(record.infrastructureId) || text(record.id))

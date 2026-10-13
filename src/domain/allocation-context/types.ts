@@ -1,6 +1,7 @@
 import type {
   Account,
   AllocationStatus,
+  AllocationSource,
   AllocationType,
   Opportunity,
   Project,
@@ -22,9 +23,6 @@ export interface AllocationActionResult {
   requiresTimeGroupOverride?: boolean
   currentSystemTimeGroup?: string
   incomingTenantTimeGroup?: string
-  requiresConfirmation?: boolean
-  affectedTenantIds?: string[]
-  affectedTids?: string[]
 }
 
 export interface AllocationValidationContext {
@@ -42,4 +40,4 @@ export interface AllocationValidationInput {
   systemId: string
 }
 
-export type { AllocationStatus, AllocationType }
+export type { AllocationStatus, AllocationSource, AllocationType }

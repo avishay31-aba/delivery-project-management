@@ -1,14 +1,13 @@
 import type { Project, ProjectSystemLink, ReusedInternalSystem, SystemInventoryRecord, SystemInventoryValidationMessage } from './types'
 import { requiresCloudPlatform } from '@/domain/hosting-context'
 import type { AppDataState } from '@/data/seed.types'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, SYSTEM_PURPOSE_POC } from './metadata'
+import { REUSED_INTERNAL_PURPOSE_NONE, SYSTEM_PURPOSE_POC } from './metadata'
 import {
   deriveReusedSystemOccupationWindow,
-  isReusedInternalOccupied,
+  isOccupationPeriodVisibleForPurpose,
   isValidReusedInternalMachineId,
   normalizeReusedInternalMachineId,
   reusedInternalMachineIdsEqual,
-  reusedInternalStatusForPurpose,
 } from './service'
 
 function textValue(value: unknown): string {
@@ -22,7 +21,7 @@ export function validateReusedInternalMachineId(
   if (!('machineId' in record)) return []
   if ('systemClass' in record) return []
   const machineId = normalizeReusedInternalMachineId(record.machineId)
-  if (!machineId) return []
+  if (!machineId) return [{ field: 'machineId', message: 'MID is required.' }]
   if (!isValidReusedInternalMachineId(machineId)) return [{ field: 'machineId', message: 'MID must contain digits only.' }]
   const duplicateMid = records.some(
     (candidate) =>
@@ -38,7 +37,7 @@ export function validateReusedInternalMachineId(
 
 export function validateSystemInventoryRequiredFields(
   record: SystemInventoryRecord,
-  context?: Pick<AppDataState, 'projects' | 'projectSystems'>,
+  context?: Pick<AppDataState, 'projects' | 'projectSystems'> & Partial<Pick<AppDataState, 'systems'>>,
 ): SystemInventoryValidationMessage[] {
   const messages: SystemInventoryValidationMessage[] = []
 
@@ -52,8 +51,17 @@ export function validateSystemInventoryRequiredFields(
   }
 
   const occupationWindow = 'machineId' in record && 'currentProjectIds' in record && context
-    ? deriveReusedSystemOccupationWindow(record, context.projectSystems, context.projects, new Date().toISOString())
+    ? deriveReusedSystemOccupationWindow(record, context.projectSystems, context.projects, new Date().toISOString(), context.systems ?? [])
     : null
+  if (
+    'purpose' in record &&
+    isOccupationDateRequiredForPurpose(record.purpose) &&
+    occupationWindow &&
+    !occupationWindow.ok &&
+    occupationWindow.message
+  ) {
+    messages.push({ field: 'occupationStartDate', message: occupationWindow.message })
+  }
   const requiresStoredOccupationDates =
     'purpose' in record &&
     isOccupationDateRequiredForPurpose(record.purpose) &&
@@ -79,7 +87,7 @@ export function validateSystemInventoryRequiredFields(
 }
 
 export function isOccupationDateRequiredForPurpose(purpose: string | undefined): boolean {
-  return isReusedInternalOccupied(reusedInternalStatusForPurpose(textValue(purpose)))
+  return isOccupationPeriodVisibleForPurpose(textValue(purpose))
 }
 
 export const ACTIVE_POC_PURPOSE_LOCK_MESSAGE =
@@ -89,13 +97,18 @@ export function openPocProjectsForReusedInternalSystem(
   system: ReusedInternalSystem,
   projects: Project[],
   projectSystems: ProjectSystemLink[],
+  systems: AppDataState['systems'] = [],
 ): Project[] {
   const currentProjectIds = Array.isArray(system.currentProjectIds) ? system.currentProjectIds : []
   const activeProjectIds = new Set(
     projectSystems
       .filter((link) =>
         link.allocationStatus !== 'DEALLOCATED' &&
-        (reusedInternalMachineIdsEqual(link.sourceMachineId, system.machineId) || currentProjectIds.includes(link.projectId)),
+        (
+          reusedInternalMachineIdsEqual(link.sourceMachineId, system.machineId) ||
+          currentProjectIds.includes(link.projectId) ||
+          systems.some((allocatedSystem) => allocatedSystem.id === link.systemId && reusedInternalMachineIdsEqual(allocatedSystem.machineId, system.machineId))
+        ),
       )
       .map((link) => link.projectId),
   )
@@ -107,8 +120,9 @@ export function hasActiveOpenPocPurposeLock(
   system: ReusedInternalSystem,
   projects: Project[],
   projectSystems: ProjectSystemLink[],
+  systems: AppDataState['systems'] = [],
 ): boolean {
-  return system.purpose === SYSTEM_PURPOSE_POC && openPocProjectsForReusedInternalSystem(system, projects, projectSystems).length > 0
+  return system.purpose === SYSTEM_PURPOSE_POC && openPocProjectsForReusedInternalSystem(system, projects, projectSystems, systems).length > 0
 }
 
 export function validateReusedInternalPurposeChange(
@@ -116,9 +130,10 @@ export function validateReusedInternalPurposeChange(
   next: Pick<ReusedInternalSystem, 'purpose'>,
   projects: Project[],
   projectSystems: ProjectSystemLink[],
+  systems: AppDataState['systems'] = [],
 ): SystemInventoryValidationMessage[] {
   if (previous.purpose === next.purpose) return []
-  if (!hasActiveOpenPocPurposeLock(previous, projects, projectSystems)) return []
+  if (!hasActiveOpenPocPurposeLock(previous, projects, projectSystems, systems)) return []
   return [{ field: 'purpose', message: ACTIVE_POC_PURPOSE_LOCK_MESSAGE }]
 }
 
@@ -139,7 +154,7 @@ export function shouldConfirmEarlyNonPocPurposeChange(
   today = new Date(),
 ): boolean {
   if (previous.purpose === next.purpose) return false
-  if (previous.purpose === REUSED_INTERNAL_PURPOSE_AVAILABLE || previous.purpose === SYSTEM_PURPOSE_POC) return false
+  if (previous.purpose === REUSED_INTERNAL_PURPOSE_NONE || previous.purpose === SYSTEM_PURPOSE_POC) return false
   const endDate = textValue(previous.occupationEndDate || next.occupationEndDate)
   const endTimestamp = dateOnlyTimestamp(endDate)
   if (endTimestamp === null) return false

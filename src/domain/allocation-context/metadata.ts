@@ -12,7 +12,7 @@ export function allocationModeLabel(mode: AllocationMode): string {
 }
 
 export function allocationModeLabelForProject(mode: AllocationMode, project: Project): string {
-  if (mode === 'EXISTING_SYSTEM') return 'Allocate Requested System'
+  if (mode === 'EXISTING_SYSTEM') return 'Allocate Requested Existing System'
   if (mode === 'REUSED_INTERNAL' && project.mainType === 'POC') return 'Allocate Available Reused System'
   if (mode === 'PRODUCTION') return 'Allocate Available Production System'
   return allocationModeLabel(mode)

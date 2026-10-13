@@ -11,6 +11,8 @@ import { WarrantyCollectionGrid } from '@/components/warranty/WarrantyCollection
 import {
   FormField,
   HeaderReadonlyValue,
+  EDIT_ACTION_LABEL,
+  EditActionIcon,
   MaintenanceStatusPresentation,
   OperationalStatusIcon,
   OperationalStatusSelect,
@@ -20,6 +22,7 @@ import {
   SaveButtonLabel,
   StatusBadge,
   WarrantyStatusPresentation,
+  dirtyControlClassName,
   formMessageClassName,
   hasCancellationValidationError,
   validationControlClassName,
@@ -72,6 +75,7 @@ import { useUndoHistory } from '@/hooks/useUndoHistory'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { routeMode } from '@/utils/route-mode'
+import { cancelFormNavigationTarget, successfulSaveApplyNavigationTarget } from '@/utils/save-apply-navigation'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import { useAppStore } from '@/store/useAppStore'
 
@@ -169,7 +173,8 @@ export function InfrastructureFormPage() {
   const requestedSection = new URLSearchParams(location.search).get('section')
   const maintenanceSectionRef = useRef<HTMLElement | null>(null)
   const isViewMode = !isNew && routeMode(location) !== 'edit'
-  const returnTo = routeState?.returnTo ?? '/infrastructure'
+  const routeReturnTo = routeState?.returnTo ?? ''
+  const returnTo = routeReturnTo || '/infrastructure'
 
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const referenceData = useAppStore((state) => state.referenceData)
@@ -224,6 +229,7 @@ export function InfrastructureFormPage() {
   const linkedSystems = draft.linkedSystemIds
     .map((systemId) => allSystems.find((system) => system.id === systemId))
     .filter((system): system is NonNullable<typeof system> => Boolean(system))
+  const baselineItem = savedItem ?? initialDraft
   const isDirty = isNew || !savedItem || !valuesEqual(savedItem, draft)
   const formActivityEvents = savedItem ? activityEventsForObject(activityEvents, 'INFRASTRUCTURE_ITEM', savedItem.infrastructureId) : []
 
@@ -287,12 +293,12 @@ export function InfrastructureFormPage() {
     }
 
     const result = updateInfrastructureItem(savedItem.id, { ...savedItem, ...patch })
-    if (!result.ok) {
+    if (!result.ok || !result.record) {
       setMessages([result.message])
       return
     }
 
-    const nextDraft = { ...draft, ...patch }
+    const nextDraft = cloneInfrastructureItem(result.record)
     setDraft(nextDraft)
     if (hasAttemptedSave) setMessages(validateInfrastructureItemDraft(nextDraft, infrastructureItems, referenceData))
   }
@@ -384,7 +390,14 @@ export function InfrastructureFormPage() {
     resetDraft(cloneInfrastructureItem(result.record))
     setMessages([result.message])
     const routePath = infrastructureItemReference(result.record).routePath
-    if (routePath) navigate(routePath, { replace: true, state: { mode: 'view', returnTo } })
+    const navigationTarget = successfulSaveApplyNavigationTarget({
+      isCreateMode: isNew,
+      stayOnPage: false,
+      persistedRoute: routePath ?? `/infrastructure/${result.record.infrastructureId}`,
+      returnTo: routeReturnTo,
+      fallbackExitRoute: '/infrastructure',
+    })
+    if (navigationTarget) navigate(navigationTarget, { replace: isNew })
   }
 
   function restoreCancelledInfrastructureItem() {
@@ -406,40 +419,52 @@ export function InfrastructureFormPage() {
   }
 
   function cancel() {
-    if (isNew) {
-      navigate(returnTo)
-      return
-    }
+    const persistedRoute = savedItem ? `/infrastructure/${savedItem.infrastructureId}` : null
+    const navigationTarget = cancelFormNavigationTarget({
+      isCreateMode: isNew,
+      persistedRoute,
+      returnTo: routeReturnTo,
+      fallbackExitRoute: '/infrastructure',
+      currentRoute: `${location.pathname}${location.search}`,
+    })
     resetDraft(savedItem ? cloneInfrastructureItem(savedItem) : createInfrastructureDraft())
     setHasAttemptedSave(false)
     setMessages([])
-    navigate(`/infrastructure/${savedItem?.infrastructureId}`, { replace: true, state: { mode: 'view', returnTo } })
+    navigate(navigationTarget, { replace: true })
   }
 
-  function fieldClass(key: string): string {
-    return invalidFields.has(key) ? 'border-red-400 bg-red-50' : 'border-sf-border bg-white'
+  function fieldIsDirty(key: keyof InfrastructureItem): boolean {
+    return !valuesEqual(draft[key], baselineItem[key])
   }
 
-  function renderTextInput(label: string, value: string | null | undefined, onChange: (value: string) => void, required = false, disabled = false) {
+  function propertyIsDirty(key: keyof InfrastructureItemProperties): boolean {
+    return !valuesEqual(draft.properties?.[key], baselineItem.properties?.[key])
+  }
+
+  function fieldClass(key: string, isChanged = false): string {
+    return invalidFields.has(key) ? 'border-red-400 bg-red-50' : ['border-sf-border', dirtyControlClassName(isChanged)].join(' ')
+  }
+
+  function renderTextInput(label: string, value: string | null | undefined, onChange: (value: string) => void, required = false, disabled = false, isChanged = false) {
     return (
       <FormField label={label} required={required} controlWidthClassName={STANDARD_FIELD_WIDTH}>
-        <input className={`h-9 w-full rounded border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted ${fieldClass(label)}`} value={value ?? ''} readOnly={isViewMode} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
+        <input className={`h-9 w-full rounded border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted ${fieldClass(label, isChanged)}`} value={value ?? ''} readOnly={isViewMode} disabled={disabled} onChange={(event) => onChange(event.target.value)} />
       </FormField>
     )
   }
 
-  function renderNumberInput(label: string, value: number | null | undefined, onChange: (value: number | null) => void, min = 0, disabled = false) {
+  function renderNumberInput(label: string, value: number | null | undefined, onChange: (value: number | null) => void, min = 0, disabled = false, isChanged = false) {
     return (
       <FormField label={label} controlWidthClassName={STANDARD_FIELD_WIDTH}>
-        <input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" type="number" min={min} step={1} value={value ?? ''} readOnly={isViewMode} disabled={disabled} onChange={(event) => onChange(asPositiveInteger(event.target.value))} />
+        <input className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted', dirtyControlClassName(isChanged)].join(' ')} type="number" min={min} step={1} value={value ?? ''} readOnly={isViewMode} disabled={disabled} onChange={(event) => onChange(asPositiveInteger(event.target.value))} />
       </FormField>
     )
   }
 
-  function renderDateInput(label: string, value: string | null | undefined, onChange: (value: string | null) => void, readOnly = isViewMode, disabled = false) {
+  function renderDateInput(label: string, value: string | null | undefined, onChange: (value: string | null) => void, readOnly = isViewMode, disabled = false, isChanged = false) {
     return (
       <FormField label={label} controlWidthClassName={STANDARD_FIELD_WIDTH}>
-        <input className="h-9 w-full rounded border border-sf-border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" type="date" value={value ?? ''} readOnly={readOnly} disabled={disabled} onChange={(event) => onChange(event.target.value || null)} />
+        <input className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted', dirtyControlClassName(isChanged)].join(' ')} type="date" value={value ?? ''} readOnly={readOnly} disabled={disabled} onChange={(event) => onChange(event.target.value || null)} />
       </FormField>
     )
   }
@@ -462,11 +487,12 @@ export function InfrastructureFormPage() {
     parentId?: string,
     required = false,
     disabled = false,
+    isChanged = false,
   ) {
     return (
       <FormField label={label} required={required} controlWidthClassName={WIDE_FIELD_WIDTH}>
         <select
-          className={`h-9 w-full rounded border px-2 py-1 pr-8 text-sm ${fieldClass(label)}`}
+          className={`h-9 w-full rounded border px-2 py-1 pr-8 text-sm ${fieldClass(label, isChanged)}`}
           value={value}
           disabled={isViewMode || disabled}
           onChange={(event) =>
@@ -483,10 +509,10 @@ export function InfrastructureFormPage() {
     )
   }
 
-  function renderYesNo(label: string, value: YesNo | '', onChange: (value: YesNo) => void) {
+  function renderYesNo(label: string, value: YesNo | '', onChange: (value: YesNo) => void, isChanged = false) {
     return (
       <FormField label={label} controlWidthClassName={STANDARD_FIELD_WIDTH}>
-        <div className="flex h-9 items-center gap-4 text-sm">
+        <div className={['flex h-9 items-center gap-4 rounded border border-sf-border px-2 text-sm', dirtyControlClassName(isChanged)].join(' ')}>
           {(['YES', 'NO'] as YesNo[]).map((option) => (
             <label key={option} className="inline-flex items-center gap-1">
               <input type="radio" checked={value === option} disabled={isViewMode} onChange={() => onChange(option)} />
@@ -506,7 +532,7 @@ export function InfrastructureFormPage() {
     return (
       <FormField label={label} controlWidthClassName={width}>
         <select
-          className="h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted"
+          className={['h-9 w-full rounded border border-sf-border px-2 py-1 pr-8 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted', dirtyControlClassName(propertyIsDirty(key))].join(' ')}
           value={text(draft.properties?.[key])}
           disabled={isViewMode || disabled}
           onChange={(event) => handleAddNewSelect(event.target.value, label, INFRASTRUCTURE_PROPERTY_VALUE_REFERENCE_TYPE, scope, (value) => updateProperties({ [key]: value }))}
@@ -528,9 +554,9 @@ export function InfrastructureFormPage() {
       <section className="sf-card space-y-3 p-3">
         <h2 className="text-lg font-semibold text-sf-text">Header</h2>
         <div className="flex flex-wrap items-start gap-3">
-          {renderSelect('Category', draft.categoryRefId, categoryOptions, changeCategory, 'Infrastructure Category', INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE, undefined, true)}
-          {renderSelect('Item Type', draft.typeRefId, typeOptions, changeType, 'Infrastructure Type', INFRASTRUCTURE_TYPE_REFERENCE_TYPE, draft.categoryRefId, true, !draft.categoryRefId)}
-          {renderTextInput('Identifier', draft.identifier, (value) => updateDraft({ identifier: value }), true)}
+          {renderSelect('Category', draft.categoryRefId, categoryOptions, changeCategory, 'Infrastructure Category', INFRASTRUCTURE_CATEGORY_REFERENCE_TYPE, undefined, true, false, fieldIsDirty('categoryRefId'))}
+          {renderSelect('Item Type', draft.typeRefId, typeOptions, changeType, 'Infrastructure Type', INFRASTRUCTURE_TYPE_REFERENCE_TYPE, draft.categoryRefId, true, !draft.categoryRefId, fieldIsDirty('typeRefId'))}
+          {renderTextInput('Identifier', draft.identifier, (value) => updateDraft({ identifier: value }), true, false, fieldIsDirty('identifier'))}
           <FormField label="Warranty Status" controlWidthClassName={WIDE_FIELD_WIDTH}>
             <div className="flex h-9 items-center gap-2 px-2 text-sm">
               <WarrantyStatusPresentation status={dashboardPreview?.warrantyStatus ?? infrastructureWarrantyStatusFromCollection(draft)} />
@@ -556,8 +582,8 @@ export function InfrastructureFormPage() {
           {renderSelect('Item Owner', draft.ownerRefId ?? '', ownerPicklistOptions, (value) => {
             const owner = ownerPicklistOptions.find((record) => record.id === value)
             updateDraft({ ownerRefId: value, owner: (owner?.label ?? '') as InfrastructureItem['owner'] })
-          }, 'Infrastructure Item Owner', INFRASTRUCTURE_OWNER_REFERENCE_TYPE, undefined, true)}
-          {renderSelect('Billing Method', draft.billingMethodRefId, billingMethodOptions, (value) => updateDraft({ billingMethodRefId: value }), 'Infrastructure Billing Method', INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE)}
+          }, 'Infrastructure Item Owner', INFRASTRUCTURE_OWNER_REFERENCE_TYPE, undefined, true, false, fieldIsDirty('ownerRefId'))}
+          {renderSelect('Billing Method', draft.billingMethodRefId, billingMethodOptions, (value) => updateDraft({ billingMethodRefId: value }), 'Infrastructure Billing Method', INFRASTRUCTURE_BILLING_METHOD_REFERENCE_TYPE, undefined, false, false, fieldIsDirty('billingMethodRefId'))}
           <FormField label="Last Maintenance Date" controlWidthClassName={STANDARD_FIELD_WIDTH}>
             <div className="flex h-9 items-center px-2 text-sm text-sf-text"><DateTimeValue value={infrastructureLastMaintenanceDate(draft)} semanticType="date" /></div>
           </FormField>
@@ -579,7 +605,7 @@ export function InfrastructureFormPage() {
           ) : (
             <FormField label="Cancel Infrastructure Item" controlWidthClassName={WIDE_FIELD_WIDTH}>
               <select
-                className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm', validationControlClassName(draft.cancellationRequested === 'YES' && hasCancellationValidationError(messages))].filter(Boolean).join(' ')}
+                className={['h-9 w-full rounded border border-sf-border px-2 py-1 text-sm', dirtyControlClassName(fieldIsDirty('cancellationRequested')), validationControlClassName(draft.cancellationRequested === 'YES' && hasCancellationValidationError(messages))].filter(Boolean).join(' ')}
                 value={draft.cancellationRequested ?? 'NO'}
                 disabled={isViewMode}
                 onChange={(event) => updateDraft({ cancellationRequested: event.target.value as InfrastructureItem['cancellationRequested'] })}
@@ -642,20 +668,20 @@ export function InfrastructureFormPage() {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-start gap-3">
-          {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, changeServerManufacturer, 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
+          {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, changeServerManufacturer, 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId, false, false, propertyIsDirty('manufacturerRefId'))}
           {propertySelect('Model', 'modelRefId', modelScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
           {propertySelect('Rack Unit', 'hardwareTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverRackUnit, STANDARD_FIELD_WIDTH, !hasManufacturer)}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('Memory Type', 'memoryTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverMemoryType, STANDARD_FIELD_WIDTH, !hasManufacturer)}
           {propertySelect('Memory Size', 'memorySizeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverMemorySize, STANDARD_FIELD_WIDTH, !hasManufacturer)}
-          {renderNumberInput('Memory Quantity', draft.properties?.memoryQuantity, (value) => updateProperties({ memoryQuantity: value }), 0, !hasManufacturer)}
+          {renderNumberInput('Memory Quantity', draft.properties?.memoryQuantity, (value) => updateProperties({ memoryQuantity: value }), 0, !hasManufacturer, propertyIsDirty('memoryQuantity'))}
           {propertySelect('CPU Type', 'cpuTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.serverCpuType, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderNumberInput('CPU Quantity', draft.properties?.cpuQuantity, (value) => updateProperties({ cpuQuantity: value }), 0, !hasManufacturer)}
+          {renderNumberInput('CPU Quantity', draft.properties?.cpuQuantity, (value) => updateProperties({ cpuQuantity: value }), 0, !hasManufacturer, propertyIsDirty('cpuQuantity'))}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('Firmware Version', 'firmwareVersionRefId', firmwareScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
-          {renderDateInput('Firmware Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer)}
+          {renderDateInput('Firmware Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, !hasManufacturer, propertyIsDirty('firmwareLastUpdatedDate'))}
         </div>
         <div className="flex flex-wrap items-start gap-3">
           <FormField label="Linked ESXi" controlWidthClassName={WIDE_FIELD_WIDTH}>
@@ -683,7 +709,7 @@ export function InfrastructureFormPage() {
     return (
       <div className="flex flex-wrap items-start gap-3">
         {propertySelect('Version', 'esxiVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.esxiVersion)}
-        {renderDateInput('Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }))}
+        {renderDateInput('Last Updated', draft.properties?.esxiLastUpdatedDate, (value) => updateProperties({ esxiLastUpdatedDate: value }), isViewMode, false, propertyIsDirty('esxiLastUpdatedDate'))}
         {renderReadonlyValue('Linked Servers', linkedServersDisplayForEsxi(infrastructureItems, referenceData, draft.id))}
       </div>
     )
@@ -695,7 +721,7 @@ export function InfrastructureFormPage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-sf-text">Disks</h3>
-          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" disabled={disabled} onClick={() => updateProperties({ disks: [...disks, { id: `disk-${crypto.randomUUID()}`, diskTypeRefId: '', quantity: null }] })}>+ Add Disk</button> : null}
+          {!isViewMode ? <button type="button" className="sf-section-action-button" disabled={disabled} onClick={() => updateProperties({ disks: [...disks, { id: `disk-${crypto.randomUUID()}`, diskTypeRefId: '', quantity: null }] })}>+ Add Disk</button> : null}
         </div>
         {disks.map((disk, index) => (
           <div key={disk.id} className="flex flex-wrap items-end gap-3 rounded border border-sf-border bg-white p-2">
@@ -725,7 +751,7 @@ export function InfrastructureFormPage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-sf-text">Virtual Machines</h3>
-          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted" disabled={disabled} onClick={() => updateProperties({ vms: [...vms, { id: `vm-${crypto.randomUUID()}`, vmTypeRefId: '', diskTypeRefId: '', diskSizeRefId: '', memoryTypeRefId: '', memorySizeRefId: '', osVersionRefId: '', rdmName: '' }] })}>+ Add VM</button> : null}
+          {!isViewMode ? <button type="button" className="sf-section-action-button" disabled={disabled} onClick={() => updateProperties({ vms: [...vms, { id: `vm-${crypto.randomUUID()}`, vmTypeRefId: '', diskTypeRefId: '', diskSizeRefId: '', memoryTypeRefId: '', memorySizeRefId: '', osVersionRefId: '', rdmName: '' }] })}>+ Add VM</button> : null}
         </div>
         {vms.map((vm, index) => (
           <div key={vm.id} className="flex flex-wrap items-end gap-3 rounded border border-sf-border bg-white p-2">
@@ -762,14 +788,14 @@ export function InfrastructureFormPage() {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-start gap-3">
-          {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
-          {selectedManufacturerLabel === 'FortiGate' ? renderYesNo('FortiManager', draft.properties?.fortiManager ?? '', (value) => updateProperties({ fortiManager: value })) : null}
+          {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId, false, false, propertyIsDirty('manufacturerRefId'))}
+          {selectedManufacturerLabel === 'FortiGate' ? renderYesNo('FortiManager', draft.properties?.fortiManager ?? '', (value) => updateProperties({ fortiManager: value }), propertyIsDirty('fortiManager')) : null}
           {propertySelect('Model', 'modelRefId', modelScope)}
           {propertySelect('Firmware Version', 'firmwareVersionRefId', INFRASTRUCTURE_PROPERTY_SCOPES.firewallFirmwareVersion)}
-          {renderDateInput('Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }))}
+          {renderDateInput('Last Updated', draft.properties?.firmwareLastUpdatedDate, (value) => updateProperties({ firmwareLastUpdatedDate: value }), isViewMode, false, propertyIsDirty('firmwareLastUpdatedDate'))}
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {renderYesNo('Rackmount', draft.properties?.rackmount ?? '', (value) => updateProperties({ rackmount: value }))}
+          {renderYesNo('Rackmount', draft.properties?.rackmount ?? '', (value) => updateProperties({ rackmount: value }), propertyIsDirty('rackmount'))}
         </div>
         {renderTokenGroups()}
       </div>
@@ -785,7 +811,7 @@ export function InfrastructureFormPage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-sf-text">Tokens</h3>
-          {!isViewMode ? <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm" onClick={() => updateProperties({ tokens: [...tokens, { id: `token-${crypto.randomUUID()}`, tokenTypeRefId: '', serialNumber: '', licenseEndDate: null }] })}>+ Add Token</button> : null}
+          {!isViewMode ? <button type="button" className="sf-section-action-button" onClick={() => updateProperties({ tokens: [...tokens, { id: `token-${crypto.randomUUID()}`, tokenTypeRefId: '', serialNumber: '', licenseEndDate: null }] })}>+ Add Token</button> : null}
         </div>
         {tokens.map((token, index) => (
           <div key={token.id} className="flex flex-wrap items-end gap-3 rounded border border-sf-border bg-white p-2">
@@ -813,7 +839,7 @@ export function InfrastructureFormPage() {
         <div className="flex flex-wrap items-start gap-3">
           {propertySelect('Domain Provider', 'domainProviderRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainProvider)}
           {propertySelect('Domain Type', 'domainTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.domainType)}
-          {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }))}
+          {renderTextInput('Domain Name', draft.properties?.domainName, (value) => updateProperties({ domainName: value }), false, false, propertyIsDirty('domainName'))}
           {renderReadonlyValue('Linked SSLs', linkedSslsDisplayForDomain(infrastructureItems, referenceData, draft.id))}
         </div>
       </div>
@@ -854,7 +880,7 @@ export function InfrastructureFormPage() {
     const hasManufacturer = Boolean(draft.properties?.manufacturerRefId)
     return (
       <div className="flex flex-wrap items-start gap-3">
-        {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId)}
+        {renderSelect('Manufacturer', draft.properties?.manufacturerRefId ?? '', manufacturerOptions, (value) => updateProperties({ manufacturerRefId: value, modelRefId: '', modelText: '' }), 'Infrastructure Manufacturer', INFRASTRUCTURE_MANUFACTURER_REFERENCE_TYPE, draft.typeRefId, false, false, propertyIsDirty('manufacturerRefId'))}
         {propertySelect('Model', 'modelRefId', modelScope, WIDE_FIELD_WIDTH, !hasManufacturer)}
       </div>
     )
@@ -864,7 +890,7 @@ export function InfrastructureFormPage() {
     return (
       <div className="flex flex-wrap items-start gap-3">
         {propertySelect('Type', 'vpnTypeRefId', INFRASTRUCTURE_PROPERTY_SCOPES.vpnType, STANDARD_FIELD_WIDTH)}
-        {renderNumberInput('Number of Licenses', draft.properties?.vpnLicenseCount, (value) => updateProperties({ vpnLicenseCount: value }))}
+        {renderNumberInput('Number of Licenses', draft.properties?.vpnLicenseCount, (value) => updateProperties({ vpnLicenseCount: value }), 0, false, propertyIsDirty('vpnLicenseCount'))}
       </div>
     )
   }
@@ -951,7 +977,12 @@ export function InfrastructureFormPage() {
         subtitle="Infrastructure Item"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {isViewMode && !isNew ? <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white" onClick={() => navigate(location.pathname, { replace: true, state: { mode: 'edit', returnTo } })}>Edit</button> : null}
+            {isViewMode && !isNew ? <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded bg-sf-brand text-white" title={EDIT_ACTION_LABEL} aria-label={EDIT_ACTION_LABEL} onClick={() => navigate(location.pathname, { replace: true, state: { mode: 'edit', returnTo } })}><EditActionIcon /></button> : null}
+            {isViewMode && !isNew ? (
+              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={cancel}>
+                Back
+              </button>
+            ) : null}
             {!isViewMode ? (
               <>
                 <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50" disabled={!isDirty || isSaving} onClick={save}>
@@ -986,14 +1017,12 @@ export function InfrastructureFormPage() {
             readOnly={isViewMode}
           />
         </section>
-        <section className="sf-card space-y-3 p-3">
-          <RemarksGrid
-            remarks={(draft.remarks ?? []) as RemarkRecord[]}
-            onChange={(remarks) => commitChildPatch({ remarks })}
-            typeOptions={[...REMARK_TYPE_OPTIONS, 'Add new...']}
-            readOnly={isViewMode}
-          />
-        </section>
+        <RemarksGrid
+          remarks={(draft.remarks ?? []) as RemarkRecord[]}
+          onChange={(remarks) => commitChildPatch({ remarks })}
+          typeOptions={[...REMARK_TYPE_OPTIONS, 'Add new...']}
+          readOnly={isViewMode}
+        />
       </WorkspaceScrollContent>
     </WorkspaceFrame>
   )

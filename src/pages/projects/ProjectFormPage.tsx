@@ -1,8 +1,9 @@
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight, GripVertical, Link2, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import {
   getProjectFormMetadata,
+  projectHeaderFieldAllowsEditing,
   projectHeaderFieldRows,
   projectTabLabel,
   type ProjectFormTab,
@@ -18,7 +19,7 @@ import type {
   Tenant,
 } from '@/data/seed.types'
 import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components/record'
-import { BusinessObjectLink, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, SearchableReferenceLookup, formMessageClassName, hasCancellationValidationError, validationControlClassName } from '@/components/ui'
+import { BusinessObjectLink, EDIT_ACTION_LABEL, EditActionIcon, FormField, MetadataHeaderField, OperationalStatusIcon, PlaceholderCard, ProgressBar, RichTextContent, RichTextEditor, SaveButtonLabel, SearchableReferenceLookup, dirtyControlClassName, formMessageClassName, hasCancellationValidationError, validationControlClassName } from '@/components/ui'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
 import { DocumentsPanel } from '@/components/documents/DocumentsPanel'
 import { DeletionHistoryField } from '@/components/lifecycle'
@@ -48,9 +49,11 @@ import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { isCreateRoute, isRouteViewMode } from '@/utils/route-mode'
+import { cancelFormNavigationTarget, successfulSaveApplyNavigationTarget } from '@/utils/save-apply-navigation'
 import { richTextIsEmpty } from '@/domain/rich-text'
 import {
   allocationModeLabelForProject,
+  allocationHasAutomaticSource,
   allowedAllocationModes,
   availableProductionCandidates,
   availableReusedInternalCandidates,
@@ -81,6 +84,7 @@ import {
   projectRequirementReadonlyCellValue,
   projectRequirementRows,
   projectRequirementTitle,
+  projectSubTypeDisplayValue,
   projectDeletionHistory,
   projectHeaderFieldValue,
   projectAlertLabels,
@@ -91,6 +95,7 @@ import {
   validateProjectSave,
 } from '@/domain/project-lifecycle'
 import { activityEventsForProject } from '@/domain/activity-log'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import {
   applicationConfigurationFieldForRequirementKey,
   compareApplicationConfigurationField,
@@ -114,7 +119,7 @@ import {
   updateTaskInPlan,
 } from '@/domain/milestone-plan'
 
-type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'documents' | 'activity'
+type CollapsibleSectionId = 'projectHeader' | 'requirements' | 'milestones' | 'tasks' | 'systems' | 'tenants' | 'activity'
 type AllocationCandidate = SystemCandidate
 type AllocationCandidateSortKey = SystemCandidateSortKey
 type AllocationCandidateFilters = SystemCandidateFilters
@@ -132,7 +137,6 @@ const DEFAULT_COLLAPSED_SECTIONS: Record<CollapsibleSectionId, boolean> = {
   tasks: false,
   systems: false,
   tenants: false,
-  documents: false,
   activity: false,
 }
 
@@ -150,7 +154,7 @@ function projectParentSaveScope(project: Project): Partial<Project> {
 function inputClassName(isChanged: boolean, extra = ''): string {
   return [
     'rounded border border-sf-border px-2 py-1 leading-tight',
-    isChanged ? 'bg-yellow-100' : 'bg-white',
+    dirtyControlClassName(isChanged),
     extra,
   ].join(' ')
 }
@@ -292,9 +296,9 @@ export function ProjectFormPage() {
   const { pid } = useParams<{ pid: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const isViewMode = isRouteViewMode(location)
   const isNewRoute = isCreateRoute(location, pid)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
+  const isViewMode = !isNewRoute && !isNewRecordSession && isRouteViewMode(location)
   const projects = useAppStore((state) => state.projects)
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
@@ -310,6 +314,7 @@ export function ProjectFormPage() {
   const projectTenants = useAppStore((state) => state.projectTenants)
   const idCounters = useAppStore((state) => state.idCounters)
   const updateProject = useAppStore((state) => state.updateProject)
+  const updateProjectDocuments = useAppStore((state) => state.updateProjectDocuments)
   const createProjectFromDraft = useAppStore((state) => state.createProjectFromDraft)
   const restoreProject = useAppStore((state) => state.restoreProject)
   const allocateProductionSystemToProject = useAppStore((state) => state.allocateProductionSystemToProject)
@@ -340,6 +345,7 @@ export function ProjectFormPage() {
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessages, setSaveMessages] = useState<string[]>([])
+  const [pendingCreateApplyPid, setPendingCreateApplyPid] = useState<string | null>(null)
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [isAddMilestoneDialogOpen, setIsAddMilestoneDialogOpen] = useState(false)
   const [newMilestoneName, setNewMilestoneName] = useState('')
@@ -356,6 +362,7 @@ export function ProjectFormPage() {
   const [allocationMode, setAllocationMode] = useState<AllocationMode>('PRODUCTION')
   const [selectedAllocationIds, setSelectedAllocationIds] = useState<string[]>([])
   const [pendingAllocationIds, setPendingAllocationIds] = useState<string[]>([])
+  const [isAllocationCommitting, setIsAllocationCommitting] = useState(false)
   const [allocationCandidateSearch, setAllocationCandidateSearch] = useState('')
   const [allocationCandidateFilters, setAllocationCandidateFilters] = useState<AllocationCandidateFilters>(EMPTY_ALLOCATION_CANDIDATE_FILTERS)
   const [allocationCandidateSortKey, setAllocationCandidateSortKey] = useState<AllocationCandidateSortKey>('id')
@@ -367,6 +374,7 @@ export function ProjectFormPage() {
   const [expandedLinkedSystemIds, setExpandedLinkedSystemIds] = useState<string[]>([])
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
+  const bypassUnsavedPromptRef = useRef(false)
 
   useReactiveDraftSync({
     source: savedProject ? cloneProjectDraft(savedProject) : newProjectDraft,
@@ -404,12 +412,25 @@ export function ProjectFormPage() {
   const linkedSystems = useMemo(() => {
     return linkedSystemsForProject(currentDraft, systems, activeSystemLinks, linkedOpportunity, tenants, projectSystems)
   }, [activeSystemLinks, currentDraft, linkedOpportunity, projectSystems, systems, tenants])
+  const activeSystemLinkBySystemId = useMemo(() => activeSystemLinkMapBySystemId(activeSystemLinks), [activeSystemLinks])
   const activeLinkedSystems = useMemo(() => {
     return linkedSystems.filter((system) => {
       const status = String(system.operationalStatus ?? '').toLocaleLowerCase()
       return !status.includes('deleted') && !status.includes('cancel')
     })
   }, [linkedSystems])
+  const manualAllocatedSystems = useMemo(() => {
+    return activeLinkedSystems.filter((system) => {
+      const link = activeSystemLinkBySystemId.get(system.id)
+      return !link || !allocationHasAutomaticSource(link)
+    })
+  }, [activeLinkedSystems, activeSystemLinkBySystemId])
+  const autoAllocatedSystems = useMemo(() => {
+    return activeLinkedSystems.filter((system) => {
+      const link = activeSystemLinkBySystemId.get(system.id)
+      return Boolean(link && allocationHasAutomaticSource(link))
+    })
+  }, [activeLinkedSystems, activeSystemLinkBySystemId])
   const linkedTenants = useMemo(() => {
     return linkedTenantsForProject(currentDraft, projectTenants, tenants, linkedOpportunity, projectSystems)
   }, [currentDraft, linkedOpportunity, projectSystems, projectTenants, tenants])
@@ -417,8 +438,26 @@ export function ProjectFormPage() {
     if (!currentDraft) return []
     return activityEventsForProject(activityEvents, currentDraft.pid || currentDraft.id)
   }, [activityEvents, currentDraft])
-  const isDirty = Boolean(currentDraft && (isNewRoute || (savedProject && (!valuesEqual(projectParentSaveScope(savedProject), projectParentSaveScope(currentDraft)) || pendingAllocationIds.length > 0))))
-  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
+  const persistedCreatedProject = useMemo(
+    () => isNewRoute && currentDraft?.pid ? projects.find((project) => project.pid === currentDraft.pid) : undefined,
+    [currentDraft?.pid, isNewRoute, projects],
+  )
+  const isPersistedCreateDraft = Boolean(
+    isNewRoute &&
+    currentDraft &&
+    persistedCreatedProject &&
+    valuesEqual(projectParentSaveScope(persistedCreatedProject), projectParentSaveScope(currentDraft)) &&
+    pendingAllocationIds.length === 0,
+  )
+  const isDirty = Boolean(
+    currentDraft &&
+    (
+      isNewRoute
+        ? !isPersistedCreateDraft
+        : savedProject && (!valuesEqual(projectParentSaveScope(savedProject), projectParentSaveScope(currentDraft)) || pendingAllocationIds.length > 0)
+    ),
+  )
+  const navigationBlocker = useBlocker(() => isDirty && !isViewMode && !bypassUnsavedPrompt && !bypassUnsavedPromptRef.current)
   useBeforeUnloadWarning(isDirty && !isViewMode)
   const missingFields = new Set<string>()
 
@@ -432,13 +471,26 @@ export function ProjectFormPage() {
   }
 
   useEffect(() => {
+    bypassUnsavedPromptRef.current = false
+    setBypassUnsavedPrompt(false)
+    setPendingCreateApplyPid(null)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!isNewRoute || !isPersistedCreateDraft || !persistedCreatedProject || pendingCreateApplyPid !== persistedCreatedProject.pid) return
+    bypassNextProjectNavigation()
+    navigate(`/projects/${persistedCreatedProject.pid}`, { replace: true, state: { mode: 'edit' } })
+  }, [isNewRoute, isPersistedCreateDraft, navigate, pendingCreateApplyPid, persistedCreatedProject])
+
+  useEffect(() => {
     setDraft((current) => {
       if (!current) return current
       const resolution = resolveProjectMilestoneTemplate(current, linkedOpportunity)
       if (current.milestoneTemplateId === resolution.templateId && projectMilestonePlanMatchesTemplate(current, resolution.templateId)) {
         return current
       }
-      const templateData = buildProjectMilestonesAndTasks(resolution.templateId)
+      const templateStatus = current.progressStatus === 'DONE' ? 'DONE' : 'OPEN'
+      const templateData = buildProjectMilestonesAndTasks(resolution.templateId, templateStatus)
       return {
         ...current,
         milestoneTemplateId: resolution.templateId,
@@ -458,7 +510,7 @@ export function ProjectFormPage() {
     return (
       <PlaceholderCard
         title="Project not found"
-        description={`No project with PID "${pid}" in mock store.`}
+        description={`No project with PID "${pid}" exists in the current ERP data.`}
       />
     )
   }
@@ -469,12 +521,11 @@ export function ProjectFormPage() {
   const visibleTabs = formMetadata.tabs
   const permittedAllocationModes = allowedAllocationModes(projectDraft)
   const selectedMode = permittedAllocationModes.includes(allocationMode) ? allocationMode : permittedAllocationModes[0]
-  const activeSystemLinkBySystemId = activeSystemLinkMapBySystemId(activeSystemLinks)
   const availableAllocationCandidates: AllocationCandidate[] =
     selectedMode === 'PRODUCTION'
       ? availableProductionCandidates(productionSystemInventory)
       : selectedMode === 'REUSED_INTERNAL'
-        ? availableReusedInternalCandidates(reusedInternalSystems)
+        ? availableReusedInternalCandidates(reusedInternalSystems, projectSystems, projects, systems)
         : requestedSystemCandidatesForProject(projectDraft, linkedOpportunity, systems, projectSystems)
 
   function toggleSection(sectionId: CollapsibleSectionId) {
@@ -515,12 +566,13 @@ export function ProjectFormPage() {
   }
 
   function confirmAllocation() {
-    if (isViewMode) return
+    if (isViewMode || isAllocationCommitting) return
     if (selectedAllocationIds.length === 0) {
       setAllocationResult({ ok: false, message: 'Select at least one system before allocating.' })
       return
     }
 
+    setIsAllocationCommitting(true)
     const results = selectedAllocationIds.map((candidateId) =>
       selectedMode === 'PRODUCTION'
         ? allocateProductionSystemToProject(projectDraft.id, candidateId)
@@ -555,6 +607,7 @@ export function ProjectFormPage() {
       setIsAllocationDialogOpen(false)
       setSelectedAllocationIds([])
     }
+    setIsAllocationCommitting(false)
   }
 
   function toggleAllocationCandidate(candidateId: string, selected: boolean) {
@@ -573,18 +626,6 @@ export function ProjectFormPage() {
   function deallocateSystem(link: ProjectSystemLink) {
     if (isViewMode) return
     const result = deallocateProjectSystem(link.id)
-    if (result.requiresConfirmation) {
-      const tids = result.affectedTids?.length ? `\n\n${result.affectedTids.join(', ')}` : ''
-      const confirmed = window.confirm(`The following tenant Project attachment(s) will be cancelled and released; Requirement IDs become available where cancellation releases them. Continue?${tids}`)
-      if (!confirmed) {
-        setAllocationResult({ ok: false, message: 'System deallocation cancelled.' })
-        return
-      }
-      const confirmedResult = deallocateProjectSystem(link.id, { confirmedTenantCancellation: true })
-      setPendingAllocationIds((current) => current.filter((allocationId) => allocationId !== link.id))
-      setAllocationResult(confirmedResult)
-      return
-    }
     setPendingAllocationIds((current) => current.filter((allocationId) => allocationId !== link.id))
     setAllocationResult(result)
   }
@@ -619,9 +660,14 @@ export function ProjectFormPage() {
     window.setTimeout(() => setIsSaving(false), 500)
   }
 
+  function bypassNextProjectNavigation() {
+    bypassUnsavedPromptRef.current = true
+    setBypassUnsavedPrompt(true)
+  }
+
   function saveProject(stayOnPage: boolean, onSaved?: () => void) {
     if (isViewMode) return
-    const messages = validateProjectSave(projectDraft, { linkedOpportunity, account, salesManager })
+    const messages = validateProjectSave(projectDraft, { linkedOpportunity, account, salesManager, projectSystems, systems })
     const cancellationRequested = projectDraft.cancellationRequested === 'YES'
     if (cancellationRequested) {
       const activeLinks = activeSystemLinksForProject(projectDraft.id, projectSystems)
@@ -653,32 +699,54 @@ export function ProjectFormPage() {
       setSaveMessages(['No changes to save.'])
       setSaveMenuOpen(false)
       onSaved?.()
-      if (!stayOnPage && returnTo) {
-        setBypassUnsavedPrompt(true)
-        window.setTimeout(() => navigate(returnTo), 0)
-      }
+      const navigationTarget = successfulSaveApplyNavigationTarget({
+        isCreateMode: false,
+        stayOnPage,
+        persistedRoute: `/projects/${projectDraft.pid}`,
+        returnTo,
+        fallbackExitRoute: '/projects',
+      })
+    if (navigationTarget) {
+      bypassNextProjectNavigation()
+      navigate(navigationTarget)
+    }
       return
     }
 
     startSaveIndicator()
-    const committedProject = isNewRoute
-      ? createProjectFromDraft({ ...projectDraft, ...savePatch })
-      : updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
+    let committedProject: Project | undefined
+    try {
+      committedProject = isNewRoute
+        ? createProjectFromDraft({ ...projectDraft, ...savePatch })
+        : updateProject(projectDraft.id, savePatch, { preserveNewState: isNewRecordSession })
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? ` ${error.message}` : ''
+      setSaveMessages([`Project could not be saved.${reason}`])
+      setSaveMenuOpen(false)
+      navigationBlocker.reset?.()
+      return
+    }
     if (committedProject) {
       resetDraft(cloneProjectDraft(committedProject))
+      if (isNewRoute && stayOnPage) setPendingCreateApplyPid(committedProject.pid)
     }
     setPendingAllocationIds([])
     setSaveMessages(['Project saved.'])
     setSaveMenuOpen(false)
     onSaved?.()
-    if (isNewRoute && committedProject && stayOnPage) {
-      setBypassUnsavedPrompt(true)
-      window.setTimeout(() => navigate(`/projects/${committedProject.pid}`, { replace: true, state: { mode: 'edit', returnTo } }), 0)
-      return
-    }
-    if (!stayOnPage && returnTo) {
-      setBypassUnsavedPrompt(true)
-      window.setTimeout(() => navigate(returnTo), 0)
+    const navigationTarget = committedProject
+      ? successfulSaveApplyNavigationTarget({
+          isCreateMode: isNewRoute,
+          stayOnPage,
+          persistedRoute: `/projects/${committedProject.pid}`,
+          returnTo,
+          fallbackExitRoute: '/projects',
+        })
+      : null
+    if (navigationTarget) {
+      bypassNextProjectNavigation()
+      const navigationState = isNewRoute && stayOnPage ? { mode: 'edit', returnTo } : undefined
+      navigate(navigationTarget, { replace: isNewRoute, state: navigationState })
     }
   }
 
@@ -693,10 +761,20 @@ export function ProjectFormPage() {
   }
 
   function cancelProject() {
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    const navigationTarget = cancelFormNavigationTarget({
+      isCreateMode: isNewRoute,
+      persistedRoute: `/projects/${persistedProject.pid}`,
+      returnTo,
+      fallbackExitRoute: '/projects',
+      currentRoute: `${location.pathname}${location.search}`,
+    })
     pendingAllocationIds.forEach((allocationId) => deallocateProjectSystem(allocationId))
     resetDraft(cloneProjectDraft(persistedProject))
-    setBypassUnsavedPrompt(true)
-    window.setTimeout(() => navigate('/projects'), 0)
+    bypassNextProjectNavigation()
+    navigate(navigationTarget)
   }
 
   function discardProjectChangesAndProceed() {
@@ -708,9 +786,7 @@ export function ProjectFormPage() {
     const isChanged = fieldChanged(field.key)
     const isMissing = missingFields.has(field.key)
     const value = headerFieldValue(projectDraft, field.key)
-    const isManualProjectWithoutOpportunity = !linkedOpportunity && !projectDraft.opportunityId
-    const isProjectTypeField = field.key === 'mainType' || field.key === 'subType'
-    const isEditable = field.editable || (isManualProjectWithoutOpportunity && !isProjectTypeField)
+    const isEditable = projectHeaderFieldAllowsEditing(field)
     const projectAlerts = field.key === 'projectAlerts' ? projectAlertLabels(projectDraft) : []
     const label = (
       <>
@@ -760,7 +836,9 @@ export function ProjectFormPage() {
               ? <ProjectStatusIcon status={projectDraft.progressStatus} />
               : field.key === 'projectAlerts'
                 ? (projectAlerts.length > 0 ? <ProjectAlertPresentation alerts={projectAlerts} /> : '-')
-                : value || '-'
+                : field.key === 'country'
+                  ? countryDisplayName(value) || '-'
+                  : value || '-'
           }
         />
       )
@@ -835,8 +913,8 @@ export function ProjectFormPage() {
     return (
       <div className="flex flex-wrap items-center gap-2">
         {isViewMode ? (
-          <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={switchToEditMode}>
-            Edit
+          <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded bg-sf-brand text-white hover:bg-blue-700" title={EDIT_ACTION_LABEL} aria-label={EDIT_ACTION_LABEL} onClick={switchToEditMode}>
+            <EditActionIcon />
           </button>
         ) : null}
         {isViewMode ? null : (
@@ -1308,7 +1386,7 @@ export function ProjectFormPage() {
         className="space-y-3 p-3"
       >
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className="rounded border border-sf-brand bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={openAddMilestoneDialog}>
+          <button type="button" className="sf-section-action-button" onClick={openAddMilestoneDialog}>
             + Add Milestone
           </button>
           <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => openTemplateNameDialog('replacement')}>
@@ -1611,7 +1689,7 @@ export function ProjectFormPage() {
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold text-sf-text">Initial tasks</h3>
-                <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={addMilestoneTaskDraft}>
+                <button type="button" className="sf-section-action-button" onClick={addMilestoneTaskDraft}>
                   + Add task
                 </button>
               </div>
@@ -1672,7 +1750,7 @@ export function ProjectFormPage() {
             <button type="button" className="rounded border border-sf-border bg-white px-3 py-1.5 text-sm hover:bg-sf-surface-alt" onClick={() => setIsAddMilestoneDialogOpen(false)}>
               Cancel
             </button>
-            <button type="button" className="rounded bg-sf-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={confirmAddMilestone}>
+            <button type="button" className="sf-section-action-button" onClick={confirmAddMilestone}>
               Add Milestone
             </button>
           </div>
@@ -1718,7 +1796,7 @@ export function ProjectFormPage() {
               </FormField>
             </div>
             <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
-              <button type="button" className="rounded border border-sf-border bg-white px-3 py-1 text-sm hover:bg-sf-surface-alt" onClick={() => addTaskToMilestone(milestone.id)}>
+              <button type="button" className="sf-section-action-button" onClick={() => addTaskToMilestone(milestone.id)}>
                 + Add task
               </button>
             </div>
@@ -1832,45 +1910,27 @@ export function ProjectFormPage() {
   }
 
   function renderDocumentsTab() {
-    const sectionId: CollapsibleSectionId = 'documents'
     return (
-      <CollapsibleSection
-        title="Documents"
-        subtitle="Shared document workspace for this Project."
-        collapsed={collapsedSections[sectionId]}
-        onToggle={() => toggleSection(sectionId)}
-        className="space-y-3 p-3"
-      >
-        <DocumentsPanel
-          documents={projectDraft.documents ?? []}
-          emptyText="No documents uploaded for this project."
-          readOnly={isViewMode}
-          onChange={(documents) => {
-            if (isViewMode) return
-            updateProject(persistedProject.id, { documents })
-            setDraft((current) => (current ? { ...current, documents } : current))
-            setSaveMessages([])
-          }}
-        />
-      </CollapsibleSection>
+      <DocumentsPanel
+        documents={projectDraft.documents ?? []}
+        emptyText="No documents uploaded for this project."
+        readOnly={isViewMode}
+        onChange={(documents) => {
+          if (isViewMode || !persistedProject) return
+          const committedProject = updateProjectDocuments(persistedProject.id, documents)
+          setDraft((current) => (current && committedProject ? cloneProjectDraft(committedProject) : current))
+          setSaveMessages([])
+        }}
+      />
     )
   }
 
   function renderActivityTab() {
-    const sectionId: CollapsibleSectionId = 'activity'
     return (
-      <CollapsibleSection
-        title="Activity Log"
-        subtitle="Read-only Project activity records from Activity Log."
-        collapsed={collapsedSections[sectionId]}
-        onToggle={() => toggleSection(sectionId)}
-        className="space-y-3 p-3"
-      >
-        <ActivityTimeline
-          events={projectActivityEvents}
-          emptyText="No activity events are linked to this Project yet."
-        />
-      </CollapsibleSection>
+      <ActivityTimeline
+        events={projectActivityEvents}
+        emptyText="No activity events are linked to this Project yet."
+      />
     )
   }
 
@@ -1904,6 +1964,7 @@ export function ProjectFormPage() {
         onSortDirectionChange={setAllocationCandidateSortDirection}
         onClose={() => setIsAllocationDialogOpen(false)}
         onConfirm={confirmAllocation}
+        confirmDisabled={isAllocationCommitting || selectedAllocationIds.length === 0}
         emptyText={selectedMode === 'EXISTING_SYSTEM' ? 'No new tenant system requirements.' : 'No available systems for this allocation mode.'}
         isReusedInternalMode={isReusedInternalAllocationMode}
         getCandidateVersion={(candidate) => systemCurrentVersionLabel(versionUpdates, referenceData, candidate.id, 'currentVersionUpdateId' in candidate ? candidate.currentVersionUpdateId : null)}
@@ -1980,6 +2041,36 @@ export function ProjectFormPage() {
   }
 
   function renderSystemsTenantsSection() {
+    const renderSystemActions = (system: System, allowManualDeallocation: boolean) => {
+      const link = activeSystemLinkBySystemId.get(system.id)
+      return (
+        <>
+          <EditableChildObjectActionButton
+            title={isViewMode ? undefined : EDIT_ACTION_LABEL}
+            ariaLabel={isViewMode ? undefined : EDIT_ACTION_LABEL}
+            onClick={() => {
+              const routePath = systemReference(system).routePath
+              if (routePath) navigate(routePath, { state: { mode: isViewMode ? 'view' : 'edit' } })
+            }}
+          >
+            {isViewMode ? 'View' : <EditActionIcon />}
+          </EditableChildObjectActionButton>
+          {link && !isViewMode && allowManualDeallocation ? (
+            <span className="ml-1 inline-flex">
+              <EditableChildObjectActionButton
+                variant="danger"
+                disabled={system.operationalStatus === 'Deleted'}
+                onClick={() => deallocateSystem(link)}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Deallocate
+              </EditableChildObjectActionButton>
+            </span>
+          ) : null}
+        </>
+      )
+    }
+
     return (
       <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2001,50 +2092,54 @@ export function ProjectFormPage() {
         {allocationResult && !isAllocationDialogOpen ? <div className={allocationStatusClassName(allocationResult)}>{allocationResult.message}</div> : null}
 
         <CollapsibleSection
-          title="Systems"
+          title="Allocated Systems"
           subtitle="Project-to-System allocation context. Allocation rules remain owned by AllocationContext and SystemInventory."
           collapsed={collapsedSections.systems}
           onToggle={() => toggleSection('systems')}
-          className="space-y-2"
+          className="space-y-3"
         >
-          <SystemDeliveryTable
-            systems={activeLinkedSystems}
-            tenants={tenants}
-            projects={projects}
-            fallbackProjectId={projectDraft.id}
-            emptyText="No systems are linked to this Project yet."
-            expandedSystemIds={expandedLinkedSystemIds}
-            onToggleDetails={toggleLinkedSystemDetails}
-            renderOperationalStatus={(status) => <OperationalStatusBadge status={status} />}
-            productMismatch={(system) => systemProductMismatchForProject(system, linkedOpportunity)}
-            actions={(system) => {
-              const link = activeSystemLinkBySystemId.get(system.id)
-              return (
-                <>
-                  <EditableChildObjectActionButton
-                    onClick={() => {
-                      const routePath = systemReference(system).routePath
-                      if (routePath) navigate(routePath, { state: { mode: isViewMode ? 'view' : 'edit' } })
-                    }}
-                  >
-                    {isViewMode ? 'View' : 'Edit'}
-                  </EditableChildObjectActionButton>
-                  {link && !isViewMode ? (
-                    <span className="ml-1 inline-flex">
-                      <EditableChildObjectActionButton
-                        variant="danger"
-                        onClick={() => deallocateSystem(link)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Deallocate
-                      </EditableChildObjectActionButton>
-                    </span>
-                  ) : null}
-                </>
-              )
-            }}
-          />
+          <div className="space-y-3">
+            <section className="space-y-2" aria-label="Manual Allocated Systems">
+              <h4 className="text-sm font-semibold text-sf-text">
+                Manual Allocated Systems
+                <span className="ml-1 text-xs font-normal text-sf-text-muted">({manualAllocatedSystems.length})</span>
+              </h4>
+              <SystemDeliveryTable
+                systems={manualAllocatedSystems}
+                tenants={tenants}
+                projects={projects}
+                fallbackProjectId={projectDraft.id}
+                emptyText="No manually allocated systems are linked to this Project yet."
+                expandedSystemIds={expandedLinkedSystemIds}
+                onToggleDetails={toggleLinkedSystemDetails}
+                renderOperationalStatus={(status) => <OperationalStatusBadge status={status} />}
+                productMismatch={(system) => systemProductMismatchForProject(system, linkedOpportunity)}
+                actions={(system) => renderSystemActions(system, true)}
+              />
+            </section>
+
+            <section className="space-y-2" aria-label="Auto-Allocated Systems">
+              <h4 className="text-sm font-semibold text-sf-text">
+                Auto-Allocated Systems
+                <span className="ml-1 text-xs font-normal text-sf-text-muted">({autoAllocatedSystems.length})</span>
+              </h4>
+              <SystemDeliveryTable
+                systems={autoAllocatedSystems}
+                tenants={tenants}
+                projects={projects}
+                fallbackProjectId={projectDraft.id}
+                emptyText="No auto-allocated systems are required by this Project yet."
+                expandedSystemIds={expandedLinkedSystemIds}
+                onToggleDetails={toggleLinkedSystemDetails}
+                renderOperationalStatus={(status) => <OperationalStatusBadge status={status} />}
+                productMismatch={(system) => systemProductMismatchForProject(system, linkedOpportunity)}
+                actions={(system) => renderSystemActions(system, false)}
+              />
+            </section>
+          </div>
         </CollapsibleSection>
+
+        <div className="border-t border-sf-border/70" aria-hidden="true" />
 
         <CollapsibleSection
           title="Tenants"
@@ -2081,68 +2176,68 @@ export function ProjectFormPage() {
             <span>{`Project ${projectDraft.pid}`}</span>
           </span>
         }
-        subtitle={`${projectDraft.mainType} / ${projectDraft.subType} - ${formMetadata.sourceSheet}`}
+        subtitle={`${projectDraft.mainType} / ${projectSubTypeDisplayValue(projectDraft.subType) || '-'} - ${formMetadata.sourceSheet}`}
         actions={renderActionButtons()}
       />
 
-      <WorkspaceScrollContent viewMode={isViewMode}>
-      {saveMessages.length > 0 ? (
-        <div className={`mb-3 ${formMessageClassName(saveMessages)}`}>
-          {saveMessages.map((message) => (
-            <div key={message}>{message}</div>
-          ))}
-        </div>
-      ) : null}
+      <WorkspaceScrollContent className="space-y-4" viewMode={isViewMode}>
+        {saveMessages.length > 0 ? (
+          <div className={formMessageClassName(saveMessages)}>
+            {saveMessages.map((message) => (
+              <div key={message}>{message}</div>
+            ))}
+          </div>
+        ) : null}
 
-      <CollapsibleSection
-        title="Delivery Profile"
-        subtitle="Project-owned delivery profile with read-only Customer and Opportunity context."
-        collapsed={collapsedSections.projectHeader}
-        onToggle={() => toggleSection('projectHeader')}
-      >
-        <div className="space-y-3">
-          {projectHeaderFieldRows(formMetadata.headerFields).map((row, index) => (
-            <div key={index} className="flex flex-wrap items-start gap-3">
-              {row.map(renderHeaderField)}
-              {row.some((field) => field.key === 'projectComments') ? renderDeletionHistoryHeaderField() : null}
-            </div>
-          ))}
-          {renderCancellationHeaderFields()}
-        </div>
-      </CollapsibleSection>
+        <CollapsibleSection
+          title="Delivery Profile"
+          subtitle="Project-owned delivery profile with read-only Customer and Opportunity context."
+          collapsed={collapsedSections.projectHeader}
+          onToggle={() => toggleSection('projectHeader')}
+        >
+          <div className="space-y-3">
+            {projectHeaderFieldRows(formMetadata.headerFields).map((row, index) => (
+              <div key={index} className="flex flex-wrap items-start gap-3">
+                {row.map(renderHeaderField)}
+                {row.some((field) => field.key === 'projectComments') ? renderDeletionHistoryHeaderField() : null}
+              </div>
+            ))}
+            {renderCancellationHeaderFields()}
+          </div>
+        </CollapsibleSection>
 
-      <div className="mt-4 space-y-4">{renderRequirementsSection()}</div>
+        {renderRequirementsSection()}
 
-      <div className="mt-4 rounded border border-sf-border bg-sf-surface">
-        <div className="sticky top-0 z-10 flex flex-wrap border-b border-sf-border bg-sf-surface">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={[
-                'sf-view-mode-allow border-b-2 px-4 py-2 text-base font-semibold',
-                activeTab === tab
-                  ? 'border-sf-brand bg-white text-sf-text'
-                  : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
-              ].join(' ')}
-              onClick={() => setActiveTab(tab)}
-            >
-              {projectTabLabel(tab)}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-[360px]" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
-          {activeTab === 'milestones'
-            ? renderMilestonesTab()
-            : activeTab === 'tasks'
-              ? renderTasksTab()
-              : activeTab === 'systemsTenants'
-                ? renderSystemsTenantsSection()
-                : activeTab === 'activity'
-                  ? renderActivityTab()
-                  : renderDocumentsTab()}
-        </div>
-      </div>
+        <section className="overflow-hidden rounded border border-sf-border bg-sf-surface">
+          <div className="sticky top-0 z-10 flex flex-nowrap overflow-x-auto border-b border-sf-border bg-sf-surface-alt">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                className={[
+                  'sf-view-mode-allow shrink-0 border-b-2 px-4 py-2 text-base font-semibold',
+                  activeTab === tab
+                    ? 'border-sf-brand bg-white text-sf-text'
+                    : 'border-transparent text-sf-text-muted hover:bg-white hover:text-sf-text',
+                ].join(' ')}
+                onClick={() => setActiveTab(tab)}
+              >
+                {projectTabLabel(tab)}
+              </button>
+            ))}
+          </div>
+          <div className="min-h-80 p-3" role="tabpanel" aria-label={projectTabLabel(activeTab)}>
+            {activeTab === 'milestones'
+              ? renderMilestonesTab()
+              : activeTab === 'tasks'
+                ? renderTasksTab()
+                : activeTab === 'systemsTenants'
+                  ? renderSystemsTenantsSection()
+                  : activeTab === 'activity'
+                    ? renderActivityTab()
+                    : renderDocumentsTab()}
+          </div>
+        </section>
       </WorkspaceScrollContent>
       {renderAddMilestoneDialog()}
       {renderMilestoneDialog()}

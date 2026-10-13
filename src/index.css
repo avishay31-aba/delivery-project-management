@@ -25,6 +25,10 @@
     @apply rounded-md border border-sf-border bg-sf-surface shadow-sf;
   }
 
+  .sf-section-action-button {
+    @apply inline-flex items-center gap-1 rounded border border-sf-brand/60 bg-white px-3 py-1.5 text-sm font-semibold text-sf-brand shadow-sm hover:border-blue-700 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-sf-brand/30 disabled:cursor-not-allowed disabled:border-sf-border disabled:bg-sf-surface-alt disabled:text-sf-text-muted disabled:shadow-none;
+  }
+
   .sf-scroll-x {
     @apply overflow-x-scroll border-b border-sf-border;
     scrollbar-color: #94a3b8 #e2e8f0;
@@ -118,6 +122,16 @@
     line-height: 1.25rem;
   }
 
+  .sf-full-table-cell {
+    display: block;
+    max-width: none;
+    overflow: visible;
+    -webkit-line-clamp: initial;
+    line-clamp: initial;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .configuration-change-increase {
     @apply font-semibold text-green-700;
   }
@@ -178,7 +192,7 @@
     pointer-events: none;
   }
 
-  .sf-view-mode button:not(.sf-view-mode-allow) {
+  .sf-view-mode button:not(.sf-view-mode-allow):not(.sf-section-action-button) {
     pointer-events: none;
     border-color: transparent;
     background-color: transparent;

@@ -1,3 +1,5 @@
+import { GEOGRAPHIC_COUNTRY_SOURCE, businessRegionForCountry } from '@/domain/geographic-configuration'
+
 export type BusinessRegion = 'NA' | 'EMEA' | 'APAC' | 'LATAM'
 
 export const BUSINESS_REGION_OPTIONS: BusinessRegion[] = ['NA', 'EMEA', 'APAC', 'LATAM']
@@ -7,19 +9,6 @@ const COUNTRY_ALIASES: Record<string, string> = {
   us: 'United States',
   'united states of america': 'United States',
   uk: 'United Kingdom',
-}
-
-const COUNTRY_BUSINESS_REGIONS: Record<string, BusinessRegion> = {
-  Australia: 'APAC',
-  Canada: 'NA',
-  Colombia: 'LATAM',
-  Germany: 'EMEA',
-  Israel: 'EMEA',
-  Japan: 'APAC',
-  Mexico: 'LATAM',
-  Singapore: 'APAC',
-  'United Kingdom': 'EMEA',
-  'United States': 'NA',
 }
 
 function canonicalCountry(country: string | null | undefined): string {
@@ -38,5 +27,5 @@ export function normalizeBusinessRegion(value: string | null | undefined): Busin
 
 export function getBusinessRegionForCountry(country: string | null | undefined, _state?: string | null): BusinessRegion | '' {
   void _state
-  return COUNTRY_BUSINESS_REGIONS[canonicalCountry(country)] ?? ''
+  return businessRegionForCountry(GEOGRAPHIC_COUNTRY_SOURCE, canonicalCountry(country)) as BusinessRegion | ''
 }

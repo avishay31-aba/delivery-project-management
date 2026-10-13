@@ -34,14 +34,6 @@ export async function addDocuments(collection: DocumentCollection, files: File[]
   return nextCollection
 }
 
-export function renameDocument(collection: DocumentCollection, documentId: string, fileName: string): DocumentCollection {
-  const nextName = fileName.trim()
-  if (!nextName) return collection
-  return collection.map((document) =>
-    document.id === documentId ? { ...document, fileName: nextName } : document,
-  )
-}
-
 export function removeDocument(collection: DocumentCollection, documentId: string): DocumentCollection {
   return collection.filter((document) => document.id !== documentId)
 }
@@ -50,7 +42,15 @@ export async function replaceDocument(collection: DocumentCollection, documentId
   const replacement = await createDocumentFromFileAsync(file, collection)
   return collection.map((document) =>
     document.id === documentId
-      ? { ...document, ...replacement, id: document.id, uploadedAt: document.uploadedAt, replacedAt: replacement.uploadedAt }
+      ? {
+          ...document,
+          ...replacement,
+          id: document.id,
+          uploadedAt: document.uploadedAt,
+          uploadedBy: document.uploadedBy,
+          replacedAt: replacement.uploadedAt,
+          replacedBy: CURRENT_USER_DISPLAY_NAME,
+        }
       : document,
   )
 }

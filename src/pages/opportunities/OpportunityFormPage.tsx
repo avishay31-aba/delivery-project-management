@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -40,6 +40,8 @@ import { PageHeader, WorkspaceFrame, WorkspaceScrollContent } from '@/components
 import {
   BusinessIdLink,
   BusinessObjectLink,
+  EDIT_ACTION_LABEL,
+  EditActionIcon,
   FormField,
   MetadataHeaderField,
   PlaceholderCard,
@@ -49,6 +51,7 @@ import {
   StatusBadge,
   WarrantyStatusPresentation,
   calculateFloatingOverlayPosition,
+  dirtyControlClassName,
   formMessageClassName,
   validationControlClassName,
 } from '@/components/ui'
@@ -64,6 +67,7 @@ import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning'
 import { useReactiveDraftSync } from '@/hooks/useReactiveDraftSync'
 import { handleDateInputPaste } from '@/utils/date-input'
 import { isCreateRoute, isRouteViewMode } from '@/utils/route-mode'
+import { cancelFormNavigationTarget, successfulSaveApplyNavigationTarget } from '@/utils/save-apply-navigation'
 import {
   getEligibleCustomerExistingTenants,
   getOpportunityExistingSidSystems,
@@ -102,10 +106,11 @@ import {
   warrantyRecordPatch,
   warrantyRecordsForTenant,
 } from '@/domain/warranty-collection'
-import { tenantRequirementIdDisplay } from '@/domain/tenant-operations'
+import { tenantDerivedWarrantyContractStatus, tenantRequirementIdDisplay } from '@/domain/tenant-operations'
 import { deriveProjectProgress, orderedProjectMilestones, projectMilestoneStatus } from '@/domain/milestone-plan'
 import { accountReference, projectReference, systemReference, tenantReference } from '@/domain/business-reference'
 import { activityEventsForOpportunity } from '@/domain/activity-log'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 import { useDateTimePresentationPreference } from '@/hooks/useDateTimePresentationPreference'
 
 type RequirementGridKind = 'A' | 'B' | 'C'
@@ -153,7 +158,7 @@ function existingSystemOptionLabel(system: System, opportunity: Opportunity): st
 function inputClassName(isChanged: boolean, extra = ''): string {
   return [
     'rounded border border-sf-border px-2 py-1 leading-tight',
-    isChanged ? 'bg-yellow-100' : 'bg-white',
+    dirtyControlClassName(isChanged),
     extra,
   ].join(' ')
 }
@@ -729,7 +734,7 @@ function RequirementGrid({
     if (column.key === 'systemId' && (kind === 'B' || kind === 'C')) {
       const tenantId = (row as ChangeRequestRequirement | StandardRenewalRequirement).tenantId
       return (
-        <span className={isChanged ? 'bg-yellow-100 px-1 text-sm' : 'text-sm text-sf-text-muted'}>
+        <span className={isChanged ? `${dirtyControlClassName(true)} px-1 text-sm` : 'text-sm text-sf-text-muted'}>
           {resolveTenantSid(tenantId, accountTenants, sidSystems)}
         </span>
       )
@@ -756,7 +761,7 @@ function RequirementGrid({
 
     if (!column.editable) {
       return (
-        <span className={isChanged ? 'bg-yellow-100 px-1 text-sm' : 'text-sm text-sf-text-muted'}>
+        <span className={isChanged ? `${dirtyControlClassName(true)} px-1 text-sm` : 'text-sm text-sf-text-muted'}>
           {textValue(rowValue(row, column.key))}
         </span>
       )
@@ -854,7 +859,7 @@ function RequirementGrid({
           ) : null}
           <button
             type="button"
-            className="rounded border border-sf-border bg-white px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="sf-section-action-button"
             disabled={tenantSelectionLimitReached}
             onClick={onAddRow}
           >
@@ -903,6 +908,7 @@ function RequirementGrid({
                     <button
                       type="button"
                       className="h-6 rounded border border-red-200 px-2 text-[11px] text-red-700 hover:bg-red-50"
+                      data-testid={`opportunity-requirement-${kind}-${rowIndex}-delete`}
                       onClick={() => onDeleteRow(row.id)}
                     >
                       Delete
@@ -926,7 +932,11 @@ function RequirementGrid({
                   </div>
                 </td>
                 {columns.map((column) => (
-                  <td key={column.key} className="border border-sf-border px-1.5 py-px align-top text-sm">
+                <td
+                  key={column.key}
+                  className="border border-sf-border px-1.5 py-px align-top text-sm"
+                  data-testid={`opportunity-requirement-${kind}-${rowIndex}-${column.key}`}
+                >
                     {renderCell(row, column, rowIndex)}
                   </td>
                 ))}
@@ -951,9 +961,9 @@ export function OpportunityFormPage() {
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const isViewMode = isRouteViewMode(location)
   const isNewRoute = isCreateRoute(location, opportunityId)
   const isNewRecordSession = (location.state as { newRecordSession?: boolean } | null)?.newRecordSession === true
+  const isViewMode = !isNewRoute && !isNewRecordSession && isRouteViewMode(location)
   const opportunities = useAppStore((state) => state.opportunities)
   const accounts = useAppStore((state) => state.accounts)
   const salesManagers = useAppStore((state) => state.salesManagers)
@@ -1004,6 +1014,7 @@ export function OpportunityFormPage() {
   const [pendingOpportunityTypeChange, setPendingOpportunityTypeChange] = useState<PendingOpportunityTypeChange | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSectionId, boolean>>(DEFAULT_COLLAPSED_SECTIONS)
   const [bypassUnsavedPrompt, setBypassUnsavedPrompt] = useState(false)
+  const bypassUnsavedPromptRef = useRef(false)
 
   useReactiveDraftSync({
     source: savedOpportunity ? cloneOpportunityDraft(savedOpportunity) : newOpportunityDraft,
@@ -1012,6 +1023,11 @@ export function OpportunityFormPage() {
     clone: (value) => (value ? cloneOpportunityDraft(value) : value),
     isEqual: valuesEqual,
   })
+
+  useEffect(() => {
+    bypassUnsavedPromptRef.current = false
+    setBypassUnsavedPrompt(false)
+  }, [location.pathname])
 
   useEffect(() => {
     setProjectChanges([])
@@ -1064,14 +1080,19 @@ export function OpportunityFormPage() {
     [accounts],
   )
   const isDirty = Boolean(draft && (isNewRoute || (savedOpportunity && !valuesEqual(savedOpportunity, draft))))
-  const navigationBlocker = useBlocker(isDirty && !isViewMode && !bypassUnsavedPrompt)
+  const navigationBlocker = useBlocker(() => isDirty && !isViewMode && !bypassUnsavedPrompt && !bypassUnsavedPromptRef.current)
   useBeforeUnloadWarning(isDirty && !isViewMode)
+
+  function bypassNextOpportunityNavigation() {
+    bypassUnsavedPromptRef.current = true
+    setBypassUnsavedPrompt(true)
+  }
 
   if (!draft || !metadata || (!savedOpportunity && !isNewRoute)) {
     return (
       <PlaceholderCard
         title="Opportunity not found"
-        description={`No opportunity with Salesforce ID "${opportunityId}" in mock store.`}
+        description={`No opportunity with Salesforce ID "${opportunityId}" exists in the current ERP data.`}
       />
     )
   }
@@ -1391,10 +1412,20 @@ export function OpportunityFormPage() {
   }
 
   function cancelChanges() {
+    const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
+      ? String(location.state.returnTo ?? '')
+      : ''
+    const navigationTarget = cancelFormNavigationTarget({
+      isCreateMode: isNewRoute,
+      persistedRoute: `/opportunities/${currentSavedOpportunity.opportunityId}`,
+      returnTo,
+      fallbackExitRoute: '/opportunities',
+      currentRoute: `${location.pathname}${location.search}`,
+    })
     resetDraft(cloneOpportunityDraft(currentSavedOpportunity))
     setSaveMessages([])
-    setBypassUnsavedPrompt(true)
-    window.setTimeout(() => navigate('/opportunities'), 0)
+    bypassNextOpportunityNavigation()
+    window.setTimeout(() => navigate(navigationTarget), 0)
   }
 
   function undoLastChange() {
@@ -1410,14 +1441,20 @@ export function OpportunityFormPage() {
   }
 
   function executeSave(options: PendingSave = {}, lifecycleOptions?: { pocAction?: PocProjectSyncAction }) {
-    if (isViewMode) return
+    if (isViewMode || isSaving) return
     setIsSaving(true)
     window.setTimeout(() => setIsSaving(false), 500)
-    const result = saveOpportunityWithProjectSync(currentDraft, savedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
+    let result: ReturnType<typeof saveOpportunityWithProjectSync>
+    try {
+      result = saveOpportunityWithProjectSync(currentDraft, savedOpportunity, lifecycleOptions, { preserveNewState: isNewRecordSession })
+    } catch (error) {
+      const reason = error instanceof Error && error.message ? ` ${error.message}` : ''
+      setSaveMessages([`Opportunity could not be saved.${reason}`])
+      setIsSaving(false)
+      return
+    }
     if (result.messages && result.messages.length > 0) {
       setSaveMessages(result.messages)
-      setPendingPocSave(null)
-      setPendingWonSave(null)
       return
     }
     resetDraft(cloneOpportunityDraft(result.opportunity))
@@ -1429,14 +1466,17 @@ export function OpportunityFormPage() {
     const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
       ? String(location.state.returnTo ?? '')
       : ''
-    if (isNewRoute) {
-      setBypassUnsavedPrompt(true)
-      window.setTimeout(() => navigate(`/opportunities/${result.opportunity.opportunityId}`, { replace: true, state: { mode: 'edit', returnTo } }), 0)
-      return
-    }
-    if (!options.stayOnPage && returnTo) {
-      setBypassUnsavedPrompt(true)
-      window.setTimeout(() => navigate(returnTo), 0)
+    const navigationTarget = successfulSaveApplyNavigationTarget({
+      isCreateMode: isNewRoute,
+      stayOnPage: options.stayOnPage === true,
+      persistedRoute: `/opportunities/${result.opportunity.opportunityId}`,
+      returnTo,
+      fallbackExitRoute: '/opportunities',
+    })
+    if (navigationTarget) {
+      bypassNextOpportunityNavigation()
+      const navigationState = isNewRoute && options.stayOnPage === true ? { mode: 'edit', returnTo } : undefined
+      window.setTimeout(() => navigate(navigationTarget, { replace: isNewRoute, state: navigationState }), 0)
     }
   }
 
@@ -1516,9 +1556,16 @@ export function OpportunityFormPage() {
       const returnTo = typeof location.state === 'object' && location.state && 'returnTo' in location.state
         ? String(location.state.returnTo ?? '')
         : ''
-      if (!options.stayOnPage && returnTo) {
-        setBypassUnsavedPrompt(true)
-        window.setTimeout(() => navigate(returnTo), 0)
+      const navigationTarget = successfulSaveApplyNavigationTarget({
+        isCreateMode: false,
+        stayOnPage: options.stayOnPage === true,
+        persistedRoute: `/opportunities/${currentDraft.opportunityId}`,
+        returnTo,
+        fallbackExitRoute: '/opportunities',
+      })
+      if (navigationTarget) {
+        bypassNextOpportunityNavigation()
+        window.setTimeout(() => navigate(navigationTarget), 0)
       }
       return
     }
@@ -1772,6 +1819,8 @@ export function OpportunityFormPage() {
         readOnlyValue={
           isDate ? (
             <DateTimeValue value={textValue(currentDraft[field.key])} semanticType="date" fallback="-" />
+          ) : field.key === 'country' ? (
+            countryDisplayName(textValue(currentDraft[field.key])) || '-'
           ) : (
             textValue(currentDraft[field.key]) || '-'
           )
@@ -1914,7 +1963,11 @@ export function OpportunityFormPage() {
                     <td className="border border-sf-border px-2 py-1">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                     <td className="border border-sf-border px-2 py-1">{tenantConfigurationSummary(tenant)}</td>
                     <td className="border border-sf-border px-2 py-1">
-                      {tenant.warrantyStatus ? <WarrantyStatusPresentation status={tenant.warrantyStatus} /> : ''}
+                      <WarrantyStatusPresentation
+                        status={tenantDerivedWarrantyContractStatus(tenant).visualStatus}
+                        label={tenantDerivedWarrantyContractStatus(tenant).label}
+                        tooltip={`Tenant warranty status: ${tenantDerivedWarrantyContractStatus(tenant).label}`}
+                      />
                     </td>
                     <td className="border border-sf-border px-2 py-1"><DateTimeValue value={tenant.warrantyEndDate} semanticType="date" /></td>
                   </tr>
@@ -2048,8 +2101,8 @@ export function OpportunityFormPage() {
         </div>
         <div className="flex gap-2">
           {isViewMode ? (
-            <button type="button" className="rounded bg-sf-brand px-3 py-1 text-sm font-semibold text-white hover:bg-blue-700" onClick={switchToEditMode}>
-              Edit
+            <button type="button" className="inline-flex h-8 w-8 items-center justify-center rounded bg-sf-brand text-white hover:bg-blue-700" title={EDIT_ACTION_LABEL} aria-label={EDIT_ACTION_LABEL} onClick={switchToEditMode}>
+              <EditActionIcon />
             </button>
           ) : null}
           {isViewMode ? null : (
@@ -2156,6 +2209,7 @@ export function OpportunityFormPage() {
               <button
                 type="button"
                 className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                disabled={isSaving}
                 onClick={() => executeSave(pendingWonSave)}
               >
                 Mark as WON
@@ -2178,6 +2232,7 @@ export function OpportunityFormPage() {
               <button
                 type="button"
                 className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                disabled={isSaving}
                 onClick={() => executeSave(pendingPocSave, { pocAction: 'DO_NOT_CREATE' })}
               >
                 Do Not Create
@@ -2185,6 +2240,7 @@ export function OpportunityFormPage() {
               <button
                 type="button"
                 className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                disabled={isSaving}
                 onClick={() => executeSave(pendingPocSave, { pocAction: 'CREATE_NEW_POC' })}
               >
                 Create New POC
@@ -2193,6 +2249,7 @@ export function OpportunityFormPage() {
                 <button
                   type="button"
                   className="rounded border border-sf-brand bg-sf-brand px-3 py-1 text-sm text-white hover:opacity-90"
+                  disabled={isSaving}
                   onClick={() => executeSave(pendingPocSave, { pocAction: 'UPDATE_EXISTING_POC' })}
                 >
                   Update Latest POC
@@ -2412,18 +2469,10 @@ export function OpportunityFormPage() {
           </div>
         ) : (
           <div className="space-y-2 p-3" role="tabpanel" aria-label="Activity Log">
-            <CollapsibleSection
-              title="Activity Log"
-              subtitle="Read-only Opportunity activity records from Activity Log."
-              collapsed={collapsedSections.activity}
-              onToggle={() => toggleSection('activity')}
-              className="space-y-2"
-            >
-              <ActivityTimeline
-                events={opportunityActivityEvents}
-                emptyText="No activity events are linked to this Opportunity yet."
-              />
-            </CollapsibleSection>
+            <ActivityTimeline
+              events={opportunityActivityEvents}
+              emptyText="No activity events are linked to this Opportunity yet."
+            />
           </div>
         )}
         </div>

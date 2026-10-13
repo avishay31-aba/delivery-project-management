@@ -4,6 +4,7 @@ import { Edit2, Maximize2, Plus, Save, Trash2, X } from 'lucide-react'
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import {
   EditableChildObjectActionButton,
+  editableChildObjectActionButtonClassName,
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
@@ -421,7 +422,7 @@ export function InfrastructureMaintenanceGrid({ tasks, onChange, referenceData, 
   const actions = permissions.canAdd ? (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      className={editableChildObjectActionButtonClassName()}
       onClick={addTask}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />

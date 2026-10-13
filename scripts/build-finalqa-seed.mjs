@@ -4,8 +4,73 @@ import { fileURLToPath } from 'node:url'
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const seedPath = path.join(rootDir, 'src', 'data', 'seed.json')
+const projectTemplatesPath = path.join(rootDir, 'src', 'config', 'project-milestone-templates.ts')
 const now = '2026-08-20T09:00:00.000Z'
 const user = 'Demo User'
+
+function loadProjectMilestoneTaskTemplates() {
+  const source = fs.readFileSync(projectTemplatesPath, 'utf8')
+  const declarationIndex = source.indexOf('export const PROJECT_MILESTONE_TASK_TEMPLATES')
+  const objectStart = source.indexOf('{', declarationIndex)
+  const objectEnd = source.indexOf('\n} as Record', objectStart)
+  if (declarationIndex < 0 || objectStart < 0 || objectEnd < 0) {
+    throw new Error('Unable to locate PROJECT_MILESTONE_TASK_TEMPLATES in project-milestone-templates.ts')
+  }
+  return Function(`return (${source.slice(objectStart, objectEnd + 2)})`)()
+}
+
+const projectMilestoneTaskTemplates = loadProjectMilestoneTaskTemplates()
+
+function buildProjectMilestonesAndTasks(templateId, status = 'OPEN') {
+  const template = projectMilestoneTaskTemplates[templateId]
+  if (!template) throw new Error(`Missing Project milestone template ${templateId}`)
+  const milestoneMap = new Map()
+  const tasks = []
+
+  template.rows.forEach((row, index) => {
+    const milestoneId = `${templateId}-milestone-${row.milestoneOrder}-${row.milestone.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+    if (!milestoneMap.has(milestoneId)) {
+      milestoneMap.set(milestoneId, {
+        id: milestoneId,
+        name: row.milestone,
+        order: row.milestoneOrder,
+        status,
+        deadline: null,
+        comment: '',
+      })
+    }
+    tasks.push({
+      id: `${templateId}-task-${index + 1}`,
+      milestoneId,
+      name: row.task,
+      department: row.department,
+      resource: row.resource,
+      status,
+      order: index + 1,
+      deadline: null,
+      comment: '',
+    })
+  })
+
+  return {
+    milestones: Array.from(milestoneMap.values()).sort((first, second) => first.order - second.order),
+    tasks,
+  }
+}
+
+function projectPlanWithDeadlines(templateData, startDate, endDate) {
+  const milestoneDeadlines = new Map()
+  const milestones = templateData.milestones.map((milestone, index) => {
+    const deadline = index === templateData.milestones.length - 1 ? endDate : startDate
+    milestoneDeadlines.set(milestone.id, deadline)
+    return { ...milestone, deadline }
+  })
+  const tasks = templateData.tasks.map((task) => ({
+    ...task,
+    deadline: milestoneDeadlines.get(task.milestoneId) ?? endDate ?? startDate ?? null,
+  }))
+  return { milestones, tasks }
+}
 
 const regionPlans = [
   { region: 'NA', countries: [['United States', 'New York', 'UTC-04:00'], ['Canada', 'Ontario', 'UTC-04:00']] },
@@ -63,8 +128,8 @@ function iso(day, hour = 9) {
 }
 
 function date(day) {
-  const d = ((day - 1) % 27) + 1
-  return `2026-08-${String(d).padStart(2, '0')}`
+  const value = new Date(Date.UTC(2026, 7, 1 + day - 1))
+  return value.toISOString().slice(0, 10)
 }
 
 function cfg(index, overrides = {}) {
@@ -102,21 +167,32 @@ function cfg(index, overrides = {}) {
 }
 
 function hosting(region, index) {
-  const cloudRegion = region === 'EMEA'
-    ? 'eu-central-1 (Frankfurt)'
-    : region === 'APAC'
-      ? 'ap-southeast-1 (Singapore)'
-      : region === 'LATAM'
-        ? 'sa-east-1 (Sao Paulo)'
-        : 'us-east-1 (N. Virginia)'
+  const platform = ['AWS', 'Azure', "Customer's datacenter"][index % 3]
+  const cloudRegion = platform === 'Azure'
+    ? (region === 'EMEA'
+        ? 'West Europe'
+        : region === 'APAC'
+          ? 'Southeast Asia'
+          : region === 'LATAM'
+            ? 'Brazil South'
+            : 'East US')
+    : platform === "Customer's datacenter"
+      ? ''
+      : region === 'EMEA'
+        ? 'eu-central-1 (Frankfurt)'
+        : region === 'APAC'
+          ? 'ap-southeast-1 (Singapore)'
+          : region === 'LATAM'
+            ? 'sa-east-1 (Sao Paulo)'
+            : 'us-east-1 (N. Virginia)'
   return {
     logo: '',
     url: `https://qa-${index}.deliveryerp.example.invalid`,
     cognitoRegion: region,
     productType: index % 7 === 0 ? 'Webloc' : 'Tangles',
     hostingType: 'Cloud',
-    cloudPlatform: 'AWS',
-    csp: 'Automate IT',
+    cloudPlatform: platform,
+    csp: platform === 'AWS' ? 'Automate IT' : platform === 'Azure' ? 'SELA' : 'Customer',
     cloudRegion,
     performanceTier: index % 9 === 0 ? 'POWERED' : 'STANDARD',
     vpnEnabled: index % 4 === 0 ? 'YES' : 'NO',
@@ -159,7 +235,11 @@ function renewalReq(requirementId, tenant, systemId, warrantyRow, overrides = {}
 function projectFromOpportunity(opp, mainType, subType, done, templateId = '1') {
   const pid = next('P', 'project')
   const taskStatus = done ? 'DONE' : 'OPEN'
-  const milestoneStatus = done ? 'DONE' : 'OPEN'
+  const templateData = projectPlanWithDeadlines(
+    buildProjectMilestonesAndTasks(templateId, taskStatus),
+    opp.deliveryDate ?? opp.pocStartDate,
+    opp.pocEndDate ?? opp.deliveryDate,
+  )
   return {
     id: pid,
     pid,
@@ -181,14 +261,8 @@ function projectFromOpportunity(opp, mainType, subType, done, templateId = '1') 
     opportunityName: opp.opportunityName,
     canceledAt: null,
     milestoneTemplateId: templateId,
-    milestones: [
-      { id: `${pid}-milestone-1`, name: mainType === 'POC' ? 'POC preparation' : 'Delivery preparation', order: 1, status: milestoneStatus, deadline: opp.deliveryDate ?? opp.pocStartDate, comment: '' },
-      { id: `${pid}-milestone-2`, name: mainType === 'POC' ? 'POC execution' : 'Customer acceptance', order: 2, status: milestoneStatus, deadline: opp.pocEndDate ?? opp.deliveryDate, comment: '' },
-    ],
-    tasks: [
-      { id: `${pid}-task-1`, milestoneId: `${pid}-milestone-1`, name: 'Confirm requirements baseline', department: 'Delivery', resource: 'Delivery Manager', status: taskStatus, order: 1, deadline: opp.deliveryDate ?? opp.pocStartDate, comment: '' },
-      { id: `${pid}-task-2`, milestoneId: `${pid}-milestone-2`, name: 'Complete acceptance', department: 'Delivery', resource: 'Project Owner', status: taskStatus, order: 2, deadline: opp.pocEndDate ?? opp.deliveryDate, comment: '' },
-    ],
+    milestones: templateData.milestones,
+    tasks: templateData.tasks,
     documents: [doc('PROJECT', pid, `${pid}-project-plan.pdf`)],
     createdAt: iso(seq.project + 1),
     updatedAt: iso(seq.project + 2),
@@ -432,6 +506,7 @@ accounts.forEach((account, accountIndex) => {
   const systemCount = accountIndex % 2 === 0 ? 2 : 3
   for (let s = 0; s < systemCount; s += 1) {
     const sid = next('S', 'sid')
+    const systemHosting = hosting(account.region, seq.sid)
     const tenantCount = 1 + ((accountIndex + s) % 4)
     const requirements = []
     const systemTenantRows = []
@@ -501,7 +576,7 @@ accounts.forEach((account, accountIndex) => {
         releasedRequirementId: relationshipStatus === 'RELEASED' ? requirement.requirementId : null,
         requirementHistory,
         configuration,
-        hostingSnapshot: { currentSystem: true, sid, operationalStatus: 'On', machineNumber: '', versionNumber: '2026.2', hostingType: 'Cloud', url: `https://${sid.toLowerCase()}.deliveryerp.example.invalid`, performanceTier: 'STANDARD', vpnEnabled: 'NO', vpnType: '', externalInterface: false, ipRestrictionEnabled: 'NO', platform: 'AWS', csp: 'Automate IT', awsRegion: hosting(account.region, seq.tenant).cloudRegion, azureRegion: '' },
+        hostingSnapshot: { currentSystem: true, sid, operationalStatus: 'On', machineNumber: '', versionNumber: '2026.2', hostingType: 'Cloud', url: systemHosting.url, performanceTier: systemHosting.performanceTier, vpnEnabled: systemHosting.vpnEnabled, vpnType: systemHosting.vpnType, externalInterface: false, ipRestrictionEnabled: systemHosting.ipRestrictionEnabled, platform: systemHosting.cloudPlatform, csp: systemHosting.csp, awsRegion: systemHosting.cloudPlatform === 'AWS' ? systemHosting.cloudRegion : '', azureRegion: systemHosting.cloudPlatform === 'Azure' ? systemHosting.cloudRegion : '' },
         engagementCircle: [],
         remarks: [remark(`${tid} deterministic tenant baseline.`)],
         configurationHistory: [configHistory(tid, configuration)],
@@ -509,14 +584,14 @@ accounts.forEach((account, accountIndex) => {
         documents: [doc('TENANT', tid, `${tid}-tenant-profile.pdf`)],
         productType: configuration.product,
         hostingType: 'Cloud',
-        cloudPlatform: 'AWS',
-        csp: 'Automate IT',
-        cloudRegion: hosting(account.region, seq.tenant).cloudRegion,
-        performanceTier: 'STANDARD',
-        vpnEnabled: 'NO',
-        vpnType: '',
+        cloudPlatform: systemHosting.cloudPlatform,
+        csp: systemHosting.csp,
+        cloudRegion: systemHosting.cloudRegion,
+        performanceTier: systemHosting.performanceTier,
+        vpnEnabled: systemHosting.vpnEnabled,
+        vpnType: systemHosting.vpnType,
         externalInterface: false,
-        ipRestrictionEnabled: 'NO',
+        ipRestrictionEnabled: systemHosting.ipRestrictionEnabled,
         mapCenter: configuration.mapCenter,
         ...configuration,
         warrantyStatus: warrantyRows.at(-1)?.warrantyStatus ?? 'NOT_SET',
@@ -536,7 +611,7 @@ accounts.forEach((account, accountIndex) => {
     })
     const summary = summarize(systemTenantRows)
     const activeSystemTenantIds = systemTenantRows.filter((tenant) => tenant.operationalStatus !== 'Deleted' && tenant.operationalStatus !== 'Cancelled').map((tenant) => tenant.id)
-    const system = { id: sid, accountId: account.id, salesManagerId: account.salesManagerId, sid, deliveryPid: isCurrentlyAllocated ? project.pid : '', machineId: null, source: 'Production', linkedProjectIds: isCurrentlyAllocated ? [project.id] : [], tenantIds: activeSystemTenantIds, systemClass: 'CUSTOMER', purpose: 'Delivery', availability: activeSystemTenantIds.length > 0 ? 'OCCUPIED' : 'AVAILABLE', ...hosting(account.region, seq.sid), mapCenter: summary.mapCenter, region: account.region, country: account.country, state: account.state, timeGroup: account.timeGroup, timeGroupAlert: '', operationalStatus: 'On', remarks: [remark(`${sid} deterministic production system.`)], owners: [], configurationHistory: [configHistory(sid, summary)], documents: [doc('SYSTEM', sid, `${sid}-architecture-summary.pdf`)], createdAt: iso(seq.sid), updatedAt: iso(seq.sid + 2), product: summary.product, ...summary }
+    const system = { id: sid, accountId: account.id, salesManagerId: account.salesManagerId, sid, deliveryPid: isCurrentlyAllocated ? project.pid : '', machineId: null, source: 'Production', linkedProjectIds: [project.id], tenantIds: activeSystemTenantIds, systemClass: 'CUSTOMER', purpose: 'Delivery', availability: activeSystemTenantIds.length > 0 ? 'OCCUPIED' : 'AVAILABLE', ...systemHosting, mapCenter: summary.mapCenter, region: account.region, country: account.country, state: account.state, timeGroup: account.timeGroup, timeGroupAlert: '', operationalStatus: 'On', remarks: [remark(`${sid} deterministic production system.`)], owners: [], configurationHistory: [configHistory(activeSystemTenantIds[0] ?? '', summary)], documents: [doc('SYSTEM', sid, `${sid}-architecture-summary.pdf`)], createdAt: iso(seq.sid), updatedAt: iso(seq.sid + 2), product: summary.product, ...summary }
     addVersionRefs(system, sid, 'allocated', sid)
     systems.push(system)
     projectSystems.push({ id: `project-system-${project.id}-${sid}`, projectId: project.id, systemId: sid, tenantIds: isCurrentlyAllocated ? activeSystemTenantIds : [], allocationStatus: isCurrentlyAllocated ? 'ALLOCATED' : 'DEALLOCATED', allocationType: 'PRODUCTION', sourceMachineId: null, allocatedAt: iso(seq.sid), deallocatedAt: isCurrentlyAllocated ? null : iso(seq.sid + 2) })
@@ -766,7 +841,7 @@ function addPoc(index, done) {
   const tenantRow = { id: tid, tid, accountId: account.id, systemId: sid, deliveryPid: project.pid, tenantType: 'POC', accountName: account.accountName, country: account.country, state: account.state, timeGroup: account.timeGroup, operationalStatus: done ? 'Deleted' : 'Active', lastManualOperationalStatus: 'Active', individualLifecyclePreviousOperationalStatus: done ? 'Active' : null, systemForcedPreviousOperationalStatus: null, systemForcedBySystemId: null, contractStatus: 'UNDER_CONTRACT', hostedSystemHistory: [{ systemId: sid, startedAt: iso(10 + index), endedAt: done ? iso(18 + index) : null, reason: 'Created' }], tenantFormType: 'POC', hostedSystemId: sid, hostingSid: sid, sourceRequirementId: done ? undefined : requirementId, releasedRequirementId: done ? requirementId : null, requirementHistory: [{ id: `tenant-req-${tid}-${requirementId}`, pid: project.pid, projectId: project.id, requirementId, relationshipType: 'A', status: done ? 'HISTORICAL' : 'CURRENT', startedAt: iso(10 + index), endedAt: done ? iso(18 + index) : null }], configuration, hostingSnapshot: { currentSystem: !done, sid, operationalStatus: 'On', machineNumber: mid, versionNumber: '2026.2', hostingType: 'Cloud', url: `https://${sid.toLowerCase()}.deliveryerp.example.invalid`, performanceTier: 'STANDARD', vpnEnabled: 'NO', vpnType: '', externalInterface: false, ipRestrictionEnabled: 'NO', platform: 'AWS', csp: 'Automate IT', awsRegion: hosting(account.region, index).cloudRegion, azureRegion: '' }, engagementCircle: [], remarks: [remark(`${tid} deterministic POC tenant.`)], configurationHistory: [configHistory(tid, configuration)], warranties: [warranty(tid, project.id, opp.id, 'NO_WARRANTY', null, null)], documents: [doc('TENANT', tid, `${tid}-poc-profile.pdf`)], productType: configuration.product, hostingType: 'Cloud', cloudPlatform: 'AWS', csp: 'Automate IT', cloudRegion: hosting(account.region, index).cloudRegion, performanceTier: 'STANDARD', vpnEnabled: 'NO', vpnType: '', externalInterface: false, ipRestrictionEnabled: 'NO', mapCenter: configuration.mapCenter, ...configuration, warrantyStatus: 'NOT_SET', warrantyStartDate: null, warrantyEndDate: null, pocStartDate: opp.pocStartDate, pocEndDate: opp.pocEndDate, createdAt: iso(10 + index), updatedAt: iso(12 + index) }
   tenants.push(tenantRow)
   warrantyRecords.push(...tenantRow.warranties.map((row) => topWarranty(row, tid)))
-  const system = { id: sid, accountId: account.id, salesManagerId: account.salesManagerId, sid, deliveryPid: done ? '' : project.pid, machineId: mid, source: 'Reused Internal Systems', linkedProjectIds: done ? [] : [project.id], tenantIds: [tid], systemClass: 'POC_DEMO_TRAINING', purpose: 'POC', availability: done ? 'AVAILABLE' : 'OCCUPIED', ...hosting(account.region, index), mapCenter: configuration.mapCenter, region: account.region, country: account.country, state: account.state, timeGroup: account.timeGroup, timeGroupAlert: '', operationalStatus: 'On', remarks: [remark(`${sid} deterministic POC system.`)], owners: [], configurationHistory: [configHistory(sid, configuration)], documents: [doc('SYSTEM', sid, `${sid}-poc-system.pdf`)], createdAt: iso(8 + index), updatedAt: iso(12 + index), product: configuration.product, ...configuration }
+  const system = { id: sid, accountId: account.id, salesManagerId: account.salesManagerId, sid, deliveryPid: done ? '' : project.pid, machineId: mid, source: 'Reused Internal Systems', linkedProjectIds: [project.id], tenantIds: done ? [] : [tid], systemClass: 'POC_DEMO_TRAINING', purpose: done ? 'None' : 'POC', availability: done ? 'AVAILABLE' : 'OCCUPIED', ...hosting(account.region, index), mapCenter: configuration.mapCenter, region: account.region, country: account.country, state: account.state, timeGroup: account.timeGroup, timeGroupAlert: '', occupationStartDate: done ? null : project.pocStartDate, occupationEndDate: done ? null : project.pocEndDate, operationalStatus: 'On', remarks: [remark(`${sid} deterministic POC system.`)], owners: [], configurationHistory: [configHistory(tid, configuration)], documents: [doc('SYSTEM', sid, `${sid}-poc-system.pdf`)], createdAt: iso(8 + index), updatedAt: iso(12 + index), product: configuration.product, ...configuration }
   addVersionRefs(system, sid, 'allocated', sid, mid)
   systems.push(system)
   projectSystems.push({ id: `project-system-${project.id}-${sid}`, projectId: project.id, systemId: sid, tenantIds: done ? [] : [tid], allocationStatus: done ? 'DEALLOCATED' : 'ALLOCATED', allocationType: 'REUSED_INTERNAL', sourceMachineId: mid, allocatedAt: iso(9 + index), deallocatedAt: done ? iso(20 + index) : null })
@@ -779,13 +854,30 @@ for (let i = 30; i < 60; i += 1) addPoc(i, true)
 for (let i = 0; i < 60; i += 1) {
   const account = accounts[i % accounts.length]
   const mid = `M${String(i + 1).padStart(6, '0')}`
-  const currentPurpose = i < 30 ? 'POC' : i < 40 ? 'Demo' : i < 50 ? 'Training' : i < 58 ? 'Available' : 'Support'
+  const currentPurpose = i < 30 ? 'POC' : i < 40 ? 'Demo' : i < 50 ? 'Training' : i < 58 ? 'None' : 'Support'
   const currentProjectIds = currentPurpose === 'POC'
     ? projectSystems
       .filter((link) => link.sourceMachineId === mid && link.allocationStatus === 'ALLOCATED')
       .map((link) => link.projectId)
     : []
-  const reused = { id: mid, machineId: mid, source: 'Reused Internal Systems', purpose: currentPurpose, status: currentPurpose === 'Available' ? 'Available' : 'Occupied', ...hosting(account.region, i), mapCenter: 'Global', ...cfg(900 + i), usedInRegion: account.region, timeGroup: account.timeGroup, timeGroupAlert: '', occupationStartDate: currentPurpose === 'POC' ? date(i + 1) : null, occupationEndDate: currentPurpose === 'POC' ? date(i + 12) : null, currentProjectIds, purposeHistory: [{ id: `purpose-history-${mid}`, recordId: next('PH', 'purposeHistory'), startDate: date(i + 1), endDate: currentPurpose === 'POC' ? null : date(i + 10), purposeType: currentPurpose }], tenantCount: currentPurpose === 'POC' ? 1 : 0, alerts: currentPurpose === 'Available' ? [] : [`Reserved for ${currentPurpose}`], operationalStatus: 'On', remarks: [remark(`${mid} deterministic reused internal system.`)], owners: [], configurationHistory: [configHistory(mid, cfg(900 + i))], documents: [doc('INTERNAL_REUSED_SYSTEM', mid, `${mid}-lab-readiness.pdf`)], createdAt: iso(i + 1), updatedAt: iso(i + 3) }
+  const currentPocProject = projects.find((project) => project.id === currentProjectIds[0])
+  const owner = { id: `owner-${mid}`, userId: `owner-${mid}`, userName: `${account.region} Owner ${String(i + 1).padStart(2, '0')}`, fullName: `${account.region} Owner ${String(i + 1).padStart(2, '0')}`, title: 'Delivery Owner', company: 'Penlink', phoneNumber: '+1-555-0100', email: `owner-${String(i + 1).padStart(2, '0')}@deliveryerp.example` }
+  const historicalPocProjects = projectSystems
+    .filter((link) => link.sourceMachineId === mid && link.allocationType === 'REUSED_INTERNAL' && link.allocationStatus === 'DEALLOCATED')
+    .map((link) => projects.find((project) => project.id === link.projectId))
+    .filter((project) => project?.mainType === 'POC' && project.progressStatus === 'DONE')
+  const purposeHistory = [
+    ...historicalPocProjects.map((project) => ({
+      id: `purpose-history-${mid}-${project.id}`,
+      recordId: next('PH', 'purposeHistory'),
+      startDate: project.pocStartDate,
+      endDate: project.pocEndDate,
+      owner: owner.fullName,
+      purposeType: 'POC',
+    })),
+    { id: `purpose-history-${mid}`, recordId: next('PH', 'purposeHistory'), startDate: currentPurpose === 'POC' ? currentPocProject?.pocStartDate ?? date(i + 1) : date(i + 14), endDate: currentPurpose === 'POC' ? null : null, owner: owner.fullName, purposeType: currentPurpose },
+  ]
+  const reused = { id: mid, machineId: mid, source: 'Reused Internal Systems', purpose: currentPurpose, status: currentPurpose === 'None' ? 'Available' : 'Occupied', ...hosting(account.region, i), mapCenter: 'Global', ...cfg(900 + i), usedInRegion: account.region, timeGroup: account.timeGroup, timeGroupAlert: '', occupationStartDate: currentPurpose === 'POC' ? currentPocProject?.pocStartDate ?? date(i + 1) : null, occupationEndDate: currentPurpose === 'POC' ? currentPocProject?.pocEndDate ?? date(i + 12) : null, currentProjectIds, purposeHistory, tenantCount: currentPurpose === 'POC' ? 1 : 0, alerts: currentPurpose === 'None' ? [] : [`Reserved for ${currentPurpose}`], operationalStatus: 'On', remarks: [remark(`${mid} deterministic reused internal system.`)], owners: [owner], configurationHistory: [configHistory('', cfg(900 + i))], documents: [doc('INTERNAL_REUSED_SYSTEM', mid, `${mid}-lab-readiness.pdf`)], createdAt: iso(i + 1), updatedAt: iso(i + 3) }
   addVersionRefs(reused, mid, 'reused', '', mid)
   reusedInternalSystems.push(reused)
 }
@@ -893,12 +985,6 @@ if (cancelledProject) {
       link.allocationStatus = 'DEALLOCATED'
       link.deallocatedAt = iso(121)
     })
-  systems
-    .filter((system) => (system.linkedProjectIds ?? []).includes(cancelledProject.id))
-    .forEach((system) => {
-      system.linkedProjectIds = (system.linkedProjectIds ?? []).filter((projectId) => projectId !== cancelledProject.id)
-      system.deliveryPid = system.deliveryPid === cancelledProject.pid ? '' : system.deliveryPid
-    })
   cancelledProject.cancellationRequested = 'NO'
   cancelledProject.cancellationReason = 'Cancelled Project seed scenario.'
   cancelledProject.cancellationPreviousProgressStatus = cancelledProject.progressStatus
@@ -952,9 +1038,120 @@ if (cancelledInfrastructureItemSourceSystem) {
   infrastructureItems.push(cancelledInfrastructureItem)
 }
 
+function opportunityForProject(project) {
+  return opportunities.find((candidate) => candidate.id === project.opportunityId || candidate.opportunityId === project.opportunityId)
+}
+
+function tenantSystemId(tenant) {
+  return tenant.hostedSystemId || tenant.systemId || ''
+}
+
+function addRequestedExistingSystemScenario() {
+  const project = projects.find((candidate) => candidate.mainType === 'DELIVERY' && candidate.progressStatus === 'OPEN')
+  if (!project) return
+  const opp = opportunityForProject(project)
+  if (!opp) return
+  const activeProjectSystems = projectSystems.filter((link) => link.allocationStatus !== 'DEALLOCATED')
+  const existingSystem = systems.find((system) =>
+    system.operationalStatus === 'On' &&
+    system.region === project.region &&
+    !activeProjectSystems.some((link) => link.projectId === project.id && link.systemId === system.id),
+  )
+  if (!existingSystem) return
+  const requirementId = reqId()
+  opp.newTenantRequirements = [
+    ...(opp.newTenantRequirements ?? []),
+    newReq(requirementId, cfg(1200 + seq.requirement), {
+      region: project.region,
+      deployTarget: 'EXISTING_SID',
+      existingSystemId: existingSystem.id,
+    }),
+  ]
+}
+
+function addAutomaticTenantAllocationRequirementScenarios() {
+  const activeTenants = tenants.filter((tenant) => tenant.operationalStatus === 'Active' && tenant.tenantType === 'CUSTOMER' && tenantSystemId(tenant))
+  const changeTenant = activeTenants[0]
+  const renewalTenant = activeTenants.find((tenant) => tenant.id !== changeTenant?.id) ?? activeTenants[1]
+  ;[
+    { tenant: changeTenant, kind: 'B' },
+    { tenant: renewalTenant, kind: 'C' },
+  ].forEach(({ tenant, kind }) => {
+    if (!tenant) return
+    const project = projects.find((candidate) => candidate.pid === tenant.deliveryPid)
+    const opp = project ? opportunityForProject(project) : undefined
+    if (!project || !opp) return
+    const requirementId = reqId()
+    const currentWarranty = (tenant.warranties ?? []).at(-1)
+    if (kind === 'B') {
+      opp.changeRequestRequirements = [
+        ...(opp.changeRequestRequirements ?? []),
+        changeReq(requirementId, tenant, tenantSystemId(tenant), tenant.configuration, { region: project.region }),
+      ]
+    } else {
+      opp.standardRenewalRequirements = [
+        ...(opp.standardRenewalRequirements ?? []),
+        renewalReq(requirementId, tenant, tenantSystemId(tenant), currentWarranty, { region: project.region }),
+      ]
+    }
+  })
+}
+
+function addTenantRequirementOneToManyScenario() {
+  const activeCustomerTenants = tenants
+    .filter((tenant) => tenant.tenantType === 'CUSTOMER' && tenant.operationalStatus === 'Active')
+    .filter((tenant) => {
+      const project = projects.find((candidate) => candidate.pid === tenant.deliveryPid)
+      const currentRelationships = (tenant.requirementHistory ?? []).filter((relationship) => relationship.status === 'CURRENT')
+      return Boolean(project && tenant.sourceRequirementId && currentRelationships.length === 1)
+    })
+  const sourceTenant = activeCustomerTenants.find((tenant) =>
+    activeCustomerTenants.some((candidate) => candidate.id !== tenant.id && candidate.deliveryPid === tenant.deliveryPid),
+  )
+  if (!sourceTenant) return
+  const siblingTenants = activeCustomerTenants
+    .filter((tenant) => tenant.id !== sourceTenant.id && tenant.deliveryPid === sourceTenant.deliveryPid)
+    .slice(0, 2)
+  const sourceRelationship = (sourceTenant.requirementHistory ?? []).find((relationship) => relationship.status === 'CURRENT')
+  if (!sourceRelationship || siblingTenants.length === 0) return
+  siblingTenants.forEach((tenant) => {
+    tenant.sourceRequirementId = sourceRelationship.requirementId
+    tenant.releasedRequirementId = null
+    tenant.requirementHistory = (tenant.requirementHistory ?? []).map((relationship) =>
+      relationship.status === 'CURRENT'
+        ? {
+            ...relationship,
+            pid: sourceRelationship.pid,
+            projectId: sourceRelationship.projectId,
+            requirementId: sourceRelationship.requirementId,
+            relationshipType: sourceRelationship.relationshipType,
+            status: 'CURRENT',
+            endedAt: null,
+          }
+        : relationship,
+    )
+    tenant.remarks = [
+      ...(tenant.remarks ?? []),
+      remark(`${tenant.tid} intentionally shares Tenant Requirement ${sourceRelationship.requirementId} for one-to-many QA coverage.`),
+    ]
+  })
+}
+
+addRequestedExistingSystemScenario()
+addAutomaticTenantAllocationRequirementScenarios()
+addTenantRequirementOneToManyScenario()
+
 const activityEvents = projects.slice(0, 80).map((project) => {
   const aid = next('ACT', 'activity')
   return { id: aid, technicalId: `activity-${aid}`, occurredAt: iso(seq.activity, 10), actorId: 'user-demo', actorName: user, source: 'USER', eventType: 'CREATE', severity: 'INFO', category: 'PROJECT', primaryObject: { objectType: 'Project', id: project.id, businessId: project.pid, displayLabel: project.opportunityName, routePath: `/projects/${project.pid}` }, relatedObjects: [], summary: `Project ${project.pid} deterministic QA baseline created.`, details: `Project ${project.pid} deterministic QA baseline created.`, metadata: {}, correlationId: `CORR-${aid}`, sequence: seq.activity, schemaVersion: 1 }
+})
+
+const projectIdsBySystemId = projectSystems.reduce((groups, link) => {
+  groups[link.systemId] = Array.from(new Set([...(groups[link.systemId] ?? []), link.projectId]))
+  return groups
+}, {})
+systems.forEach((system) => {
+  system.linkedProjectIds = projectIdsBySystemId[system.id] ?? system.linkedProjectIds ?? []
 })
 
 const data = {

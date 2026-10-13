@@ -398,7 +398,7 @@ function productionInventory(n, sid, country, state, overrides = {}) {
 }
 
 function reusedInternal(n, machineId, purpose, country, overrides = {}) {
-  const status = purpose === 'Available' ? 'Available' : 'Occupied'
+  const status = purpose === 'None' ? 'Available' : 'Occupied'
   const usedInRegion = region(country)
   return {
     id: machineId,
@@ -417,7 +417,7 @@ function reusedInternal(n, machineId, purpose, country, overrides = {}) {
     currentProjectIds: overrides.currentProjectIds ?? [],
     purposeHistory: [purposeHistory(n, purpose, overrides.occupationStartDate ?? '2026-07-01', overrides.occupationEndDate ?? null, overrides.historyContext ?? {})],
     tenantCount: overrides.tenantCount ?? 0,
-    alerts: purpose === 'Available' ? [] : [`Reserved for ${purpose}`],
+    alerts: purpose === 'None' ? [] : [`Reserved for ${purpose}`],
     operationalStatus: 'On',
     remarks: [remark(10 + n, `${machineId} prepared for ${purpose}.`)],
     owners: [owner(10 + n, `Lab Owner ${n}`, 'Delivery ERP Lab')],
@@ -817,11 +817,11 @@ const productionSystemInventory = [
 const reusedInternalSystems = [
   reusedInternal(1, 'M000001', 'POC', 'Germany', { occupationStartDate: '2026-07-12', occupationEndDate: '2026-08-02', currentProjectIds: ['P000001'], tenantCount: 1, currentVersionUpdateId: 'VU000015', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004', historyContext: { pid: 'P000001', sid: 'S000006', projectName: 'Civic Sentinel POC Evaluation', accountName: accounts[0].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
   reusedInternal(2, 'M000002', 'POC', 'Australia', { occupationStartDate: '2026-07-25', occupationEndDate: '2026-08-18', currentProjectIds: ['P000008'], tenantCount: 1, currentVersionUpdateId: 'VU000016', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004', historyContext: { pid: 'P000008', sid: 'S000007', projectName: 'Southern Cross Paid POC', accountName: accounts[5].accountName, product: 'Tangles', projectStatus: 'OPEN' } }),
-  reusedInternal(3, 'M000003', 'Available', 'United States', { currentVersionUpdateId: 'VU000006', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
+  reusedInternal(3, 'M000003', 'None', 'United States', { currentVersionUpdateId: 'VU000006', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
   reusedInternal(4, 'M000004', 'Demo', 'Singapore', { currentVersionUpdateId: 'VU000017', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000001' }),
   reusedInternal(5, 'M000005', 'Training', 'United Kingdom', { currentVersionUpdateId: 'VU000018', currentVersionNumberRefId: 'VN000001', currentBuildNumberRefId: 'BN000002' }),
   reusedInternal(6, 'M000006', 'Support', 'Canada', { currentVersionUpdateId: 'VU000019', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000003' }),
-  reusedInternal(7, 'M000007', 'Available', 'Germany', { currentVersionUpdateId: 'VU000020', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
+  reusedInternal(7, 'M000007', 'None', 'Germany', { currentVersionUpdateId: 'VU000020', currentVersionNumberRefId: 'VN000002', currentBuildNumberRefId: 'BN000004' }),
   reusedInternal(8, 'M000008', 'Demo', 'Australia', { currentVersionUpdateId: 'VU000021', currentVersionNumberRefId: 'VN000003', currentBuildNumberRefId: 'BN000005' }),
 ]
 
@@ -1024,7 +1024,7 @@ function validate(state) {
     projectDone: state.projects.some((row) => row.progressStatus === 'DONE'),
     pocTenants: state.tenants.some((row) => row.tenantType === 'POC'),
     deliveryTenants: state.tenants.some((row) => row.tenantType === 'CUSTOMER'),
-    reusedPurposes: ['Available','POC','Demo','Training','Support'].every((purpose) => state.reusedInternalSystems.some((row) => row.purpose === purpose)),
+    reusedPurposes: ['None','POC','Demo','Training','Support'].every((purpose) => state.reusedInternalSystems.some((row) => row.purpose === purpose)),
     warrantyStates: ['NOT_SET','PLANNED','VALID','PENDING','RENEWED','EXPIRED','NO_WARRANTY'].every((status) => state.tenants.some((tenantRow) => (tenantRow.warranties ?? []).length === 0 && status === 'NOT_SET' || (tenantRow.warranties ?? []).some((warrantyRow) => warrantyRow.warrantyStatus === status))),
   }
   for (const [key, passed] of Object.entries(dashboardCoverage)) {

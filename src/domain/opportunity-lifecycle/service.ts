@@ -60,8 +60,12 @@ export function projectSubTypeForOpportunity(opportunity: Opportunity): ProjectS
   return opportunity.subType === 'FREE' || opportunity.subType === 'PAID' ? 'NONE' : opportunity.subType
 }
 
+export function pocProjectSubTypeForOpportunity(opportunity: Opportunity): ProjectSubType {
+  return opportunity.financialProfile ?? (opportunity.subType === 'PAID' ? 'PAID' : 'FREE')
+}
+
 export function projectTypeForOpportunity(opportunity: Opportunity): { mainType: ProjectMainType; subType: ProjectSubType } {
-  if (opportunity.type === 'POC') return { mainType: 'POC', subType: 'NONE' }
+  if (opportunity.type === 'POC') return { mainType: 'POC', subType: pocProjectSubTypeForOpportunity(opportunity) }
   if (opportunity.type === 'DELIVERY') return { mainType: 'DELIVERY', subType: opportunity.subType === 'UPSELL' ? 'UPSELL' : 'NEW' }
   if (opportunity.subType === 'UPSELL') return { mainType: 'RENEWAL', subType: 'UPSELL' }
   if (opportunity.subType === 'DOWN_SELL') return { mainType: 'RENEWAL', subType: 'DOWN_SELL' }

@@ -13,6 +13,7 @@ export const APPLICATION_CONFIGURATION_CATEGORY_ORDER = [
   'Modules',
   'AI',
   'Additional Features',
+  'API',
 ] as const
 
 export function applicationConfigurationValue(
@@ -155,8 +156,11 @@ export function applicationConfigurationCategoryLabel(field: Pick<SharedFieldMet
   if (field.group === 'AI') {
     return 'AI'
   }
-  if (field.group === 'Additional Sources' || field.group === 'Additional features' || field.group === 'Additional Features' || field.group === 'API') {
+  if (field.group === 'Additional Sources' || field.group === 'Additional features' || field.group === 'Additional Features') {
     return 'Additional Features'
+  }
+  if (field.group === 'API') {
+    return 'API'
   }
   return field.group || 'Core Details'
 }

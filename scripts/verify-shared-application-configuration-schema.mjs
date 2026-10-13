@@ -79,15 +79,27 @@ assert(
 
 assert(
   applicationMetadata.indexOf("key: 'aiFeatures'") > -1 &&
+    applicationMetadata.indexOf("key: 'additionalFeatures'") > -1 &&
     applicationMetadata.indexOf("key: 'apiEnabled'") > -1 &&
-    applicationMetadata.indexOf("key: 'aiFeatures'") < applicationMetadata.indexOf("key: 'apiEnabled'"),
-  'AI fields must precede API fields in the shared application configuration metadata.',
+    applicationMetadata.indexOf("key: 'aiFeatures'") < applicationMetadata.indexOf("key: 'additionalFeatures'") &&
+    applicationMetadata.indexOf("key: 'additionalFeatures'") < applicationMetadata.indexOf("key: 'apiEnabled'") &&
+    applicationMetadata.indexOf("key: 'apiEnabled'") < applicationMetadata.indexOf("key: 'apiDailyQty'") &&
+    applicationMetadata.indexOf("key: 'apiDailyQty'") < applicationMetadata.indexOf("key: 'apiMonthlyQty'"),
+  'Shared application configuration metadata must order AI, Additional Features, then the three API fields.',
 )
 assert(
   tenantColumns.indexOf("id: 'aiFeatures'") > -1 &&
+    tenantColumns.indexOf("id: 'additionalFeatures'") > -1 &&
     tenantColumns.indexOf("id: 'apiEnabled'") > -1 &&
-    tenantColumns.indexOf("id: 'aiFeatures'") < tenantColumns.indexOf("id: 'apiEnabled'"),
-  'Tenant dashboard configuration columns must present AI before API.',
+    tenantColumns.indexOf("id: 'aiFeatures'") < tenantColumns.indexOf("id: 'additionalFeatures'") &&
+    tenantColumns.indexOf("id: 'additionalFeatures'") < tenantColumns.indexOf("id: 'apiEnabled'") &&
+    tenantColumns.indexOf("id: 'apiEnabled'") < tenantColumns.indexOf("id: 'apiDailyQty'") &&
+    tenantColumns.indexOf("id: 'apiDailyQty'") < tenantColumns.indexOf("id: 'apiMonthlyQty'"),
+  'Tenant dashboard configuration columns must present AI, Additional Features, then the three API fields.',
+)
+assert(
+  applicationMetadata.trim().endsWith("export const APPLICATION_CONFIGURATION_SUMMARY_FIELDS = TENANT_APPLICATION_CONFIGURATION_FIELDS"),
+  'The three API fields must remain the final shared application configuration summary columns.',
 )
 assert(
   /key: 'blockchain'[^}]*inputType: 'integer'/.test(applicationMetadata),
@@ -116,7 +128,11 @@ function configurationRecords() {
 configurationRecords().forEach((record, index) => {
   const value = record.blockchain
   assert(
-    value == null || (typeof value === 'number' && Number.isInteger(value) && value >= 0),
+    value == null ||
+      value === '' ||
+      value === 'YES' ||
+      value === 'NO' ||
+      (typeof value === 'number' && Number.isInteger(value) && value >= 0),
     `Configuration record ${index + 1} has a non-integer Blockchain value.`,
   )
   if (typeof value === 'number' && typeof record.users === 'number') {

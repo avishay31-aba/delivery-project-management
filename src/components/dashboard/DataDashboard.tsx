@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   Eye,
-  Pencil,
 } from 'lucide-react'
 import {
   flexRender,
@@ -44,7 +43,7 @@ import {
   type SavedDashboardViewState,
 } from '@/store/dashboardViews'
 import { UnsavedChangesDialog } from '@/components/dashboard/UnsavedChangesDialog'
-import { AlertStatusIcon, ClampedTableCellContent, RecordChangeBadge, recordChangeState, useFloatingOverlay } from '@/components/ui'
+import { AlertStatusIcon, ClampedTableCellContent, EDIT_ACTION_LABEL, EditActionIcon, RecordChangeBadge, recordChangeState, useFloatingOverlay } from '@/components/ui'
 import { useUnsavedChangesGuardStore } from '@/store/useUnsavedChangesGuardStore'
 import {
   formatSemanticDateTimeValue,
@@ -70,6 +69,9 @@ export interface DashboardColumn<T> {
   id: string
   label: string
   getValue: (row: T) => string | number | null
+  headerClassName?: string
+  cellClassName?: string
+  cellContentClassName?: string
   editKey?: keyof T
   render?: (row: T) => ReactNode
   sortable?: boolean
@@ -109,6 +111,7 @@ interface DataDashboardProps<T extends { id: string }> {
   colorLegend?: DashboardColorLegendItem[]
   contentModeControls?: ReactNode
   renderAlternateContent?: (rows: T[]) => ReactNode
+  showDefaultRecordActions?: boolean
 }
 
 interface HeaderMenuProps<T extends { id: string }> {
@@ -192,7 +195,7 @@ function DashboardActionLink<T extends { id: string }>({
   const className = 'inline-flex h-7 w-7 items-center justify-center rounded border border-sf-border bg-white text-sf-text hover:bg-sf-surface-alt aria-disabled:cursor-not-allowed aria-disabled:opacity-40'
   if (to) {
     return (
-      <Link to={to} className={className} title={label} aria-label={`${label} record`}>
+      <Link to={to} className={className} title={label} aria-label={label}>
         {icon}
       </Link>
     )
@@ -203,7 +206,7 @@ function DashboardActionLink<T extends { id: string }>({
         type="button"
         className={className}
         title={label}
-        aria-label={`${label} record`}
+        aria-label={label}
         onClick={(event) => {
           event.stopPropagation()
           onFallback(row)
@@ -242,7 +245,7 @@ export function DashboardActionButton({
       type="button"
       className={className}
       title={label}
-      aria-label={`${label} record`}
+      aria-label={label}
       disabled={disabled}
       onClick={(event) => {
         event.stopPropagation()
@@ -284,6 +287,15 @@ function uniqueColumnOptions<T>(rows: T[], sourceColumn?: DashboardColumn<T>): s
   return Array.from(new Set(rows.flatMap((row) => splitDashboardFilterValues(sourceColumn.getValue(row)))))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b))
+}
+
+function dashboardSearchText<T>(row: T, columns: Array<DashboardColumn<T>>): string {
+  return columns
+    .filter((column) => column.filterable !== false)
+    .map((column) => String(column.getValue(row) ?? ''))
+    .filter(Boolean)
+    .join(' ')
+    .toLocaleLowerCase()
 }
 
 function moveColumn(
@@ -940,6 +952,7 @@ export function DataDashboard<T extends { id: string }>({
   colorLegend = [],
   contentModeControls,
   renderAlternateContent,
+  showDefaultRecordActions = true,
 }: DataDashboardProps<T>) {
   const regionalDateFormat = useDateTimePresentationPreference()
   const userPresentationPreferences = useAppStore((state) => state.userPresentationPreferences)
@@ -1005,6 +1018,11 @@ export function DataDashboard<T extends { id: string }>({
   const [replaceFindValue, setReplaceFindValue] = useState('')
   const [replaceValue, setReplaceValue] = useState('')
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false)
+  const globalFilteredRows = useMemo(() => {
+    const query = globalFilter.trim().toLocaleLowerCase()
+    if (!query) return rows
+    return rows.filter((row) => dashboardSearchText(row, orderedColumns).includes(query))
+  }, [globalFilter, orderedColumns, rows])
   const hasAppliedInitialDefaultRef = useRef<DashboardViewScope | null>(null)
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
   const [frozenColumnOffsets, setFrozenColumnOffsets] = useState<number[]>([])
@@ -1145,20 +1163,24 @@ export function DataDashboard<T extends { id: string }>({
           const editRoute = dashboardRecordModeRoutePath(dashboardScope, row.original, 'edit')
           return (
             <div className="flex items-center gap-1">
-              <DashboardActionLink
-                icon={<Eye className="h-4 w-4" aria-hidden="true" />}
-                label="View"
-                to={viewRoute}
-                onFallback={onView}
-                row={row.original}
-              />
-              <DashboardActionLink
-                icon={<Pencil className="h-4 w-4" aria-hidden="true" />}
-                label="Edit"
-                to={editRoute}
-                onFallback={onEditRecord}
-                row={row.original}
-              />
+              {showDefaultRecordActions ? (
+                <>
+                  <DashboardActionLink
+                    icon={<Eye className="h-4 w-4" aria-hidden="true" />}
+                    label="View"
+                    to={viewRoute}
+                    onFallback={onView}
+                    row={row.original}
+                  />
+                  <DashboardActionLink
+                    icon={<EditActionIcon className="h-4 w-4" />}
+                    label={EDIT_ACTION_LABEL}
+                    to={editRoute}
+                    onFallback={onEditRecord}
+                    row={row.original}
+                  />
+                </>
+              ) : null}
               {renderRecordActions?.(row.original)}
             </div>
           )
@@ -1198,21 +1220,20 @@ export function DataDashboard<T extends { id: string }>({
           const renderedValue = column.render?.(row.original) ?? formattedDashboardCellValue(column, raw)
 
           return (
-            <ClampedTableCellContent title={raw}>
+            <ClampedTableCellContent title={raw} className={column.cellContentClassName}>
               {renderedValue || '-'}
             </ClampedTableCellContent>
           )
         },
       })),
     ],
-    [dashboardScope, enableRecordActions, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions],
+    [dashboardScope, enableRecordActions, onEditRecord, onView, orderedColumns, regionalDateFormat, renderRecordActions, showDefaultRecordActions],
   )
 
   const table = useReactTable({
-    data: rows,
+    data: globalFilteredRows,
     columns: tableColumns,
-    state: { globalFilter, sorting, grouping, columnFilters, columnOrder: internalColumnOrder, columnVisibility: internalColumnVisibility, pagination },
-    onGlobalFilterChange: (updater) => updateDashboardState(setGlobalFilter, updater),
+    state: { sorting, grouping, columnFilters, columnOrder: internalColumnOrder, columnVisibility: internalColumnVisibility, pagination },
     onSortingChange: (updater) => updateDashboardState(setSorting, updater),
     onGroupingChange: (updater) => updateDashboardState(setGrouping, updater),
     onColumnFiltersChange: (updater) => updateDashboardState(setColumnFilters, updater),
@@ -1846,9 +1867,13 @@ const alternateRows = useMemo(
             <td
               key={cell.id}
               style={columnPositionStyle(cellIndex, cell.column.id)}
-              className={joinClassNames('px-3 py-2 align-middle', frozenColumnClassName(cellIndex, false, cell.column.id))}
+              className={joinClassNames(
+                'px-3 py-2 align-middle',
+                dashboardColumnById.get(cell.column.id)?.cellClassName,
+                frozenColumnClassName(cellIndex, false, cell.column.id),
+              )}
             >
-              {cell.getIsPlaceholder() ? null : flexRender(cell.column.columnDef.cell, cell.getContext())}
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
             </td>
           ))}
         </tr>
@@ -2168,6 +2193,7 @@ const alternateRows = useMemo(
                         className={joinClassNames(
                           'whitespace-nowrap px-3 py-2 font-semibold text-sf-text transition-colors',
                           'sticky top-0 z-10 bg-sf-surface-alt',
+                          sourceColumn?.headerClassName,
                           frozenColumnClassName(headerIndex, true, header.column.id),
                           draggedColumnId === header.column.id && 'opacity-60',
                           dragOverColumnId === header.column.id &&

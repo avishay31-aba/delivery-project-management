@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
+import { Plus, Save, Trash2, X } from 'lucide-react'
 import {
   EditableChildObjectActionButton,
+  editableChildObjectActionButtonClassName,
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, type RecordHistoryColumn } from '@/components/ui'
+import { EDIT_ACTION_LABEL, EditActionIcon, RecordHistorySection, RequiredFieldMarker, RichTextContent, RichTextEditor, TableSection, type RecordHistoryColumn } from '@/components/ui'
 import {
   createRemarkRecord,
   remarkDeadlineAlertLabel,
@@ -146,7 +147,7 @@ export function RemarksGrid({
   const actions = permissions.canAdd ? (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      className={editableChildObjectActionButtonClassName()}
       onClick={addRemark}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
@@ -193,9 +194,8 @@ export function RemarksGrid({
             ) : (
               <>
                 {permissions.canEdit ? (
-                  <EditableChildObjectActionButton onClick={() => editor.beginEdit(remark)}>
-                    <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    Edit
+                  <EditableChildObjectActionButton title={EDIT_ACTION_LABEL} ariaLabel={EDIT_ACTION_LABEL} onClick={() => editor.beginEdit(remark)}>
+                    <EditActionIcon />
                   </EditableChildObjectActionButton>
                 ) : null}
                 {permissions.canDelete ? (

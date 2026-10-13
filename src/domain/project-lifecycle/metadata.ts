@@ -69,6 +69,10 @@ export interface ProjectFormMetadata {
   milestoneTemplate: string
 }
 
+export function projectHeaderFieldAllowsEditing(field: ProjectHeaderFieldMetadata): boolean {
+  return field.editable
+}
+
 export const PROJECT_TABS: ProjectFormTab[] = [
   'milestones',
   'tasks',
@@ -154,16 +158,20 @@ function keyForProject(mainType: ProjectMainType, subType: ProjectSubType): stri
   return `${mainType}:${subType}`
 }
 
+const POC_PROJECT_METADATA: ProjectFormMetadata = {
+  sourceSheet: 'Project Form - POC',
+  headerFields: POC_HEADER_FIELDS,
+  requirementSections: [NEW_TENANT_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION],
+  tabs: PROJECT_TABS,
+  milestoneTemplate: 'Template #1/#2 - POC by requirement mix',
+}
+
 const METADATA_BY_PROJECT = new Map<string, ProjectFormMetadata>([
+  [keyForProject('POC', 'FREE'), POC_PROJECT_METADATA],
+  [keyForProject('POC', 'PAID'), POC_PROJECT_METADATA],
   [
     keyForProject('POC', 'NONE'),
-    {
-      sourceSheet: 'Project Form - POC',
-      headerFields: POC_HEADER_FIELDS,
-      requirementSections: [NEW_TENANT_PROJECT_SECTION, CHANGE_REQUEST_PROJECT_SECTION],
-      tabs: PROJECT_TABS,
-      milestoneTemplate: 'Template #1/#2 - POC by requirement mix',
-    },
+    POC_PROJECT_METADATA,
   ],
   [
     keyForProject('DELIVERY', 'NEW'),

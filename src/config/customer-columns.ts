@@ -13,6 +13,7 @@ import {
   customerTypeLabel,
   customerWarrantySummary,
 } from '@/domain/customer-account'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 
 export function createCustomerColumns(
   salesManagers: SalesManager[],
@@ -36,7 +37,7 @@ export function createCustomerColumns(
       getValue: (row) => accountManagerDisplayName(row.salesManagerId, salesManagers),
     },
     { id: 'region', label: CUSTOMER_ACCOUNT_FIELD_LABELS.region, getValue: (row) => row.region, editKey: 'region', options: REGION_OPTIONS },
-    { id: 'country', label: CUSTOMER_ACCOUNT_FIELD_LABELS.country, getValue: (row) => row.country, editKey: 'country' },
+    { id: 'country', label: CUSTOMER_ACCOUNT_FIELD_LABELS.country, getValue: (row) => countryDisplayName(row.country), editKey: 'country' },
     { id: 'state', label: CUSTOMER_ACCOUNT_FIELD_LABELS.state, getValue: (row) => row.state, editKey: 'state' },
     { id: 'timeZone', label: CUSTOMER_ACCOUNT_FIELD_LABELS.timeZone, getValue: (row) => row.timeZone },
     {

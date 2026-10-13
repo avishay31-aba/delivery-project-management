@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useFloatingOverlay } from '@/components/ui/FloatingOverlay'
-import { validationControlClassName } from '@/components/ui/validationPresentation'
+import { dirtyControlClassName, validationControlClassName } from '@/components/ui/validationPresentation'
 
 export interface CheckboxMultiSelectOption {
   value: string
@@ -16,6 +16,7 @@ export function CheckboxMultiSelect({
   options,
   disabled = false,
   invalid = false,
+  dirty = false,
   onChange,
 }: {
   id: string
@@ -24,6 +25,7 @@ export function CheckboxMultiSelect({
   options: CheckboxMultiSelectOption[]
   disabled?: boolean
   invalid?: boolean
+  dirty?: boolean
   onChange: (selected: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -68,7 +70,8 @@ export function CheckboxMultiSelect({
         aria-expanded={open}
         disabled={disabled}
         className={[
-          'h-8 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border bg-white px-2 py-1 text-left text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted',
+          'h-8 min-w-56 max-w-[42rem] whitespace-nowrap rounded border border-sf-border px-2 py-1 text-left text-sm disabled:bg-sf-surface-alt disabled:text-sf-text-muted',
+          dirtyControlClassName(dirty),
           validationControlClassName(invalid),
         ].join(' ')}
         style={{ width: triggerWidth }}

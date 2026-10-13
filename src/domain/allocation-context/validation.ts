@@ -1,9 +1,17 @@
-import type { ProjectSystemLink } from '@/data/seed.types'
+import type { ProjectSystemLink, ProjectTenantLink, System, Tenant } from '@/data/seed.types'
 import { getBusinessRegionForCountry, normalizeBusinessRegion } from '@/domain/business-region'
 import { applicableOpportunityRequirementSources } from '@/domain/opportunity-lifecycle'
 import { projectHeaderFieldValue } from '@/domain/project-lifecycle'
-import { REUSED_INTERNAL_PURPOSE_AVAILABLE, REUSED_INTERNAL_STATUS_AVAILABLE, reusedInternalMachineIdsEqual } from '@/domain/system-inventory'
-import { activeProjectSystemLinks } from './service'
+import {
+  REUSED_INTERNAL_PURPOSE_NONE,
+  REUSED_INTERNAL_STATUS_AVAILABLE,
+  SYSTEM_AVAILABILITY_AVAILABLE,
+  SYSTEM_OPERATIONAL_STATUS_DELETED,
+  reusedInternalAvailabilityStatus,
+  reusedInternalMachineIdsEqual,
+} from '@/domain/system-inventory'
+import { isTenantLifecycleInactive } from '@/domain/tenant-operations'
+import { activeProjectSystemLinks, activeProjectTenantLinks, automaticAllocationSourcesForProjectSystem } from './service'
 import type { AllocationActionResult, AllocationValidationContext, AllocationValidationInput } from './types'
 
 function failed(message: string): AllocationActionResult {
@@ -71,6 +79,9 @@ export function validateProductionAllocation(
   if (!project) return failed('Project not found.')
   if (project.mainType === 'POC') return failed('POC projects cannot allocate Production Inventory.')
   if (!productionSystem) return failed('Production system not found.')
+  if ('availability' in productionSystem && productionSystem.availability !== SYSTEM_AVAILABILITY_AVAILABLE) {
+    return failed('Production system is not available for allocation.')
+  }
   const projectRegion = projectBusinessRegionForAllocation(project, context)
   if (!projectRegion) return unmappedProjectRegionMessage()
   if (activeProjectSystemLinks(context.projectSystems).some((link) => link.systemId === input.systemId)) {
@@ -91,11 +102,21 @@ export function validateReusedInternalAllocation(
   if (!project) return failed('Project not found.')
   if (project.mainType !== 'POC') return failed('Delivery and Renewal projects cannot allocate Reused Internal Systems.')
   if (!reusedSystem) return failed('Reused internal system not found.')
-  if (reusedSystem.status !== REUSED_INTERNAL_STATUS_AVAILABLE) return failed('Reused internal system is not available for allocation.')
-  if (reusedSystem.purpose !== REUSED_INTERNAL_PURPOSE_AVAILABLE) return failed(`Reused internal system is not available for allocation. Current Purpose is ${reusedSystem.purpose}.`)
+  const allActiveLinks = activeProjectSystemLinks(context.projectSystems)
+  const derivedAvailability = reusedInternalAvailabilityStatus(reusedSystem, allActiveLinks, context.projects, context.systems)
+  const hasReusablePurpose =
+    derivedAvailability === REUSED_INTERNAL_STATUS_AVAILABLE &&
+    reusedSystem.purpose === REUSED_INTERNAL_PURPOSE_NONE
+  if (!hasReusablePurpose) return failed(`Reused internal system is not available for allocation. Current Purpose is ${reusedSystem.purpose}.`)
   const projectRegion = projectBusinessRegionForAllocation(project, context)
   if (!projectRegion) return unmappedProjectRegionMessage()
-  const activeLinks = activeProjectSystemLinks(context.projectSystems).filter((link) =>
+  const hasCurrentAllocation = allActiveLinks.some((link) => {
+    if (reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId)) return true
+    const allocatedSystem = context.systems.find((candidate) => candidate.id === link.systemId)
+    return Boolean(allocatedSystem && reusedInternalMachineIdsEqual(allocatedSystem.machineId, reusedSystem.machineId))
+  })
+  if (hasCurrentAllocation) return failed('Reused internal system is already actively allocated.')
+  const activeLinks = allActiveLinks.filter((link) =>
     (reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId) || reusedSystem.currentProjectIds.includes(link.projectId)) &&
     reusedSystem.currentProjectIds.includes(link.projectId),
   )
@@ -103,7 +124,7 @@ export function validateReusedInternalAllocation(
   if (regionConflict) return regionConflict
   if (!projectPocDateForAllocation(project, context, 'pocStartDate')) return failed(`Project ${project.pid} must have a POC Start Date before this Reused System can be allocated.`)
   if (!projectPocDateForAllocation(project, context, 'pocEndDate')) return failed(`Project ${project.pid} must have a POC End Date before this Reused System can be allocated.`)
-  if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId))) {
+  if (allActiveLinks.some((link) => link.projectId === input.projectId && reusedInternalMachineIdsEqual(link.sourceMachineId, reusedSystem.machineId))) {
     return failed('This MID is already allocated to the project.')
   }
   return null
@@ -126,24 +147,22 @@ export function validateExistingSystemLink(
     system.region || system.timeGroup,
   )
   if (regionConflict) return regionConflict
-  if (project.mainType === 'POC') {
-    const opportunity = context.opportunities?.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
-    const requestedSystemIds = new Set(
-      opportunity
-        ? applicableOpportunityRequirementSources(opportunity)
-            .map((source) => {
-              const requirement = source.requirement
-              if ('deployTarget' in requirement) {
-                return requirement.deployTarget === 'EXISTING_SID' ? requirement.existingSystemId : ''
-              }
-              return 'systemId' in requirement ? requirement.systemId : ''
-            })
-            .filter(Boolean)
-        : [],
-    )
-    if (!requestedSystemIds.has(input.systemId)) {
-      return failed('POC projects can only link existing systems specified in the Opportunity tenant requirements.')
-    }
+  const opportunity = context.opportunities?.find((candidate) => candidate.opportunityId === project.opportunityId || candidate.id === project.opportunityId)
+  const requestedSystemIds = new Set(
+    opportunity
+      ? applicableOpportunityRequirementSources(opportunity)
+          .map((source) => {
+            const requirement = source.requirement
+            if (source.requirementType === 'A' && 'deployTarget' in requirement) {
+              return requirement.deployTarget === 'EXISTING_SID' ? requirement.existingSystemId : ''
+            }
+            return ''
+          })
+          .filter(Boolean)
+      : [],
+  )
+  if (!requestedSystemIds.has(input.systemId)) {
+    return failed('Projects can only manually link existing systems requested in Grid A New Tenant requirements.')
   }
   if (activeProjectSystemLinks(context.projectSystems).some((link) => link.projectId === input.projectId && link.systemId === input.systemId)) {
     return failed('This system is already allocated to the project.')
@@ -153,10 +172,55 @@ export function validateExistingSystemLink(
 
 export function validateProjectSystemDeallocation(
   allocationId: string,
-  projectSystems: ProjectSystemLink[],
+  context: {
+    projects?: AllocationValidationContext['projects']
+    opportunities?: AllocationValidationContext['opportunities']
+    projectSystems: ProjectSystemLink[]
+    projectTenants?: ProjectTenantLink[]
+    systems?: System[]
+    tenants?: Tenant[]
+  },
 ): AllocationActionResult | null {
-  const allocation = projectSystems.find((candidate) => candidate.id === allocationId)
+  const allocation = context.projectSystems.find((candidate) => candidate.id === allocationId)
   if (!allocation) return failed('Allocation not found.')
   if (allocation.allocationStatus === 'DEALLOCATED') return failed('Allocation is already deallocated.')
+  const project = context.projects?.find((candidate) => candidate.id === allocation.projectId)
+  const opportunity = project
+    ? context.opportunities?.find((candidate) =>
+        candidate.id === project.opportunityId ||
+        candidate.opportunityId === project.opportunityId,
+      )
+    : undefined
+  const automaticSources = project
+    ? automaticAllocationSourcesForProjectSystem(project, opportunity, context.tenants ?? [], allocation.systemId)
+    : []
+  if (automaticSources.length > 0) {
+    return failed('This System is auto-allocated from existing Tenant requirements and cannot be manually deallocated while Grid B/C requires it.')
+  }
+  const system = context.systems?.find((candidate) => candidate.id === allocation.systemId)
+  if (system?.operationalStatus === SYSTEM_OPERATIONAL_STATUS_DELETED) {
+    return failed(`System ${system.sid ?? allocation.systemId} cannot be deallocated because its Operational Status is Deleted.`)
+  }
+
+  const tenantById = new Map((context.tenants ?? []).map((tenant) => [tenant.id, tenant]))
+  const blockingTenants = activeProjectTenantLinks(context.projectTenants ?? [])
+    .filter((link) =>
+      link.projectId === allocation.projectId &&
+      link.systemId === allocation.systemId,
+    )
+    .map((link) => tenantById.get(link.tenantId))
+    .filter((tenant): tenant is Tenant => Boolean(tenant))
+    .filter((tenant) => !isTenantLifecycleInactive(tenant))
+  if (blockingTenants.length > 0) {
+    const systemId = system?.sid ?? allocation.systemId
+    const tenantIds = blockingTenants
+      .map((tenant) => tenant.tid)
+      .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+      .join('; ')
+    return failed(`Deallocating a system with existing tenants is not allowed.
+Please delete or cancel them first.
+
+System ${systemId} with tenants ${tenantIds}`)
+  }
   return null
 }

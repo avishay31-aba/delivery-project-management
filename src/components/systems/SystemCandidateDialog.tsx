@@ -1,7 +1,10 @@
 import { type ReactNode, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { ProductionSystemInventoryItem, ReusedInternalSystem, System } from '@/data/seed.types'
-import { formattedReusedInternalMachineId } from '@/domain/system-inventory'
+import { BUSINESS_REGION_OPTIONS, type BusinessRegion } from '@/domain/business-region'
+import { countryDisplayName } from '@/domain/geographic-configuration'
+import { CLOUD_PLATFORM_OPTIONS, HOSTING_OPTIONS } from '@/domain/hosting-context'
+import { formattedReusedInternalMachineId, reusedInternalAvailabilityStatusForPurpose } from '@/domain/system-inventory'
 
 export type SystemCandidate = ProductionSystemInventoryItem | ReusedInternalSystem | System
 export type SystemCandidateSortKey = 'id' | 'mid' | 'source' | 'status' | 'product' | 'cloudPlatform' | 'csp' | 'region'
@@ -9,10 +12,10 @@ export type SystemCandidateFilterKey = 'hostingType' | 'cloudPlatform' | 'region
 export type SystemCandidateFilters = Record<SystemCandidateFilterKey, string>
 
 export const SYSTEM_CANDIDATE_SORT_OPTIONS: Array<{ key: SystemCandidateSortKey; label: string }> = [
-  { key: 'id', label: 'ID' },
+  { key: 'id', label: 'SID' },
   { key: 'mid', label: 'MID' },
   { key: 'source', label: 'Source' },
-  { key: 'status', label: 'Status' },
+  { key: 'status', label: 'Operational Status' },
   { key: 'product', label: 'Product' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
   { key: 'csp', label: 'CSP' },
@@ -28,8 +31,10 @@ export const EMPTY_SYSTEM_CANDIDATE_FILTERS: SystemCandidateFilters = {
 export const SYSTEM_CANDIDATE_FILTER_OPTIONS: Array<{ key: SystemCandidateFilterKey; label: string }> = [
   { key: 'hostingType', label: 'Hosting' },
   { key: 'cloudPlatform', label: 'Cloud Platform' },
-  { key: 'regionTimeGroup', label: 'Used in Region' },
+  { key: 'regionTimeGroup', label: 'Region' },
 ]
+
+const ALLOCATION_REGION_FILTER_OPTIONS: BusinessRegion[] = ['EMEA', 'APAC', 'LATAM', 'NA']
 
 export function candidatePrimaryId(candidate: SystemCandidate): string {
   if ('sid' in candidate && candidate.sid) return candidate.sid
@@ -46,7 +51,7 @@ export function candidateSource(candidate: SystemCandidate): string {
 }
 
 export function candidateStatus(candidate: SystemCandidate): string {
-  return 'status' in candidate ? candidate.status : candidate.operationalStatus
+  return candidate.operationalStatus
 }
 
 export function candidateRegionTimeGroup(candidate: SystemCandidate): string {
@@ -61,6 +66,7 @@ export function candidateCloudRegion(candidate: SystemCandidate): string {
 }
 
 export function candidateAvailability(candidate: SystemCandidate): string {
+  if (!('sid' in candidate) && 'machineId' in candidate) return reusedInternalAvailabilityStatusForPurpose(candidate.purpose)
   if ('availability' in candidate && candidate.availability) return candidate.availability
   if ('allocationStatus' in candidate && candidate.allocationStatus) return String(candidate.allocationStatus)
   return ''
@@ -103,6 +109,11 @@ function candidateSearchText(candidate: SystemCandidate): string {
 }
 
 function candidateFilterOptions(candidates: SystemCandidate[], filterKey: SystemCandidateFilterKey): string[] {
+  if (filterKey === 'regionTimeGroup') {
+    return ALLOCATION_REGION_FILTER_OPTIONS.filter((region) => BUSINESS_REGION_OPTIONS.includes(region))
+  }
+  if (filterKey === 'hostingType') return HOSTING_OPTIONS
+  if (filterKey === 'cloudPlatform') return CLOUD_PLATFORM_OPTIONS
   return Array.from(new Set(candidates.map((candidate) => candidateFilterValue(candidate, filterKey)).filter(Boolean)))
     .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
 }
@@ -179,9 +190,9 @@ export function SystemCandidateDialog({
 }: SystemCandidateDialogProps) {
   const candidateHeaders = [
     'Select',
-    ...(isReusedInternalMode ? ['MID'] : ['ID', 'MID']),
+    ...(isReusedInternalMode ? ['MID'] : ['SID', 'MID']),
     'Source',
-    'Status',
+    'Operational Status',
     'Used in Region',
     'Country',
     'Product',
@@ -328,11 +339,16 @@ export function SystemCandidateDialog({
                     </thead>
                     <tbody>
                       {visibleCandidates.map((candidate) => (
-                        <tr key={candidate.id} className="hover:bg-sf-surface-alt">
+                        <tr
+                          key={candidate.id}
+                          className="hover:bg-sf-surface-alt"
+                          data-testid={`system-candidate-${candidatePrimaryId(candidate) || candidate.id}`}
+                        >
                           <td className="border border-sf-border px-1.5 py-1">
                             <input
                               type={allowMultiple ? 'checkbox' : 'radio'}
                               name={allowMultiple ? undefined : 'system-candidate-selection'}
+                              data-testid={`system-candidate-select-${candidatePrimaryId(candidate) || candidate.id}`}
                               checked={selectedCandidateIds.includes(candidate.id)}
                               onChange={(event) => onToggleCandidate(candidate.id, event.target.checked)}
                             />
@@ -348,7 +364,7 @@ export function SystemCandidateDialog({
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateSource(candidate)}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidateStatus(candidate)}</td>
                           <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{candidateRegionTimeGroup(candidate) || '-'}</td>
-                          <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? candidate.country || '-' : '-'}</td>
+                          <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sf-text">{'country' in candidate ? countryDisplayName(candidate.country) || '-' : '-'}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.productType || '-'}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.hostingType || '-'}</td>
                           <td className="border border-sf-border px-1.5 py-1 text-sf-text">{candidate.cloudPlatform || '-'}</td>

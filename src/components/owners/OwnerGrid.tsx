@@ -1,16 +1,20 @@
-import { Edit2, Plus, Save, Trash2, X } from 'lucide-react'
+import { Plus, Save, Trash2, X } from 'lucide-react'
 import { createOwnerRecord, type OwnerRecord } from '@/domain/owners'
 import {
   EditableChildObjectActionButton,
+  editableChildObjectActionButtonClassName,
   editableChildObjectPermissions,
   useEditableChildObjectEditor,
 } from '@/components/child-objects'
-import { TableSection } from '@/components/ui'
+import { EDIT_ACTION_LABEL, EditActionIcon, TableSection } from '@/components/ui'
 
 interface OwnerGridProps {
   owners: OwnerRecord[]
   onChange: (owners: OwnerRecord[]) => void
   readOnly?: boolean
+  maxOwners?: number
+  addLabel?: string
+  replaceOnly?: boolean
 }
 
 const OWNER_COLUMNS: Array<{ key: keyof OwnerRecord; label: string; widthClassName: string }> = [
@@ -34,13 +38,15 @@ function hasMeaningfulOwnerValue(owner: OwnerRecord): boolean {
   return Object.values(normalizedOwner(owner)).some(Boolean)
 }
 
-export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps) {
+export function OwnerGrid({ owners, onChange, readOnly = false, maxOwners, addLabel = 'Add owner', replaceOnly = false }: OwnerGridProps) {
   const editor = useEditableChildObjectEditor<OwnerRecord>()
   const permissions = editableChildObjectPermissions({ readOnly })
+  const currentOwners = typeof maxOwners === 'number' ? owners.slice(0, maxOwners) : owners
   const renderedOwners = [
-    ...owners,
-    ...editor.newDrafts.filter((draft) => !owners.some((owner) => owner.id === draft.id)),
+    ...currentOwners,
+    ...editor.newDrafts.filter((draft) => !currentOwners.some((owner) => owner.id === draft.id)),
   ]
+  const canAddOwner = permissions.canAdd && (typeof maxOwners !== 'number' || currentOwners.length + editor.newDrafts.length < maxOwners)
 
   function addOwner() {
     editor.beginAdd(createOwnerRecord())
@@ -53,9 +59,9 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
       commit: (draft) => {
         const committedOwner = { ...draft }
         onChange(
-          owners.some((owner) => owner.id === draft.id)
-            ? owners.map((owner) => (owner.id === draft.id ? committedOwner : owner))
-            : [...owners, committedOwner],
+          currentOwners.some((owner) => owner.id === draft.id)
+            ? currentOwners.map((owner) => (owner.id === draft.id ? committedOwner : owner)).slice(0, maxOwners)
+            : [...(replaceOnly ? [] : currentOwners), committedOwner].slice(0, maxOwners),
         )
       },
       successMessage: 'Owner saved.',
@@ -79,19 +85,19 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
   function deleteOwner(id: string) {
     editor.commitDelete(id, {
       confirmMessage: 'Delete this Owner record?\n\nThis change will be saved immediately and cannot be undone.',
-      commit: () => onChange(owners.filter((owner) => owner.id !== id)),
+      commit: () => onChange(currentOwners.filter((owner) => owner.id !== id)),
       successMessage: 'Owner deleted.',
     })
   }
 
-  const actions = permissions.canAdd ? (
+  const actions = canAddOwner ? (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border border-sf-border bg-white px-3 py-1.5 text-sm font-semibold hover:bg-sf-surface-alt"
+      className={editableChildObjectActionButtonClassName()}
       onClick={addOwner}
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
-      Add owner
+      {addLabel}
     </button>
   ) : null
 
@@ -163,9 +169,8 @@ export function OwnerGrid({ owners, onChange, readOnly = false }: OwnerGridProps
                         ) : (
                           <>
                             {permissions.canEdit ? (
-                              <EditableChildObjectActionButton onClick={() => editor.beginEdit(owner)}>
-                                <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
-                                Edit
+                              <EditableChildObjectActionButton title={EDIT_ACTION_LABEL} ariaLabel={EDIT_ACTION_LABEL} onClick={() => editor.beginEdit(owner)}>
+                                <EditActionIcon />
                               </EditableChildObjectActionButton>
                             ) : null}
                             {permissions.canDelete ? (

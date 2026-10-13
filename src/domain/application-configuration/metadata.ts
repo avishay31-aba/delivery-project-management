@@ -50,9 +50,6 @@ export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFi
     inputType: 'multiselect',
     options: ['Face Detection', 'OCR', 'Object Detection', 'Reverse Face', 'Landmark', 'Video Analysis', 'CoAnalyst'],
   },
-  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
-  { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
-  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
   {
     key: 'additionalFeatures',
     configKey: 'additionalFeatures',
@@ -62,6 +59,9 @@ export const TENANT_APPLICATION_CONFIGURATION_FIELDS: ApplicationConfigurationFi
     inputType: 'multiselect',
     options: ['SSO', '2FA', 'Export to PDF', 'Enhanced Search', 'Post Translation', 'Advanced Search'],
   },
+  { key: 'apiEnabled', configKey: 'apiEnabled', label: 'API Enable', group: 'API', editable: true, inputType: 'picklist', options: YES_NO_OPTIONS },
+  { key: 'apiDailyQty', configKey: 'apiDailyQty', label: 'API Daily Qty', group: 'API', editable: true, inputType: 'integer' },
+  { key: 'apiMonthlyQty', configKey: 'apiMonthlyQty', label: 'API Monthly Qty', group: 'API', editable: true, inputType: 'integer' },
 ]
 
 export const APPLICATION_CONFIGURATION_FIELDS = TENANT_APPLICATION_CONFIGURATION_FIELDS

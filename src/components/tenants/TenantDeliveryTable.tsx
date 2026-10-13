@@ -7,6 +7,7 @@ import { currentOrHistoricalSystemForTenant, effectiveTenantOperationalMode, ten
 import { systemReference, tenantReference } from '@/domain/business-reference'
 import { BusinessIdLink, BusinessObjectLink, OperationalStatusIcon, RecordChangeBadge, WarrantyStatusPresentation } from '@/components/ui'
 import { ConfigurationColumnHeaders, ConfigurationValueCells } from '@/components/configuration'
+import { countryDisplayName } from '@/domain/geographic-configuration'
 
 function OperationalStatusBadge({ value }: { value: string }) {
   return (
@@ -14,6 +15,14 @@ function OperationalStatusBadge({ value }: { value: string }) {
       <OperationalStatusIcon status={value} showLabel className="h-5 w-5 stroke-[3]" />
     </span>
   )
+}
+
+function tenantRelationshipValue(
+  tenant: Tenant,
+  system: System | undefined,
+  key: 'hostingType' | 'cloudPlatform',
+): string {
+  return tenant[key] || system?.[key] || '-'
 }
 
 interface TenantDeliveryTableProps {
@@ -62,7 +71,9 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
               'Country',
               'Time Group',
               'Operational Status',
-              'Environment',
+              'Type',
+              'Hosting',
+              'Cloud Platform',
             ].map((label) => (
               <th key={label} className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm font-semibold text-sf-text">
                 {label}
@@ -87,7 +98,11 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                 ) : null}
                 {showWarrantyStatusColumn ? (
                   <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
-                    <WarrantyStatusPresentation status={tenantDerivedWarrantyContractStatus(tenant).visualStatus} />
+                    <WarrantyStatusPresentation
+                      status={tenantDerivedWarrantyContractStatus(tenant).visualStatus}
+                      label={tenantDerivedWarrantyContractStatus(tenant).label}
+                      tooltip={`Tenant warranty status: ${tenantDerivedWarrantyContractStatus(tenant).label}`}
+                    />
                   </td>
                 ) : null}
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
@@ -104,7 +119,7 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantRequirementIdDisplay(tenant) || '-'}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.accountName}</td>
-                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.country}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{countryDisplayName(tenant.country)}</td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">
                   <span className="inline-flex items-center gap-1">
                     {tenant.timeGroup}
@@ -119,6 +134,8 @@ export function TenantDeliveryTable({ tenants, systems, emptyText, actions, syst
                   <OperationalStatusBadge value={effectiveTenantOperationalMode(tenant, system)} />
                 </td>
                 <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenant.tenantFormType ?? tenant.tenantType}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantRelationshipValue(tenant, system, 'hostingType')}</td>
+                <td className="whitespace-nowrap border border-sf-border px-1.5 py-1 text-sm text-sf-text">{tenantRelationshipValue(tenant, system, 'cloudPlatform')}</td>
                 <ConfigurationValueCells record={configurationRecord as unknown as Record<string, unknown>} fields={TENANT_CONFIGURATION_FIELDS} />
               </tr>
             )

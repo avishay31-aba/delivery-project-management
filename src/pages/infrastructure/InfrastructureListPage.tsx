@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CalendarDays, Table2 } from 'lucide-react'
-import { DataDashboard } from '@/components/dashboard'
+import { DataDashboard, TableCalendarViewToggle, type TableCalendarViewMode } from '@/components/dashboard'
 import { InfrastructureMaintenanceCalendar } from '@/components/maintenance/InfrastructureMaintenanceCalendar'
 import { PageHeader, WorkspaceFrame, WorkspaceTabs } from '@/components/record'
 import { createInfrastructureColumns, createInfrastructureMaintenanceTaskColumns } from '@/config/infrastructure-columns'
@@ -48,7 +47,7 @@ export function InfrastructureListPage() {
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}`
   const [activeTab, setActiveTab] = useState<InfrastructureDashboardTab>('allItems')
-  const [maintenanceViewMode, setMaintenanceViewMode] = useState<'table' | 'calendar'>('table')
+  const [maintenanceViewMode, setMaintenanceViewMode] = useState<TableCalendarViewMode>('table')
   const infrastructureItems = useAppStore((state) => state.infrastructureItems)
   const accounts = useAppStore((state) => state.accounts)
   const referenceData = useAppStore((state) => state.referenceData)
@@ -109,7 +108,7 @@ export function InfrastructureListPage() {
               toolbar={
                 <button
                   type="button"
-                  className="rounded border border-sf-border bg-white px-3 py-1 text-sm"
+                  className="sf-section-action-button"
                   onClick={() => {
                     navigate('/infrastructure/new', { state: { returnTo, mode: 'edit', newRecordSession: true } })
                   }}
@@ -153,26 +152,7 @@ export function InfrastructureListPage() {
               initialSorting={[{ id: 'startDate', desc: true }]}
               getRowClassName={maintenanceRowClassName}
               contentModeControls={
-                <div className="inline-flex items-center gap-1">
-                  <button
-                    type="button"
-                    className={maintenanceViewMode === 'table' ? 'rounded border border-sf-brand bg-sf-brand px-2 py-1 text-white' : 'rounded border border-sf-border bg-white px-2 py-1 text-sf-text hover:bg-sf-surface-alt'}
-                    aria-label="Table view"
-                    title="Table view"
-                    onClick={() => setMaintenanceViewMode('table')}
-                  >
-                    <Table2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className={maintenanceViewMode === 'calendar' ? 'rounded border border-sf-brand bg-sf-brand px-2 py-1 text-white' : 'rounded border border-sf-border bg-white px-2 py-1 text-sf-text hover:bg-sf-surface-alt'}
-                    aria-label="Calendar view"
-                    title="Calendar view"
-                    onClick={() => setMaintenanceViewMode('calendar')}
-                  >
-                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
+                <TableCalendarViewToggle value={maintenanceViewMode} onChange={setMaintenanceViewMode} />
               }
               renderAlternateContent={maintenanceViewMode === 'calendar'
                 ? (filteredRows) => (

@@ -1,6 +1,6 @@
 import { DateTimeValue } from '@/components/date-time/DateTimeValue'
 import { configurationColumnGroupLabel } from '@/components/configuration'
-import { BusinessIdLink, RecordHistorySection, type RecordHistoryColumn } from '@/components/ui'
+import { BusinessIdLink, RecordHistorySection, TableSection, type RecordHistoryColumn } from '@/components/ui'
 import type {
   ApplicationConfigurationFieldMetadata,
   ApplicationConfigurationHistoryRecord,
@@ -11,6 +11,10 @@ interface ConfigurationHistorySectionProps<TRecord extends ApplicationConfigurat
   fields: ApplicationConfigurationFieldMetadata[]
   emptyText: string
   tidValue: (record: TRecord) => string
+  pidValue?: (record: TRecord) => string
+  sidValue?: (record: TRecord) => string
+  showProjectSystemContext?: boolean
+  title?: string
 }
 
 function textValue(value: unknown): string {
@@ -39,6 +43,10 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
   fields,
   emptyText,
   tidValue,
+  pidValue = () => '',
+  sidValue = () => '',
+  showProjectSystemContext = false,
+  title = 'Configuration History',
 }: ConfigurationHistorySectionProps<TRecord>) {
   const orderedRecords = [...records].sort(defaultConfigurationHistorySort)
   const columns: Array<RecordHistoryColumn<TRecord>> = [
@@ -54,6 +62,23 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
       render: (record) => <DateTimeValue value={record.timestamp} semanticType="datetime" />,
       sortValue: (record) => record.timestamp,
     },
+    ...(showProjectSystemContext ? [
+      {
+        key: 'pid',
+        label: 'PID',
+        render: (record: TRecord) => pidValue(record) || '-',
+        sortValue: pidValue,
+      },
+      {
+        key: 'sid',
+        label: 'SID',
+        render: (record: TRecord) => {
+          const sid = sidValue(record)
+          return sid ? <BusinessIdLink objectType="SYSTEM" businessId={sid}>{sid}</BusinessIdLink> : '-'
+        },
+        sortValue: sidValue,
+      },
+    ] satisfies Array<RecordHistoryColumn<TRecord>> : []),
     {
       key: 'tid',
       label: 'TID',
@@ -81,25 +106,29 @@ export function ConfigurationHistorySection<TRecord extends ApplicationConfigura
   ]
 
   return (
-    <RecordHistorySection
-      records={orderedRecords}
-      columns={columns}
-      getRowKey={(record) => record.id}
-      getSearchText={(record) => [
-        record.recordId,
-        record.timestamp,
-        tidValue(record),
-        record.recordedBy,
-        ...fields.map((field) => configurationValue(record, field)),
-      ].join(' ')}
-      emptyText={emptyText}
-      filteredEmptyText="No configuration history matches the current filters."
-      enableSearch={false}
-      searchLabel="Search / Filter"
-      searchPlaceholder="Search Configuration History"
-      recordsPerPageLabel="Records per page"
-      logicalTableType="configuration-history"
-      logicalTableLabel="Configuration History"
-    />
+    <TableSection title={title}>
+      <RecordHistorySection
+        records={orderedRecords}
+        columns={columns}
+        getRowKey={(record) => record.id}
+        getSearchText={(record) => [
+          record.recordId,
+          record.timestamp,
+          showProjectSystemContext ? pidValue(record) : '',
+          showProjectSystemContext ? sidValue(record) : '',
+          tidValue(record),
+          record.recordedBy,
+          ...fields.map((field) => configurationValue(record, field)),
+        ].join(' ')}
+        emptyText={emptyText}
+        filteredEmptyText="No configuration history matches the current filters."
+        enableSearch={false}
+        searchLabel="Search / Filter"
+        searchPlaceholder="Search Configuration History"
+        recordsPerPageLabel="Records per page"
+        logicalTableType="configuration-history"
+        logicalTableLabel="Configuration History"
+      />
+    </TableSection>
   )
 }

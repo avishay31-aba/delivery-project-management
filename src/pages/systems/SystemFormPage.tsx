@@ -27,6 +27,7 @@ export function SystemFormPage() {
     const records = [...reusedInternalSystems, ...reusedAllocatedRecords]
     return (
       <InventoryForm
+        key={record.id}
         record={record}
         records={records}
         metadata={reusedInternalSystemMetadata}
@@ -41,6 +42,7 @@ export function SystemFormPage() {
   const records = [...productionSystemInventory, ...productionAllocatedRecords]
   return (
     <InventoryForm
+      key={record?.id ?? sid}
       record={record}
       records={records}
       metadata={productionSystemMetadata}

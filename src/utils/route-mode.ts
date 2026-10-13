@@ -7,7 +7,7 @@ export function routeMode(location: Location): string | null {
 }
 
 export function isRouteViewMode(location: Location): boolean {
-  return routeMode(location) === 'view'
+  return routeMode(location) !== 'edit'
 }
 
 export function isCreateRouteParam(value: string | null | undefined): boolean {

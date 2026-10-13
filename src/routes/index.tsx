@@ -19,8 +19,14 @@ import { RequirementCoverageDashboardPage } from '@/pages/requirement-coverage/R
 import { RenewalWorkQueuePage } from '@/pages/renewals/RenewalWorkQueuePage'
 import { ActivityLogDashboardPage } from '@/pages/activity-log/ActivityLogDashboardPage'
 import { TimeGroupSettingsPage } from '@/pages/admin/TimeGroupSettingsPage'
+import { RolesPermissionsPage } from '@/pages/admin/RolesPermissionsPage'
+import { CountrySettingsPage, UsStateSettingsPage } from '@/pages/admin/GeographicConfigurationPages'
+import { StorageDiagnosticsPage } from '@/pages/admin/StorageDiagnosticsPage'
 import { InfrastructureListPage } from '@/pages/infrastructure/InfrastructureListPage'
 import { InfrastructureFormPage } from '@/pages/infrastructure/InfrastructureFormPage'
+import { NotificationsAlertsWorkspacePage } from '@/pages/notifications/NotificationsAlertsPage'
+import { RemindersPage } from '@/pages/reminders/RemindersPage'
+import { VersionUpgradeSchedulerPage } from '@/pages/version-upgrades/VersionUpgradeSchedulerPage'
 
 export const router = createHashRouter([
   {
@@ -53,7 +59,18 @@ export const router = createHashRouter([
       { path: 'renewals', element: <RenewalWorkQueuePage /> },
       { path: 'requirement-coverage', element: <RequirementCoverageDashboardPage /> },
       { path: 'activity-log', element: <ActivityLogDashboardPage /> },
+      { path: 'notifications-alerts', element: <Navigate to="/notifications-alerts/alerts" replace /> },
+      { path: 'notifications-alerts/alerts', element: <NotificationsAlertsWorkspacePage /> },
+      { path: 'notifications-alerts/notifications', element: <NotificationsAlertsWorkspacePage /> },
+      { path: 'reminders', element: <RemindersPage /> },
+      { path: 'version-upgrades', element: <VersionUpgradeSchedulerPage /> },
+      { path: 'version-upgrades/new', element: <VersionUpgradeSchedulerPage /> },
+      { path: 'version-upgrades/:id', element: <VersionUpgradeSchedulerPage /> },
+      { path: 'admin/roles-permissions', element: <RolesPermissionsPage /> },
+      { path: 'admin/countries', element: <CountrySettingsPage /> },
+      { path: 'admin/us-states', element: <UsStateSettingsPage /> },
       { path: 'admin/time-groups', element: <TimeGroupSettingsPage /> },
+      { path: 'admin/storage-diagnostics', element: <StorageDiagnosticsPage /> },
       { path: 'infrastructure', element: <InfrastructureListPage /> },
       { path: 'infrastructure/:infrastructureId', element: <InfrastructureFormPage /> },
     ],
