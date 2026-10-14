@@ -16,6 +16,7 @@ const APP_STATE_KEYED_DELTA_FORMAT = 'dpm-keyed-seed-delta-v1'
 export const APP_STATE_COMPRESSED_KEYED_DELTA_FORMAT = 'dpm-compressed-keyed-seed-delta-v1'
 const LEGACY_FULL_STATE_MAX_SAFE_CHARS = 4_500_000
 const CROSS_TAB_NOTIFICATION_STORAGE_KEY = 'delivery-erp-state-sync-notification'
+const LEGACY_MIGRATION_TEMP_STORAGE_KEY = 'delivery-erp-legacy-state-migration-v1'
 const STALE_NOTIFICATION_MAX_SAFE_CHARS = 100_000
 
 const APP_DATA_COLLECTION_KEYS = [
@@ -175,6 +176,7 @@ function storageKeys(storage: KeyValuePersistenceAdapter): string[] {
 function isDpmStorageKey(key: string): boolean {
   return key === APP_STATE_STORAGE_KEY ||
     key === CROSS_TAB_NOTIFICATION_STORAGE_KEY ||
+    key === LEGACY_MIGRATION_TEMP_STORAGE_KEY ||
     key.startsWith('dpm-') ||
     key.startsWith('dpm.') ||
     key.startsWith('delivery-erp')
@@ -693,6 +695,82 @@ function expandAppDataStateFromStorage(storedState: SeedDeltaAppDataState): AppD
   return expanded
 }
 
+function serializeCompressedAppDataState(state: AppDataState): string {
+  const payload = normalizeAppDataState({
+    ...state,
+    lastPersistedAt: state.lastPersistedAt ?? new Date().toISOString(),
+  })
+  return stringifyJson(compressedKeyedSeedDeltaAppDataState(compactAppDataStateForStorage(payload)))
+}
+
+function decodeCompressedAppDataState(raw: string): AppDataState | null {
+  try {
+    const parsed = parseJson(raw)
+    if (!isCompressedKeyedSeedDeltaAppDataState(parsed)) return null
+    const decoded = seedDeltaAppDataStateFromCompressedKeyed(parsed)
+    return decoded ? normalizeAppDataState(expandAppDataStateFromStorage(decoded)) : null
+  } catch {
+    return null
+  }
+}
+
+function migrateLegacyFullStateToCompressedStorage(
+  raw: string,
+  parsed: AppDataState,
+  storage: KeyValuePersistenceAdapter,
+): AppDataState | null {
+  const legacyState = normalizeAppDataState(parsed)
+  const migratedRaw = serializeCompressedAppDataState(legacyState)
+  const usageBefore = captureStorageDiagnosticSnapshot(storage, APP_STATE_COMPRESSED_KEYED_DELTA_FORMAT)
+
+  try {
+    storage.setItem(LEGACY_MIGRATION_TEMP_STORAGE_KEY, migratedRaw)
+    const tempRaw = storage.getItem(LEGACY_MIGRATION_TEMP_STORAGE_KEY)
+    if (tempRaw !== migratedRaw || !decodeCompressedAppDataState(tempRaw)) {
+      throw new Error('Legacy state migration verification failed before replacing the original payload.')
+    }
+
+    storage.setItem(APP_STATE_STORAGE_KEY, migratedRaw)
+    const committedRaw = storage.getItem(APP_STATE_STORAGE_KEY)
+    const committedState = committedRaw ? decodeCompressedAppDataState(committedRaw) : null
+    if (committedRaw !== migratedRaw || !committedState) {
+      try {
+        storage.setItem(APP_STATE_STORAGE_KEY, raw)
+      } catch {
+        // The original oversized payload remains recoverable only when the browser accepts restoring it.
+      }
+      throw new Error('Legacy state migration verification failed after writing the compact payload.')
+    }
+
+    storage.removeItem(LEGACY_MIGRATION_TEMP_STORAGE_KEY)
+    recordPersistenceWriteDiagnostic(buildPersistenceWriteDiagnostic(
+      'legacy-full-state-migration-succeeded',
+      migratedRaw,
+      APP_STATE_COMPRESSED_KEYED_DELTA_FORMAT,
+      storage,
+      { usageBefore },
+    ))
+    cachedRawAppDataState = { raw: migratedRaw, state: committedState }
+    return committedState
+  } catch (error) {
+    try {
+      storage.removeItem(LEGACY_MIGRATION_TEMP_STORAGE_KEY)
+    } catch {
+      // Best effort cleanup only; preserving dpm-mvp-v1 is the critical safety condition.
+    }
+    recordPersistenceWriteDiagnostic(buildPersistenceWriteDiagnostic(
+      'legacy-full-state-migration-failed-preserved-original',
+      migratedRaw,
+      APP_STATE_COMPRESSED_KEYED_DELTA_FORMAT,
+      storage,
+      { usageBefore, error },
+    ))
+    console.error('Delivery ERP legacy browser data migration failed. The original dpm-mvp-v1 payload was preserved.', error)
+    cachedRawAppDataState = { raw, state: legacyState }
+    return legacyState
+  }
+}
+
 export function loadAppDataStateFromStorage(
   storage: KeyValuePersistenceAdapter = localStoragePersistenceAdapter,
 ): AppDataState | null {
@@ -724,12 +802,10 @@ export function loadAppDataStateFromStorage(
     if (typeof parsed.version !== 'number' || !Array.isArray(parsed.projects)) {
       return null
     }
-    if (raw.length > LEGACY_FULL_STATE_MAX_SAFE_CHARS) {
-      const diagnostics = removeObsoleteDpmStorage(storage)
-      logStorageDiagnostics('startup-obsolete-legacy-invalidated', diagnostics, 0)
-      return null
-    }
     const state = normalizeAppDataState(parsed)
+    if (raw.length > LEGACY_FULL_STATE_MAX_SAFE_CHARS) {
+      return migrateLegacyFullStateToCompressedStorage(raw, state, storage)
+    }
     cachedRawAppDataState = { raw, state }
     return state
   } catch {

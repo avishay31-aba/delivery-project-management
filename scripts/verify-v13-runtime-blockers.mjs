@@ -87,11 +87,14 @@ assert(
 assert(
   repositorySource.includes('LEGACY_FULL_STATE_MAX_SAFE_CHARS') &&
     repositorySource.includes('CROSS_TAB_NOTIFICATION_STORAGE_KEY') &&
+    repositorySource.includes('LEGACY_MIGRATION_TEMP_STORAGE_KEY') &&
     repositorySource.includes('inspectDpmStorage') &&
     repositorySource.includes('quota-before-retry') &&
     repositorySource.includes('removeObsoleteDpmStorage(storage)') &&
+    repositorySource.includes('migrateLegacyFullStateToCompressedStorage') &&
+    repositorySource.includes('decodeCompressedAppDataState') &&
     repositorySource.includes('raw.length > LEGACY_FULL_STATE_MAX_SAFE_CHARS'),
-  'Oversized legacy full-state browser payloads must be invalidated before they can be rebased into current compact delta persistence.',
+  'Oversized valid legacy full-state browser payloads must migrate transactionally into current compact delta persistence.',
 )
 
 assert(
@@ -129,10 +132,14 @@ try {
   const oldFullStorage = storageAdapter(oldFullMap)
   oldFullStorage.setItem(repository.APP_STATE_STORAGE_KEY, JSON.stringify({ ...seedState, lastPersistedAt: '2026-09-20T00:00:00.000Z' }))
   const oldFullBefore = payloadLength(oldFullMap, repository.APP_STATE_STORAGE_KEY)
-  const invalidatedOldFull = repository.loadAppDataStateFromStorage(oldFullStorage)
-  assert(oldFullBefore > 4_500_000, 'Simulated old full browser payload must exceed the safety threshold.')
-  assert(invalidatedOldFull === null, 'Oversized legacy full browser payload must not hydrate as current app state.')
-  assert(payloadLength(oldFullMap, repository.APP_STATE_STORAGE_KEY) === 0, 'Oversized legacy full browser payload must be removed after invalidation.')
+  const migratedOldFull = repository.loadAppDataStateFromStorage(oldFullStorage)
+  const oldFullAfter = payloadLength(oldFullMap, repository.APP_STATE_STORAGE_KEY)
+  const oldFullAfterRaw = oldFullMap.get(repository.APP_STATE_STORAGE_KEY) ?? ''
+  assert(oldFullBefore > 4_500_000, 'Simulated old full browser payload must exceed the previous safety threshold.')
+  assert(migratedOldFull?.projects?.length === seedState.projects.length, 'Oversized valid legacy full browser payload must hydrate without data loss.')
+  assert(oldFullAfter > 0 && oldFullAfter < oldFullBefore, 'Oversized valid legacy full browser payload must be compacted instead of removed.')
+  assert(oldFullAfterRaw.includes('dpm-compressed-keyed-seed-delta-v1'), 'Migrated oversized legacy payload must use compressed keyed delta format.')
+  assert(!oldFullMap.has('delivery-erp-legacy-state-migration-v1'), 'Temporary legacy migration payload must be cleaned up after verified migration.')
 
   const staleNotificationMap = new Map()
   const staleNotificationStorage = storageAdapter(staleNotificationMap, 4_500_000)
@@ -296,7 +303,8 @@ try {
       freshProjectAfterSecondSave: projectAfterSecondSave,
       p000390Before: p390Before,
       p000390After: p390After,
-      oldFullBeforeInvalidation: oldFullBefore,
+      oldFullBeforeMigration: oldFullBefore,
+      oldFullAfterMigration: oldFullAfter,
     },
     storageProjection: {
       storedCurrentStateFromChromeQa: 364720,
